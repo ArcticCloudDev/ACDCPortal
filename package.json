@@ -1,0 +1,16 @@
+{
+  "name": "acdc-portal",
+  "version": "1.0.0",
+  "description": "ACDC Team Registration Portal",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["azure", "static-web-apps", "entra", "otp"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.0.0",
+    "uuid": "^11.0.0"
+  }
+}

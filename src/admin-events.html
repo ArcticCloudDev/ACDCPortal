@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Events - ACDC Committee</title>
+    <link rel="stylesheet" href="css/admin-styles.css">
+    <style>
+        /* Page-specific styles */
+        .main-content {
+            padding: 24px 40px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .panel-title { font-size: 0.9rem; font-weight: 600; color: var(--admin-sidebar); }
+        .panel-body { padding: 0; }
+        .panel-body.padded { padding: 20px; }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+
+        .data-table th {
+            text-align: left;
+            padding: 10px 16px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--admin-text-muted);
+            background: var(--admin-bg);
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--admin-border);
+            font-size: 0.85rem;
+        }
+
+        .data-table tbody tr:hover { background: var(--admin-bg); }
+        .data-table tbody tr:last-child td { border-bottom: none; }
+
+        .badge {
+            display: inline-flex;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        /* Status badges */
+        .badge.draft { background: #f1f5f9; color: #475569; }
+        .badge.waitlist { background: #fef3c7; color: #92400e; }
+        .badge.registration { background: #dbeafe; color: #1d4ed8; }
+        .badge.live { background: #d1fae5; color: #065f46; }
+        .badge.completed { background: #e2e8f0; color: #64748b; }
+        
+        /* Type badges */
+        .badge.team { background: #ede9fe; color: #7c3aed; }
+        .badge.single { background: #fce7f3; color: #be185d; }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid var(--admin-border);
+            background: white;
+            color: var(--admin-text);
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-sm:hover { background: var(--admin-bg); }
+        .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
+        .btn-sm.primary:hover { background: #2563eb; }
+        .btn-sm.danger { background: var(--admin-danger); border-color: var(--admin-danger); color: white; }
+        .btn-sm.danger:hover { background: #dc2626; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.85rem; color: var(--admin-text); }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--admin-border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--admin-primary);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+        }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .form-group .help-text { font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px; }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .checkbox-row input { width: auto; }
+        .checkbox-row label { margin: 0; font-weight: normal; }
+
+        .form-actions { display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--admin-border); }
+
+        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
+
+        .access-denied {
+            max-width: 400px;
+            margin: 100px auto;
+            margin-left: calc(220px + 100px);
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+        }
+
+        /* Status workflow */
+        .status-section {
+            background: var(--admin-bg);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .status-section h3 {
+            margin: 0 0 12px 0;
+            font-size: 0.9rem;
+            color: var(--admin-sidebar);
+        }
+
+        .status-workflow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .status-step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-btn {
+            padding: 8px 16px;
+            border: 2px solid var(--admin-border);
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.15s;
+            opacity: 0.5;
+        }
+
+        .status-btn:hover:not(:disabled) { opacity: 0.8; }
+        .status-btn.current { opacity: 1; border-color: var(--admin-primary); background: #eff6ff; }
+        .status-btn.available { opacity: 1; cursor: pointer; }
+        .status-btn:disabled { cursor: not-allowed; }
+
+        .status-btn.draft { border-color: #94a3b8; }
+        .status-btn.draft.current { background: #f1f5f9; border-color: #475569; }
+        .status-btn.waitlist { border-color: #fbbf24; }
+        .status-btn.waitlist.current { background: #fef3c7; border-color: #d97706; }
+        .status-btn.registration { border-color: #60a5fa; }
+        .status-btn.registration.current { background: #dbeafe; border-color: #2563eb; }
+        .status-btn.live { border-color: #34d399; }
+        .status-btn.live.current { background: #d1fae5; border-color: #059669; }
+
+        .status-arrow {
+            color: var(--admin-text-muted);
+            font-size: 1rem;
+        }
+
+        .team-fields { display: none; }
+        .team-fields.visible { display: block; }
+
+        /* Full-width form layout */
+        .form-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+        }
+
+        .form-column {
+            min-width: 0;
+        }
+
+        .form-column h3 {
+            margin: 0 0 16px 0;
+            font-size: 0.9rem;
+            color: var(--admin-sidebar);
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        /* Radio buttons styling */
+        .radio-group {
+            display: flex;
+            gap: 20px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border: 2px solid var(--admin-border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .radio-option:hover { border-color: var(--admin-primary); }
+        .radio-option.selected { border-color: var(--admin-primary); background: #eff6ff; }
+        .radio-option input { display: none; }
+        .radio-option .icon { font-size: 1.2rem; }
+        .radio-option .label { font-weight: 500; }
+        .radio-option .desc { font-size: 0.75rem; color: var(--admin-text-muted); }
+
+        /* Tabs */
+        .tabs-container {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid var(--admin-border);
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--admin-text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-bottom: -2px;
+        }
+
+        .tab-btn:hover:not(:disabled) {
+            color: var(--admin-text);
+            background: var(--admin-bg);
+        }
+
+        .tab-btn.active {
+            color: var(--admin-primary);
+            border-bottom-color: var(--admin-primary);
+            background: transparent;
+        }
+
+        .tab-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.4;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        /* Committee/Judges tables */
+        .invite-section {
+            margin-bottom: 24px;
+        }
+
+        .invite-form {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .invite-form .form-group {
+            flex: 1;
+            margin: 0;
+        }
+
+        .members-list {
+            margin-top: 16px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1000px) {
+            .form-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <div id="loading" style="text-align: center; padding: 60px;">Loading...</div>
+
+            <div id="admin-content" class="hidden">
+                <!-- List View -->
+                <div id="events-list-view">
+                    <div class="page-header">
+                        <h1 class="page-title">Events</h1>
+                        <button id="create-event-btn" class="btn-sm primary">+ Create Event</button>
+                    </div>
+                    <div class="panel">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Event Name</th>
+                                    <th>Type</th>
+                                    <th>Dates</th>
+                                    <th>Location</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="events-table-body">
+                                <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Form View -->
+                <div id="event-form-view" class="hidden">
+                    <div class="page-header">
+                        <h1 class="page-title" id="form-title">Create Event</h1>
+                        <button id="back-to-list" class="btn-sm">← Back</button>
+                    </div>
+
+                    <!-- Status Workflow (only shown when editing) -->
+                    <div id="status-section" class="status-section hidden">
+                        <h3>Event Status</h3>
+                        <div class="status-workflow">
+                            <div class="status-step">
+                                <button type="button" class="status-btn draft" data-status="draft">📝 Draft</button>
+                            </div>
+                            <span class="status-arrow">→</span>
+                            <div class="status-step">
+                                <button type="button" class="status-btn waitlist" data-status="waitlist">📋 Waiting List</button>
+                            </div>
+                            <span class="status-arrow">→</span>
+                            <div class="status-step">
+                                <button type="button" class="status-btn registration" data-status="registration">✅ Registration</button>
+                            </div>
+                            <span class="status-arrow">→</span>
+                            <div class="status-step">
+                                <button type="button" class="status-btn live" data-status="live">🚀 Live</button>
+                            </div>
+                        </div>
+                        <p class="help-text" id="status-help" style="margin-top: 12px;"></p>
+                    </div>
+
+                    <!-- Tabs Navigation -->
+                    <div class="tabs-container">
+                        <button class="tab-btn active" data-tab="general">📋 General</button>
+                        <button class="tab-btn" data-tab="committee" id="committee-tab-btn">👔 Committee</button>
+                        <button class="tab-btn" data-tab="judges" id="judges-tab-btn">⚖️ Judges</button>
+                    </div>
+
+                    <!-- Tab Panels -->
+                    <!-- General Tab -->
+                    <div class="tab-panel active" id="general-panel">
+                        <div class="panel">
+                            <div class="panel-body padded">
+                                <form id="event-form">
+                                    <input type="hidden" id="event-id">
+                                    <input type="hidden" id="event-status" value="draft">
+                                    
+                                    <div class="form-layout">
+                                    <!-- Left Column: Basic Info -->
+                                    <div class="form-column">
+                                        <h3>📋 Event Details</h3>
+                                        
+                                        <div class="form-group">
+                                            <label>Event Name *</label>
+                                            <input type="text" id="event-name" required placeholder="ACDC 2026">
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label>Description</label>
+                                            <textarea id="event-description" placeholder="Arctic Cloud Developer Challenge..." style="min-height: 100px;"></textarea>
+                                        </div>
+
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label>Start Date *</label>
+                                                <input type="date" id="event-start" required>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>End Date *</label>
+                                                <input type="date" id="event-end" required>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label>Location</label>
+                                            <input type="text" id="event-location" placeholder="Soria Moria, Oslo">
+                                        </div>
+                                    </div>
+
+                                    <!-- Right Column: Registration Settings -->
+                                    <div class="form-column">
+                                        <h3>⚙️ Registration Settings</h3>
+
+                                        <div class="form-group">
+                                            <label>Registration Type *</label>
+                                            <div class="radio-group">
+                                                <label class="radio-option selected" data-value="team">
+                                                    <input type="radio" name="registration-type" value="team" checked>
+                                                    <span class="icon">👥</span>
+                                                    <div>
+                                                        <div class="label">Team</div>
+                                                        <div class="desc">Register as teams</div>
+                                                    </div>
+                                                </label>
+                                                <label class="radio-option" data-value="single">
+                                                    <input type="radio" name="registration-type" value="single">
+                                                    <span class="icon">👤</span>
+                                                    <div>
+                                                        <div class="label">Single</div>
+                                                        <div class="desc">Individual only</div>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div id="team-fields" class="team-fields visible">
+                                            <div class="form-row">
+                                                <div class="form-group">
+                                                    <label>Min Team Size</label>
+                                                    <input type="number" id="min-team-size" min="1" max="10" value="3">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Max Team Size</label>
+                                                    <input type="number" id="max-team-size" min="1" max="10" value="5">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="submit" class="btn-sm primary" id="save-btn">💾 Save Event</button>
+                                    <button type="button" class="btn-sm" id="cancel-btn">Cancel</button>
+                                    <button type="button" class="btn-sm danger hidden" id="delete-btn" style="margin-left: auto;">🗑️ Delete Event</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Committee Tab -->
+                <div class="tab-panel" id="committee-panel">
+                    <div class="panel">
+                        <div class="panel-body padded">
+                            <div class="invite-section">
+                                <h3>👔 Committee Members</h3>
+                                <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 16px;">
+                                    Invite committee members to the event. They will receive an invitation to register.
+                                </p>
+                                
+                                <div class="invite-form">
+                                    <div class="form-group">
+                                        <label>Email Address</label>
+                                        <input type="email" id="committee-email" placeholder="name@example.com">
+                                    </div>
+                                    <button type="button" id="invite-committee-btn" class="btn-sm primary">✉️ Send Invitation</button>
+                                </div>
+
+                                <div class="members-list">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Email</th>
+                                                <th>Status</th>
+                                                <th>Registered</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="committee-members-body">
+                                            <tr><td colspan="5" class="empty-state">No committee members yet</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Judges Tab -->
+                <div class="tab-panel" id="judges-panel">
+                    <div class="panel">
+                        <div class="panel-body padded">
+                            <div class="invite-section">
+                                <h3>⚖️ Judges</h3>
+                                <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 16px;">
+                                    Invite judges to the event. They will receive an invitation to register.
+                                </p>
+                                
+                                <div class="invite-form">
+                                    <div class="form-group">
+                                        <label>Email Address</label>
+                                        <input type="email" id="judge-email" placeholder="name@example.com">
+                                    </div>
+                                    <button type="button" id="invite-judge-btn" class="btn-sm primary">✉️ Send Invitation</button>
+                                </div>
+
+                                <div class="members-list">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Email</th>
+                                                <th>Status</th>
+                                                <th>Registered</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="judges-members-body">
+                                            <tr><td colspan="5" class="empty-state">No judges yet</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <div id="not-committee" class="access-denied hidden">
+        <h2>⛔ Access Denied</h2>
+        <p style="color: var(--admin-text-muted);">You do not have committee access.</p>
+        <a href="events.html" class="btn-sm primary">Go to Events</a>
+    </div>
+
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin-sidebar.js"></script>
+    <script src="js/admin-events.js"></script>
+</body>
+</html>

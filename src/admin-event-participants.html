@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Participants - ACDC Admin</title>
+    <link rel="stylesheet" href="css/admin-styles.css">
+    <style>
+        /* Page-specific styles */
+        .page-header { margin-bottom: 24px; }
+        .breadcrumb { font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 8px; }
+        .breadcrumb a { color: var(--admin-primary); text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .page-title { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
+
+        /* Event summary card */
+        .event-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+            padding: 16px;
+        }
+
+        .stat-card .label { font-size: 0.75rem; color: var(--admin-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-card .value { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin-top: 4px; }
+        .stat-card .sub { font-size: 0.8rem; color: var(--admin-text-muted); margin-top: 2px; }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group { display: flex; gap: 8px; align-items: center; }
+        .filter-group label { font-size: 0.8rem; color: var(--admin-text-muted); }
+        .filter-group select {
+            padding: 6px 12px;
+            border: 1px solid var(--admin-border);
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            border: 1px solid var(--admin-border);
+            background: white;
+            color: var(--admin-text);
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-sm:hover { background: var(--admin-bg); }
+        .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
+        .btn-sm.primary:hover { background: #2563eb; }
+
+        /* Panel */
+        .panel {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+            margin-bottom: 24px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .panel-title { font-size: 0.9rem; font-weight: 600; color: var(--admin-sidebar); }
+        .panel-body { padding: 0; }
+
+        /* Data table */
+        .data-table { width: 100%; border-collapse: collapse; }
+
+        .data-table th {
+            text-align: left;
+            padding: 10px 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--admin-text-muted);
+            background: var(--admin-bg);
+            border-bottom: 1px solid var(--admin-border);
+            white-space: nowrap;
+        }
+
+        .data-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--admin-border);
+            font-size: 0.85rem;
+            vertical-align: top;
+        }
+
+        .data-table tbody tr:hover { background: #f1f5f9; }
+        .data-table tbody tr:last-child td { border-bottom: none; }
+
+        /* Team grouping */
+        .team-header-row td {
+            background: #e2e8f0;
+            font-weight: 600;
+            color: var(--admin-sidebar);
+            padding: 8px 12px;
+        }
+        .team-header-row:hover td { background: #e2e8f0; }
+
+        .team-member-row td:first-child { padding-left: 28px; }
+
+        /* No team */
+        .no-team-section td { background: #fef3c7; }
+
+        /* Hotel night cells */
+        .night-cell { text-align: center; width: 45px; }
+        .night-cell.checked { color: var(--admin-success); font-weight: 600; }
+        .night-cell.unchecked { color: #cbd5e1; }
+
+        /* Allergies */
+        .allergy-cell { max-width: 200px; }
+        .allergy-tag {
+            display: inline-block;
+            background: #fee2e2;
+            color: #b91c1c;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin: 2px;
+        }
+        .no-allergy { color: var(--admin-text-muted); font-size: 0.8rem; }
+
+        /* Badge */
+        .badge {
+            display: inline-flex;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+        .badge.admin { background: #dbeafe; color: #1d4ed8; }
+        .badge.team { background: #ede9fe; color: #7c3aed; }
+        .badge.single { background: #fce7f3; color: #be185d; }
+
+        /* Status badges */
+        .badge.draft { background: #f1f5f9; color: #475569; }
+        .badge.waitlist { background: #fef3c7; color: #92400e; }
+        .badge.registration { background: #dbeafe; color: #1d4ed8; }
+        .badge.live { background: #d1fae5; color: #065f46; }
+
+        /* Hotel summary */
+        .hotel-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 12px;
+            padding: 16px;
+            background: #f0fdf4;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        .hotel-night-stat { text-align: center; }
+        .hotel-night-stat .day { font-size: 0.75rem; color: var(--admin-text-muted); }
+        .hotel-night-stat .count { font-size: 1.2rem; font-weight: 600; color: var(--admin-success); }
+
+        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
+
+        .hidden { display: none !important; }
+
+        .access-denied {
+            max-width: 400px;
+            margin: 100px auto;
+            margin-left: calc(220px + 100px);
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+        }
+
+        /* Print styles */
+        @media print {
+            .sidebar, .toolbar, .btn-sm { display: none !important; }
+            .main-content { margin-left: 0; padding: 0; }
+            .panel { border: 1px solid #ccc; }
+            .data-table th { background: #f0f0f0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content" id="admin-content">
+            <div class="page-header">
+                <div class="breadcrumb">
+                    <a href="admin-events.html">Events</a> / <span id="event-name-breadcrumb">Loading...</span>
+                </div>
+                <h1 class="page-title">📋 Participants & Hotel</h1>
+            </div>
+
+            <!-- Event Summary -->
+            <div class="event-summary" id="event-summary">
+                <div class="stat-card">
+                    <div class="label">Event</div>
+                    <div class="value" id="stat-event-name">-</div>
+                    <div class="sub" id="stat-event-dates">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Status</div>
+                    <div class="value" id="stat-status">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Teams</div>
+                    <div class="value" id="stat-teams">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Participants</div>
+                    <div class="value" id="stat-participants">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">With Allergies</div>
+                    <div class="value" id="stat-allergies">0</div>
+                </div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="filter-group">
+                    <label>Group by:</label>
+                    <select id="group-filter">
+                        <option value="team">Team</option>
+                        <option value="none">None (flat list)</option>
+                    </select>
+                    <label style="margin-left: 16px;">Show:</label>
+                    <select id="show-filter">
+                        <option value="all">All Participants</option>
+                        <option value="with-hotel">With Hotel Nights</option>
+                        <option value="with-allergies">With Allergies</option>
+                    </select>
+                </div>
+                <div>
+                    <button class="btn-sm" onclick="window.print()">🖨️ Print for Hotel</button>
+                    <button class="btn-sm" id="export-btn">📥 Export CSV</button>
+                </div>
+            </div>
+
+            <!-- Participants Table -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">👥 Participants by Team</span>
+                    <span id="participant-count" style="font-size: 0.8rem; color: var(--admin-text-muted);">0 participants</span>
+                </div>
+                <div class="panel-body">
+                    <table class="data-table" id="participants-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th class="night-cell">Wed</th>
+                                <th class="night-cell">Thu</th>
+                                <th class="night-cell">Fri</th>
+                                <th class="night-cell">Sat</th>
+                                <th class="night-cell">Sun</th>
+                                <th>Nights</th>
+                                <th>Allergies / Dietary</th>
+                            </tr>
+                        </thead>
+                        <tbody id="participants-body">
+                            <tr><td colspan="10" class="empty-state">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Hotel Summary -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">🏨 Hotel Nights Summary</span>
+                </div>
+                <div class="panel-body" style="padding: 16px;">
+                    <div class="hotel-summary" id="hotel-summary">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="not-committee" class="access-denied hidden">
+        <h2>🔒 Access Denied</h2>
+        <p style="margin-top: 12px; color: var(--admin-text-muted);">You don't have permission to access the admin area.</p>
+        <a href="index.html" class="btn-sm primary" style="margin-top: 20px; display: inline-block;">Go to Portal</a>
+    </div>
+
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin-sidebar.js"></script>
+    <script>
+        let currentEvent = null;
+        let currentUser = null;
+        let allParticipants = [];
+        let allTeams = [];
+        let allUsers = [];
+
+        // Hotel night keys in order
+        const NIGHT_KEYS = ['wed-thu', 'thu-fri', 'fri-sat', 'sat-sun', 'sun-mon'];
+        const NIGHT_LABELS = ['Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function init() {
+            Auth.init();
+            renderAdminSidebar('events');
+            
+            try {
+                await Auth.handleRedirect();
+
+                if (!Auth.isLoggedIn()) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                const authUser = Auth.getUser();
+                currentUser = await API.users.get(authUser.email);
+
+                if (!currentUser.isPortalAdmin) {
+                    document.getElementById('admin-content').classList.add('hidden');
+                    document.querySelector('.sidebar').classList.add('hidden');
+                    document.getElementById('not-committee').classList.remove('hidden');
+                    return;
+                }
+
+                // Get event ID from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const eventId = urlParams.get('id');
+
+                if (!eventId) {
+                    window.location.href = 'admin-events.html';
+                    return;
+                }
+
+                await loadEventData(eventId);
+                setupFilters();
+            } catch (err) {
+                console.error('Init error:', err);
+            }
+        }
+
+        async function loadEventData(eventId) {
+            try {
+                // Load all data in parallel
+                const [eventsRes, teamsRes, usersRes, participationsRes] = await Promise.all([
+                    API.events.list(),
+                    API.teams.list(),
+                    API.users.list(),
+                    API.participations.list()
+                ]);
+
+                const events = eventsRes.events || eventsRes || [];
+                allTeams = teamsRes.teams || teamsRes || [];
+                allUsers = usersRes.users || usersRes || [];
+                const participations = participationsRes.participations || participationsRes || [];
+
+                // Find the event
+                currentEvent = events.find(e => e.id === eventId);
+                if (!currentEvent) {
+                    document.getElementById('participants-body').innerHTML = 
+                        '<tr><td colspan="10" class="empty-state">Event not found</td></tr>';
+                    return;
+                }
+
+                // Filter teams for this event
+                allTeams = allTeams.filter(t => t.eventId === eventId);
+
+                // Filter participations for this event
+                const eventParticipations = participations.filter(p => p.eventId === eventId);
+
+                // Build participant list with all info
+                allParticipants = eventParticipations.map(p => {
+                    const user = allUsers.find(u => u.id === p.userId) || {};
+                    
+                    // Find team membership
+                    const teamMembership = (p.teamMemberships || []).find(tm => tm.isParticipant);
+                    const team = teamMembership ? allTeams.find(t => t.id === teamMembership.teamId) : null;
+
+                    return {
+                        id: p.id,
+                        oderId: p.userId,
+                        firstName: user.firstName || 'Unknown',
+                        lastName: user.lastName || '',
+                        email: user.email || '',
+                        phone: user.phone || '',
+                        allergies: user.allergies || '',
+                        teamId: team?.id || null,
+                        teamName: team?.teamName || null,
+                        isTeamAdmin: teamMembership?.isAdmin || false,
+                        hotelNights: p.hotelNights || {}
+                    };
+                });
+
+                updateUI();
+
+            } catch (err) {
+                console.error('Failed to load data:', err);
+                document.getElementById('participants-body').innerHTML = 
+                    '<tr><td colspan="10" class="empty-state">Failed to load data</td></tr>';
+            }
+        }
+
+        function updateUI() {
+            updateSummary();
+            renderParticipants();
+            renderHotelSummary();
+        }
+
+        function updateSummary() {
+            document.getElementById('event-name-breadcrumb').textContent = currentEvent.name;
+            document.getElementById('stat-event-name').textContent = currentEvent.name;
+            
+            const startDate = new Date(currentEvent.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const endDate = new Date(currentEvent.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            document.getElementById('stat-event-dates').textContent = `${startDate} - ${endDate}`;
+
+            const status = currentEvent.status || 'draft';
+            const statusLabels = { draft: 'Draft', waitlist: 'Waitlist', registration: 'Registration', live: 'Live' };
+            document.getElementById('stat-status').innerHTML = `<span class="badge ${status}">${statusLabels[status] || status}</span>`;
+
+            document.getElementById('stat-teams').textContent = allTeams.length;
+            document.getElementById('stat-participants').textContent = allParticipants.length;
+
+            const withAllergies = allParticipants.filter(p => p.allergies && p.allergies.trim()).length;
+            document.getElementById('stat-allergies').textContent = withAllergies;
+        }
+
+        function renderParticipants() {
+            const tbody = document.getElementById('participants-body');
+            const groupBy = document.getElementById('group-filter').value;
+            const showFilter = document.getElementById('show-filter').value;
+
+            // Apply filters
+            let filtered = [...allParticipants];
+            if (showFilter === 'with-hotel') {
+                filtered = filtered.filter(p => countHotelNights(p.hotelNights) > 0);
+            } else if (showFilter === 'with-allergies') {
+                filtered = filtered.filter(p => p.allergies && p.allergies.trim());
+            }
+
+            document.getElementById('participant-count').textContent = `${filtered.length} participants`;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No participants match the filter</td></tr>';
+                return;
+            }
+
+            if (groupBy === 'team') {
+                renderGroupedByTeam(tbody, filtered);
+            } else {
+                renderFlatList(tbody, filtered);
+            }
+        }
+
+        function renderGroupedByTeam(tbody, participants) {
+            // Group by team
+            const teamGroups = {};
+            const noTeam = [];
+
+            participants.forEach(p => {
+                if (p.teamId) {
+                    if (!teamGroups[p.teamId]) {
+                        teamGroups[p.teamId] = { name: p.teamName, members: [] };
+                    }
+                    teamGroups[p.teamId].members.push(p);
+                } else {
+                    noTeam.push(p);
+                }
+            });
+
+            let html = '';
+
+            // Render teams
+            Object.entries(teamGroups).forEach(([teamId, group]) => {
+                const teamNights = group.members.reduce((sum, m) => sum + countHotelNights(m.hotelNights), 0);
+                html += `
+                    <tr class="team-header-row">
+                        <td colspan="8">
+                            <span class="badge team" style="margin-right: 8px;">👥 Team</span>
+                            ${escapeHtml(group.name)} 
+                            <span style="font-weight: normal; color: var(--admin-text-muted); margin-left: 8px;">(${group.members.length} members)</span>
+                        </td>
+                        <td><strong>${teamNights}</strong></td>
+                        <td></td>
+                    </tr>
+                `;
+                group.members.forEach(p => {
+                    html += renderParticipantRow(p, true);
+                });
+            });
+
+            // Render no-team participants
+            if (noTeam.length > 0) {
+                html += `
+                    <tr class="team-header-row no-team-section">
+                        <td colspan="10">
+                            <span class="badge single" style="margin-right: 8px;">👤 No Team</span>
+                            Individual Participants
+                            <span style="font-weight: normal; color: var(--admin-text-muted); margin-left: 8px;">(${noTeam.length} participants)</span>
+                        </td>
+                    </tr>
+                `;
+                noTeam.forEach(p => {
+                    html += renderParticipantRow(p, true);
+                });
+            }
+
+            tbody.innerHTML = html;
+        }
+
+        function renderFlatList(tbody, participants) {
+            // Sort alphabetically
+            const sorted = [...participants].sort((a, b) => 
+                `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`)
+            );
+
+            tbody.innerHTML = sorted.map(p => renderParticipantRow(p, false)).join('');
+        }
+
+        function renderParticipantRow(p, isGrouped) {
+            const nights = p.hotelNights || {};
+            const nightCells = NIGHT_KEYS.map(key => {
+                const checked = nights[key];
+                return `<td class="night-cell ${checked ? 'checked' : 'unchecked'}">${checked ? '✓' : '–'}</td>`;
+            }).join('');
+
+            const totalNights = countHotelNights(nights);
+
+            let allergyHtml = '';
+            if (p.allergies && p.allergies.trim()) {
+                // Split by comma or newline
+                const items = p.allergies.split(/[,\n]/).map(s => s.trim()).filter(s => s);
+                allergyHtml = items.map(a => `<span class="allergy-tag">⚠️ ${escapeHtml(a)}</span>`).join('');
+            } else {
+                allergyHtml = '<span class="no-allergy">None</span>';
+            }
+
+            const adminBadge = p.isTeamAdmin ? '<span class="badge admin" style="margin-left: 6px;">Admin</span>' : '';
+
+            return `
+                <tr class="${isGrouped ? 'team-member-row' : ''}">
+                    <td>
+                        <strong>${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}</strong>
+                        ${adminBadge}
+                    </td>
+                    <td>${escapeHtml(p.email)}</td>
+                    <td>${escapeHtml(p.phone)}</td>
+                    ${nightCells}
+                    <td><strong>${totalNights}</strong></td>
+                    <td class="allergy-cell">${allergyHtml}</td>
+                </tr>
+            `;
+        }
+
+        function countHotelNights(nights) {
+            if (!nights) return 0;
+            return NIGHT_KEYS.filter(key => nights[key]).length;
+        }
+
+        function renderHotelSummary() {
+            const summary = document.getElementById('hotel-summary');
+            
+            // Count nights per day
+            const nightCounts = {};
+            NIGHT_KEYS.forEach(key => nightCounts[key] = 0);
+
+            allParticipants.forEach(p => {
+                NIGHT_KEYS.forEach(key => {
+                    if (p.hotelNights && p.hotelNights[key]) {
+                        nightCounts[key]++;
+                    }
+                });
+            });
+
+            const dayLabels = {
+                'wed-thu': 'Wed → Thu',
+                'thu-fri': 'Thu → Fri',
+                'fri-sat': 'Fri → Sat',
+                'sat-sun': 'Sat → Sun',
+                'sun-mon': 'Sun → Mon'
+            };
+
+            summary.innerHTML = NIGHT_KEYS.map(key => `
+                <div class="hotel-night-stat">
+                    <div class="day">${dayLabels[key]}</div>
+                    <div class="count">${nightCounts[key]}</div>
+                    <div class="day">rooms</div>
+                </div>
+            `).join('');
+        }
+
+        function setupFilters() {
+            document.getElementById('group-filter').addEventListener('change', renderParticipants);
+            document.getElementById('show-filter').addEventListener('change', renderParticipants);
+            document.getElementById('export-btn').addEventListener('click', exportCSV);
+        }
+
+        function exportCSV() {
+            const rows = [
+                ['Team', 'Name', 'Email', 'Phone', 'Wed-Thu', 'Thu-Fri', 'Fri-Sat', 'Sat-Sun', 'Sun-Mon', 'Total Nights', 'Allergies']
+            ];
+
+            allParticipants.forEach(p => {
+                const nights = p.hotelNights || {};
+                rows.push([
+                    p.teamName || 'No Team',
+                    `${p.firstName} ${p.lastName}`,
+                    p.email,
+                    p.phone,
+                    nights['wed-thu'] ? 'Yes' : 'No',
+                    nights['thu-fri'] ? 'Yes' : 'No',
+                    nights['fri-sat'] ? 'Yes' : 'No',
+                    nights['sat-sun'] ? 'Yes' : 'No',
+                    nights['sun-mon'] ? 'Yes' : 'No',
+                    countHotelNights(nights),
+                    p.allergies || ''
+                ]);
+            });
+
+            const csv = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentEvent.name.replace(/\s+/g, '_')}_participants.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

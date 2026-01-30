@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Events - ACDC Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Events page styles */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 25px;
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .page-header h1 {
+            margin: 0;
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .events-section {
+            margin-bottom: 30px;
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-color);
+        }
+        
+        .section-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--text-color);
+        }
+        
+        .section-header .badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+        
+        .events-grid {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        }
+        
+        .event-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        
+        .event-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .event-card.active .event-card-header {
+            background: linear-gradient(135deg, #0078d4 0%, #00bcf2 100%);
+        }
+        
+        .event-card.inactive .event-card-header {
+            background: linear-gradient(135deg, #6c757d 0%, #adb5bd 100%);
+        }
+        
+        .event-card.inactive {
+            opacity: 0.8;
+        }
+        
+        .event-card-header {
+            padding: 20px;
+            color: white;
+        }
+        
+        .event-card-header h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.4rem;
+        }
+        
+        .event-card-header .event-dates {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .event-card-body {
+            padding: 20px;
+        }
+        
+        .event-card-body .event-location {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+        }
+        
+        .event-card-body .event-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        .event-card-body .event-stats span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .event-card-footer {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .status-badge.open {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-badge.closed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-badge.ended {
+            background: #e9ecef;
+            color: #6c757d;
+        }
+        
+        .status-badge.waitlist {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-badge.live {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .event-card-footer .btn {
+            font-size: 0.85rem;
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+        
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        
+        /* Historical section styling */
+        .events-section.historical .section-header {
+            border-bottom-color: #6c757d;
+        }
+        
+        .events-section.historical .section-header .badge {
+            background: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="max-width: 1000px;">
+        <!-- Page Header -->
+        <header class="page-header">
+            <h1>🏔️ ACDC Portal</h1>
+            <div class="header-actions">
+                <a id="committee-link" href="admin-dashboard.html" class="btn btn-primary btn-small hidden" style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);">⚙️ Committee</a>
+                <button id="profile-btn" class="btn btn-secondary btn-small">👤 Profile</button>
+                <button id="logout-btn" class="btn btn-secondary btn-small">Log Out</button>
+            </div>
+        </header>
+
+        <!-- Loading -->
+        <div id="loading" class="card">
+            <p>Loading events...</p>
+        </div>
+
+        <!-- Events Content -->
+        <div id="content" class="hidden">
+            <!-- Active Events Section -->
+            <section class="events-section active-events">
+                <div class="section-header">
+                    <h2>🎯 Active Events</h2>
+                    <span class="badge" id="active-count">0</span>
+                </div>
+                <div class="events-grid" id="active-events-grid">
+                    <!-- Active event cards will be inserted here -->
+                </div>
+                <div id="no-active-events" class="empty-state hidden">
+                    <div class="icon">📅</div>
+                    <p>No active events at the moment</p>
+                    <p style="color: var(--text-muted); margin-top: 10px; font-size: 0.9rem;">
+                        Want to be notified when registration opens?
+                    </p>
+                    <a href="interest.html" class="btn btn-primary" style="margin-top: 15px;">
+                        🔔 Join Interest List
+                    </a>
+                </div>
+            </section>
+
+            <!-- Historical Events Section -->
+            <section class="events-section historical">
+                <div class="section-header">
+                    <h2>📚 Past Events</h2>
+                    <span class="badge" id="historical-count">0</span>
+                </div>
+                <div class="events-grid" id="historical-events-grid">
+                    <!-- Historical event cards will be inserted here -->
+                </div>
+                <div id="no-historical-events" class="empty-state hidden">
+                    <div class="icon">📜</div>
+                    <p>No past events yet</p>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p>&copy; 2026 ACDC Portal</p>
+        </footer>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>👤 Your Profile</h2>
+                <button class="modal-close" id="close-profile">&times;</button>
+            </div>
+            
+            <form id="profile-form">
+                <div class="form-group">
+                    <label for="firstName">First Name *</label>
+                    <input type="text" id="firstName" name="firstName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="lastName">Last Name *</label>
+                    <input type="text" id="lastName" name="lastName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" readonly class="readonly">
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone *</label>
+                    <input type="tel" id="phone" name="phone" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gamertag">Gamertag</label>
+                    <input type="text" id="gamertag" name="gamertag" 
+                           placeholder="Your gaming username (optional)">
+                </div>
+                
+                <div class="form-group">
+                    <label for="allergies">Allergies / Dietary Requirements</label>
+                    <textarea id="allergies" name="allergies" rows="3" 
+                              maxlength="500" placeholder="Enter any allergies or dietary requirements..."></textarea>
+                </div>
+
+                <div id="profile-error" class="error-message hidden"></div>
+                <div id="profile-success" class="success-message hidden"></div>
+                
+                <button type="submit" class="btn btn-primary" id="save-btn">
+                    <span class="btn-text">Save Profile</span>
+                    <span class="btn-loading hidden">Saving...</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Styles (inline for this page) -->
+    <style>
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+        
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+        
+        .modal-close:hover {
+            color: var(--text-color);
+        }
+    </style>
+
+    <!-- MSAL for Entra External ID Email OTP -->
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/events.js"></script>
+</body>
+</html>

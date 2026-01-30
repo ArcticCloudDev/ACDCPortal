@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Team - ACDC Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- reCAPTCHA v3 -->
+    <script src="https://www.google.com/recaptcha/api.js?render=6LcjN1YsAAAAALq6PKDAsDnRc4KnDzUJnScPTxiy"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏔️ ACDC Portal</h1>
+            <p class="subtitle">Team Registration</p>
+        </header>
+
+        <main>
+            <!-- Step 1: Registration Form -->
+            <div id="step-form" class="card">
+                <h2>Register Your Team</h2>
+                <form id="registration-form">
+                    <fieldset>
+                        <legend>Personal Information</legend>
+                        
+                        <div class="form-group">
+                            <label for="firstName">First Name *</label>
+                            <input type="text" id="firstName" name="firstName" required minlength="2" maxlength="50">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="lastName">Last Name *</label>
+                            <input type="text" id="lastName" name="lastName" required minlength="2" maxlength="50">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Email *</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="phone">Phone *</label>
+                            <input type="tel" id="phone" name="phone" required>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Team Information</legend>
+                        
+                        <div class="form-group">
+                            <label for="teamName">Team Name *</label>
+                            <input type="text" id="teamName" name="teamName" required minlength="2" maxlength="100">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="numberOfParticipants">Number of Participants *</label>
+                            <select id="numberOfParticipants" name="numberOfParticipants" required>
+                                <option value="">Select...</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                    </fieldset>
+
+                    <div id="form-error" class="error-message hidden"></div>
+                    
+                    <button type="submit" class="btn btn-primary" id="submit-btn">
+                        <span class="btn-text">Register Team</span>
+                        <span class="btn-loading hidden">Preparing...</span>
+                    </button>
+                    
+                    <p class="recaptcha-notice">
+                        Protected by reCAPTCHA. 
+                        <a href="https://policies.google.com/privacy" target="_blank">Privacy</a> · 
+                        <a href="https://policies.google.com/terms" target="_blank">Terms</a>
+                    </p>
+                </form>
+                
+                <p class="form-footer">
+                    Already have an account? <a href="login.html">Login here</a>
+                </p>
+            </div>
+
+            <!-- Step 2: Completing (shown during MS login redirect) -->
+            <div id="step-completing" class="card hidden">
+                <h2>⏳ Completing Registration...</h2>
+                <p>Finalizing your team registration. Please wait...</p>
+                <div id="completing-error" class="error-message hidden"></div>
+            </div>
+
+            <!-- Step 3: Success -->
+            <div id="step-success" class="card hidden">
+                <h2>✅ Registration Complete!</h2>
+                <p>Your team <strong id="success-team-name"></strong> has been registered successfully.</p>
+                <p>You are now logged in. Let's complete your profile!</p>
+                <a href="events.html" class="btn btn-primary">Go to Events</a>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 ACDC Portal</p>
+        </footer>
+    </div>
+
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/register.js"></script>
+</body>
+</html>

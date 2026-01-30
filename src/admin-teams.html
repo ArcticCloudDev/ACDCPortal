@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Teams - ACDC Committee</title>
+    <link rel="stylesheet" href="css/admin-styles.css">
+    <style>
+        /* Page-specific styles */
+        .main-content {
+            flex: 1;
+            margin-left: 220px;
+            padding: 24px 32px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .page-title { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
+
+        .filters { display: flex; gap: 10px; align-items: center; }
+        .filters select, .filters input {
+            padding: 6px 12px;
+            border: 1px solid var(--admin-border);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+        .filters input[type="search"] { width: 180px; }
+
+        .stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--admin-border);
+            border-radius: 8px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 150px;
+        }
+
+        .stat-card .icon {
+            width: 40px; height: 40px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .stat-card .icon.blue { background: #dbeafe; color: #2563eb; }
+        .stat-card .icon.green { background: #d1fae5; color: #059669; }
+        .stat-card .icon.purple { background: #ede9fe; color: #7c3aed; }
+        .stat-card .icon.amber { background: #fef3c7; color: #d97706; }
+
+        .stat-card .info .value { font-size: 1.5rem; font-weight: 700; color: var(--admin-sidebar); line-height: 1; }
+        .stat-card .info .label { font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 2px; }
+
+        .panel {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+        }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+
+        .data-table th {
+            text-align: left;
+            padding: 10px 16px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--admin-text-muted);
+            background: var(--admin-bg);
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--admin-border);
+            font-size: 0.85rem;
+        }
+
+        .data-table tbody tr:hover { background: var(--admin-bg); }
+        .data-table tbody tr:last-child td { border-bottom: none; }
+
+        .badge {
+            display: inline-flex;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .badge.full { background: #d1fae5; color: #065f46; }
+        .badge.partial { background: #dbeafe; color: #1d4ed8; }
+        .badge.empty { background: #fef3c7; color: #92400e; }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid var(--admin-border);
+            background: white;
+            color: var(--admin-text);
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-sm:hover { background: var(--admin-bg); }
+        .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
+        .btn-sm.primary:hover { background: #2563eb; }
+
+        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
+
+        .access-denied {
+            max-width: 400px;
+            margin: 100px auto;
+            margin-left: calc(220px + 100px);
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <div id="loading" style="text-align: center; padding: 60px;">Loading teams...</div>
+
+            <div id="admin-content" class="hidden">
+                <div class="page-header">
+                    <h1 class="page-title">Teams</h1>
+                    <div class="filters">
+                        <select id="event-filter">
+                            <option value="">All Events</option>
+                        </select>
+                        <input type="search" id="search-teams" placeholder="Search teams...">
+                    </div>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="icon blue">👥</div>
+                        <div class="info">
+                            <div class="value" id="total-teams">0</div>
+                            <div class="label">Teams</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon green">👤</div>
+                        <div class="info">
+                            <div class="value" id="total-participants">0</div>
+                            <div class="label">Participants</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon purple">✓</div>
+                        <div class="info">
+                            <div class="value" id="total-committed">0</div>
+                            <div class="label">Committed</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon amber">📊</div>
+                        <div class="info">
+                            <div class="value" id="fill-rate">0%</div>
+                            <div class="label">Fill Rate</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Team Name</th>
+                                <th>Event</th>
+                                <th>Admin</th>
+                                <th>Members</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="teams-table-body">
+                            <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="not-committee" class="access-denied hidden">
+        <h2>⛔ Access Denied</h2>
+        <p style="color: var(--admin-text-muted);">You do not have committee access.</p>
+        <a href="events.html" class="btn-sm primary">Go to Events</a>
+    </div>
+
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin-sidebar.js"></script>
+    <script src="js/admin-teams.js"></script>
+</body>
+</html>

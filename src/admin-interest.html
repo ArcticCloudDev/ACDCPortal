@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interest Queue - ACDC Committee</title>
+    <link rel="stylesheet" href="css/admin-styles.css">
+    <style>
+        /* Page-specific styles */
+
+        .stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--admin-border);
+            border-radius: 8px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 140px;
+        }
+
+        .stat-card .icon {
+            width: 40px; height: 40px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .stat-card .icon.blue { background: #dbeafe; color: #2563eb; }
+        .stat-card .icon.green { background: #d1fae5; color: #059669; }
+        .stat-card .icon.amber { background: #fef3c7; color: #d97706; }
+        .stat-card .icon.purple { background: #ede9fe; color: #7c3aed; }
+
+        .stat-card .info .value { font-size: 1.5rem; font-weight: 700; color: var(--admin-sidebar); line-height: 1; }
+        .stat-card .info .label { font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 2px; }
+
+        .panel {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .panel-title { font-size: 0.9rem; font-weight: 600; color: var(--admin-sidebar); }
+
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-tab {
+            padding: 6px 12px;
+            border: 1px solid var(--admin-border);
+            background: white;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .filter-tab:hover { background: var(--admin-bg); }
+        .filter-tab.active { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+
+        .data-table th {
+            text-align: left;
+            padding: 10px 16px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--admin-text-muted);
+            background: var(--admin-bg);
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--admin-border);
+            font-size: 0.85rem;
+        }
+
+        .data-table tbody tr:hover { background: var(--admin-bg); }
+        .data-table tbody tr:last-child td { border-bottom: none; }
+
+        .badge {
+            display: inline-flex;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .badge.pending { background: #fef3c7; color: #92400e; }
+        .badge.notified { background: #dbeafe; color: #1d4ed8; }
+        .badge.registered { background: #d1fae5; color: #065f46; }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid var(--admin-border);
+            background: white;
+            color: var(--admin-text);
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-sm:hover { background: var(--admin-bg); }
+        .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
+        .btn-sm.primary:hover { background: #2563eb; }
+        .btn-sm.danger { color: var(--admin-danger); border-color: var(--admin-danger); }
+        .btn-sm.danger:hover { background: #fef2f2; }
+
+        .actions { display: flex; gap: 6px; }
+
+        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
+
+        .bulk-actions {
+            display: flex;
+            gap: 10px;
+            padding: 12px 18px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .copy-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--admin-bg);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .copy-link input {
+            border: none;
+            background: transparent;
+            flex: 1;
+            font-size: 0.85rem;
+            color: var(--admin-text-muted);
+        }
+
+        .copy-link button {
+            padding: 4px 8px;
+            border: 1px solid var(--admin-border);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Interest Queue</h1>
+                <div class="copy-link">
+                    <span>Share link:</span>
+                    <input type="text" id="share-link" readonly>
+                    <button onclick="copyShareLink()">Copy</button>
+                </div>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="icon blue">📋</div>
+                    <div class="info">
+                        <div class="value" id="stat-total">0</div>
+                        <div class="label">Total</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="icon amber">⏳</div>
+                    <div class="info">
+                        <div class="value" id="stat-pending">0</div>
+                        <div class="label">Pending</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="icon purple">📨</div>
+                    <div class="info">
+                        <div class="value" id="stat-notified">0</div>
+                        <div class="label">Notified</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="icon green">✓</div>
+                    <div class="info">
+                        <div class="value" id="stat-registered">0</div>
+                        <div class="label">Registered</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">Interest List</span>
+                    <div class="filter-tabs">
+                        <button class="filter-tab active" data-filter="pending">Pending</button>
+                        <button class="filter-tab" data-filter="notified">Notified</button>
+                        <button class="filter-tab" data-filter="registered">Registered</button>
+                        <button class="filter-tab" data-filter="all">All</button>
+                    </div>
+                </div>
+                <div class="bulk-actions" id="bulk-actions" style="display: none;">
+                    <button class="btn-sm primary" onclick="markSelectedNotified()">📨 Mark as Notified</button>
+                    <button class="btn-sm" onclick="exportSelected()">📥 Export Selected</button>
+                    <span id="selected-count" style="margin-left: auto; color: var(--admin-text-muted);">0 selected</span>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="select-all" onchange="toggleSelectAll()"></th>
+                            <th>#</th>
+                            <th>Email</th>
+                            <th>Name</th>
+                            <th>Company</th>
+                            <th>Signed Up</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="queue-table-body">
+                        <tr><td colspan="8" class="empty-state">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/admin-sidebar.js"></script>
+    <script>
+        let allEntries = [];
+        let currentFilter = 'pending';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            renderAdminSidebar('interest');
+            
+            // Set share link
+            const shareLink = window.location.origin + '/interest.html';
+            document.getElementById('share-link').value = shareLink;
+
+            // Filter tabs
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentFilter = tab.dataset.filter;
+                    renderTable();
+                });
+            });
+
+            await loadData();
+        });
+
+        async function loadData() {
+            try {
+                // Load stats
+                const statsResponse = await fetch(`${CONFIG.api.baseUrl}/interest-queue/stats`);
+                if (statsResponse.ok) {
+                    const stats = await statsResponse.json();
+                    document.getElementById('stat-total').textContent = stats.total;
+                    document.getElementById('stat-pending').textContent = stats.pending;
+                    document.getElementById('stat-notified').textContent = stats.notified;
+                    document.getElementById('stat-registered').textContent = stats.registered;
+                }
+
+                // Load entries
+                const response = await fetch(`${CONFIG.api.baseUrl}/interest-queue`);
+                if (response.ok) {
+                    allEntries = await response.json();
+                    renderTable();
+                }
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('queue-table-body').innerHTML = 
+                    '<tr><td colspan="8" class="empty-state">Error loading data</td></tr>';
+            }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('queue-table-body');
+            
+            let filtered = allEntries;
+            switch (currentFilter) {
+                case 'pending':
+                    filtered = allEntries.filter(e => !e.registeredEventId && !e.notified);
+                    break;
+                case 'notified':
+                    filtered = allEntries.filter(e => !e.registeredEventId && e.notified);
+                    break;
+                case 'registered':
+                    filtered = allEntries.filter(e => e.registeredEventId);
+                    break;
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No entries</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map((entry, index) => {
+                const date = new Date(entry.createdAt).toLocaleDateString('en-US', {
+                    month: 'short', day: 'numeric', year: 'numeric'
+                });
+
+                let status = 'pending';
+                let statusLabel = 'Pending';
+                if (entry.registeredEventId) {
+                    status = 'registered';
+                    statusLabel = 'Registered';
+                } else if (entry.notified) {
+                    status = 'notified';
+                    statusLabel = 'Notified';
+                }
+
+                const name = [entry.firstName, entry.lastName].filter(Boolean).join(' ') || '-';
+
+                return `
+                    <tr>
+                        <td><input type="checkbox" class="entry-checkbox" data-id="${entry.id}" onchange="updateSelection()"></td>
+                        <td style="color: var(--admin-text-muted);">${index + 1}</td>
+                        <td><strong>${escapeHtml(entry.email)}</strong></td>
+                        <td>${escapeHtml(name)}</td>
+                        <td style="color: var(--admin-text-muted);">${escapeHtml(entry.company || '-')}</td>
+                        <td style="color: var(--admin-text-muted);">${date}</td>
+                        <td><span class="badge ${status}">${statusLabel}</span></td>
+                        <td>
+                            <div class="actions">
+                                ${!entry.registeredEventId ? `<button class="btn-sm danger" onclick="removeEntry('${entry.id}')">Remove</button>` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('select-all').checked;
+            document.querySelectorAll('.entry-checkbox').forEach(cb => cb.checked = selectAll);
+            updateSelection();
+        }
+
+        function updateSelection() {
+            const checked = document.querySelectorAll('.entry-checkbox:checked').length;
+            document.getElementById('selected-count').textContent = `${checked} selected`;
+            document.getElementById('bulk-actions').style.display = checked > 0 ? 'flex' : 'none';
+        }
+
+        function getSelectedIds() {
+            return Array.from(document.querySelectorAll('.entry-checkbox:checked'))
+                .map(cb => cb.dataset.id);
+        }
+
+        async function markSelectedNotified() {
+            const ids = getSelectedIds();
+            if (ids.length === 0) return;
+
+            try {
+                const response = await fetch(`${CONFIG.api.baseUrl}/interest-queue/mark-notified`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ entryIds: ids })
+                });
+
+                if (response.ok) {
+                    await loadData();
+                }
+            } catch (error) {
+                console.error('Error marking notified:', error);
+            }
+        }
+
+        function exportSelected() {
+            const ids = getSelectedIds();
+            const entries = allEntries.filter(e => ids.includes(e.id));
+            
+            const csv = [
+                'Email,First Name,Last Name,Company,Phone,Signed Up',
+                ...entries.map(e => 
+                    `${e.email},"${e.firstName || ''}","${e.lastName || ''}","${e.company || ''}","${e.phone || ''}",${e.createdAt}`
+                )
+            ].join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `interest-queue-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+        }
+
+        async function removeEntry(id) {
+            if (!confirm('Remove this entry from the interest queue?')) return;
+
+            try {
+                const response = await fetch(`${CONFIG.api.baseUrl}/interest-queue/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    await loadData();
+                }
+            } catch (error) {
+                console.error('Error removing entry:', error);
+            }
+        }
+
+        function copyShareLink() {
+            const input = document.getElementById('share-link');
+            input.select();
+            document.execCommand('copy');
+            
+            const btn = input.nextElementSibling;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy', 2000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

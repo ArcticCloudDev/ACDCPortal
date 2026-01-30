@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Registration - ACDC Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏔️ ACDC Portal</h1>
+            <p class="subtitle">Complete Your Registration</p>
+        </header>
+
+        <main>
+            <div id="loading" class="card">
+                <p>Loading...</p>
+            </div>
+
+            <div id="registration-card" class="card hidden">
+                <div id="invitation-banner" class="hidden" style="background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; border-left: 4px solid #2563eb;">
+                    <p style="margin: 0 0 8px; color: #1e40af; font-weight: 600;">🎉 You've been invited to join a team!</p>
+                    <p style="margin: 0; color: #475569;" id="invitation-details"></p>
+                    <p style="margin: 8px 0 0; color: #64748b; font-size: 14px;">
+                        Complete your profile below to accept the invitation.
+                    </p>
+                </div>
+                <h2>Welcome! Let's get you set up</h2>
+                <p>Please complete your profile to continue.</p>
+                
+                <form id="complete-registration-form">
+                    <fieldset>
+                        <legend>Personal Information</legend>
+                        
+                        <div class="form-group">
+                            <label for="firstName">First Name *</label>
+                            <input type="text" id="firstName" name="firstName" required 
+                                   placeholder="Enter your first name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="lastName">Last Name *</label>
+                            <input type="text" id="lastName" name="lastName" required
+                                   placeholder="Enter your last name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email" readonly class="readonly">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="phone">Phone *</label>
+                            <input type="tel" id="phone" name="phone" required
+                                   placeholder="Enter your phone number">
+                        </div>
+                    </fieldset>
+
+                    <div id="form-error" class="error-message hidden"></div>
+                    
+                    <button type="submit" class="btn btn-primary btn-large" id="complete-btn">
+                        <span class="btn-text">Complete Registration</span>
+                        <span class="btn-loading hidden">Completing...</span>
+                    </button>
+                </form>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 ACDC Portal</p>
+        </footer>
+    </div>
+
+    <!-- MSAL for Auth -->
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const loadingDiv = document.getElementById('loading');
+            const registrationCard = document.getElementById('registration-card');
+            const form = document.getElementById('complete-registration-form');
+            
+            let currentUser = null;
+
+            // Initialize Auth
+            Auth.init();
+            
+            try {
+                await Auth.handleRedirect();
+                
+                if (!Auth.isLoggedIn()) {
+                    window.location.href = '/';
+                    return;
+                }
+                
+                const authUser = Auth.getUser();
+                
+                // Try to load existing user or create new one
+                try {
+                    currentUser = await API.users.get(authUser.email);
+                    
+                    // If profile is already complete, redirect to events list
+                    if (currentUser.profileComplete) {
+                        window.location.href = 'events.html';
+                        return;
+                    }
+                } catch (error) {
+                    // User doesn't exist - create a minimal record
+                    currentUser = {
+                        id: generateId(),
+                        email: authUser.email,
+                        firstName: '',
+                        lastName: '',
+                        phone: '',
+                        profileComplete: false,
+                        createdAt: new Date().toISOString()
+                    };
+                    await API.users.create(currentUser);
+                }
+                
+                // Pre-fill email
+                document.getElementById('email').value = authUser.email;
+                
+                // Pre-fill name if available from token
+                if (authUser.name && authUser.name !== authUser.email) {
+                    const nameParts = authUser.name.split(' ');
+                    document.getElementById('firstName').value = nameParts[0] || '';
+                    document.getElementById('lastName').value = nameParts.slice(1).join(' ') || '';
+                }
+                
+                // Check for pending invitation and show banner
+                const inviteId = sessionStorage.getItem('pendingInvitation');
+                if (inviteId) {
+                    try {
+                        const invitation = await API.invitations.get(inviteId);
+                        if (invitation && invitation.status === 'pending' && !invitation.isExpired) {
+                            document.getElementById('invitation-details').innerHTML = 
+                                `<strong>${invitation.inviterName}</strong> invited you to join team <strong style="color: #1e40af;">${invitation.teamName}</strong>`;
+                            document.getElementById('invitation-banner').classList.remove('hidden');
+                        }
+                    } catch (err) {
+                        console.log('Could not load invitation:', err);
+                    }
+                }
+                
+                // Show form
+                loadingDiv.classList.add('hidden');
+                registrationCard.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                loadingDiv.innerHTML = `<p class="error-message">Error: ${error.message}</p>
+                                       <a href="/" class="btn btn-primary">Back to Home</a>`;
+            }
+
+            function generateId() {
+                return Date.now().toString(36) + Math.random().toString(36).substr(2);
+            }
+
+            // Form submission
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const completeBtn = document.getElementById('complete-btn');
+                const errorDiv = document.getElementById('form-error');
+                
+                const formData = {
+                    firstName: document.getElementById('firstName').value.trim(),
+                    lastName: document.getElementById('lastName').value.trim(),
+                    phone: document.getElementById('phone').value.trim()
+                };
+                
+                // Validate
+                if (!formData.firstName || !formData.lastName || !formData.phone) {
+                    errorDiv.textContent = 'Please fill in all fields.';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+                
+                // Show loading
+                completeBtn.disabled = true;
+                completeBtn.querySelector('.btn-text').classList.add('hidden');
+                completeBtn.querySelector('.btn-loading').classList.remove('hidden');
+                errorDiv.classList.add('hidden');
+                
+                try {
+                    // Update user profile
+                    await API.users.update(currentUser.id, {
+                        firstName: formData.firstName,
+                        lastName: formData.lastName,
+                        phone: formData.phone,
+                        profileComplete: true
+                    });
+                    
+                    // Redirect to events list
+                    window.location.href = 'events.html';
+                    
+                } catch (error) {
+                    errorDiv.textContent = error.message || 'Registration failed. Please try again.';
+                    errorDiv.classList.remove('hidden');
+                    
+                    completeBtn.disabled = false;
+                    completeBtn.querySelector('.btn-text').classList.remove('hidden');
+                    completeBtn.querySelector('.btn-loading').classList.add('hidden');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

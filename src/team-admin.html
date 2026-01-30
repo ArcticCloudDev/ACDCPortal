@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Admin - ACDC Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏔️ ACDC Portal</h1>
+            <p class="subtitle">Team Administration</p>
+            <div class="header-buttons">
+                <a href="events.html" class="btn btn-small btn-secondary">← Events</a>
+                <button id="logout-btn" class="btn btn-small btn-secondary">Logout</button>
+            </div>
+        </header>
+
+        <main>
+            <div id="loading" class="card">
+                <p>Loading team data...</p>
+            </div>
+
+            <div id="not-admin" class="card hidden">
+                <h2>Access Denied</h2>
+                <p>You are not a team admin.</p>
+                <a href="events.html" class="btn btn-primary">Back to Events</a>
+            </div>
+
+            <div id="admin-content" class="hidden">
+                <!-- Team Info -->
+                <div class="card">
+                    <h2>Team: <span id="team-name"></span></h2>
+                    <p>Max Participants: <span id="max-participants"></span></p>
+                    <p>Current Members: <span id="current-members"></span></p>
+                </div>
+
+                <!-- Invite Member -->
+                <div class="card">
+                    <h3>✉️ Invite Team Member</h3>
+                    <p class="form-hint">Send an email invitation to join your team. They'll receive a link to sign up and join automatically.</p>
+                    <form id="invite-member-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="inviteEmail">Email *</label>
+                                <input type="email" id="inviteEmail" name="inviteEmail" placeholder="teammate@example.com" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="inviteMessage">Personal Message (optional)</label>
+                                <textarea id="inviteMessage" name="inviteMessage" rows="2" placeholder="Hey! Join our team for the Arctic Cloud Developer Challenge..."></textarea>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="invite-member-btn">
+                            <span class="btn-text">Send Invitation</span>
+                            <span class="btn-loading hidden">Sending...</span>
+                        </button>
+                        <div id="invite-member-error" class="error-message hidden"></div>
+                        <div id="invite-member-success" class="success-message hidden"></div>
+                    </form>
+                </div>
+
+                <!-- Pending Invitations -->
+                <div class="card">
+                    <h3>📬 Pending Invitations</h3>
+                    <div id="invitation-list">
+                        <p class="text-muted">Loading invitations...</p>
+                    </div>
+                </div>
+
+                <!-- Member List -->
+                <div class="card">
+                    <h3>👥 Team Members</h3>
+                    <div id="member-list">
+                        <!-- Members will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 ACDC Portal</p>
+        </footer>
+    </div>
+
+    <!-- MSAL for Entra External ID Email OTP -->
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/team-admin.js"></script>
+</body>
+</html>

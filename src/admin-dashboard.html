@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Committee Dashboard - ACDC Portal</title>
+    <link rel="stylesheet" href="css/admin-styles.css">
+    <style>
+        /* Page-specific styles */
+        .main-content {
+            max-width: 1400px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--admin-sidebar);
+            margin: 0;
+        }
+
+        .page-subtitle {
+            color: var(--admin-text-muted);
+            font-size: 0.875rem;
+            margin-top: 4px;
+        }
+
+        /* Stats Row */
+        .stats-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            flex: 1;
+            background: white;
+            padding: 16px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .stat-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .stat-icon.blue { background: #dbeafe; }
+        .stat-icon.green { background: #d1fae5; }
+        .stat-icon.orange { background: #fef3c7; }
+        .stat-icon.red { background: #fee2e2; }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--admin-sidebar);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--admin-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-top: 4px;
+        }
+
+        /* Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .content-grid.full-width {
+            grid-template-columns: 1fr;
+        }
+
+        /* Panel */
+        .panel {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .panel-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--admin-sidebar);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-body {
+            padding: 0;
+        }
+
+        .panel-body.padded {
+            padding: 16px 18px;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            padding: 16px 18px;
+        }
+
+        .quick-action {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 14px 10px;
+            background: var(--admin-bg);
+            border: 1px solid var(--admin-border);
+            border-radius: 6px;
+            text-decoration: none;
+            color: var(--admin-text);
+            transition: all 0.15s;
+            font-size: 0.8rem;
+        }
+
+        .quick-action:hover {
+            border-color: var(--admin-primary);
+            background: #eff6ff;
+        }
+
+        .quick-action .icon {
+            font-size: 1.25rem;
+        }
+
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 10px 16px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--admin-text-muted);
+            background: var(--admin-bg);
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--admin-border);
+            font-size: 0.85rem;
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--admin-bg);
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Event Row */
+        .event-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .event-row:last-child {
+            border-bottom: none;
+        }
+
+        .event-row:hover {
+            background: var(--admin-bg);
+        }
+
+        .event-info {
+            flex: 1;
+        }
+
+        .event-name {
+            font-weight: 500;
+            color: var(--admin-sidebar);
+            font-size: 0.875rem;
+        }
+
+        .event-meta {
+            font-size: 0.75rem;
+            color: var(--admin-text-muted);
+            margin-top: 2px;
+        }
+
+        .event-meta span {
+            margin-right: 12px;
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .badge.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge.inactive {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge.count {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        /* Buttons */
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid var(--admin-border);
+            background: white;
+            color: var(--admin-text);
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+
+        .btn-sm:hover {
+            background: var(--admin-bg);
+        }
+
+        .btn-sm.primary {
+            background: var(--admin-primary);
+            border-color: var(--admin-primary);
+            color: white;
+        }
+
+        .btn-sm.primary:hover {
+            background: #2563eb;
+        }
+
+        /* Empty State */
+        .empty-state {
+            padding: 32px;
+            text-align: center;
+            color: var(--admin-text-muted);
+        }
+
+        .empty-state .icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            opacity: 0.5;
+        }
+
+        /* Loading */
+        .loading-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin-left: 220px;
+        }
+
+        .access-denied {
+            max-width: 400px;
+            margin: 100px auto;
+            margin-left: calc(220px + 100px);
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <div id="sidebar-container"></div>
+
+        <!-- Main Content -->
+        <main class="main-content" id="main-content">
+            <div id="loading" style="text-align: center; padding: 60px;">
+                <p>Loading dashboard...</p>
+            </div>
+        </main>
+    </div>
+
+    <div id="not-committee" class="access-denied hidden">
+        <h2>⛔ Access Denied</h2>
+        <p style="color: var(--admin-text-muted); margin: 16px 0;">You do not have committee member access.</p>
+        <a href="events.html" class="btn-sm primary">Go to Events</a>
+    </div>
+
+    <div id="dashboard-content" class="hidden">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Dashboard</h1>
+                <p class="page-subtitle">Overview of ACDC registrations and activity</p>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-icon blue">📅</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="stat-events">0</div>
+                    <div class="stat-label">Events</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green">👥</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="stat-teams">0</div>
+                    <div class="stat-label">Teams</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon orange">🎯</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="stat-participants">0</div>
+                    <div class="stat-label">Participants</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon red">📧</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="stat-pending">0</div>
+                    <div class="stat-label">Pending Invites</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions & Events -->
+        <div class="content-grid">
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">⚡ Quick Actions</span>
+                </div>
+                <div class="quick-actions">
+                    <a href="admin-events.html?action=create" class="quick-action">
+                        <span class="icon">➕</span>
+                        <span>New Event</span>
+                    </a>
+                    <a href="admin-email.html" class="quick-action">
+                        <span class="icon">📧</span>
+                        <span>Send Email</span>
+                    </a>
+                    <a href="admin-teams.html" class="quick-action">
+                        <span class="icon">👥</span>
+                        <span>View Teams</span>
+                    </a>
+                    <a href="#" class="quick-action" id="export-data">
+                        <span class="icon">📥</span>
+                        <span>Export</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">📅 Events</span>
+                    <a href="admin-events.html" class="btn-sm">View All</a>
+                </div>
+                <div class="panel-body" id="events-list">
+                    <div class="empty-state">
+                        <div class="icon">⏳</div>
+                        <p>Loading events...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Teams Table -->
+        <div class="content-grid full-width" style="margin-top: 20px;">
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">👥 Recent Teams</span>
+                    <a href="admin-teams.html" class="btn-sm">View All</a>
+                </div>
+                <div class="panel-body">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Team Name</th>
+                                <th>Admin</th>
+                                <th>Members</th>
+                                <th>Event</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="teams-table-body">
+                            <tr>
+                                <td colspan="6" class="empty-state">Loading teams...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin-sidebar.js"></script>
+    <script src="js/admin-dashboard.js"></script>
+</body>
+</html>

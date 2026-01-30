@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Users - ACDC Committee</title>
+    <link rel="stylesheet" href="css/admin-styles.css">
+    <style>
+        /* Page-specific styles */
+
+        .filters { display: flex; gap: 10px; align-items: center; }
+        .filters select, .filters input {
+            padding: 6px 12px;
+            border: 1px solid var(--admin-border);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+        .filters input[type="search"] { width: 200px; }
+
+        .stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--admin-border);
+            border-radius: 8px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 150px;
+        }
+
+        .stat-card .icon {
+            width: 40px; height: 40px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .stat-card .icon.blue { background: #dbeafe; color: #2563eb; }
+        .stat-card .icon.green { background: #d1fae5; color: #059669; }
+        .stat-card .icon.purple { background: #ede9fe; color: #7c3aed; }
+
+        .stat-card .info .value { font-size: 1.5rem; font-weight: 700; color: var(--admin-sidebar); line-height: 1; }
+        .stat-card .info .label { font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 2px; }
+
+        .panel {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+        }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+
+        .data-table th {
+            text-align: left;
+            padding: 10px 16px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--admin-text-muted);
+            background: var(--admin-bg);
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--admin-border);
+            font-size: 0.85rem;
+        }
+
+        .data-table tbody tr:hover { background: var(--admin-bg); }
+        .data-table tbody tr:last-child td { border-bottom: none; }
+
+        .badge {
+            display: inline-flex;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .badge.committee { background: #ede9fe; color: #7c3aed; }
+        .badge.user { background: #dbeafe; color: #1d4ed8; }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid var(--admin-border);
+            background: white;
+            color: var(--admin-text);
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-sm:hover { background: var(--admin-bg); }
+        .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
+        .btn-sm.primary:hover { background: #2563eb; }
+
+        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
+
+        .access-denied {
+            max-width: 400px;
+            margin: 100px auto;
+            margin-left: calc(220px + 100px);
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <div id="loading" style="text-align: center; padding: 60px;">Loading users...</div>
+
+            <div id="admin-content" class="hidden">
+                <div class="page-header">
+                    <h1 class="page-title">Users</h1>
+                    <div class="filters">
+                        <select id="role-filter">
+                            <option value="">All Users</option>
+                            <option value="committee">Committee Members</option>
+                            <option value="regular">Regular Users</option>
+                        </select>
+                        <input type="search" id="search-users" placeholder="Search users...">
+                    </div>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="icon blue">👤</div>
+                        <div class="info">
+                            <div class="value" id="total-users">0</div>
+                            <div class="label">Total Users</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon purple">⭐</div>
+                        <div class="info">
+                            <div class="value" id="committee-users">0</div>
+                            <div class="label">Committee</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon green">✅</div>
+                        <div class="info">
+                            <div class="value" id="active-users">0</div>
+                            <div class="label">Active</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Teams</th>
+                                <th>Registered</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="not-committee" class="access-denied hidden">
+        <h2>⛔ Access Denied</h2>
+        <p style="color: var(--admin-text-muted);">You do not have committee access.</p>
+        <a href="events.html" class="btn-sm primary">Go to Events</a>
+    </div>
+
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin-sidebar.js"></script>
+    <script>
+        let currentUser = null;
+        let allUsers = [];
+        let allParticipations = [];
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const loadingDiv = document.getElementById('loading');
+            const notCommitteeDiv = document.getElementById('not-committee');
+            const adminContent = document.getElementById('admin-content');
+
+            Auth.init();
+            renderAdminSidebar('users');
+
+            try {
+                await Auth.handleRedirect();
+
+                if (!Auth.isLoggedIn()) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                const authUser = Auth.getUser();
+                currentUser = await API.users.get(authUser.email);
+
+                if (!currentUser.isPortalAdmin) {
+                    loadingDiv.classList.add('hidden');
+                    notCommitteeDiv.classList.remove('hidden');
+                    return;
+                }
+
+                await loadData();
+                setupFilters();
+
+                loadingDiv.classList.add('hidden');
+                adminContent.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error:', error);
+                loadingDiv.innerHTML = `<p class="error-message">Error: ${error.message}</p>`;
+            }
+        });
+
+        async function loadData() {
+            try {
+                const [usersResponse, participationsResponse] = await Promise.all([
+                    API.users.list(),
+                    API.participations.list()
+                ]);
+
+                allUsers = usersResponse || [];
+                allParticipations = participationsResponse || [];
+
+                updateStats();
+                renderUsers();
+
+            } catch (err) {
+                console.error('Failed to load data:', err);
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('total-users').textContent = allUsers.length;
+            document.getElementById('committee-users').textContent = 
+                allUsers.filter(u => u.isPortalAdmin).length;
+            document.getElementById('active-users').textContent = 
+                allUsers.filter(u => hasParticipation(u.id)).length;
+        }
+
+        function hasParticipation(userId) {
+            return allParticipations.some(p => p.userId === userId);
+        }
+
+        function getUserTeamCount(userId) {
+            return allParticipations.filter(p => 
+                p.userId === userId && p.teamMemberships?.length > 0
+            ).reduce((count, p) => count + p.teamMemberships.length, 0);
+        }
+
+        function renderUsers() {
+            const roleFilter = document.getElementById('role-filter')?.value || '';
+            const searchText = document.getElementById('search-users')?.value.toLowerCase() || '';
+
+            let filtered = allUsers.filter(user => {
+                const matchesRole = !roleFilter || 
+                    (roleFilter === 'committee' && user.isPortalAdmin) ||
+                    (roleFilter === 'regular' && !user.isPortalAdmin);
+                
+                const matchesSearch = !searchText || 
+                    user.firstName?.toLowerCase().includes(searchText) ||
+                    user.lastName?.toLowerCase().includes(searchText) ||
+                    user.email?.toLowerCase().includes(searchText);
+
+                return matchesRole && matchesSearch;
+            });
+
+            const tbody = document.getElementById('users-table-body');
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No users found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(user => {
+                const teamCount = getUserTeamCount(user.id);
+                const registeredDate = new Date(user.registeredAt || user.createdAt).toLocaleDateString();
+
+                return `
+                    <tr>
+                        <td><strong>${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</strong></td>
+                        <td>${escapeHtml(user.email)}</td>
+                        <td>${teamCount} team${teamCount !== 1 ? 's' : ''}</td>
+                        <td>${registeredDate}</td>
+                        <td>
+                            <button class="btn-sm" onclick="viewUser('${user.id}')">👁️ View</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function setupFilters() {
+            document.getElementById('role-filter').addEventListener('change', renderUsers);
+            document.getElementById('search-users').addEventListener('input', renderUsers);
+        }
+
+        function viewUser(userId) {
+            const user = allUsers.find(u => u.id === userId);
+            if (!user) return;
+
+            const userParticipations = allParticipations.filter(p => p.userId === userId);
+            const details = userParticipations.map(p => {
+                const teams = (p.teamMemberships || []).map(tm => tm.teamName).join(', ');
+                return `Event: ${p.eventName || p.eventId}, Teams: ${teams || 'None'}`;
+            }).join('\n');
+
+            alert(`User: ${user.firstName} ${user.lastName}\nEmail: ${user.email}\nPortal Admin: ${user.isPortalAdmin ? 'Yes' : 'No'}\n\n${details || 'No participations yet'}`);
+        }
+    </script>
+</body>
+</html>

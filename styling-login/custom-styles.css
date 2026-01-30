@@ -1,0 +1,90 @@
+/* 
+ * ACDC Portal - Custom Login Styles
+ * For Microsoft Entra External ID Login Pages
+ * 
+ * NOTE: Microsoft only supports limited CSS customization.
+ * Supported properties vary - test thoroughly after upload.
+ * Max file size: 25 KB
+ */
+
+/* ===== Background & Container ===== */
+.ext-sign-in-box {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* ===== Typography ===== */
+.ext-title {
+    color: #1a365d !important;
+    font-weight: 700 !important;
+}
+
+.ext-subtitle {
+    color: #475569 !important;
+}
+
+/* ===== Buttons ===== */
+.ext-button-primary {
+    background-color: #3b82f6 !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 12px 24px !important;
+    transition: background-color 0.2s ease !important;
+}
+
+.ext-button-primary:hover {
+    background-color: #2563eb !important;
+}
+
+.ext-button-secondary {
+    background-color: transparent !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 8px !important;
+    color: #3b82f6 !important;
+}
+
+/* ===== Input Fields ===== */
+.ext-input {
+    border: 2px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+    font-size: 16px !important;
+    transition: border-color 0.2s ease !important;
+}
+
+.ext-input:focus {
+    border-color: #3b82f6 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* ===== Links ===== */
+.ext-link {
+    color: #3b82f6 !important;
+    text-decoration: none !important;
+}
+
+.ext-link:hover {
+    color: #2563eb !important;
+    text-decoration: underline !important;
+}
+
+/* ===== Error Messages ===== */
+.ext-error {
+    background-color: #fef2f2 !important;
+    border: 1px solid #fecaca !important;
+    border-radius: 8px !important;
+    color: #dc2626 !important;
+    padding: 12px !important;
+}
+
+/* ===== Footer ===== */
+.ext-footer {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.ext-footer a {
+    color: rgba(255, 255, 255, 0.9) !important;
+}

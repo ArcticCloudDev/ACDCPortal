@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event - ACDC Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Event page styles */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--text-muted);
+            text-decoration: none;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+        
+        .back-link:hover {
+            color: var(--primary-color);
+        }
+        
+        .event-banner {
+            background: linear-gradient(135deg, #0078d4 0%, #00bcf2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .event-banner.inactive {
+            background: linear-gradient(135deg, #6c757d 0%, #adb5bd 100%);
+        }
+        
+        .event-banner-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .event-banner h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .event-banner .event-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 0.9rem;
+            opacity: 0.95;
+        }
+        
+        .event-banner .status-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+        }
+        
+        .banner-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .banner-btn {
+            padding: 6px 12px;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: var(--border-radius);
+            background: rgba(255,255,255,0.15);
+            color: white;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+        
+        .banner-btn:hover {
+            background: rgba(255,255,255,0.25);
+        }
+        
+        .banner-btn.btn-logout:hover {
+            background: rgba(220,53,69,0.8);
+        }
+        
+        /* Teams section - no outer box */
+        .teams-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .teams-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .teams-header h2 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* My Teams - full width stacked layout */
+        .my-teams-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .team-card {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+        
+        .team-card-header {
+            padding: 15px 20px;
+            background: var(--primary-color);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .team-card-header h3 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+        
+        .team-admin-info {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        
+        .team-card-body {
+            padding: 20px;
+        }
+        
+        .team-stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+        
+        .team-stats span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        /* Participants grid - always 3 columns, flows naturally */
+        .participants-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        .participant-card, .empty-slot, .unlock-slot {
+            min-width: 0;
+        }
+        
+        @media (max-width: 768px) {
+            .participants-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .participants-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .participant-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .participant-card.editable {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .participant-card.editable:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 8px rgba(0, 120, 212, 0.15);
+        }
+        
+        .participant-card .name {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 5px;
+        }
+        
+        .participant-card .edit-participant-btn {
+            margin-top: 10px;
+        }
+        
+        .participant-card .detail-row {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .participant-card .detail-row.email {
+            color: var(--primary-color);
+        }
+        
+        .participant-card .roles {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 8px;
+        }
+        
+        .participant-card .role-tag {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 8px;
+        }
+        
+        .participant-card .role-tag.admin {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .participant-card .role-tag.participant {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .empty-slot {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 2px dashed #64b5f6;
+            border-radius: var(--border-radius);
+            padding: 30px 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #1976d2;
+            font-size: 0.9rem;
+            min-height: 120px;
+            transition: all 0.2s;
+        }
+        
+        .empty-slot.add-member-slot {
+            cursor: pointer;
+        }
+        
+        .empty-slot.add-member-slot:hover {
+            border-color: #1976d2;
+            background: linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.25);
+        }
+        
+        .empty-slot .add-icon {
+            font-size: 2rem;
+            font-weight: 300;
+            line-height: 1;
+            margin-bottom: 8px;
+            color: #1976d2;
+        }
+        
+        .empty-slot .add-text {
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        /* TBD participant cards */
+        .participant-card.tbd-card {
+            background: #fff8e1;
+            border: 2px dashed #ffc107;
+            position: relative;
+        }
+        
+        .tbd-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #ffc107;
+            color: #000;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        
+        .tbd-placeholder {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        
+        .tbd-card .btn-primary {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .tbd-card .btn-primary:hover {
+            background: #ffca28;
+        }
+        
+        /* Unlock slot */
+        .unlock-slot {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            border: 2px dashed #4caf50;
+            border-radius: var(--border-radius);
+            padding: 30px 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #2e7d32;
+            font-size: 0.9rem;
+            min-height: 120px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .unlock-slot:hover {
+            border-color: #2e7d32;
+            background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+        
+        .unlock-slot .unlock-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+        
+        .unlock-slot .unlock-text {
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        /* Readonly and TBD field styles */
+        .readonly-field {
+            background: var(--bg-color);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+        
+        .field-hint {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        .field-hint.tbd-hint {
+            color: #ffc107;
+        }
+        
+        /* Modal Tabs */
+        .modal-tabbed {
+            max-width: 550px;
+        }
+        
+        .modal-tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border-color);
+            margin: -20px -25px 20px -25px;
+            padding: 0 25px;
+            gap: 5px;
+        }
+        
+        .modal-tab {
+            padding: 12px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        
+        .modal-tab:hover {
+            color: var(--text-color);
+            background: rgba(0, 120, 212, 0.05);
+        }
+        
+        .modal-tab.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            font-weight: 500;
+        }
+        
+        .modal-tab.hidden {
+            display: none;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .tab-description {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        @media (max-width: 500px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Hotel Calendar */
+        .hotel-calendar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            padding: 15px 5px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        
+        .hotel-day {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 4px;
+            min-width: 40px;
+            flex-shrink: 0;
+        }
+        
+        .day-label {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--text-color);
+        }
+        
+        .day-date {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        
+        .hotel-night {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .hotel-night input[type="checkbox"] {
+            display: none;
+        }
+        
+        .night-checkbox {
+            width: 32px;
+            height: 32px;
+            border: 2px dashed #adb5bd;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+        
+        .night-checkbox:hover {
+            border-color: var(--primary-color);
+            transform: scale(1.05);
+        }
+        
+        .night-icon {
+            font-size: 0.85rem;
+            opacity: 0.3;
+            transition: all 0.2s;
+        }
+        
+        .hotel-night input[type="checkbox"]:checked + .night-checkbox {
+            background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+            border: 2px solid #1565c0;
+            box-shadow: 0 2px 6px rgba(25, 118, 210, 0.4);
+        }
+        
+        .hotel-night input[type="checkbox"]:checked + .night-checkbox .night-icon {
+            opacity: 1;
+            filter: brightness(0) invert(1);
+        }
+        
+        .hotel-summary {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px;
+            background: var(--bg-color);
+            border-radius: var(--border-radius);
+        }
+        
+        .summary-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        
+        .summary-count {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--primary-color);
+        }
+        
+        /* Role toggles */
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        /* Role toggles */
+        .role-toggles {
+            border-top: 1px solid var(--border-color);
+            padding-top: 15px;
+            margin-top: 10px;
+        }
+        
+        .toggle-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        
+        .toggle-label {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            cursor: pointer;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            transition: all 0.2s;
+            background: var(--card-background);
+        }
+        
+        .toggle-label:hover {
+            border-color: var(--primary-color);
+            background: rgba(0, 120, 212, 0.05);
+        }
+        
+        .toggle-label input[type="checkbox"] {
+            margin: 2px 0 0 0;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        
+        .toggle-content {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .toggle-text {
+            font-weight: 500;
+            color: var(--text-color);
+        }
+        
+        .toggle-hint {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        
+        .toggle-label input[type="checkbox"]:checked + .toggle-content .toggle-text {
+            color: var(--primary-color);
+        }
+        
+        /* Radio button group */
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        
+        .radio-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            transition: all 0.2s;
+        }
+        
+        .radio-label:hover {
+            border-color: var(--primary-color);
+            background: rgba(0, 120, 212, 0.05);
+        }
+        
+        .radio-label input[type="radio"] {
+            margin: 0;
+        }
+        
+        .radio-label input[type="radio"]:checked + span {
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+        
+        /* Team file uploads section */
+        .team-uploads {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .team-uploads h4 {
+            margin: 0 0 15px 0;
+            font-size: 1rem;
+            color: var(--text-color);
+        }
+        
+        .uploads-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        @media (max-width: 600px) {
+            .uploads-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .upload-box {
+            background: var(--bg-color);
+            border: 2px dashed var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .upload-box:hover {
+            border-color: var(--primary-color);
+            background: rgba(0, 120, 212, 0.05);
+        }
+        
+        .upload-box.has-file {
+            border-style: solid;
+            border-color: var(--success-color, #28a745);
+            background: rgba(40, 167, 69, 0.05);
+        }
+        
+        .upload-box .upload-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .upload-box .upload-label {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        
+        .upload-box .upload-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+        
+        .upload-box .upload-status {
+            font-size: 0.85rem;
+            color: var(--success-color, #28a745);
+            margin-top: 8px;
+        }
+        
+        .upload-box input[type="file"] {
+            display: none;
+        }
+        
+        .upload-box .btn-upload {
+            padding: 6px 16px;
+            font-size: 0.85rem;
+        }
+        
+        .upload-box .file-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .upload-box .file-name {
+            font-size: 0.85rem;
+            color: var(--text-color);
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .upload-box .btn-remove {
+            background: none;
+            border: none;
+            color: var(--danger-color, #dc3545);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 2px;
+        }
+        
+        .team-card-footer {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+        }
+        
+        /* Create team button - standalone */
+        .create-team-section {
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .solo-hint {
+            margin-top: 12px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        .btn-lg {
+            padding: 15px 30px;
+            font-size: 1.1rem;
+        }
+        
+        /* Solo Queue Status */
+        .solo-queue-status {
+            margin-top: 20px;
+        }
+        
+        .queue-card {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            border: 2px solid #ff9800;
+            border-radius: var(--border-radius);
+            padding: 30px;
+            text-align: center;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .queue-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        
+        .queue-card h3 {
+            margin: 0 0 10px 0;
+            color: #e65100;
+        }
+        
+        .queue-card p {
+            margin: 0 0 10px 0;
+            color: #5d4037;
+        }
+        
+        .queue-position {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin: 15px 0 !important;
+        }
+        
+        .queue-position span {
+            color: #e65100;
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #e65100;
+            color: #e65100;
+        }
+        
+        .btn-outline:hover {
+            background: #e65100;
+            color: white;
+        }
+        
+        /* Solo Queue Modal Info */
+        .solo-queue-info {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .solo-queue-info p {
+            margin: 0 0 10px 0;
+            color: var(--text-color);
+        }
+        
+        .solo-queue-info ul {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+        
+        .solo-queue-info li {
+            margin: 5px 0;
+            color: var(--text-color);
+        }
+        
+        .solo-queue-info .info-note {
+            font-size: 0.9rem;
+            color: #1565c0;
+            font-style: italic;
+            margin-bottom: 0;
+        }
+        
+        /* Empty state */
+        .empty-teams {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            border: 2px dashed var(--border-color);
+        }
+        
+        .empty-teams .icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+        
+        /* Create Team Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+        
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+        
+        .modal-close:hover {
+            color: var(--text-color);
+        }
+        
+        /* Team details modal */
+        .team-members-list {
+            margin-top: 20px;
+        }
+        
+        .member-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: var(--bg-color);
+            border-radius: var(--border-radius);
+            margin-bottom: 10px;
+        }
+        
+        .member-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .member-info .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        
+        .member-info .name {
+            font-weight: 500;
+        }
+        
+        .member-info .email {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        .member-roles {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .role-badge {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .role-badge.admin {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .role-badge.participant {
+            background: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="max-width: 1000px;">
+        <!-- Back link -->
+        <a href="events.html" class="back-link">← Back to Events</a>
+        
+        <!-- Loading -->
+        <div id="loading" class="card">
+            <p>Loading event...</p>
+        </div>
+
+        <!-- Event Content -->
+        <div id="content" class="hidden">
+            <!-- Event Banner -->
+            <div id="event-banner" class="event-banner">
+                <div class="event-banner-left">
+                    <h1><span id="event-name">ACDC 2026</span></h1>
+                    <div class="event-info">
+                        <span>📅 <span id="event-dates">Mar 12-15, 2026</span></span>
+                        <span>📍 <span id="event-location">Tromsø</span></span>
+                        <span id="event-status" class="status-badge">✓ Open</span>
+                    </div>
+                </div>
+                <div class="banner-controls">
+                    <button id="profile-btn" class="banner-btn">👤 Profile</button>
+                    <button id="logout-btn" class="banner-btn btn-logout">Log Out</button>
+                </div>
+            </div>
+
+            <!-- Teams Section -->
+            <div class="teams-section">
+                <div id="my-teams-container" class="my-teams-container">
+                    <!-- User's team cards will be inserted here -->
+                </div>
+                
+                <div id="no-teams" class="empty-teams hidden">
+                    <div class="icon">👥</div>
+                    <p>You are not part of any team for this event yet</p>
+                </div>
+            </div>
+            
+            <div id="create-team-section" class="create-team-section">
+                <div class="action-buttons">
+                    <button id="create-team-btn" class="btn btn-primary btn-lg">+ Create New Team</button>
+                    <button id="join-solo-btn" class="btn btn-secondary btn-lg">🎲 Join Solo Queue</button>
+                </div>
+                <p class="solo-hint">No team? Join solo and we'll match you with others!</p>
+            </div>
+            
+            <!-- Solo Queue Status (shown when in queue) -->
+            <div id="solo-queue-status" class="solo-queue-status hidden">
+                <div class="queue-card">
+                    <div class="queue-icon">🎲</div>
+                    <h3>You're in the Solo Queue!</h3>
+                    <p>We'll match you with other solo players or teams looking for members.</p>
+                    <p class="queue-position">Position: <span id="queue-position">-</span></p>
+                    <button id="leave-queue-btn" class="btn btn-outline">Leave Queue</button>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2026 ACDC Portal</p>
+        </footer>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>👤 Your Profile</h2>
+                <button class="modal-close" id="close-profile">&times;</button>
+            </div>
+            
+            <form id="profile-form">
+                <div class="form-group">
+                    <label for="firstName">First Name *</label>
+                    <input type="text" id="firstName" name="firstName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="lastName">Last Name *</label>
+                    <input type="text" id="lastName" name="lastName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" readonly class="readonly">
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone *</label>
+                    <input type="tel" id="phone" name="phone" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gamertag">Gamertag</label>
+                    <input type="text" id="gamertag" name="gamertag" 
+                           placeholder="Your gaming username (optional)">
+                </div>
+                
+                <div class="form-group">
+                    <label for="allergies">Allergies / Dietary Requirements</label>
+                    <textarea id="allergies" name="allergies" rows="3" 
+                              maxlength="500" placeholder="Enter any allergies or dietary requirements..."></textarea>
+                </div>
+
+                <div id="profile-error" class="error-message hidden"></div>
+                <div id="profile-success" class="success-message hidden"></div>
+                
+                <button type="submit" class="btn btn-primary" id="save-profile-btn">
+                    <span class="btn-text">Save Profile</span>
+                    <span class="btn-loading hidden">Saving...</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Team Modal -->
+    <div id="create-team-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🏔️ Create New Team</h2>
+                <button class="modal-close" id="close-create-team">&times;</button>
+            </div>
+            
+            <form id="create-team-form">
+                <div class="form-group">
+                    <label for="teamName">Team Name *</label>
+                    <input type="text" id="teamName" name="teamName" required 
+                           placeholder="Enter team name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="expectedParticipants">Expected Participants *</label>
+                    <select id="expectedParticipants" name="expectedParticipants" required>
+                        <option value="">Select...</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                    <p class="field-hint">Maximum 5 participants per team. This determines the locked-in cost.</p>
+                </div>
+                
+                <div class="form-group">
+                    <label>Will you participate in the event?</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="creatorParticipates" value="yes" checked>
+                            <span>Yes, I will participate</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="creatorParticipates" value="no">
+                            <span>No, I'm only the team admin</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="create-team-error" class="error-message hidden"></div>
+                <div id="create-team-success" class="success-message hidden"></div>
+                
+                <button type="submit" class="btn btn-primary" id="create-team-submit">
+                    <span class="btn-text">Create Team</span>
+                    <span class="btn-loading hidden">Creating...</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Invite Member Modal -->
+    <div id="invite-member-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>➕ Invite Team Member</h2>
+                <button class="modal-close" id="close-invite-member">&times;</button>
+            </div>
+            
+            <form id="invite-member-form">
+                <input type="hidden" id="invite-teamId">
+                
+                <p>Invite a new member to <strong id="invite-teamName"></strong></p>
+                
+                <div class="form-group">
+                    <label for="invite-email">Email Address *</label>
+                    <input type="email" id="invite-email" name="email" required 
+                           placeholder="Enter email address">
+                </div>
+                
+                <div id="invite-error" class="error-message hidden"></div>
+                <div id="invite-success" class="success-message hidden"></div>
+                
+                <button type="submit" class="btn btn-primary" id="send-invite-btn">
+                    <span class="btn-text">Send Invitation</span>
+                    <span class="btn-loading hidden">Sending...</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Team Details Modal -->
+    <div id="team-details-modal" class="modal-overlay">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 id="team-modal-title">👥 Team Name</h2>
+                <button class="modal-close" id="close-team-details">&times;</button>
+            </div>
+            
+            <div id="team-modal-content">
+                <div class="team-members-list" id="team-members-list">
+                    <!-- Members will be loaded here -->
+                </div>
+                
+                <div id="team-admin-actions" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                    <h4>Admin Actions</h4>
+                    <button id="invite-member-btn" class="btn btn-secondary btn-small">+ Invite Member</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Solo Queue Modal -->
+    <div id="solo-queue-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🎲 Join Solo Queue</h2>
+                <button class="modal-close" id="close-solo-queue">&times;</button>
+            </div>
+            
+            <div class="solo-queue-info">
+                <p>Don't have a full team? No problem! Join our solo queue and we'll match you with:</p>
+                <ul>
+                    <li>Other solo players looking for a team</li>
+                    <li>Teams that need additional members</li>
+                </ul>
+                <p class="info-note">You'll be notified by email when you're matched with a team.</p>
+            </div>
+            
+            <form id="solo-queue-form">
+                <div class="form-group">
+                    <label for="solo-note">Note (optional)</label>
+                    <textarea id="solo-note" rows="3" placeholder="Tell us about your skills, preferences, or anything else..." maxlength="500"></textarea>
+                    <span class="field-hint">E.g., "Experienced in C#, prefer backend work"</span>
+                </div>
+                
+                <div id="solo-queue-error" class="error-message hidden"></div>
+                <div id="solo-queue-success" class="success-message hidden"></div>
+                
+                <button type="submit" class="btn btn-primary" id="join-queue-btn">
+                    <span class="btn-text">Join Solo Queue</span>
+                    <span class="btn-loading hidden">Joining...</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Participant Modal -->
+    <div id="edit-participant-modal" class="modal-overlay">
+        <div class="modal modal-tabbed">
+            <div class="modal-header">
+                <h2>✏️ Edit Participant</h2>
+                <button class="modal-close" id="close-edit-participant">&times;</button>
+            </div>
+            
+            <!-- Tab Navigation -->
+            <div class="modal-tabs">
+                <button class="modal-tab active" data-tab="tab-personal">👤 Personal</button>
+                <button class="modal-tab" data-tab="tab-hotel">🏨 Hotel</button>
+                <button class="modal-tab" data-tab="tab-roles" id="tab-roles-btn">🔑 Roles</button>
+            </div>
+            
+            <form id="edit-participant-form">
+                <input type="hidden" id="edit-userId">
+                <input type="hidden" id="edit-participationId">
+                <input type="hidden" id="edit-teamId">
+                
+                <!-- Personal Info Tab -->
+                <div class="tab-content active" id="tab-personal">
+                    <div class="form-group">
+                        <label for="edit-email">Email</label>
+                        <input type="email" id="edit-email" name="email" readonly class="readonly-field">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-firstName">First Name *</label>
+                            <input type="text" id="edit-firstName" name="firstName" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="edit-lastName">Last Name *</label>
+                            <input type="text" id="edit-lastName" name="lastName" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-phone">Phone *</label>
+                            <input type="tel" id="edit-phone" name="phone" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="edit-gamertag">Gamertag</label>
+                            <input type="text" id="edit-gamertag" name="gamertag" 
+                                   placeholder="Gaming username (optional)">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-allergies">Allergies / Dietary Requirements</label>
+                        <textarea id="edit-allergies" name="allergies" rows="3" 
+                                  maxlength="500" placeholder="Enter any allergies or dietary requirements..."></textarea>
+                    </div>
+                </div>
+                
+                <!-- Hotel Tab -->
+                <div class="tab-content" id="tab-hotel">
+                    <p class="tab-description">Select which nights you need hotel accommodation. Check the boxes between the days you'll be staying.</p>
+                    
+                    <div class="hotel-calendar" id="hotel-calendar-container">
+                        <!-- Dynamic calendar will be generated from event data -->
+                    </div>
+                    
+                    <div class="hotel-summary">
+                        <span class="summary-label">Nights selected:</span>
+                        <span class="summary-count" id="hotel-nights-count">0</span>
+                    </div>
+                </div>
+                
+                <!-- Roles Tab (admin only) -->
+                <div class="tab-content" id="tab-roles">
+                    <p class="tab-description">Configure team membership roles for this participant.</p>
+                    
+                    <div class="toggle-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="edit-isAdmin">
+                            <div class="toggle-content">
+                                <span class="toggle-text">Admin</span>
+                                <span class="toggle-hint">Can manage team, invite members, and edit participant info</span>
+                            </div>
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="edit-isParticipant">
+                            <div class="toggle-content">
+                                <span class="toggle-text">Participant</span>
+                                <span class="toggle-hint">Counts toward team size and will attend the event</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="edit-participant-error" class="error-message hidden"></div>
+                <div id="edit-participant-success" class="success-message hidden"></div>
+                
+                <button type="submit" class="btn btn-primary" id="save-participant-btn">
+                    <span class="btn-text">Save Changes</span>
+                    <span class="btn-loading hidden">Saving...</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MSAL for Entra External ID Email OTP -->
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/event-page.js"></script>
+</body>
+</html>

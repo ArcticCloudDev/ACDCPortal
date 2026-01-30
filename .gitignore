@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Local data (persists locally, not in repo)
+data/
+
+# Local settings
+local.settings.json
+.env
+
+# Build outputs
+dist/
+
+# IDE
+.vscode/settings.json
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Azure Functions
+bin/
+obj/

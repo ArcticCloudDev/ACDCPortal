@@ -1,0 +1,20 @@
+{
+  "name": "acdc-portal-api",
+  "version": "1.0.0",
+  "description": "ACDC Portal API - Azure Functions v4",
+  "main": "src/functions/*.js",
+  "scripts": {
+    "start": "func start",
+    "test": "echo \"No tests yet\""
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.6.0",
+    "@azure/identity": "^4.13.0",
+    "@azure/msal-node": "^2.6.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "uuid": "^11.0.0"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "displayName": "TeamName",
+  "description": "Name of the team for ACDC registration",
+  "dataType": "string"
+}

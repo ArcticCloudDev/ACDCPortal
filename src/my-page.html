@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - ACDC Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Dashboard-specific styles */
+        .event-banner {
+            background: linear-gradient(135deg, #0078d4 0%, #00bcf2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        
+        .event-banner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        
+        .event-banner h2 {
+            margin: 0;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .event-banner h2 .logo {
+            font-size: 1.8rem;
+        }
+        
+        .banner-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .banner-btn {
+            padding: 8px 14px;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: var(--border-radius);
+            background: rgba(255,255,255,0.15);
+            color: white;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+        
+        .banner-btn:hover {
+            background: rgba(255,255,255,0.25);
+        }
+        
+        .banner-btn.btn-logout {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .banner-btn.btn-logout:hover {
+            background: rgba(220,53,69,0.8);
+        }
+        
+        .event-selector {
+            padding: 8px 12px;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: var(--border-radius);
+            background: rgba(255,255,255,0.15);
+            color: white;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        
+        .event-selector option {
+            color: #333;
+            background: white;
+        }
+        
+        .event-banner .event-details {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        
+        .event-banner .event-details span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .event-banner .status-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        
+        @media (min-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        .dashboard-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dashboard-card h3 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 15px 0;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .dashboard-card .card-icon {
+            font-size: 1.5rem;
+        }
+        
+        .team-status {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .team-status.no-team {
+            color: var(--text-muted);
+        }
+        
+        .team-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .team-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: var(--bg-color);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+        }
+        
+        .team-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .team-item-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .team-item-roles {
+            display: flex;
+            gap: 8px;
+            font-size: 0.85rem;
+        }
+        
+        .role-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+        }
+        
+        .role-badge.admin {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .role-badge.participant {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .team-item-count {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        .team-item-actions {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .team-info {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .team-info .team-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        
+        .team-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        /* Profile Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+        
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+        
+        .modal-close:hover {
+            color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="max-width: 900px;">
+        <main>
+            <!-- Loading -->
+            <div id="loading" class="card">
+                <p>Loading dashboard...</p>
+            </div>
+
+            <!-- Dashboard Content -->
+            <div id="dashboard" class="hidden">
+                <!-- Event Banner (combined header) -->
+                <div id="event-banner" class="event-banner">
+                    <div class="event-banner-header">
+                        <h2><span class="logo">🏔️</span> <span id="event-title">ACDC 2026</span></h2>
+                        <div class="banner-controls">
+                            <select id="event-selector" class="event-selector">
+                                <option value="">Loading...</option>
+                            </select>
+                            <button id="profile-btn" class="banner-btn">👤 Profile</button>
+                            <button id="logout-btn" class="banner-btn btn-logout">Log Out</button>
+                        </div>
+                    </div>
+                    <div class="event-details">
+                        <span>📅 <span id="event-dates">12-15. mars 2026</span></span>
+                        <span>📍 <span id="event-location">Tromsø</span></span>
+                    </div>
+                    <div id="event-status" class="status-badge">Registrering åpen</div>
+                </div>
+
+                <!-- Dashboard Grid -->
+                <div class="dashboard-grid">
+                    <!-- Team Card -->
+                    <div class="dashboard-card">
+                        <h3><span class="card-icon">👥</span> Your Teams</h3>
+                        
+                        <!-- No Teams -->
+                        <div id="no-team" class="team-status no-team">
+                            <p>You're not on a team yet</p>
+                            <div class="team-actions" style="justify-content: center;">
+                                <button id="create-team-btn" class="btn btn-primary">Create Team</button>
+                            </div>
+                            <p class="field-hint" style="margin-top: 15px;">Team admins can invite you to join their team.</p>
+                        </div>
+                        
+                        <!-- Has Teams -->
+                        <div id="has-team" class="team-list hidden">
+                            <!-- Teams will be populated dynamically -->
+                        </div>
+                        
+                        <div id="create-another-team" class="hidden" style="margin-top: 15px;">
+                            <button id="create-team-btn-2" class="btn btn-secondary btn-small">+ Create Another Team</button>
+                        </div>
+                    </div>
+
+                    <!-- Hotel Card -->
+                    <div class="dashboard-card">
+                        <h3><span class="card-icon">🏨</span> Hotel</h3>
+                        
+                        <p class="field-hint" style="margin-bottom: 15px;">Select which nights you need accommodation:</p>
+                        
+                        <div class="hotel-nights">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="hotel-wed-thu">
+                                <span>Wednesday → Thursday</span>
+                            </label>
+                            
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="hotel-thu-sun" checked>
+                                <span>Thursday → Sunday (Standard)</span>
+                            </label>
+                            
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="hotel-sun-mon">
+                                <span>Sunday → Monday</span>
+                            </label>
+                        </div>
+
+                        <div id="hotel-error" class="error-message hidden" style="margin-top: 15px;"></div>
+                        <div id="hotel-success" class="success-message hidden" style="margin-top: 15px;"></div>
+                        
+                        <button type="button" class="btn btn-primary" id="save-hotel-btn" style="margin-top: 15px;">
+                            <span class="btn-text">Save</span>
+                            <span class="btn-loading hidden">Saving...</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 ACDC Portal</p>
+        </footer>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>👤 Your Profile</h2>
+                <button class="modal-close" id="close-profile">&times;</button>
+            </div>
+            
+            <form id="profile-form">
+                <div class="form-group">
+                    <label for="firstName">First Name *</label>
+                    <input type="text" id="firstName" name="firstName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="lastName">Last Name *</label>
+                    <input type="text" id="lastName" name="lastName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" readonly class="readonly">
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone *</label>
+                    <input type="tel" id="phone" name="phone" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="allergies">Allergies / Dietary Requirements</label>
+                    <textarea id="allergies" name="allergies" rows="3" 
+                              maxlength="500" placeholder="Enter any allergies or dietary requirements..."></textarea>
+                </div>
+
+                <div id="profile-error" class="error-message hidden"></div>
+                <div id="profile-success" class="success-message hidden"></div>
+                
+                <button type="submit" class="btn btn-primary" id="save-btn">
+                    <span class="btn-text">Save Profile</span>
+                    <span class="btn-loading hidden">Saving...</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Team Modal -->
+    <div id="create-team-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🏔️ Create New Team</h2>
+                <button class="modal-close" id="close-create-team">&times;</button>
+            </div>
+            
+            <form id="register-team-form">
+                <div class="form-group">
+                    <label for="teamName">Team Name *</label>
+                    <input type="text" id="teamName" name="teamName" required 
+                           placeholder="Enter team name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="numberOfParticipants">Number of Participants *</label>
+                    <select id="numberOfParticipants" name="numberOfParticipants" required>
+                        <option value="">Select...</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                    </select>
+                </div>
+                
+                <div id="team-register-error" class="error-message hidden"></div>
+                <div id="team-register-success" class="success-message hidden"></div>
+                
+                <button type="submit" class="btn btn-primary" id="register-team-btn">
+                    <span class="btn-text">Create Team</span>
+                    <span class="btn-loading hidden">Creating...</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MSAL for Entra External ID Email OTP -->
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/my-page.js"></script>
+</body>
+</html>
