@@ -452,6 +452,45 @@ const API = {
                 body: JSON.stringify({ userId, eventId })
             });
         }
+    },
+
+    // Sequences endpoints
+    sequences: {
+        async list(eventId = null) {
+            const url = eventId ? `/sequences?eventId=${eventId}` : '/sequences';
+            return API.request(url);
+        },
+
+        async get(sequenceId) {
+            return API.request(`/sequences/${sequenceId}`);
+        },
+
+        async create(data) {
+            return API.request('/sequences', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+        },
+
+        async update(sequenceId, data) {
+            return API.request(`/sequences/${sequenceId}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        },
+
+        async delete(sequenceId) {
+            return API.request(`/sequences/${sequenceId}`, {
+                method: 'DELETE'
+            });
+        },
+
+        async copy(sequenceId, targetEventId) {
+            return API.request(`/sequences/${sequenceId}/copy`, {
+                method: 'POST',
+                body: JSON.stringify({ targetEventId })
+            });
+        }
     }
 };
 

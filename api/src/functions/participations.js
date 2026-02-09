@@ -18,6 +18,11 @@ const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
 const { sendEmail } = require('../shared/mail');
 
+// Helper to check if event status means it's active (visible to public)
+function isActiveStatus(status) {
+    return status === 'pre-registration' || status === 'registration' || status === 'live';
+}
+
 // Helper to generate ID
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -176,7 +181,7 @@ app.http('participations-get', {
             let targetEventId = eventId;
             if (!targetEventId) {
                 const events = await eventsStorage.getAll();
-                const activeEvent = events.find(e => e.isActive);
+                const activeEvent = events.find(e => isActiveStatus(e.status));
                 if (activeEvent) {
                     targetEventId = activeEvent.id;
                 }

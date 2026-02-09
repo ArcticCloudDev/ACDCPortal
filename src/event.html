@@ -759,6 +759,60 @@
             gap: 10px;
         }
         
+        /* Pre-registration info section */
+        .pre-reg-section {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border: 2px solid #f59e0b;
+            border-radius: var(--border-radius);
+            padding: 40px 30px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .pre-reg-section .pre-reg-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .pre-reg-section h2 {
+            margin: 0 0 12px;
+            color: #78350f;
+            font-size: 1.4rem;
+        }
+
+        .pre-reg-section p {
+            color: #92400e;
+            font-size: 1rem;
+            margin: 0 0 8px;
+            line-height: 1.5;
+        }
+
+        .pre-reg-section .btn-interest {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 32px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .pre-reg-section .btn-interest:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+        }
+
+        .pre-reg-section .pre-reg-hint {
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: #a16207;
+        }
+
         /* Create team button - standalone */
         .create-team-section {
             text-align: center;
@@ -1031,6 +1085,15 @@
                     <button id="profile-btn" class="banner-btn">👤 Profile</button>
                     <button id="logout-btn" class="banner-btn btn-logout">Log Out</button>
                 </div>
+            </div>
+
+            <!-- Pre-Registration Info (shown when event is in pre-registration status) -->
+            <div id="pre-reg-section" class="pre-reg-section hidden">
+                <div class="pre-reg-icon">🔔</div>
+                <h2>This Event is in Pre-Registration</h2>
+                <p>Registration hasn't opened yet, but you can register your interest<br>to be notified as soon as it does!</p>
+                <a id="interest-link" href="#" class="btn-interest">Register Interest</a>
+                <p class="pre-reg-hint">No account needed — just your name and email.</p>
             </div>
 
             <!-- Teams Section -->

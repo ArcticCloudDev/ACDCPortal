@@ -117,26 +117,26 @@ app.http('email-campaigns-create', {
     handler: async (request, context) => {
         try {
             const body = await request.json();
-            const { eventId, subject, content, ctaUrl, ctaText, createdBy } = body;
+            const { sequenceId, subject, content, ctaUrl, ctaText, createdBy } = body;
 
-            if (!eventId || !subject || !content) {
-                return { status: 400, jsonBody: { error: 'eventId, subject, and content are required' } };
+            if (!sequenceId || !subject || !content) {
+                return { status: 400, jsonBody: { error: 'sequenceId, subject, and content are required' } };
             }
 
             const data = await campaignsStorage.getRaw() || { campaigns: [] };
 
-            // All campaigns are sequence type (auto-sent to new joiners)
-            const eventSequences = data.campaigns.filter(c => c.eventId === eventId);
-            const sequenceOrder = eventSequences.length + 1;
+            // Calculate sequence order within this sequence
+            const sequenceEmails = data.campaigns.filter(c => c.sequenceId === sequenceId);
+            const sequenceOrder = sequenceEmails.length + 1;
 
             const campaign = {
                 id: generateId(),
-                eventId,
+                sequenceId,
                 subject,
                 content,
                 ctaUrl: ctaUrl || null,
                 ctaText: ctaText || null,
-                type: 'sequence', // Always sequence type
+                type: 'sequence',
                 sequenceOrder,
                 createdAt: new Date().toISOString(),
                 createdBy: createdBy || null

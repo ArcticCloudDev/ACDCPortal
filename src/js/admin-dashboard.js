@@ -109,13 +109,23 @@ function renderEventsList() {
     const displayEvents = allEvents.slice(0, 5);
 
     eventsList.innerHTML = displayEvents.map(event => {
-        const isActive = event.isActive;
+        const status = event.status || 'draft';
+        const isActive = status === 'pre-registration' || status === 'registration' || status === 'live';
         const startDate = new Date(event.startDate).toLocaleDateString('en-US', {
             month: 'short', day: 'numeric', year: 'numeric'
         });
         
         // Count teams for this event
         const eventTeams = allTeams.filter(t => t.eventId === event.id);
+        
+        // Status labels
+        const statusLabels = {
+            'draft': 'Draft',
+            'pre-registration': 'Pre-Registration',
+            'registration': 'Registration',
+            'live': 'Live',
+            'completed': 'Completed'
+        };
         
         return `
             <div class="event-row">
@@ -127,8 +137,8 @@ function renderEventsList() {
                         <span class="badge count">${eventTeams.length} teams</span>
                     </div>
                 </div>
-                <span class="badge ${isActive ? 'active' : 'inactive'}">
-                    ${isActive ? 'Active' : 'Inactive'}
+                <span class="badge ${status}">
+                    ${statusLabels[status] || status}
                 </span>
                 <div style="margin-left: 12px; display: flex; gap: 6px;">
                     <a href="event.html?id=${event.id}" class="btn-sm">View</a>

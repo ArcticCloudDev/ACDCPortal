@@ -34,7 +34,7 @@ function renderAdminSidebar(activePage = '') {
                     <span class="icon">✉️</span><span>Quick Email</span>
                 </a>
                 <a href="admin-campaigns.html" class="nav-item ${activePage === 'campaigns' ? 'active' : ''}">
-                    <span class="icon">📧</span><span>Sequence Emails</span>
+                    <span class="icon">📧</span><span>Sequences</span>
                 </a>
 
                 <div class="nav-section">Settings</div>

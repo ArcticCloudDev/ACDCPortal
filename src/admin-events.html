@@ -63,10 +63,10 @@
 
         /* Status badges */
         .badge.draft { background: #f1f5f9; color: #475569; }
-        .badge.waitlist { background: #fef3c7; color: #92400e; }
+        .badge.pre-registration { background: #fef3c7; color: #92400e; }
         .badge.registration { background: #dbeafe; color: #1d4ed8; }
         .badge.live { background: #d1fae5; color: #065f46; }
-        .badge.completed { background: #e2e8f0; color: #64748b; }
+        .badge.completed { background: #f3e8ff; color: #7c3aed; }
         
         /* Type badges */
         .badge.team { background: #ede9fe; color: #7c3aed; }
@@ -141,48 +141,170 @@
             color: var(--admin-sidebar);
         }
 
-        .status-workflow {
+        /* Status Stepper - Professional Progress Indicator */
+        .status-stepper {
             display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: space-between;
+            position: relative;
+            margin: 0 0 16px 0;
+            padding: 0;
+        }
+
+        .status-stepper::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 40px;
+            right: 40px;
+            height: 3px;
+            background: #e2e8f0;
+            z-index: 0;
         }
 
         .status-step {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 8px;
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            max-width: 140px;
         }
 
-        .status-btn {
-            padding: 8px 16px;
-            border: 2px solid var(--admin-border);
+        .step-indicator {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 600;
+            border: 3px solid #e2e8f0;
             background: white;
-            border-radius: 6px;
+            color: #94a3b8;
             cursor: pointer;
-            font-size: 0.8rem;
-            font-weight: 500;
-            transition: all 0.15s;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .step-indicator:hover:not(.disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .step-label {
+            margin-top: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            line-height: 1.3;
+        }
+
+        /* Completed steps */
+        .status-step.completed .step-indicator {
+            background: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+        .status-step.completed .step-label {
+            color: #10b981;
+        }
+
+        /* Current step */
+        .status-step.current .step-indicator {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: white;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+        }
+        .status-step.current .step-label {
+            color: #2563eb;
+            font-weight: 700;
+        }
+
+        /* Available (clickable) step */
+        .status-step.available .step-indicator {
+            border-color: #60a5fa;
+            color: #60a5fa;
+            cursor: pointer;
+        }
+        .status-step.available .step-indicator:hover {
+            background: #eff6ff;
+        }
+
+        /* Disabled/future steps */
+        .status-step.disabled .step-indicator {
+            cursor: not-allowed;
             opacity: 0.5;
         }
 
-        .status-btn:hover:not(:disabled) { opacity: 0.8; }
-        .status-btn.current { opacity: 1; border-color: var(--admin-primary); background: #eff6ff; }
-        .status-btn.available { opacity: 1; cursor: pointer; }
-        .status-btn:disabled { cursor: not-allowed; }
+        /* Allow clicking on previous (completed) steps to go back */
+        .status-step.completed .step-indicator {
+            cursor: pointer;
+        }
+        .status-step.completed .step-indicator:hover {
+            background: #059669;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
 
-        .status-btn.draft { border-color: #94a3b8; }
-        .status-btn.draft.current { background: #f1f5f9; border-color: #475569; }
-        .status-btn.waitlist { border-color: #fbbf24; }
-        .status-btn.waitlist.current { background: #fef3c7; border-color: #d97706; }
-        .status-btn.registration { border-color: #60a5fa; }
-        .status-btn.registration.current { background: #dbeafe; border-color: #2563eb; }
-        .status-btn.live { border-color: #34d399; }
-        .status-btn.live.current { background: #d1fae5; border-color: #059669; }
+        /* Progress line fill */
+        .status-stepper .progress-line {
+            position: absolute;
+            top: 20px;
+            left: 40px;
+            height: 3px;
+            background: linear-gradient(90deg, #10b981 0%, #2563eb 100%);
+            z-index: 0;
+            transition: width 0.3s ease;
+            border-radius: 2px;
+        }
 
-        .status-arrow {
-            color: var(--admin-text-muted);
+        /* Current status banner */
+        .current-status-banner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-radius: 10px;
+            border-left: 4px solid #2563eb;
+            margin-top: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .current-status-banner .status-icon {
+            font-size: 1.75rem;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .current-status-banner .status-info {
+            flex: 1;
+        }
+
+        .current-status-banner .status-title {
+            font-weight: 700;
+            color: #1e40af;
             font-size: 1rem;
+            margin: 0 0 4px 0;
+        }
+
+        .current-status-banner .status-description {
+            color: #3b82f6;
+            font-size: 0.875rem;
+            margin: 0;
         }
 
         .team-fields { display: none; }
@@ -348,24 +470,36 @@
                     <!-- Status Workflow (only shown when editing) -->
                     <div id="status-section" class="status-section hidden">
                         <h3>Event Status</h3>
-                        <div class="status-workflow">
-                            <div class="status-step">
-                                <button type="button" class="status-btn draft" data-status="draft">📝 Draft</button>
+                        <div class="status-stepper">
+                            <div class="progress-line" id="progress-line"></div>
+                            <div class="status-step" data-status="draft">
+                                <div class="step-indicator">1</div>
+                                <span class="step-label">Draft</span>
                             </div>
-                            <span class="status-arrow">→</span>
-                            <div class="status-step">
-                                <button type="button" class="status-btn waitlist" data-status="waitlist">📋 Waiting List</button>
+                            <div class="status-step" data-status="pre-registration">
+                                <div class="step-indicator">2</div>
+                                <span class="step-label">Pre-Reg</span>
                             </div>
-                            <span class="status-arrow">→</span>
-                            <div class="status-step">
-                                <button type="button" class="status-btn registration" data-status="registration">✅ Registration</button>
+                            <div class="status-step" data-status="registration">
+                                <div class="step-indicator">3</div>
+                                <span class="step-label">Registration</span>
                             </div>
-                            <span class="status-arrow">→</span>
-                            <div class="status-step">
-                                <button type="button" class="status-btn live" data-status="live">🚀 Live</button>
+                            <div class="status-step" data-status="live">
+                                <div class="step-indicator">4</div>
+                                <span class="step-label">Live</span>
+                            </div>
+                            <div class="status-step" data-status="completed">
+                                <div class="step-indicator">5</div>
+                                <span class="step-label">Completed</span>
                             </div>
                         </div>
-                        <p class="help-text" id="status-help" style="margin-top: 12px;"></p>
+                        <div class="current-status-banner" id="status-banner">
+                            <span class="status-icon" id="status-icon">📝</span>
+                            <div class="status-info">
+                                <p class="status-title" id="status-title">Draft</p>
+                                <p class="status-description" id="status-description">Event is in draft mode. Only visible to committee members.</p>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Tabs Navigation -->
@@ -373,6 +507,8 @@
                         <button class="tab-btn active" data-tab="general">📋 General</button>
                         <button class="tab-btn" data-tab="committee" id="committee-tab-btn">👔 Committee</button>
                         <button class="tab-btn" data-tab="judges" id="judges-tab-btn">⚖️ Judges</button>
+                        <button class="tab-btn" data-tab="leads" id="leads-tab-btn">📧 Interest Leads</button>
+                        <button class="tab-btn" data-tab="teams" id="teams-tab-btn">👥 Teams</button>
                     </div>
 
                     <!-- Tab Panels -->
@@ -453,6 +589,20 @@
                                                     <input type="number" id="max-team-size" min="1" max="10" value="5">
                                                 </div>
                                             </div>
+                                        </div>
+
+                                        <div class="form-group" style="margin-top: 16px;">
+                                            <label>� Email Sequence</label>
+                                            <select id="event-sequence">
+                                                <option value="">No sequence (no automated emails)</option>
+                                            </select>
+                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Choose an email sequence to send to interest leads for this event.</small>
+                                        </div>
+
+                                        <div class="form-group" style="margin-top: 16px;">
+                                            <label>�📁 File Upload Categories</label>
+                                            <input type="text" id="event-file-categories" placeholder="e.g. Presentation, Source Code, Architecture Diagram, Demo Video">
+                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Comma-separated list. Teams will pick from these when uploading files.</small>
                                         </div>
                                     </div>
                                 </div>
@@ -537,6 +687,73 @@
                                         </thead>
                                         <tbody id="judges-members-body">
                                             <tr><td colspan="5" class="empty-state">No judges yet</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interest Leads Tab -->
+                <div class="tab-panel" id="leads-panel">
+                    <div class="panel">
+                        <div class="panel-body padded">
+                            <div class="invite-section">
+                                <h3>📧 Interest Leads</h3>
+                                <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 16px;">
+                                    People who registered their interest in this event. Share this link to collect leads:
+                                </p>
+                                
+                                <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 20px;">
+                                    <input type="text" id="interest-link" readonly style="flex: 1; background: var(--admin-bg); font-family: monospace; font-size: 0.85rem;">
+                                    <button type="button" id="copy-interest-link" class="btn-sm">📋 Copy Link</button>
+                                    <button type="button" id="export-leads-btn" class="btn-sm primary">📥 Export CSV</button>
+                                </div>
+
+                                <div class="members-list">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Email</th>
+                                                <th>Registered</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="leads-table-body">
+                                            <tr><td colspan="5" class="empty-state">No interest leads yet</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Teams Tab -->
+                <div class="tab-panel" id="teams-panel">
+                    <div class="panel">
+                        <div class="panel-body padded">
+                            <div class="invite-section">
+                                <h3>👥 Registered Teams</h3>
+                                <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 16px;">
+                                    Teams registered for this event. Navigate to the Teams section in the left menu for full details.
+                                </p>
+                                
+                                <div class="members-list">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Team Name</th>
+                                                <th>Admin</th>
+                                                <th>Members</th>
+                                                <th>Created</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="teams-table-body">
+                                            <tr><td colspan="5" class="empty-state">No teams registered yet</td></tr>
                                         </tbody>
                                     </table>
                                 </div>

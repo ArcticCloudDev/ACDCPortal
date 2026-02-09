@@ -124,8 +124,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('event-dates').textContent = formatDateRange(currentEvent.startDate, currentEvent.endDate);
         document.getElementById('event-location').textContent = currentEvent.location || 'TBD';
         
-        // Get status from new field or derive from old registrationOpen
-        const status = currentEvent.status || (currentEvent.registrationOpen ? 'registration' : 'draft');
+        // Get status
+        const status = currentEvent.status || 'draft';
         
         const statusEl = document.getElementById('event-status');
         if (status === 'live') {
@@ -134,19 +134,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else if (status === 'registration') {
             statusEl.textContent = '✓ Registration Open';
             statusEl.style.background = 'rgba(40, 167, 69, 0.3)';
-        } else if (status === 'waitlist') {
-            statusEl.textContent = '📋 Waiting List';
+        } else if (status === 'pre-registration') {
+            statusEl.textContent = '🔔 Pre-Registration';
             statusEl.style.background = 'rgba(245, 158, 11, 0.3)';
+        } else if (status === 'completed') {
+            statusEl.textContent = '✓ Completed';
+            statusEl.style.background = 'rgba(100, 116, 139, 0.3)';
         } else {
             statusEl.textContent = 'Coming Soon';
             statusEl.style.background = 'rgba(100, 116, 139, 0.3)';
         }
         
-        // Check if event is historical
-        if (!currentEvent.isActive && new Date(currentEvent.endDate) < new Date()) {
+        // Check if event is completed/historical or not open for team registration
+        if (status === 'completed' || status === 'draft' || status === 'pre-registration') {
             banner.classList.add('inactive');
             const createSection = document.getElementById('create-team-section');
             if (createSection) createSection.classList.add('hidden');
+        }
+        
+        // Show pre-registration section with interest link
+        if (status === 'pre-registration') {
+            const preRegSection = document.getElementById('pre-reg-section');
+            if (preRegSection) {
+                preRegSection.classList.remove('hidden');
+                const interestLink = document.getElementById('interest-link');
+                if (interestLink) {
+                    interestLink.href = `interest.html?eventId=${currentEvent.id}`;
+                }
+            }
+            // Hide the teams area — nothing to show yet
+            const teamsSection = document.querySelector('.teams-section');
+            if (teamsSection) teamsSection.classList.add('hidden');
+            const noTeams = document.getElementById('no-teams');
+            if (noTeams) noTeams.classList.add('hidden');
         }
     }
     
@@ -208,33 +228,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             setupFileUploadHandlers();
         }
         
-        // Hide create button if registration not open or event inactive
-        const status = currentEvent.status || (currentEvent.registrationOpen ? 'registration' : 'draft');
-        if (status !== 'registration' || !currentEvent.isActive) {
+        // Hide create button if registration not open
+        const status = currentEvent.status || 'draft';
+        if (status !== 'registration') {
             createSection.classList.add('hidden');
         }
     }
     
     // Setup file upload handlers for team deliverables
     function setupFileUploadHandlers() {
-        // Presentation file uploads
-        document.querySelectorAll('input[id^="ppt-"]').forEach(input => {
+        // File upload inputs
+        document.querySelectorAll('input[id^="file-"]').forEach(input => {
             input.addEventListener('change', async (e) => {
-                const teamId = input.id.replace('ppt-', '');
+                const teamId = input.id.replace('file-', '');
                 const file = e.target.files[0];
+                const categorySelect = document.getElementById(`file-cat-${teamId}`);
+                const category = categorySelect ? categorySelect.value : 'General';
                 if (file) {
-                    await handleFileUpload(teamId, 'presentation', file);
-                }
-            });
-        });
-        
-        // Video file uploads
-        document.querySelectorAll('input[id^="video-"]').forEach(input => {
-            input.addEventListener('change', async (e) => {
-                const teamId = input.id.replace('video-', '');
-                const file = e.target.files[0];
-                if (file) {
-                    await handleFileUpload(teamId, 'video', file);
+                    await handleFileUpload(teamId, category, file);
                 }
             });
         });
@@ -244,25 +255,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const teamId = btn.dataset.teamId;
-                const fileType = btn.dataset.type;
-                await handleFileRemove(teamId, fileType);
+                const fileIndex = parseInt(btn.dataset.fileIndex);
+                if (!isNaN(fileIndex)) {
+                    await handleFileRemove(teamId, fileIndex);
+                }
             });
         });
     }
     
     // Handle file upload
-    async function handleFileUpload(teamId, fileType, file) {
+    async function handleFileUpload(teamId, category, file) {
         try {
-            // For now, we'll just store the filename in the team record
-            // In production, you'd upload to Azure Blob Storage
-            const updateData = {};
-            if (fileType === 'presentation') {
-                updateData.presentationFile = file.name;
-            } else if (fileType === 'video') {
-                updateData.deliveryVideo = file.name;
-            }
+            // Find the team to get current files
+            const team = teams.find(t => t.id === teamId);
+            const files = team?.files || [];
             
-            await API.teams.update(teamId, updateData);
+            // Add the new file entry
+            files.push({ category, fileName: file.name, uploadedAt: new Date().toISOString() });
+            
+            await API.teams.update(teamId, { files });
             
             // Reload to show updated state
             await loadEventTeams();
@@ -275,18 +286,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Handle file removal
-    async function handleFileRemove(teamId, fileType) {
+    async function handleFileRemove(teamId, fileIndex) {
         if (!confirm('Are you sure you want to remove this file?')) return;
         
         try {
-            const updateData = {};
-            if (fileType === 'presentation') {
-                updateData.presentationFile = null;
-            } else if (fileType === 'video') {
-                updateData.deliveryVideo = null;
-            }
+            const team = teams.find(t => t.id === teamId);
+            const files = team?.files || [];
+            files.splice(fileIndex, 1);
             
-            await API.teams.update(teamId, updateData);
+            await API.teams.update(teamId, { files });
             
             // Reload to show updated state
             await loadEventTeams();
@@ -417,44 +425,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
     }
     
-    // Build uploads section for team files
+    // Build uploads section for team files - uses event.fileCategories for dropdown
     function buildUploadsSection(team) {
-        const hasPpt = team.presentationFile;
-        const hasVideo = team.deliveryVideo;
+        const files = team.files || []; // Array of { category, fileName }
+        const categories = (currentEvent.fileCategories && currentEvent.fileCategories.length > 0)
+            ? currentEvent.fileCategories
+            : ['General'];
         
         return `
             <div class="team-uploads">
                 <h4>📁 Team Deliverables</h4>
-                <div class="uploads-grid">
-                    <div class="upload-box ${hasPpt ? 'has-file' : ''}" data-team-id="${team.id}" data-type="presentation">
-                        <div class="upload-icon">📊</div>
-                        <div class="upload-label">Team Presentation</div>
-                        <div class="upload-hint">.pptx file</div>
-                        ${hasPpt ? `
-                            <div class="file-info">
-                                <span class="file-name">${escapeHtml(team.presentationFile)}</span>
-                                <button class="btn-remove" data-team-id="${team.id}" data-type="presentation" title="Remove">✕</button>
+                ${files.length > 0 ? `
+                    <div class="uploaded-files-list">
+                        ${files.map((f, i) => `
+                            <div class="uploaded-file-row">
+                                <span class="file-category-badge">${escapeHtml(f.category)}</span>
+                                <span class="file-name">${escapeHtml(f.fileName)}</span>
+                                <button class="btn-remove" data-team-id="${team.id}" data-file-index="${i}" title="Remove">✕</button>
                             </div>
-                            <div class="upload-status">✓ Uploaded</div>
-                        ` : `
-                            <input type="file" id="ppt-${team.id}" accept=".pptx,.ppt">
-                            <button class="btn btn-secondary btn-upload" onclick="document.getElementById('ppt-${team.id}').click()">Choose File</button>
-                        `}
+                        `).join('')}
                     </div>
-                    <div class="upload-box ${hasVideo ? 'has-file' : ''}" data-team-id="${team.id}" data-type="video">
-                        <div class="upload-icon">🎬</div>
-                        <div class="upload-label">Delivery Video</div>
-                        <div class="upload-hint">Video file</div>
-                        ${hasVideo ? `
-                            <div class="file-info">
-                                <span class="file-name">${escapeHtml(team.deliveryVideo)}</span>
-                                <button class="btn-remove" data-team-id="${team.id}" data-type="video" title="Remove">✕</button>
-                            </div>
-                            <div class="upload-status">✓ Uploaded</div>
-                        ` : `
-                            <input type="file" id="video-${team.id}" accept="video/*">
-                            <button class="btn btn-secondary btn-upload" onclick="document.getElementById('video-${team.id}').click()">Choose File</button>
-                        `}
+                ` : '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">No files uploaded yet.</p>'}
+                <div class="upload-box">
+                    <div class="upload-row">
+                        <select id="file-cat-${team.id}" class="upload-category-select">
+                            ${categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+                        </select>
+                        <input type="file" id="file-${team.id}" style="display:none;">
+                        <button class="btn btn-secondary btn-upload" onclick="document.getElementById('file-${team.id}').click()">📎 Upload File</button>
                     </div>
                 </div>
             </div>
@@ -1012,8 +1010,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Helper to check if registration is open
         const isRegistrationOpen = () => {
-            const status = currentEvent.status || (currentEvent.registrationOpen ? 'registration' : 'draft');
-            return status === 'registration';
+            return currentEvent.status === 'registration';
         };
         
         // Create team modal

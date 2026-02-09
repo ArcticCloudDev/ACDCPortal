@@ -5,9 +5,82 @@ const { Storage } = require('../shared/storage');
 const eventsStorage = new Storage('events');
 const teamsStorage = new Storage('teams');
 
-// Helper to generate ID
-function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+// Helper to generate GUID
+function generateGuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// Helper to check if event status means it's active (visible to public)
+function isActiveStatus(status) {
+    return status === 'pre-registration' || status === 'registration' || status === 'live';
+}
+
+// Helper to check if registration is open based on status
+function isRegistrationOpen(status) {
+    return status === 'registration';
+}
+
+// Helper to generate hotel dates (1 day before start to 1 day after end)
+function generateHotelDates(startDate, endDate) {
+    const dates = [];
+    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayLabelsFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    // Start from 1 day before event
+    const start = new Date(startDate);
+    start.setDate(start.getDate() - 1);
+    
+    // End 1 day after event
+    const end = new Date(endDate);
+    end.setDate(end.getDate() + 1);
+    
+    // Generate dates
+    const current = new Date(start);
+    while (current <= end) {
+        const dateStr = current.toISOString().split('T')[0];
+        const dayOfWeek = current.getDay();
+        dates.push({
+            date: dateStr,
+            dayLabel: dayLabels[dayOfWeek],
+            dayLabelFull: dayLabelsFull[dayOfWeek]
+        });
+        current.setDate(current.getDate() + 1);
+    }
+    
+    return dates;
+}
+
+// Helper to generate default hotel nights (nights during the event, excluding night before)
+function generateDefaultHotelNights(hotelDates, eventStartDate, eventEndDate) {
+    const defaults = [];
+    const dayLabels = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    
+    const eventStart = new Date(eventStartDate);
+    const eventEnd = new Date(eventEndDate);
+    
+    // For each date except the last one (since it's check-in date, next day is checkout)
+    for (let i = 0; i < hotelDates.length - 1; i++) {
+        const currentDate = new Date(hotelDates[i].date);
+        const nextDate = new Date(hotelDates[i + 1].date);
+        
+        // Skip the night before the event starts (day before -> first day)
+        if (currentDate < eventStart) {
+            continue;
+        }
+        
+        // Include nights from event start through event end
+        if (currentDate >= eventStart && currentDate <= eventEnd) {
+            const fromDay = dayLabels[currentDate.getDay()];
+            const toDay = dayLabels[nextDate.getDay()];
+            defaults.push(`${fromDay}-${toDay}`);
+        }
+    }
+    
+    return defaults;
 }
 
 // GET /api/events - List all events
@@ -40,7 +113,8 @@ app.http('events-active', {
     handler: async (request, context) => {
         try {
             const events = await eventsStorage.getAll();
-            const activeEvent = events.find(e => e.isActive);
+            // Find event with active status (registration or live)
+            const activeEvent = events.find(e => isActiveStatus(e.status));
             
             if (!activeEvent) {
                 return {
@@ -113,31 +187,34 @@ app.http('events-create', {
             
             const events = await eventsStorage.getAll();
             
-            // If this event is set as active, deactivate others
-            if (body.isActive) {
-                events.forEach(e => e.isActive = false);
+            // If new event has active status, deactivate others
+            const newStatus = body.status || 'draft';
+            if (isActiveStatus(newStatus)) {
+                events.forEach(e => {
+                    if (isActiveStatus(e.status)) {
+                        e.status = 'completed';
+                    }
+                });
             }
             
-            // Generate ID from name
-            const id = body.name.toLowerCase()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-|-$/g, '');
+            // Generate hotel dates from event dates
+            const hotelDates = generateHotelDates(body.startDate, body.endDate);
+            const hotelDefaultNights = generateDefaultHotelNights(hotelDates, body.startDate, body.endDate);
             
             const newEvent = {
-                id: id + '-' + Date.now().toString(36),
+                id: generateGuid(),
                 name: body.name,
                 description: body.description || '',
                 startDate: body.startDate,
                 endDate: body.endDate,
                 location: body.location || '',
-                status: body.status || 'draft',
-                registrationOpen: body.registrationOpen !== false || body.status === 'registration',
-                isActive: body.isActive || false,
+                status: newStatus,
                 registrationType: body.registrationType || 'team',
                 minTeamSize: body.minTeamSize || 3,
                 maxTeamSize: body.maxTeamSize || 5,
-                hotelDates: body.hotelDates || [],
-                hotelDefaultNights: body.hotelDefaultNights || [],
+                sequenceId: body.sequenceId || null,
+                hotelDates: hotelDates,
+                hotelDefaultNights: hotelDefaultNights,
                 createdAt: new Date().toISOString()
             };
 
@@ -147,7 +224,7 @@ app.http('events-create', {
                 
                 // Create Committee team
                 const committeeTeam = {
-                    id: generateId(),
+                    id: generateGuid(),
                     teamName: `Committee - ${newEvent.name}`,
                     eventId: newEvent.id,
                     isSpecialTeam: true,
@@ -159,7 +236,7 @@ app.http('events-create', {
                 
                 // Create Judges team
                 const judgesTeam = {
-                    id: generateId(),
+                    id: generateGuid(),
                     teamName: `Judges - ${newEvent.name}`,
                     eventId: newEvent.id,
                     isSpecialTeam: true,
@@ -217,9 +294,35 @@ app.http('events-update', {
             
             const existingEvent = events[index];
             
-            // If this event is being set as active, deactivate others
-            if (body.isActive && !existingEvent.isActive) {
-                events.forEach(e => e.isActive = false);
+            // If this event is being set to active status, deactivate others
+            const newStatus = body.status || existingEvent.status;
+            if (isActiveStatus(newStatus) && !isActiveStatus(existingEvent.status)) {
+                events.forEach(e => {
+                    if (e.id !== id && isActiveStatus(e.status)) {
+                        e.status = 'completed';
+                    }
+                });
+            }
+            
+            // Remove legacy fields if present in body
+            delete body.isActive;
+            delete body.registrationOpen;
+            
+            // Check if event dates changed - if so, regenerate hotel dates
+            const datesChanged = (body.startDate && body.startDate !== existingEvent.startDate) ||
+                                 (body.endDate && body.endDate !== existingEvent.endDate);
+            
+            // Determine final start/end dates
+            const finalStartDate = body.startDate || existingEvent.startDate;
+            const finalEndDate = body.endDate || existingEvent.endDate;
+            
+            // Regenerate hotel dates if event dates changed
+            let hotelDates = existingEvent.hotelDates;
+            let hotelDefaultNights = existingEvent.hotelDefaultNights;
+            
+            if (datesChanged || !hotelDates || hotelDates.length === 0) {
+                hotelDates = generateHotelDates(finalStartDate, finalEndDate);
+                hotelDefaultNights = generateDefaultHotelNights(hotelDates, finalStartDate, finalEndDate);
             }
             
             // Update fields
@@ -228,6 +331,9 @@ app.http('events-update', {
                 ...body,
                 id: existingEvent.id, // Preserve ID
                 createdAt: existingEvent.createdAt, // Preserve creation date
+                sequenceId: body.sequenceId !== undefined ? body.sequenceId : existingEvent.sequenceId,
+                hotelDates: hotelDates,
+                hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()
             };
 
@@ -240,7 +346,7 @@ app.http('events-update', {
                 // Create Committee team if not exists
                 if (!updatedEvent.committeeTeamId) {
                     const committeeTeam = {
-                        id: generateId(),
+                        id: generateGuid(),
                         teamName: `Committee - ${updatedEvent.name}`,
                         eventId: updatedEvent.id,
                         isSpecialTeam: true,
@@ -255,7 +361,7 @@ app.http('events-update', {
                 // Create Judges team if not exists
                 if (!updatedEvent.judgesTeamId) {
                     const judgesTeam = {
-                        id: generateId(),
+                        id: generateGuid(),
                         teamName: `Judges - ${updatedEvent.name}`,
                         eventId: updatedEvent.id,
                         isSpecialTeam: true,

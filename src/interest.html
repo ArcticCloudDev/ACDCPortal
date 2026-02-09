@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stay Notified - ACDC</title>
+    <title>Register Interest - ACDC</title>
     <link rel="stylesheet" href="css/styles.css">
     <style>
         body {
@@ -52,31 +52,33 @@
             opacity: 0.9;
             font-size: 1rem;
         }
+        
+        .event-dates {
+            margin-top: 8px;
+            font-size: 0.9rem;
+            opacity: 0.85;
+        }
 
         .interest-body {
             padding: 2rem;
         }
 
-        .info-box {
-            background: #f0f9ff;
-            border: 1px solid #bae6fd;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 24px;
         }
 
-        .info-box h3 {
-            margin: 0 0 0.5rem;
-            color: #0369a1;
-            font-size: 0.9rem;
+        .step {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #e2e8f0;
         }
 
-        .info-box p {
-            margin: 0;
-            color: #0c4a6e;
-            font-size: 0.85rem;
-            line-height: 1.5;
-        }
+        .step.active { background: #3b82f6; }
+        .step.completed { background: #22c55e; }
 
         .form-group {
             margin-bottom: 1.25rem;
@@ -90,10 +92,6 @@
             font-size: 0.9rem;
         }
 
-        .form-group label .required {
-            color: #ef4444;
-        }
-
         .form-group input {
             width: 100%;
             padding: 0.75rem 1rem;
@@ -101,6 +99,7 @@
             border-radius: 8px;
             font-size: 1rem;
             transition: border-color 0.2s, box-shadow 0.2s;
+            box-sizing: border-box;
         }
 
         .form-group input:focus {
@@ -138,15 +137,60 @@
             cursor: not-allowed;
             transform: none;
         }
-
-        .success-state {
-            display: none;
-            text-align: center;
-            padding: 2rem;
+        
+        .btn-secondary {
+            width: 100%;
+            padding: 0.75rem;
+            background: #f1f5f9;
+            color: #475569;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .btn-secondary:hover {
+            background: #e2e8f0;
         }
 
-        .success-state.visible {
-            display: block;
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .hidden { display: none !important; }
+        
+        .verification-code-input {
+            text-align: center;
+            font-size: 1.5rem;
+            letter-spacing: 8px;
+            font-weight: 600;
+        }
+        
+        .info-text {
+            color: #64748b;
+            font-size: 0.9rem;
+            text-align: center;
+            margin-top: 16px;
+        }
+        
+        .resend-link {
+            color: #3b82f6;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        
+        .resend-link:hover { color: #1d4ed8; }
+
+        .success-state {
+            text-align: center;
+            padding: 1rem;
         }
 
         .success-state .icon {
@@ -164,48 +208,6 @@
             margin: 0 0 1.5rem;
         }
 
-        .success-state .queue-position {
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .success-state .queue-position .number {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #059669;
-        }
-
-        .success-state .queue-position .label {
-            color: #166534;
-            font-size: 0.85rem;
-        }
-
-        .form-state {
-            display: block;
-        }
-
-        .form-state.hidden {
-            display: none;
-        }
-
-        .error-message {
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            color: #991b1b;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            font-size: 0.9rem;
-            display: none;
-        }
-
-        .error-message.visible {
-            display: block;
-        }
-
         .back-link {
             text-align: center;
             margin-top: 1.5rem;
@@ -220,102 +222,163 @@
         .back-link a:hover {
             text-decoration: underline;
         }
-
-        .already-registered {
-            background: #fef3c7;
-            border: 1px solid #fde68a;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            display: none;
+        
+        .loading {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
         }
-
-        .already-registered.visible {
-            display: block;
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
-
-        .already-registered p {
-            margin: 0;
-            color: #92400e;
-            font-size: 0.9rem;
+        
+        .not-found {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .not-found h2 {
+            color: #64748b;
         }
     </style>
 </head>
 <body>
     <div class="interest-container">
         <div class="interest-card">
-            <div class="interest-header">
-                <div class="icon">🏔️</div>
-                <h1>ACDC Interest List</h1>
-                <p>Be the first to know when registration opens</p>
+            <!-- Loading State -->
+            <div id="loading-state" class="interest-body" style="text-align: center; padding: 3rem;">
+                <p>Loading event...</p>
             </div>
-
-            <div class="interest-body">
-                <!-- Form State -->
-                <div id="form-state" class="form-state">
-                    <div class="info-box">
-                        <h3>📢 What is this?</h3>
-                        <p>Registration for the next Arctic Cloud Developer Challenge isn't open yet. 
-                           Sign up here to be notified as soon as registration opens. 
-                           You'll get early access and won't miss your spot!</p>
-                    </div>
-
-                    <div id="already-registered" class="already-registered">
-                        <p>✅ You're already on the interest list! We'll notify you when registration opens.</p>
-                    </div>
-
-                    <div id="error-message" class="error-message"></div>
-
-                    <form id="interest-form">
-                        <div class="form-group">
-                            <label for="email">Email <span class="required">*</span></label>
-                            <input type="email" id="email" required placeholder="your.email@company.com">
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="firstName">First Name</label>
-                                <input type="text" id="firstName" placeholder="John">
-                            </div>
-                            <div class="form-group">
-                                <label for="lastName">Last Name</label>
-                                <input type="text" id="lastName" placeholder="Doe">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="company">Company</label>
-                            <input type="text" id="company" placeholder="Your Company">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="phone">Phone (optional)</label>
-                            <input type="tel" id="phone" placeholder="+47 123 45 678">
-                        </div>
-
-                        <button type="submit" class="btn-submit" id="submit-btn">
-                            🔔 Notify Me When Registration Opens
-                        </button>
-                    </form>
-
+            
+            <!-- Not Found State -->
+            <div id="not-found-state" class="hidden">
+                <div class="interest-header">
+                    <div class="icon">🏔️</div>
+                    <h1>ACDC Portal</h1>
+                </div>
+                <div class="interest-body not-found">
+                    <h2>🔍 Event Not Found</h2>
+                    <p>The event you're looking for doesn't exist or the link is invalid.</p>
                     <div class="back-link">
-                        <a href="events.html">← Back to Events</a>
+                        <a href="events.html">← Browse Events</a>
                     </div>
                 </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div id="main-content" class="hidden">
+                <div class="interest-header">
+                    <div class="icon">🏔️</div>
+                    <h1 id="event-name">Event Name</h1>
+                    <p>Register Your Interest</p>
+                    <div class="event-dates" id="event-dates"></div>
+                </div>
 
-                <!-- Success State -->
-                <div id="success-state" class="success-state">
-                    <div class="icon">🎉</div>
-                    <h2>You're on the list!</h2>
-                    <p>We'll send you an email as soon as registration opens for the next ACDC.</p>
+                <div class="interest-body">
+                    <!-- Step 1: Enter Details -->
+                    <div id="step-details">
+                        <div class="step-indicator">
+                            <div class="step active"></div>
+                            <div class="step"></div>
+                            <div class="step"></div>
+                        </div>
+                        
+                        <p style="color: #64748b; text-align: center; margin: 0 0 24px;">
+                            Get notified when registration opens
+                        </p>
+
+                        <div id="details-error" class="error-message hidden"></div>
+
+                        <form id="details-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="firstName">First Name *</label>
+                                    <input type="text" id="firstName" required minlength="2" maxlength="50" placeholder="John">
+                                </div>
+                                <div class="form-group">
+                                    <label for="lastName">Last Name *</label>
+                                    <input type="text" id="lastName" required minlength="2" maxlength="50" placeholder="Doe">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="email">Email *</label>
+                                <input type="email" id="email" required placeholder="john.doe@example.com">
+                            </div>
+
+                            <button type="submit" class="btn-submit" id="submit-details-btn">
+                                <span class="btn-text">Send Verification Code</span>
+                                <span class="btn-loading hidden"><span class="loading"></span>Sending...</span>
+                            </button>
+                        </form>
+
+                        <div class="back-link">
+                            <a href="events.html">← Back to Events</a>
+                        </div>
+                    </div>
                     
-                    <div class="queue-position">
-                        <div class="number" id="queue-position">-</div>
-                        <div class="label">Your position in the interest queue</div>
+                    <!-- Step 2: Verify Code -->
+                    <div id="step-verify" class="hidden">
+                        <div class="step-indicator">
+                            <div class="step completed"></div>
+                            <div class="step active"></div>
+                            <div class="step"></div>
+                        </div>
+                        
+                        <h3 style="margin: 0 0 8px; text-align: center;">Verify Your Email</h3>
+                        <p style="color: #64748b; text-align: center; margin: 0 0 24px;">
+                            We sent a 6-digit code to<br><strong id="verify-email"></strong>
+                        </p>
+                        
+                        <div id="verify-error" class="error-message hidden"></div>
+                        
+                        <form id="verify-form">
+                            <div class="form-group">
+                                <label for="code">Verification Code</label>
+                                <input type="text" id="code" class="verification-code-input" 
+                                       required maxlength="6" pattern="[0-9]{6}" 
+                                       placeholder="000000" inputmode="numeric" autocomplete="one-time-code">
+                            </div>
+                            
+                            <button type="submit" class="btn-submit" id="submit-verify-btn">
+                                <span class="btn-text">Verify</span>
+                                <span class="btn-loading hidden"><span class="loading"></span>Verifying...</span>
+                            </button>
+                        </form>
+                        
+                        <p class="info-text">
+                            Didn't receive the code? <span class="resend-link" id="resend-btn">Resend code</span>
+                        </p>
+                        
+                        <button class="btn-secondary" id="back-btn">← Back</button>
                     </div>
 
-                    <div class="back-link">
-                        <a href="events.html">← Back to Events</a>
+                    <!-- Step 3: Success -->
+                    <div id="step-success" class="success-state hidden">
+                        <div class="step-indicator">
+                            <div class="step completed"></div>
+                            <div class="step completed"></div>
+                            <div class="step completed"></div>
+                        </div>
+                        
+                        <div class="icon">🎉</div>
+                        <h2>You're on the list!</h2>
+                        <p>
+                            Thanks <strong id="success-name"></strong>!<br>
+                            We'll notify you when registration opens for<br>
+                            <strong id="success-event"></strong>
+                        </p>
+
+                        <div class="back-link">
+                            <a href="events.html">← Browse Other Events</a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -324,90 +387,210 @@
 
     <script src="js/config.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const form = document.getElementById('interest-form');
-            const emailInput = document.getElementById('email');
-            const submitBtn = document.getElementById('submit-btn');
-            const errorMessage = document.getElementById('error-message');
-            const alreadyRegistered = document.getElementById('already-registered');
-            const formState = document.getElementById('form-state');
-            const successState = document.getElementById('success-state');
+        let currentEvent = null;
+        let currentLeadId = null;
+        let submittedData = null;
 
-            // Check if email is already in queue when they type
-            let checkTimeout;
-            emailInput.addEventListener('input', () => {
-                clearTimeout(checkTimeout);
-                alreadyRegistered.classList.remove('visible');
-                
-                const email = emailInput.value.trim();
-                if (email && email.includes('@')) {
-                    checkTimeout = setTimeout(() => checkEmail(email), 500);
-                }
-            });
-
-            async function checkEmail(email) {
-                try {
-                    const response = await fetch(`${CONFIG.api.baseUrl}/interest-queue/check/${encodeURIComponent(email)}`);
-                    if (response.ok) {
-                        const result = await response.json();
-                        if (result.inQueue) {
-                            alreadyRegistered.classList.add('visible');
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error checking email:', error);
-                }
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const eventId = urlParams.get('eventId') || urlParams.get('event');
+            
+            if (!eventId) {
+                showNotFound();
+                return;
             }
-
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Submitting...';
-                errorMessage.classList.remove('visible');
-
-                try {
-                    const response = await fetch(`${CONFIG.api.baseUrl}/interest-queue`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            email: emailInput.value.trim(),
-                            firstName: document.getElementById('firstName').value.trim(),
-                            lastName: document.getElementById('lastName').value.trim(),
-                            company: document.getElementById('company').value.trim(),
-                            phone: document.getElementById('phone').value.trim(),
-                            source: 'website'
-                        })
-                    });
-
-                    const result = await response.json();
-
-                    if (response.ok) {
-                        // Show success state
-                        formState.classList.add('hidden');
-                        successState.classList.add('visible');
-                        
-                        // Get queue position
-                        const statsResponse = await fetch(`${CONFIG.api.baseUrl}/interest-queue/stats`);
-                        if (statsResponse.ok) {
-                            const stats = await statsResponse.json();
-                            document.getElementById('queue-position').textContent = `#${stats.pending}`;
-                        }
-                    } else if (response.status === 409) {
-                        // Already exists
-                        alreadyRegistered.classList.add('visible');
-                    } else {
-                        throw new Error(result.error || 'Failed to submit');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    errorMessage.textContent = error.message;
-                    errorMessage.classList.add('visible');
-                } finally {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = '🔔 Notify Me When Registration Opens';
+            
+            try {
+                const response = await fetch(`${CONFIG.api.baseUrl}/events/${eventId}`);
+                if (!response.ok) {
+                    showNotFound();
+                    return;
                 }
-            });
+                
+                currentEvent = await response.json();
+                showMainContent();
+            } catch (error) {
+                console.error('Error loading event:', error);
+                showNotFound();
+            }
+        });
+        
+        function showNotFound() {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('not-found-state').classList.remove('hidden');
+        }
+        
+        function showMainContent() {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+            
+            document.getElementById('event-name').textContent = currentEvent.name;
+            
+            if (currentEvent.startDate && currentEvent.endDate) {
+                const startDate = new Date(currentEvent.startDate);
+                const endDate = new Date(currentEvent.endDate);
+                const dateOptions = { month: 'long', day: 'numeric', year: 'numeric' };
+                document.getElementById('event-dates').textContent = 
+                    `${startDate.toLocaleDateString('en-US', dateOptions)} - ${endDate.toLocaleDateString('en-US', dateOptions)}`;
+            }
+        }
+        
+        // Details form submission
+        document.getElementById('details-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('submit-details-btn');
+            const errorDiv = document.getElementById('details-error');
+            
+            submittedData = {
+                eventId: currentEvent.id,
+                firstName: document.getElementById('firstName').value.trim(),
+                lastName: document.getElementById('lastName').value.trim(),
+                email: document.getElementById('email').value.trim().toLowerCase()
+            };
+            
+            btn.disabled = true;
+            btn.querySelector('.btn-text').classList.add('hidden');
+            btn.querySelector('.btn-loading').classList.remove('hidden');
+            errorDiv.classList.add('hidden');
+            
+            try {
+                const response = await fetch(`${CONFIG.api.baseUrl}/interest/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(submittedData)
+                });
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to send verification code');
+                }
+                
+                currentLeadId = result.leadId;
+                
+                // Show verify step
+                document.getElementById('step-details').classList.add('hidden');
+                document.getElementById('step-verify').classList.remove('hidden');
+                document.getElementById('verify-email').textContent = submittedData.email;
+                document.getElementById('code').focus();
+                
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.querySelector('.btn-text').classList.remove('hidden');
+                btn.querySelector('.btn-loading').classList.add('hidden');
+            }
+        });
+        
+        // Verify form submission
+        document.getElementById('verify-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('submit-verify-btn');
+            const errorDiv = document.getElementById('verify-error');
+            const code = document.getElementById('code').value.trim();
+            
+            btn.disabled = true;
+            btn.querySelector('.btn-text').classList.add('hidden');
+            btn.querySelector('.btn-loading').classList.remove('hidden');
+            errorDiv.classList.add('hidden');
+            
+            try {
+                const response = await fetch(`${CONFIG.api.baseUrl}/interest/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        leadId: currentLeadId,
+                        code: code
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Verification failed');
+                }
+                
+                // Check if already registered
+                if (result.alreadyRegistered) {
+                    // Show success with a special message
+                    document.getElementById('step-verify').classList.add('hidden');
+                    document.getElementById('step-success').classList.remove('hidden');
+                    document.getElementById('success-name').textContent = result.lead.firstName;
+                    document.getElementById('success-event').textContent = currentEvent.name;
+                    
+                    // Update the success message
+                    document.querySelector('#step-success p').innerHTML = 
+                        `You've already registered your interest for<br><strong>${currentEvent.name}</strong>!<br><br>We'll notify you when registration opens.`;
+                } else {
+                    // Show normal success
+                    document.getElementById('step-verify').classList.add('hidden');
+                    document.getElementById('step-success').classList.remove('hidden');
+                    document.getElementById('success-name').textContent = submittedData.firstName;
+                    document.getElementById('success-event').textContent = currentEvent.name;
+                }
+                
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.querySelector('.btn-text').classList.remove('hidden');
+                btn.querySelector('.btn-loading').classList.add('hidden');
+            }
+        });
+        
+        // Back button
+        document.getElementById('back-btn').addEventListener('click', () => {
+            document.getElementById('step-verify').classList.add('hidden');
+            document.getElementById('step-details').classList.remove('hidden');
+            document.getElementById('verify-error').classList.add('hidden');
+            document.getElementById('code').value = '';
+        });
+        
+        // Resend code
+        document.getElementById('resend-btn').addEventListener('click', async () => {
+            const resendBtn = document.getElementById('resend-btn');
+            const errorDiv = document.getElementById('verify-error');
+            
+            resendBtn.textContent = 'Sending...';
+            resendBtn.style.pointerEvents = 'none';
+            
+            try {
+                const response = await fetch(`${CONFIG.api.baseUrl}/interest/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(submittedData)
+                });
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to resend code');
+                }
+                
+                currentLeadId = result.leadId;
+                resendBtn.textContent = 'Code sent! ✓';
+                
+                setTimeout(() => {
+                    resendBtn.textContent = 'Resend code';
+                    resendBtn.style.pointerEvents = 'auto';
+                }, 3000);
+                
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.classList.remove('hidden');
+                resendBtn.textContent = 'Resend code';
+                resendBtn.style.pointerEvents = 'auto';
+            }
+        });
+        
+        // Auto-format code input (numbers only)
+        document.getElementById('code').addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
         });
     </script>
 </body>

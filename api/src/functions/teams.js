@@ -6,10 +6,15 @@ const { Storage: GenericStorage } = require('../shared/storage');
 
 const eventsStorage = new GenericStorage('events');
 
+// Helper to check if event status means it's active (visible to public)
+function isActiveStatus(status) {
+    return status === 'pre-registration' || status === 'registration' || status === 'live';
+}
+
 // Helper to get active event ID
 async function getActiveEventId() {
     const events = await eventsStorage.getAll();
-    const activeEvent = events.find(e => e.isActive);
+    const activeEvent = events.find(e => isActiveStatus(e.status));
     return activeEvent ? activeEvent.id : null;
 }
 

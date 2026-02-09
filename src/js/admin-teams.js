@@ -77,12 +77,20 @@ async function loadData() {
 function populateEventFilter() {
     const eventFilter = document.getElementById('event-filter');
     
+    // Status labels for display
+    const statusLabels = {
+        'pre-registration': 'Pre-Reg',
+        'registration': 'Registration',
+        'live': 'Live'
+    };
+    
     allEvents.forEach(event => {
         const option = document.createElement('option');
         option.value = event.id;
         option.textContent = event.name;
-        if (event.isActive) {
-            option.textContent += ' (Active)';
+        const status = event.status || 'draft';
+        if (statusLabels[status]) {
+            option.textContent += ` (${statusLabels[status]})`;
         }
         eventFilter.appendChild(option);
     });

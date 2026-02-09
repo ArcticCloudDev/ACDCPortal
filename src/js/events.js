@@ -3,11 +3,14 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const loadingDiv = document.getElementById('loading');
     const content = document.getElementById('content');
+    const loginBtn = document.getElementById('login-btn');
     const logoutBtn = document.getElementById('logout-btn');
     const profileBtn = document.getElementById('profile-btn');
     
     let currentUser = null;
     let allEvents = [];
+    let userParticipations = [];
+    let userInterestLeads = [];
 
     // Initialize Auth
     Auth.init();
@@ -19,44 +22,77 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Handle any redirect from Entra
         await Auth.handleRedirect();
         
-        // Check if logged in
-        if (!Auth.isLoggedIn()) {
-            window.location.href = '/';
-            return;
-        }
+        // Check if logged in (but don't require it)
+        const isLoggedIn = Auth.isLoggedIn();
         
-        const authUser = Auth.getUser();
-        
-        // Load user data
-        try {
-            currentUser = await API.users.getOrNull(authUser.email);
+        if (isLoggedIn) {
+            // Hide login button, show profile/logout
+            loginBtn.classList.add('hidden');
+            profileBtn.classList.remove('hidden');
+            logoutBtn.classList.remove('hidden');
             
-            if (!currentUser) {
-                console.log('New user, redirecting to complete registration...');
-                window.location.href = 'complete-registration.html';
-                return;
-            }
+            const authUser = Auth.getUser();
             
-            if (!currentUser.profileComplete) {
-                window.location.href = 'complete-registration.html';
-                return;
-            }
-            
-            // Show committee link if user is portal admin
-            if (currentUser.isPortalAdmin) {
-                const committeeLink = document.getElementById('committee-link');
-                if (committeeLink) {
-                    committeeLink.classList.remove('hidden');
+            // Load user data
+            try {
+                currentUser = await API.users.getOrNull(authUser.email);
+                
+                if (!currentUser) {
+                    console.log('New user, redirecting to complete registration...');
+                    window.location.href = 'complete-registration.html';
+                    return;
                 }
+                
+                if (!currentUser.profileComplete) {
+                    window.location.href = 'complete-registration.html';
+                    return;
+                }
+                
+                // Show committee link if user is portal admin
+                if (currentUser.isPortalAdmin) {
+                    const committeeLink = document.getElementById('committee-link');
+                    if (committeeLink) {
+                        committeeLink.classList.remove('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading user:', error);
+                window.location.href = 'complete-registration.html';
+                return;
             }
-        } catch (error) {
-            console.error('Error loading user:', error);
-            window.location.href = 'complete-registration.html';
-            return;
+            
+            // Check for pending invitation and process it
+            await processPendingInvitation();
+            
+            // Load user participations (to know which events they're involved in)
+            try {
+                const allParticipations = await API.participations.list();
+                userParticipations = allParticipations.filter(p => p.userId === currentUser.id);
+            } catch (error) {
+                console.warn('Could not load participations:', error);
+                userParticipations = [];
+            }
+            
+            // Load interest leads for this user's email
+            try {
+                const response = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
+                if (response.ok) {
+                    const leads = await response.json();
+                    userInterestLeads = leads.filter(l => l.email.toLowerCase() === currentUser.email.toLowerCase());
+                }
+            } catch (error) {
+                console.warn('Could not load interest leads:', error);
+                userInterestLeads = [];
+            }
+            
+            // Populate profile form
+            populateProfileForm();
+        } else {
+            // Not logged in - show login button
+            loginBtn.classList.remove('hidden');
+            profileBtn.classList.add('hidden');
+            logoutBtn.classList.add('hidden');
         }
-        
-        // Check for pending invitation and process it
-        await processPendingInvitation();
         
         // Load all events
         try {
@@ -211,10 +247,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const noActive = document.getElementById('no-active-events');
         const noHistorical = document.getElementById('no-historical-events');
         
-        // Separate active and historical events
-        const now = new Date();
-        const activeEvents = events.filter(e => e.isActive || new Date(e.endDate) >= now);
-        const historicalEvents = events.filter(e => !e.isActive && new Date(e.endDate) < now);
+        // Separate active and historical events based on status
+        const activeEvents = events.filter(e => e.status === 'pre-registration' || e.status === 'registration' || e.status === 'live');
+        const historicalEvents = events.filter(e => e.status === 'completed' || e.status === 'draft');
         
         // Update counts
         activeCount.textContent = activeEvents.length;
@@ -240,13 +275,60 @@ document.addEventListener('DOMContentLoaded', async () => {
             historicalGrid.innerHTML = historicalEvents.map(event => createEventCard(event, false)).join('');
         }
         
-        // Add click handlers to all event cards
-        document.querySelectorAll('.event-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const eventId = card.dataset.eventId;
-                window.location.href = `event.html?id=${eventId}`;
+        // Add click handlers to event card action buttons
+        document.querySelectorAll('.event-card .btn-card-action').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                
+                // If this is a login-required button, trigger login
+                if (btn.classList.contains('login-required')) {
+                    Auth.login();
+                    return;
+                }
+                
+                const href = btn.dataset.href;
+                if (href) window.location.href = href;
             });
         });
+        
+        // Make the rest of the card clickable too (same destination)
+        document.querySelectorAll('.event-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                // Don't double-navigate if they clicked the button
+                if (e.target.closest('.btn-card-action')) return;
+                const btn = card.querySelector('.btn-card-action');
+                
+                // If login required, trigger login
+                if (btn && btn.classList.contains('login-required')) {
+                    Auth.login();
+                    return;
+                }
+                
+                // Only navigate if there's a valid href
+                if (btn && btn.dataset.href && btn.dataset.href !== '') {
+                    window.location.href = btn.dataset.href;
+                }
+            });
+        });
+    }
+    
+    // Login button handler
+    loginBtn.addEventListener('click', () => {
+        Auth.login();
+    });
+    
+    // Determine what the user's relationship is to an event
+    function getUserEventContext(event) {
+        const status = event.status || 'draft';
+        
+        // Check if user has a participation with team memberships for this event
+        const participation = userParticipations.find(p => p.eventId === event.id);
+        const hasTeam = participation && (participation.teamMemberships || []).length > 0;
+        
+        // Check if user registered interest for this event
+        const hasInterest = userInterestLeads.some(l => l.eventId === event.id);
+        
+        return { status, participation, hasTeam, hasInterest };
     }
     
     // Create an event card HTML
@@ -256,20 +338,53 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const dateStr = formatDateRange(startDate, endDate);
         
-        // Get status from new field or derive from old registrationOpen
-        const status = event.status || (event.registrationOpen ? 'registration' : 'draft');
+        // Get status
+        const status = event.status || 'draft';
+        const ctx = getUserEventContext(event);
         
         let statusBadge = '';
-        if (!isActive) {
+        if (status === 'completed') {
             statusBadge = '<span class="status-badge ended">Completed</span>';
         } else if (status === 'live') {
             statusBadge = '<span class="status-badge live">🚀 Live</span>';
         } else if (status === 'registration') {
             statusBadge = '<span class="status-badge open">✓ Registration Open</span>';
-        } else if (status === 'waitlist') {
-            statusBadge = '<span class="status-badge waitlist">📋 Waiting List</span>';
+        } else if (status === 'pre-registration') {
+            statusBadge = '<span class="status-badge preregistration">🔔 Pre-Registration</span>';
         } else {
             statusBadge = '<span class="status-badge closed">Coming Soon</span>';
+        }
+        
+        // Determine button text and destination based on status + user context
+        let buttonText = 'View Details';
+        let buttonHref = `event.html?id=${event.id}`;
+        let buttonClass = 'btn btn-primary btn-small btn-card-action';
+        
+        if (status === 'pre-registration') {
+            if (ctx.hasInterest) {
+                buttonText = '✓ Interest Registered';
+                buttonHref = ''; // No navigation - just visual feedback
+                buttonClass = 'btn btn-secondary btn-small btn-card-action';
+            } else {
+                buttonText = '🔔 Register Interest';
+                buttonHref = `interest.html?eventId=${event.id}`;
+            }
+        } else if (status === 'registration') {
+            if (ctx.hasTeam) {
+                buttonText = 'View Event';
+                buttonHref = `event.html?id=${event.id}`;
+            } else if (!currentUser) {
+                // Not logged in - prompt to sign in
+                buttonText = '🔑 Sign In to Register';
+                buttonHref = ''; // Will trigger login via click handler
+                buttonClass = 'btn btn-primary btn-small btn-card-action login-required';
+            } else {
+                buttonText = '📝 Register Team';
+                buttonHref = `event.html?id=${event.id}`;
+            }
+        } else if (status === 'live' || status === 'completed') {
+            buttonText = 'View Event';
+            buttonHref = `event.html?id=${event.id}`;
         }
         
         return `
@@ -291,7 +406,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
                 <div class="event-card-footer">
                     ${statusBadge}
-                    <button class="btn btn-primary btn-small">${isActive ? 'View Event' : 'View Details'}</button>
+                    <button class="${buttonClass}" data-href="${buttonHref}">${buttonText}</button>
                 </div>
             </div>
         `;

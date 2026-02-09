@@ -7,6 +7,116 @@
     <link rel="stylesheet" href="css/styles.css">
     <!-- MSAL Library for Auth -->
     <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <style>
+        .event-card {
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .event-card.pre-registration {
+            background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
+            border-left: 4px solid #eab308;
+        }
+        .event-card.registration {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border-left: 4px solid #10b981;
+        }
+        .event-card .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        .event-card.pre-registration .status-badge { color: #a16207; }
+        .event-card.registration .status-badge { color: #047857; }
+        .event-card h3 {
+            margin: 0 0 8px;
+            font-size: 1.25rem;
+        }
+        .event-card.pre-registration h3 { color: #78350f; }
+        .event-card.registration h3 { color: #064e3b; }
+        .event-card .event-meta {
+            font-size: 0.85rem;
+            margin: 0 0 16px;
+        }
+        .event-card.pre-registration .event-meta { color: #a16207; }
+        .event-card.registration .event-meta { color: #047857; }
+        .event-card .description {
+            font-size: 0.9rem;
+            margin: 0 0 16px;
+            line-height: 1.5;
+        }
+        .event-card.pre-registration .description { color: #92400e; }
+        .event-card.registration .description { color: #065f46; }
+        .event-card .btn-event {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        .event-card.pre-registration .btn-event {
+            background: #ca8a04;
+            color: white;
+        }
+        .event-card.pre-registration .btn-event:hover {
+            background: #a16207;
+        }
+        .event-card.registration .btn-event {
+            background: #059669;
+            color: white;
+        }
+        .event-card.registration .btn-event:hover {
+            background: #047857;
+        }
+        .event-card .helper-text {
+            font-size: 0.8rem;
+            margin: 12px 0 0;
+        }
+        .event-card.pre-registration .helper-text { color: #92400e; }
+        .event-card.registration .helper-text { color: #047857; }
+        
+        .profile-section {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+        }
+        .profile-section p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin: 0 0 12px;
+        }
+        .btn-profile {
+            display: inline-block;
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-color);
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-profile:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        .no-events-message {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -17,23 +127,20 @@
 
         <main class="landing">
             <div class="card">
-                <h2>Welcome!</h2>
-                <p>Sign in to access your profile and manage your team.</p>
-                <p class="text-muted">New here? No problem - just enter your email and we'll set you up!</p>
-                
-                <div class="button-group">
-                    <button id="signin-btn" class="btn btn-primary">Sign In / Register</button>
+                <!-- Event section - dynamically populated -->
+                <div id="events-section">
+                    <div class="loading" style="padding: 20px; text-align: center; color: var(--text-muted);">
+                        Loading events...
+                    </div>
                 </div>
                 
-                <p class="form-footer" style="margin-top: 20px;">
-                    <small>We use a one-time code sent to your email - no password needed!</small>
-                </p>
-                
-                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color);">
-                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 12px;">
-                        🔔 Want to be notified when registration opens?
+                <!-- Profile login section -->
+                <div class="profile-section">
+                    <p>👤 Already registered? Access your profile and team.</p>
+                    <button id="signin-btn" class="btn-profile">Sign In to Your Profile</button>
+                    <p style="margin-top: 12px; font-size: 0.8rem; color: var(--text-muted);">
+                        We use a one-time code sent to your email - no password needed!
                     </p>
-                    <a href="interest.html" class="btn btn-secondary btn-small">Join Interest List</a>
                 </div>
             </div>
         </main>
@@ -63,12 +170,10 @@
             try {
                 const account = await Auth.handleRedirect();
                 if (account) {
-                    // User just signed in/up - check if they need to complete registration
                     window.location.href = 'events.html';
                     return;
                 }
                 
-                // Check if already logged in
                 if (Auth.isLoggedIn()) {
                     window.location.href = 'events.html';
                     return;
@@ -77,22 +182,100 @@
                 console.error('Auth error:', error);
             }
             
+            // Load events
+            await loadEvents();
+            
             // If there's a pending invitation, show a welcome message
             if (inviteId) {
                 showInvitationWelcome(inviteId);
             }
             
-            // Sign in button - works for both new and existing users
+            // Sign in button
             document.getElementById('signin-btn').addEventListener('click', async () => {
                 try {
-                    // Just use regular login - Entra will show "No account? Create one"
-                    // for new users, or proceed with OTP for existing users
                     await Auth.login();
                 } catch (error) {
                     console.error('Sign-in error:', error);
                     alert('Error signing in. Please try again.');
                 }
             });
+            
+            // Load and display events based on their status
+            async function loadEvents() {
+                const section = document.getElementById('events-section');
+                
+                try {
+                    const response = await fetch(`${CONFIG.api.baseUrl}/events`);
+                    if (!response.ok) throw new Error('Failed to load events');
+                    
+                    const events = await response.json();
+                    
+                    // Get events that are in pre-registration or registration status
+                    const activeEvents = events.filter(e => 
+                        e.status === 'pre-registration' || e.status === 'registration'
+                    );
+                    
+                    if (activeEvents.length === 0) {
+                        section.innerHTML = `
+                            <div class="no-events-message">
+                                <h2 style="margin-bottom: 12px;">Welcome!</h2>
+                                <p>No events are currently open for registration.</p>
+                                <p style="margin-top: 8px;">Check back later or sign in to see your profile.</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    section.innerHTML = activeEvents.map(event => {
+                        const isPreReg = event.status === 'pre-registration';
+                        const statusIcon = isPreReg ? '🔔' : '✅';
+                        const statusText = isPreReg ? 'Coming Soon' : 'Registration Open';
+                        const buttonText = isPreReg ? 'Register Interest' : 'Register Now';
+                        const helperText = isPreReg 
+                            ? 'Be the first to know when registration opens!' 
+                            : 'Sign in to create or join a team';
+                        const buttonAction = isPreReg 
+                            ? `href="interest.html?eventId=${event.id}"` 
+                            : `href="#" onclick="Auth.login(); return false;"`;
+                        
+                        return `
+                            <div class="event-card ${event.status}">
+                                <div class="status-badge">
+                                    <span style="font-size: 1.1rem;">${statusIcon}</span>
+                                    <span>${statusText}</span>
+                                </div>
+                                <h3>${event.name}</h3>
+                                ${event.description ? `<p class="description">${event.description}</p>` : ''}
+                                <p class="event-meta">
+                                    📅 ${formatDateRange(event.startDate, event.endDate)}
+                                    ${event.location ? ` • 📍 ${event.location}` : ''}
+                                </p>
+                                <a ${buttonAction} class="btn-event">${buttonText}</a>
+                                <p class="helper-text">${helperText}</p>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                } catch (error) {
+                    console.error('Error loading events:', error);
+                    section.innerHTML = `
+                        <div class="no-events-message">
+                            <h2 style="margin-bottom: 12px;">Welcome!</h2>
+                            <p>Unable to load events. Please try again later.</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            function formatDateRange(start, end) {
+                const startDate = new Date(start);
+                const endDate = new Date(end);
+                
+                if (startDate.getMonth() === endDate.getMonth() && startDate.getFullYear() === endDate.getFullYear()) {
+                    return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.getDate()}, ${endDate.getFullYear()}`;
+                }
+                return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+            }
             
             // Show invitation welcome message
             async function showInvitationWelcome(inviteId) {
@@ -101,7 +284,7 @@
                     if (invitation && invitation.status === 'pending') {
                         const card = document.querySelector('.card');
                         const welcomeHtml = `
-                            <div class="invitation-welcome" style="background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; border-left: 4px solid #2563eb;">
+                            <div style="background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; border-left: 4px solid #2563eb;">
                                 <p style="margin: 0 0 8px; color: #1e40af; font-weight: 600;">🎉 You've been invited!</p>
                                 <p style="margin: 0; color: #475569;">
                                     <strong>${invitation.inviterName}</strong> has invited you to join team 

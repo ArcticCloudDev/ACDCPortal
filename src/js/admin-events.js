@@ -2,16 +2,18 @@
 
 let currentUser = null;
 let allEvents = [];
+let allSequences = [];
 let editingEventId = null;
 let currentStatus = 'draft';
 
 // Status workflow - defines valid transitions
-const STATUS_ORDER = ['draft', 'waitlist', 'registration', 'live'];
+const STATUS_ORDER = ['draft', 'pre-registration', 'registration', 'live', 'completed'];
 const STATUS_LABELS = {
     draft: '📝 Draft',
-    waitlist: '📋 Waiting List',
+    'pre-registration': '🔔 Pre-Registration',
     registration: '✅ Registration Open',
-    live: '🚀 Live'
+    live: '🚀 Live',
+    completed: '✓ Completed'
 };
 
 // Valid status transitions (can only go forward one step, or back to previous)
@@ -51,17 +53,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Load events
         await loadEvents();
+        await loadSequences();
 
         // Setup event listeners
         setupEventListeners();
 
         // Check for action in URL
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('action') === 'create') {
+        const eventId = urlParams.get('event');
+        const tab = urlParams.get('tab');
+        
+        if (eventId) {
+            const event = allEvents.find(e => e.id === eventId);
+            if (event) {
+                currentEventId = eventId;
+                currentEvent = event;
+                showForm(event);
+                if (tab && tab !== 'general') {
+                    // Switch to specific tab after a brief delay to ensure DOM is ready
+                    setTimeout(() => {
+                        const targetBtn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+                        if (targetBtn) targetBtn.click();
+                    }, 100);
+                }
+            }
+        } else if (urlParams.get('action') === 'create') {
             showForm();
-        } else if (urlParams.get('edit')) {
-            const eventId = urlParams.get('edit');
-            editEvent(eventId);
         }
 
         loadingDiv.classList.add('hidden');
@@ -80,6 +97,25 @@ async function loadEvents() {
     } catch (error) {
         console.error('Error loading events:', error);
     }
+}
+
+async function loadSequences() {
+    try {
+        const response = await API.sequences.list();
+        allSequences = response.sequences || [];
+        populateSequencesDropdown();
+    } catch (err) {
+        console.error('Failed to load sequences:', err);
+    }
+}
+
+function populateSequencesDropdown() {
+    const select = document.getElementById('event-sequence');
+    if (!select) return;
+    select.innerHTML = '<option value="">No sequence (no automated emails)</option>';
+    allSequences.forEach(seq => {
+        select.innerHTML += `<option value="${seq.id}">${seq.name}</option>`;
+    });
 }
 
 function renderEventsList() {
@@ -171,8 +207,8 @@ function setupEventListeners() {
     });
 
     // Status buttons
-    document.querySelectorAll('.status-btn').forEach(btn => {
-        btn.addEventListener('click', () => handleStatusChange(btn.dataset.status));
+    document.querySelectorAll('.status-step').forEach(step => {
+        step.addEventListener('click', () => handleStatusChange(step.dataset.status));
     });
 
     // Tab navigation
@@ -183,45 +219,132 @@ function setupEventListeners() {
     document.getElementById('invite-judge-btn').addEventListener('click', () => sendInvitation('judge'));
 }
 
+// Status display configuration
+const STATUS_CONFIG = {
+    draft: {
+        icon: '📝',
+        title: 'Draft',
+        description: 'Event is in draft mode. Only visible to committee members.',
+        bannerBg: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+        bannerBorder: '#64748b',
+        titleColor: '#334155',
+        descColor: '#64748b'
+    },
+    'pre-registration': {
+        icon: '🔔',
+        title: 'Pre-Registration',
+        description: 'Theme announced. People can register interest, but team registration is not yet open.',
+        bannerBg: 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)',
+        bannerBorder: '#eab308',
+        titleColor: '#a16207',
+        descColor: '#ca8a04'
+    },
+    registration: {
+        icon: '✅',
+        title: 'Registration Open',
+        description: 'Registration is open. Participants can create teams and register.',
+        bannerBg: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+        bannerBorder: '#2563eb',
+        titleColor: '#1e40af',
+        descColor: '#3b82f6'
+    },
+    live: {
+        icon: '🚀',
+        title: 'Event Live',
+        description: 'Event is running! No new registrations allowed.',
+        bannerBg: 'linear-gradient(135deg, #ecfdf5 0%, #a7f3d0 100%)',
+        bannerBorder: '#10b981',
+        titleColor: '#047857',
+        descColor: '#10b981'
+    },
+    completed: {
+        icon: '✓',
+        title: 'Completed',
+        description: 'Event has ended. Read-only mode (only admins can edit).',
+        bannerBg: 'linear-gradient(135deg, #faf5ff 0%, #e9d5ff 100%)',
+        bannerBorder: '#8b5cf6',
+        titleColor: '#6b21a8',
+        descColor: '#8b5cf6'
+    }
+};
+
 function updateStatusUI(status) {
     currentStatus = status;
     document.getElementById('event-status').value = status;
     
-    // Update button states
-    document.querySelectorAll('.status-btn').forEach(btn => {
-        const btnStatus = btn.dataset.status;
-        btn.classList.remove('current', 'available');
+    const currentIndex = STATUS_ORDER.indexOf(status);
+    const steps = document.querySelectorAll('.status-step');
+    
+    // Update step states
+    steps.forEach((step, index) => {
+        const indicator = step.querySelector('.step-indicator');
+        step.classList.remove('completed', 'current', 'available', 'disabled');
         
-        if (btnStatus === status) {
-            btn.classList.add('current');
-        } else if (canTransitionTo(status, btnStatus)) {
-            btn.classList.add('available');
+        if (index < currentIndex) {
+            // Completed steps
+            step.classList.add('completed');
+            indicator.innerHTML = '✓';
+        } else if (index === currentIndex) {
+            // Current step
+            step.classList.add('current');
+            indicator.innerHTML = index + 1;
+        } else if (index === currentIndex + 1) {
+            // Next available step
+            step.classList.add('available');
+            indicator.innerHTML = index + 1;
+        } else {
+            // Future disabled steps
+            step.classList.add('disabled');
+            indicator.innerHTML = index + 1;
         }
     });
     
-    // Update help text
-    const helpText = document.getElementById('status-help');
+    // Update progress line
+    const progressLine = document.getElementById('progress-line');
+    if (progressLine) {
+        // Calculate progress percentage based on current step
+        const progressPercent = currentIndex / (STATUS_ORDER.length - 1) * 100;
+        const containerWidth = document.querySelector('.status-stepper').offsetWidth - 80; // Subtract padding
+        progressLine.style.width = `${(containerWidth * progressPercent) / 100}px`;
+    }
     
-    if (status === 'draft') {
-        helpText.textContent = 'Event is in draft mode. Only visible to committee members.';
-    } else if (status === 'waitlist') {
-        helpText.textContent = 'Waiting list is open. People can express interest but not fully register yet.';
-    } else if (status === 'registration') {
-        helpText.textContent = 'Registration is open. Participants can create teams and register.';
-    } else if (status === 'live') {
-        helpText.textContent = 'Event is live! No new registrations allowed.';
+    // Update status banner
+    const config = STATUS_CONFIG[status];
+    if (config) {
+        const banner = document.getElementById('status-banner');
+        const icon = document.getElementById('status-icon');
+        const title = document.getElementById('status-title');
+        const description = document.getElementById('status-description');
+        
+        banner.style.background = config.bannerBg;
+        banner.style.borderLeftColor = config.bannerBorder;
+        icon.textContent = config.icon;
+        title.textContent = config.title;
+        title.style.color = config.titleColor;
+        description.textContent = config.description;
+        description.style.color = config.descColor;
     }
 }
 
 function handleStatusChange(newStatus) {
+    // Ignore clicks on current status
+    if (newStatus === currentStatus) return;
+    
     if (!canTransitionTo(currentStatus, newStatus)) {
-        const direction = STATUS_ORDER.indexOf(newStatus) > STATUS_ORDER.indexOf(currentStatus) ? 'forward' : 'back';
-        alert(`You can only move one step ${direction} at a time. Current status: ${STATUS_LABELS[currentStatus]}`);
+        const currentIndex = STATUS_ORDER.indexOf(currentStatus);
+        const targetIndex = STATUS_ORDER.indexOf(newStatus);
+        
+        if (targetIndex > currentIndex) {
+            alert(`You can only advance one step at a time.\nCurrent: ${STATUS_LABELS[currentStatus]}\nNext available: ${STATUS_LABELS[STATUS_ORDER[currentIndex + 1]]}`);
+        } else {
+            alert(`You can only go back one step at a time.\nCurrent: ${STATUS_LABELS[currentStatus]}\nPrevious: ${STATUS_LABELS[STATUS_ORDER[currentIndex - 1]]}`);
+        }
         return;
     }
     
     // Confirm status change
-    const confirmMsg = `Change status from "${STATUS_LABELS[currentStatus]}" to "${STATUS_LABELS[newStatus]}"?`;
+    const direction = STATUS_ORDER.indexOf(newStatus) > STATUS_ORDER.indexOf(currentStatus) ? 'advance to' : 'revert to';
+    const confirmMsg = `${direction === 'advance to' ? '▶️' : '◀️'} ${direction.charAt(0).toUpperCase() + direction.slice(1)} "${STATUS_LABELS[newStatus]}"?\n\nCurrent: ${STATUS_LABELS[currentStatus]}`;
     if (!confirm(confirmMsg)) return;
     
     updateStatusUI(newStatus);
@@ -240,15 +363,18 @@ function showForm(event = null) {
     const statusSection = document.getElementById('status-section');
     const committeeTab = document.getElementById('committee-tab-btn');
     const judgesTab = document.getElementById('judges-tab-btn');
+    const leadsTab = document.getElementById('leads-tab-btn');
     const form = document.getElementById('event-form');
 
-    // Disable committee/judges tabs for new events
+    // Disable committee/judges/leads tabs for new events
     if (event) {
         committeeTab.disabled = false;
         judgesTab.disabled = false;
+        leadsTab.disabled = false;
     } else {
         committeeTab.disabled = true;
         judgesTab.disabled = true;
+        leadsTab.disabled = true;
     }
 
     // Reset to General tab
@@ -271,6 +397,8 @@ function showForm(event = null) {
         document.getElementById('event-location').value = event.location || '';
         document.getElementById('min-team-size').value = event.minTeamSize || 3;
         document.getElementById('max-team-size').value = event.maxTeamSize || 5;
+        document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
+        document.getElementById('event-sequence').value = event.sequenceId || '';
         
         // Set registration type
         const regType = event.registrationType || 'team';
@@ -306,12 +434,30 @@ function showForm(event = null) {
     }
 }
 
+function updateURL() {
+    if (currentEventId) {
+        const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab || 'general';
+        window.history.replaceState({}, '', `admin-events.html?event=${currentEventId}&tab=${activeTab}`);
+    } else {
+        window.history.replaceState({}, '', 'admin-events.html');
+    }
+}
+
+function updateURL() {
+    if (currentEventId) {
+        const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab || 'general';
+        window.history.replaceState({}, '', `admin-events.html?event=${currentEventId}&tab=${activeTab}`);
+    } else {
+        window.history.replaceState({}, '', 'admin-events.html');
+    }
+}
+
 function hideForm() {
     document.getElementById('events-list-view').classList.remove('hidden');
     document.getElementById('event-form-view').classList.add('hidden');
     editingEventId = null;
-    currentEventId = null; // Clear current event ID
-    currentEvent = null; // Clear current event object
+    currentEventId = null;
+    currentEvent = null;
     
     // Clear URL params
     window.history.replaceState({}, '', 'admin-events.html');
@@ -320,9 +466,10 @@ function hideForm() {
 function editEvent(eventId) {
     const event = allEvents.find(e => e.id === eventId);
     if (event) {
-        currentEventId = eventId; // Set current event ID for committee/judges tabs
-        currentEvent = event; // Set full event object
+        currentEventId = eventId;
+        currentEvent = event;
         showForm(event);
+        updateURL();
     }
 }
 
@@ -343,7 +490,12 @@ async function handleFormSubmit(e) {
             endDate: document.getElementById('event-end').value,
             location: document.getElementById('event-location').value.trim(),
             registrationType: registrationType,
-            status: document.getElementById('event-status').value || 'draft'
+            status: document.getElementById('event-status').value || 'draft',
+            sequenceId: document.getElementById('event-sequence').value || null,
+            fileCategories: document.getElementById('event-file-categories').value
+                .split(',')
+                .map(c => c.trim())
+                .filter(c => c.length > 0)
         };
         
         // Only include team size if team type
@@ -351,9 +503,6 @@ async function handleFormSubmit(e) {
             eventData.minTeamSize = parseInt(document.getElementById('min-team-size').value) || 3;
             eventData.maxTeamSize = parseInt(document.getElementById('max-team-size').value) || 5;
         }
-        
-        // Derive registrationOpen from status for backwards compatibility
-        eventData.registrationOpen = eventData.status === 'registration';
 
         const eventId = document.getElementById('event-id').value;
 
@@ -374,10 +523,11 @@ async function handleFormSubmit(e) {
             currentEvent = savedEvent;
             currentEventId = savedEvent.id;
             
-            // If this is a new event, enable the committee/judges tabs
+            // If this is a new event, enable the committee/judges/leads tabs
             if (!eventId) {
                 document.getElementById('committee-tab-btn').disabled = false;
                 document.getElementById('judges-tab-btn').disabled = false;
+                document.getElementById('leads-tab-btn').disabled = false;
                 // Update the hidden event ID field
                 document.getElementById('event-id').value = savedEvent.id;
             }
@@ -436,14 +586,27 @@ function setupTabs() {
             tabPanels.forEach(panel => panel.classList.remove('active'));
             document.getElementById(`${targetTab}-panel`).classList.add('active');
             
-            // Load data for committee/judges tabs when opened
+            // Update URL
+            if (currentEventId) {
+                updateURL();
+            }
+            
+            // Load data for committee/judges/leads tabs when opened
             if (targetTab === 'committee') {
                 loadCommitteeMembers();
             } else if (targetTab === 'judges') {
                 loadJudgesMembers();
+            } else if (targetTab === 'leads') {
+                loadInterestLeads();
+            } else if (targetTab === 'teams') {
+                loadEventTeams();
             }
         });
     });
+    
+    // Leads tab button handlers
+    document.getElementById('copy-interest-link')?.addEventListener('click', copyInterestLink);
+    document.getElementById('export-leads-btn')?.addEventListener('click', exportLeadsCSV);
 }
 
 // ===== Committee & Judges Management =====
@@ -721,6 +884,209 @@ async function revokeInvite(inviteId, role) {
         console.error('Error revoking invitation:', error);
         alert('Error revoking invitation: ' + error.message);
     }
+}
+
+// ===== Interest Leads Management =====
+let allLeads = [];
+
+async function loadInterestLeads() {
+    if (!currentEventId) {
+        document.getElementById('leads-table-body').innerHTML = 
+            '<tr><td colspan="5" class="empty-state">Save the event first to view leads</td></tr>';
+        return;
+    }
+
+    // Set the interest link
+    const baseUrl = window.location.origin;
+    const interestLink = `${baseUrl}/interest.html?event=${currentEventId}`;
+    document.getElementById('interest-link').value = interestLink;
+
+    try {
+        const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads?eventId=${currentEventId}`);
+        if (!response.ok) throw new Error('Failed to load leads');
+        
+        allLeads = await response.json();
+        renderLeadsTable();
+    } catch (error) {
+        console.error('Error loading leads:', error);
+        document.getElementById('leads-table-body').innerHTML = 
+            '<tr><td colspan="5" class="empty-state">Error loading leads</td></tr>';
+    }
+}
+
+function renderLeadsTable() {
+    const tbody = document.getElementById('leads-table-body');
+    
+    if (allLeads.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No interest leads yet. Share the interest link to collect leads!</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = allLeads.map(lead => `
+        <tr>
+            <td><strong>${escapeHtml(lead.firstName)} ${escapeHtml(lead.lastName)}</strong></td>
+            <td>${escapeHtml(lead.email)}</td>
+            <td>${new Date(lead.verifiedAt || lead.createdAt).toLocaleDateString()}</td>
+            <td>
+                <button class="btn-sm" onclick="restartSequence('${lead.id}')">🔄 Restart Sequence</button>
+                <button class="btn-sm danger" onclick="deleteLead('${lead.id}')">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function copyInterestLink() {
+    const linkInput = document.getElementById('interest-link');
+    linkInput.select();
+    document.execCommand('copy');
+    
+    const btn = document.getElementById('copy-interest-link');
+    const originalText = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = originalText, 2000);
+}
+
+function exportLeadsCSV() {
+    if (allLeads.length === 0) {
+        alert('No leads to export');
+        return;
+    }
+
+    const headers = ['First Name', 'Last Name', 'Email', 'Registered Date'];
+    const rows = allLeads.map(lead => [
+        lead.firstName,
+        lead.lastName,
+        lead.email,
+        new Date(lead.verifiedAt || lead.createdAt).toISOString().split('T')[0]
+    ]);
+
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `interest-leads-${currentEventId}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function deleteLead(leadId) {
+    if (!confirm('Are you sure you want to delete this lead?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads/${leadId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) throw new Error('Failed to delete lead');
+        
+        await loadInterestLeads();
+    } catch (error) {
+        console.error('Error deleting lead:', error);
+        alert('Error deleting lead: ' + error.message);
+    }
+}
+
+async function restartSequence(leadId) {
+    if (!confirm('Restart sequence emails for this lead?\n\nThis will send all unsent sequence emails. Check the browser console for detailed logs.')) return;
+
+    try {
+        console.log('🔄 Restarting sequence for lead:', leadId);
+        const response = await fetch(`${CONFIG.api.baseUrl}/interest/restart-sequence`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ leadId })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to restart sequence');
+        }
+
+        const result = await response.json();
+        console.log('✅ Sequence restart result:', result);
+        alert(`Sequence restarted successfully!\n${result.sent || 0} email(s) sent.\n\nCheck the browser console and server terminal for detailed logs.`);
+    } catch (error) {
+        console.error('❌ Error restarting sequence:', error);
+        alert('Failed to restart sequence: ' + error.message);
+    }
+}
+
+// ===== Teams Management =====
+let allTeams = [];
+
+async function loadEventTeams() {
+    if (!currentEventId) {
+        document.getElementById('teams-table-body').innerHTML = 
+            '<tr><td colspan="5" class="empty-state">Save the event first to view teams</td></tr>';
+        return;
+    }
+
+    try {
+        // Load teams for this event
+        const response = await fetch(`${CONFIG.api.baseUrl}/teams`);
+        if (!response.ok) throw new Error('Failed to load teams');
+        
+        const teams = await response.json();
+        allTeams = teams.filter(t => t.eventId === currentEventId);
+        
+        // Load participations to get member counts
+        const partResponse = await fetch(`${CONFIG.api.baseUrl}/participations/event/${currentEventId}`);
+        if (partResponse.ok) {
+            allParticipations = await partResponse.json();
+        }
+        
+        renderTeamsTable();
+    } catch (error) {
+        console.error('Error loading teams:', error);
+        document.getElementById('teams-table-body').innerHTML = 
+            '<tr><td colspan="5" class="empty-state">Error loading teams</td></tr>';
+    }
+}
+
+function renderTeamsTable() {
+    const tbody = document.getElementById('teams-table-body');
+    
+    if (allTeams.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No teams registered yet</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = allTeams.map(team => {
+        // Count team members
+        const memberships = allParticipations.filter(p => 
+            (p.teamMemberships || []).some(m => m.teamId === team.id && m.isParticipant)
+        );
+        const memberCount = memberships.length;
+        
+        // Find team admin
+        const adminMembership = allParticipations.find(p =>
+            (p.teamMemberships || []).some(m => m.teamId === team.id && m.isAdmin)
+        );
+        
+        const adminName = adminMembership ? `${adminMembership.firstName} ${adminMembership.lastName}` : 'N/A';
+        const createdDate = new Date(team.createdAt).toLocaleDateString();
+        
+        return `
+            <tr>
+                <td><strong>${escapeHtml(team.name)}</strong></td>
+                <td>${escapeHtml(adminName)}</td>
+                <td>${memberCount} / ${team.maxSize || 5}</td>
+                <td>${createdDate}</td>
+                <td>
+                    <a href="admin-teams.html?team=${team.id}" class="btn-sm" style="text-decoration: none;">View →</a>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 console.log('Admin Events page loaded');

@@ -3,32 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Campaigns - ACDC Admin</title>
+    <title>Sequences - ACDC Admin</title>
     <link rel="stylesheet" href="css/admin-styles.css">
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <style>
         /* Page-specific styles */
         .page-title { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
+        .page-subtitle { font-size: 0.9rem; color: var(--admin-text-muted); margin-top: 8px; }
 
-        /* Tabs */
-        .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--admin-border); }
-        .tab {
-            padding: 10px 20px;
-            background: none;
-            border: none;
-            font-size: 0.9rem;
-            color: var(--admin-text-muted);
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -1px;
+        /* Cards */
+        .sequence-card {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--admin-border);
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
         }
-        .tab:hover { color: var(--admin-text); }
-        .tab.active { color: var(--admin-primary); border-bottom-color: var(--admin-primary); font-weight: 500; }
+        
+        .sequence-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        .sequence-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-bottom: 1px solid var(--admin-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .sequence-header:hover {
+            background: linear-gradient(135deg, #f1f5f9 0%, #d1d5db 100%);
+        }
+        
+        .sequence-info h3 {
+            margin: 0 0 4px 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--admin-sidebar);
+        }
+        
+        .sequence-meta {
+            font-size: 0.85rem;
+            color: var(--admin-text-muted);
+        }
+        
+        .sequence-actions {
+            display: flex;
+            gap: 8px;
+        }
 
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-
-        /* Panel */
+        /* Panels */
         .panel {
             background: white;
             border-radius: 8px;
@@ -123,16 +151,87 @@
             font-weight: 500;
         }
         .badge.sequence { background: #dbeafe; color: #1d4ed8; }
-        .badge.broadcast { background: #f3e8ff; color: #7c3aed; }
-        .badge.sent { background: #d1fae5; color: #065f46; }
-        .badge.failed { background: #fee2e2; color: #b91c1c; }
-        .badge.pending { background: #fef3c7; color: #92400e; }
 
-        /* Stats */
-        .stats-row { display: flex; gap: 24px; margin-bottom: 16px; }
-        .stat { text-align: center; }
-        .stat .value { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); }
-        .stat .label { font-size: 0.75rem; color: var(--admin-text-muted); }
+        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
+        .empty-state-small { padding: 20px; text-align: center; color: var(--admin-text-muted); font-size: 0.9rem; }
+
+        .hidden { display: none !important; }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--admin-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 1px solid #fde047;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 16px;
+            font-size: 0.85rem;
+            color: #78350f;
+        }
+
+        .breadcrumb {
+            font-size: 0.9rem;
+            color: var(--admin-text-muted);
+            margin-bottom: 16px;
+        }
+        
+        .breadcrumb a {
+            color: var(--admin-primary);
+            text-decoration: none;
+        }
+        
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
 
         /* Preview */
         .preview-frame {
@@ -142,29 +241,6 @@
             border-radius: 6px;
             background: white;
         }
-
-        /* Radio group for type */
-        .type-group { display: flex; gap: 12px; }
-        .type-option {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 16px;
-            border: 2px solid var(--admin-border);
-            border-radius: 6px;
-            cursor: pointer;
-            flex: 1;
-        }
-        .type-option:hover { border-color: var(--admin-primary); }
-        .type-option.selected { border-color: var(--admin-primary); background: #eff6ff; }
-        .type-option input { display: none; }
-        .type-option .icon { font-size: 1.2rem; }
-        .type-option .label { font-weight: 500; }
-        .type-option .desc { font-size: 0.75rem; color: var(--admin-text-muted); }
-
-        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
-
-        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -172,79 +248,84 @@
         <div id="sidebar-container"></div>
 
         <main class="main-content" id="admin-content">
-            <div class="page-header">
-                <h1 class="page-title">📧 Sequence Emails</h1>
-                <div>
-                    <select id="event-filter" style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--admin-border);">
-                        <option value="">All Events</option>
-                    </select>
-                    <button class="btn btn-primary" onclick="showCreateForm()">➕ New Sequence Email</button>
+            <!-- Sequences List View -->
+            <div id="view-sequences" class="view">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">📧 Email Sequences</h1>
+                        <p class="page-subtitle">Reusable email sequences that can be assigned to events</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-primary" onclick="showCreateSequenceModal()">➕ New Sequence</button>
+                    </div>
                 </div>
+
+                <div id="sequences-list"></div>
             </div>
 
-            <p style="margin-bottom: 20px; color: var(--admin-text-muted); font-size: 0.9rem;">
-                📋 Sequence emails are automatically sent to participants when they join an event. Create them in order - #1 first, #2 second, etc.
-            </p>
+            <!-- Sequence Detail View (emails in sequence) -->
+            <div id="view-sequence-detail" class="view hidden">
+                <div class="breadcrumb">
+                    <a href="#" onclick="showSequencesList()">← Back to Sequences</a>
+                </div>
+                
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title" id="detail-sequence-name"></h1>
+                        <p class="page-subtitle" id="detail-sequence-meta"></p>
+                    </div>
+                    <div>
+                        <button class="btn btn-secondary btn-sm" onclick="editCurrentSequence()">✏️ Edit Sequence</button>
+                        <button class="btn btn-primary" onclick="showCreateEmailForm()">➕ Add Email</button>
+                    </div>
+                </div>
 
-            <div class="tabs">
-                <button class="tab active" data-tab="campaigns">📋 Sequences</button>
-                <button class="tab" data-tab="create">✏️ Create/Edit</button>
-                <button class="tab" data-tab="detail">📊 Delivery Log</button>
-            </div>
-
-            <!-- Sequences List Tab -->
-            <div id="tab-campaigns" class="tab-content active">
                 <div class="panel">
                     <div class="panel-header">
-                        <span class="panel-title">All Sequence Emails</span>
+                        <span class="panel-title">Sequence Emails</span>
                     </div>
                     <table class="data-table">
                         <thead>
                             <tr>
                                 <th>Order</th>
                                 <th>Subject</th>
-                                <th>Event</th>
                                 <th>Sent</th>
                                 <th>Failed</th>
                                 <th>Created</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="campaigns-body">
-                            <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+                        <tbody id="emails-body">
+                            <tr><td colspan="6" class="empty-state-small">No emails yet. Click "Add Email" to create the first email in this sequence.</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Create/Edit Tab -->
-            <div id="tab-create" class="tab-content">
+            <!-- Email Create/Edit View -->
+            <div id="view-email-form" class="view hidden">
+                <div class="breadcrumb">
+                    <a href="#" onclick="showSequenceDetail(currentSequenceId)">← Back to Sequence</a>
+                </div>
+
                 <div class="panel">
                     <div class="panel-header">
-                        <span class="panel-title" id="form-title">Create New Campaign</span>
+                        <span class="panel-title" id="email-form-title">Create Email</span>
                     </div>
                     <div class="panel-body">
-                        <input type="hidden" id="campaign-id">
+                        <input type="hidden" id="email-id">
+                        <input type="hidden" id="email-sequence-id">
                         
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Event *</label>
-                                <select id="campaign-event" required>
-                                    <option value="">Select event...</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Sequence Order</label>
-                                <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 8px;" id="sequence-order-info">
-                                    This will be sequence #<span id="sequence-number">1</span> for the selected event.
-                                </p>
-                            </div>
+                        <div class="form-group">
+                            <label>Email Order</label>
+                            <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;" id="email-order-info">
+                                This will be email #<span id="email-number">1</span> in the sequence.
+                            </p>
                         </div>
-                        <input type="hidden" name="campaign-type" value="sequence">
 
                         <div class="form-group">
                             <label>Subject *</label>
-                            <input type="text" id="campaign-subject" placeholder="Welcome to ACDC 2026!" required>
+                            <input type="text" id="email-subject" placeholder="Welcome to ACDC 2026!" required>
                         </div>
 
                         <div class="form-group">
@@ -255,19 +336,19 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label>CTA Button URL (optional)</label>
-                                <input type="url" id="campaign-cta-url" placeholder="https://...">
+                                <input type="url" id="email-cta-url" placeholder="https://...">
                             </div>
                             <div class="form-group">
                                 <label>CTA Button Text (optional)</label>
-                                <input type="text" id="campaign-cta-text" placeholder="View Details">
+                                <input type="text" id="email-cta-text" placeholder="View Details">
                             </div>
                         </div>
 
                         <div class="btn-row">
-                            <button class="btn btn-primary" onclick="saveCampaign()">💾 Save Campaign</button>
-                            <button class="btn btn-secondary" onclick="previewCampaign()">👁️ Preview</button>
-                            <button class="btn btn-secondary" onclick="cancelEdit()">Cancel</button>
-                            <button class="btn btn-danger hidden" id="delete-campaign-btn" onclick="deleteCampaign()">🗑️ Delete</button>
+                            <button class="btn btn-primary" onclick="saveEmail()">💾 Save Email</button>
+                            <button class="btn btn-secondary" onclick="previewEmail()">👁️ Preview</button>
+                            <button class="btn btn-secondary" onclick="cancelEmailEdit()">Cancel</button>
+                            <button class="btn btn-danger hidden" id="delete-email-btn" onclick="deleteEmail()">🗑️ Delete</button>
                         </div>
                     </div>
                 </div>
@@ -280,372 +361,48 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Sequence Detail Tab -->
-            <div id="tab-detail" class="tab-content">
-                <div class="panel">
-                    <div class="panel-header">
-                        <span class="panel-title" id="detail-title">Sequence Email Details</span>
-                        <span class="badge sequence" style="font-size: 0.85rem;">Auto-sent to new joiners</span>
-                    </div>
-                    <div class="panel-body">
-                        <div class="stats-row">
-                            <div class="stat">
-                                <div class="value" id="stat-total">0</div>
-                                <div class="label">Total Sent</div>
-                            </div>
-                            <div class="stat">
-                                <div class="value" id="stat-delivered" style="color: var(--admin-success);">0</div>
-                                <div class="label">Delivered</div>
-                            </div>
-                            <div class="stat">
-                                <div class="value" id="stat-failed" style="color: var(--admin-danger);">0</div>
-                                <div class="label">Failed</div>
-                            </div>
-                        </div>
-
-                        <h3 style="margin: 20px 0 12px; font-size: 0.9rem;">Delivery Log</h3>
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Recipient</th>
-                                    <th>Status</th>
-                                    <th>Sent At</th>
-                                    <th>Error</th>
-                                </tr>
-                            </thead>
-                            <tbody id="deliveries-body">
-                                <tr><td colspan="4" class="empty-state">Select a campaign to view deliveries</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
         </main>
     </div>
 
-    <!-- Sequence emails are auto-sent, no manual send modal needed -->
+    <!-- Create Sequence Modal -->
+    <div id="create-sequence-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="sequence-modal-title">📧 Create New Sequence</h3>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="sequence-id">
+                
+                <div class="form-group">
+                    <label>Sequence Name *</label>
+                    <input type="text" id="sequence-name" placeholder="e.g., Standard Interest Follow-up" required>
+                    <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin-top: 4px;">
+                        Give this sequence a descriptive name - it can be reused across multiple events
+                    </p>
+                </div>
+                
+                <div class="form-group">
+                    <label>Description (optional)</label>
+                    <textarea id="sequence-description" rows="3" placeholder="Brief description of this email sequence..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSequenceModal()">Cancel</button>
+                <button class="btn btn-danger hidden" id="delete-sequence-btn" onclick="deleteSequence()">🗑️ Delete</button>
+                <button class="btn btn-primary" onclick="saveSequence()">💾 Save Sequence</button>
+            </div>
+        </div>
+    </div>
 
+    <!-- Copy Sequence Modal -->
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    <script src="https://unpkg.com/quill-image-resize-module@3.0.0/image-resize.min.js"></script>
+    <script src="https://unpkg.com/quill-image-drop-module@1.0.3/image-drop.min.js"></script>
     <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/admin-sidebar.js"></script>
-    <script>
-        let quill;
-        let allCampaigns = [];
-        let allEvents = [];
-        let currentCampaign = null;
-        let eventParticipants = [];
-
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        async function init() {
-            Auth.init();
-            renderAdminSidebar('campaigns');
-            await Auth.handleRedirect();
-
-            if (!Auth.isLoggedIn()) {
-                window.location.href = '/login.html';
-                return;
-            }
-
-            // Initialize Quill editor
-            quill = new Quill('#editor', {
-                theme: 'snow',
-                modules: {
-                    toolbar: [
-                        [{ 'header': [1, 2, 3, false] }],
-                        ['bold', 'italic', 'underline'],
-                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                        ['link'],
-                        ['clean']
-                    ]
-                }
-            });
-
-            // Setup tabs
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', () => switchTab(tab.dataset.tab));
-            });
-
-            // Load data
-            await loadEvents();
-            await loadCampaigns();
-
-            // Event filter change
-            document.getElementById('event-filter').addEventListener('change', loadCampaigns);
-            
-            // Update sequence order when event changes in form
-            document.getElementById('campaign-event').addEventListener('change', updateSequenceOrderDisplay);
-        }
-
-        async function updateSequenceOrderDisplay() {
-            const eventId = document.getElementById('campaign-event').value;
-            const campaignId = document.getElementById('campaign-id').value;
-            const sequenceInfo = document.getElementById('sequence-order-info');
-            
-            if (!eventId) {
-                sequenceInfo.textContent = 'Select an event to see sequence order';
-                return;
-            }
-
-            // Count existing sequences for this event
-            const existingSequences = allCampaigns.filter(c => 
-                c.eventId === eventId && c.id !== campaignId
-            ).length;
-
-            if (campaignId) {
-                // Editing - show current order
-                const current = allCampaigns.find(c => c.id === campaignId);
-                sequenceInfo.textContent = `This is sequence #${current?.sequenceOrder || 1} of ${existingSequences + 1} for this event`;
-            } else {
-                // Creating - will be next in order
-                sequenceInfo.textContent = `This will be sequence #${existingSequences + 1} for this event`;
-            }
-        }
-
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
-            document.getElementById(`tab-${tabName}`).classList.add('active');
-        }
-
-        async function loadEvents() {
-            try {
-                const response = await API.events.list();
-                allEvents = response.events || response || [];
-                
-                const eventFilter = document.getElementById('event-filter');
-                const campaignEvent = document.getElementById('campaign-event');
-                
-                allEvents.forEach(event => {
-                    eventFilter.innerHTML += `<option value="${event.id}">${escapeHtml(event.name)}</option>`;
-                    campaignEvent.innerHTML += `<option value="${event.id}">${escapeHtml(event.name)}</option>`;
-                });
-            } catch (err) {
-                console.error('Failed to load events:', err);
-            }
-        }
-
-        async function loadCampaigns() {
-            try {
-                const eventId = document.getElementById('event-filter').value || null;
-                const response = await API.campaigns.list(eventId);
-                allCampaigns = response.campaigns || [];
-                renderCampaigns();
-            } catch (err) {
-                console.error('Failed to load campaigns:', err);
-                document.getElementById('campaigns-body').innerHTML = 
-                    '<tr><td colspan="7" class="empty-state">Failed to load campaigns</td></tr>';
-            }
-        }
-
-        function renderCampaigns() {
-            const tbody = document.getElementById('campaigns-body');
-
-            if (allCampaigns.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No sequence emails yet. Create your first one!</td></tr>';
-                return;
-            }
-
-            // Sort by event, then by sequence order
-            allCampaigns.sort((a, b) => {
-                if (a.eventId !== b.eventId) return a.eventId.localeCompare(b.eventId);
-                return (a.sequenceOrder || 0) - (b.sequenceOrder || 0);
-            });
-
-            tbody.innerHTML = allCampaigns.map(campaign => {
-                const event = allEvents.find(e => e.id === campaign.eventId);
-                const createdDate = new Date(campaign.createdAt).toLocaleDateString();
-
-                return `
-                    <tr>
-                        <td><span class="badge sequence">#${campaign.sequenceOrder || 1}</span></td>
-                        <td><strong>${escapeHtml(campaign.subject)}</strong></td>
-                        <td>${escapeHtml(event?.name || campaign.eventId)}</td>
-                        <td><span style="color: var(--admin-success);">${campaign.stats?.sent || 0}</span></td>
-                        <td><span style="color: var(--admin-danger);">${campaign.stats?.failed || 0}</span></td>
-                        <td>${createdDate}</td>
-                        <td>
-                            <button class="btn btn-sm btn-secondary" onclick="viewCampaign('${campaign.id}')">📊 View</button>
-                            <button class="btn btn-sm btn-secondary" onclick="editCampaign('${campaign.id}')">✏️ Edit</button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function showCreateForm() {
-            document.getElementById('campaign-id').value = '';
-            document.getElementById('form-title').textContent = 'Create New Sequence Email';
-            document.getElementById('campaign-event').value = document.getElementById('event-filter').value || '';
-            document.getElementById('campaign-subject').value = '';
-            quill.setContents([]);
-            document.getElementById('campaign-cta-url').value = '';
-            document.getElementById('campaign-cta-text').value = '';
-            document.getElementById('delete-campaign-btn').classList.add('hidden');
-            
-            // Update sequence order display
-            updateSequenceOrderDisplay();
-
-            switchTab('create');
-        }
-
-        async function editCampaign(campaignId) {
-            try {
-                const response = await API.campaigns.get(campaignId);
-                const campaign = response.campaign;
-                currentCampaign = campaign;
-
-                document.getElementById('campaign-id').value = campaign.id;
-                document.getElementById('form-title').textContent = 'Edit Sequence Email';
-                document.getElementById('campaign-event').value = campaign.eventId;
-                document.getElementById('campaign-subject').value = campaign.subject;
-                quill.root.innerHTML = campaign.content;
-                document.getElementById('campaign-cta-url').value = campaign.ctaUrl || '';
-                document.getElementById('campaign-cta-text').value = campaign.ctaText || '';
-                document.getElementById('delete-campaign-btn').classList.remove('hidden');
-
-                // Update sequence order display
-                updateSequenceOrderDisplay();
-
-                switchTab('create');
-            } catch (err) {
-                console.error('Failed to load campaign:', err);
-                alert('Failed to load campaign');
-            }
-        }
-
-        async function saveCampaign() {
-            const eventId = document.getElementById('campaign-event').value;
-            const subject = document.getElementById('campaign-subject').value.trim();
-            const content = quill.root.innerHTML;
-            const type = document.querySelector('input[name="campaign-type"]:checked').value;
-            const ctaUrl = document.getElementById('campaign-cta-url').value.trim();
-            const ctaText = document.getElementById('campaign-cta-text').value.trim();
-
-            if (!eventId || !subject || !content) {
-                alert('Please fill in all required fields');
-                return;
-            }
-
-            try {
-                const campaignId = document.getElementById('campaign-id').value;
-                const data = { eventId, subject, content, type, ctaUrl, ctaText };
-
-                if (campaignId) {
-                    await API.campaigns.update(campaignId, data);
-                } else {
-                    await API.campaigns.create(data);
-                }
-
-                await loadCampaigns();
-                switchTab('campaigns');
-            } catch (err) {
-                console.error('Failed to save campaign:', err);
-                alert('Failed to save campaign: ' + err.message);
-            }
-        }
-
-        async function deleteCampaign() {
-            const campaignId = document.getElementById('campaign-id').value;
-            if (!campaignId) return;
-
-            if (!confirm('Are you sure you want to delete this campaign? This will also delete all delivery records.')) {
-                return;
-            }
-
-            try {
-                await API.campaigns.delete(campaignId);
-                await loadCampaigns();
-                switchTab('campaigns');
-            } catch (err) {
-                console.error('Failed to delete campaign:', err);
-                alert('Failed to delete campaign');
-            }
-        }
-
-        function cancelEdit() {
-            switchTab('campaigns');
-        }
-
-        async function previewCampaign() {
-            const subject = document.getElementById('campaign-subject').value.trim();
-            const content = quill.root.innerHTML;
-            const ctaUrl = document.getElementById('campaign-cta-url').value.trim();
-            const ctaText = document.getElementById('campaign-cta-text').value.trim();
-
-            try {
-                const response = await fetch(`${CONFIG.api.baseUrl}/email/preview`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        subject,
-                        content,
-                        ctaUrl,
-                        ctaText,
-                        recipient: { firstName: 'Preview User' }
-                    })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const frame = document.getElementById('preview-frame');
-                    frame.srcdoc = data.html;
-                }
-            } catch (err) {
-                console.error('Preview error:', err);
-            }
-        }
-
-        async function viewCampaign(campaignId) {
-            try {
-                const response = await API.campaigns.get(campaignId);
-                currentCampaign = response.campaign;
-                const deliveries = response.deliveries || [];
-
-                document.getElementById('detail-title').textContent = `#${currentCampaign.sequenceOrder || 1} - ${currentCampaign.subject}`;
-                document.getElementById('stat-total').textContent = response.stats?.total || 0;
-                document.getElementById('stat-delivered').textContent = response.stats?.sent || 0;
-                document.getElementById('stat-failed').textContent = response.stats?.failed || 0;
-
-                const tbody = document.getElementById('deliveries-body');
-                if (deliveries.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No deliveries yet - emails are sent automatically when users join teams</td></tr>';
-                } else {
-                    tbody.innerHTML = deliveries.map(d => {
-                        const statusBadge = `<span class="badge ${d.status}">${d.status}</span>`;
-                        const sentAt = d.sentAt ? new Date(d.sentAt).toLocaleString() : '-';
-                        return `
-                            <tr>
-                                <td>${escapeHtml(d.userName || d.email)}</td>
-                                <td>${statusBadge}</td>
-                                <td>${sentAt}</td>
-                                <td style="color: var(--admin-danger);">${escapeHtml(d.error || '-')}</td>
-                            </tr>
-                        `;
-                    }).join('');
-                }
-
-                switchTab('detail');
-            } catch (err) {
-                console.error('Failed to load campaign:', err);
-                alert('Failed to load campaign details');
-            }
-        }
-
-        // Sequence emails are auto-sent when users join teams
-        // No manual send functions needed
-
-        document.addEventListener('DOMContentLoaded', init);
-    </script>
+    <script src="js/admin-campaigns.js"></script>
 </body>
 </html>
