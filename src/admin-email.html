@@ -414,8 +414,10 @@
                     if (e.target.value === 'live') {
                         document.getElementById('schedule-group').style.display = 'block';
                         displayUserTimezone();
+                        lockFormFields(true);
                     } else {
                         document.getElementById('schedule-group').style.display = 'none';
+                        lockFormFields(false);
                     }
                 });
             });
@@ -500,6 +502,7 @@
                             document.querySelector(`input[name="email-status"][value="${email.status}"]`).checked = true;
                             if (email.status === 'live') {
                                 document.getElementById('schedule-group').style.display = 'block';
+                                lockFormFields(true);
                             }
                         }
                         
@@ -584,22 +587,23 @@
                 return;
             }
 
-            // Interest queue doesn't require an event
+            // Interest queue doesn't require an event - load all interest leads
             if (filter === 'interest-queue') {
                 try {
-                    const response = await fetch(`${CONFIG.api.baseUrl}/interest-queue`);
+                    const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads`);
                     if (!response.ok) throw new Error('Failed to load');
-                    const entries = await response.json();
-                    // Only include non-registered entries
-                    recipients = entries
-                        .filter(e => !e.registeredEventId)
-                        .map(e => ({
-                            email: e.email,
-                            displayName: [e.firstName, e.lastName].filter(Boolean).join(' ') || e.email
+                    const data = await response.json();
+                    const leads = data.leads || [];
+                    // Only include verified leads
+                    recipients = leads
+                        .filter(l => l.verified)
+                        .map(l => ({
+                            email: l.email,
+                            displayName: [l.firstName, l.lastName].filter(Boolean).join(' ') || l.email
                         }));
                     document.getElementById('recipient-count').textContent = recipients.length;
                 } catch (error) {
-                    console.error('Error loading interest queue:', error);
+                    console.error('Error loading interest leads:', error);
                     recipients = [];
                     document.getElementById('recipient-count').textContent = '0';
                 }
@@ -940,6 +944,26 @@
             
             preview.innerHTML = `📅 Will send on: <strong>${localDate.toLocaleString()}</strong> (${gmtOffset})<br>UTC: ${utcDate}`;
             preview.style.display = 'block';
+        }
+        
+        function lockFormFields(lock) {
+            // Lock/unlock form fields
+            document.getElementById('subject').readOnly = lock;
+            document.getElementById('cta-url').readOnly = lock;
+            document.getElementById('cta-text').readOnly = lock;
+            document.getElementById('scheduled-send-time').disabled = lock;
+            quill.enable(!lock);
+            
+            // Lock/unlock template cards
+            document.querySelectorAll('.template-card').forEach(card => {
+                card.style.pointerEvents = lock ? 'none' : 'auto';
+                card.style.opacity = lock ? '0.6' : '1';
+            });
+            
+            // Show/hide message
+            if (lock) {
+                showStatus('Email is live - switch to draft to make changes', 'info');
+            }
         }
 
         function showStatus(message, type) {

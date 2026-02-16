@@ -709,7 +709,7 @@
                         <button class="tab-btn" data-tab="judges" id="judges-tab-btn">⚖️ Judges</button>
                         <button class="tab-btn" data-tab="leads" id="leads-tab-btn">📧 Interest Leads</button>
                         <button class="tab-btn" data-tab="teams" id="teams-tab-btn">👥 Teams</button>
-                        <button class="tab-btn" data-tab="deliveries" id="deliveries-tab-btn">📬 Deliveries</button>
+                        <!-- Deliveries tab removed - now integrated into Sequence tab -->
                         <button class="tab-btn" data-tab="sequence" id="sequence-tab-btn">📧 Sequence</button>
                     </div>
 
@@ -1033,11 +1033,31 @@
                                         </button>
                                     </div>
 
-                                    <!-- Sequence Stats -->
-                                    <div id="sequence-stats-section" style="margin-bottom: 20px;"></div>
-
                                     <!-- Email List -->
                                     <div id="sequence-emails-list"></div>
+                                    
+                                    <!-- Recipient Delivery Overview -->
+                                    <div id="recipient-delivery-overview" style="margin-top: 40px; display: none;">
+                                        <div style="border-top: 2px solid var(--admin-border); padding-top: 24px;">
+                                            <h3 style="margin: 0 0 12px 0; color: var(--admin-sidebar);">📊 Recipient Delivery Overview</h3>
+                                            <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin: 0 0 16px 0;">
+                                                Track which recipients have received each email in the sequence
+                                            </p>
+                                            <div class="table-container">
+                                                <table class="data-table">
+                                                    <thead id="recipient-overview-header">
+                                                        <tr>
+                                                            <th>Recipient</th>
+                                                            <th>Total</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="recipient-overview-body">
+                                                        <tr><td colspan="2" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">Loading...</td></tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

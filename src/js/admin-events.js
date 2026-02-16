@@ -1137,7 +1137,6 @@ async function loadEventSequence() {
         document.getElementById('sequence-exists-state').style.display = 'block';
         
         renderSequenceEmails();
-        loadSequenceStatsForEvent();
     } catch (error) {
         console.error('Failed to load sequence:', error);
         document.getElementById('no-sequence-state').style.display = 'block';
@@ -1150,36 +1149,52 @@ function renderSequenceEmails() {
     
     if (!currentEventSequence || !currentEventSequence.emails || currentEventSequence.emails.length === 0) {
         container.innerHTML = '<p style="text-align: center; color: var(--admin-text-muted); padding: 40px;">No emails yet. Click "Add Email" to create the first email.</p>';
+        document.getElementById('recipient-delivery-overview').style.display = 'none';
         return;
     }
 
     const emails = currentEventSequence.emails.sort((a, b) => (a.sequenceOrder || a.order || 0) - (b.sequenceOrder || b.order || 0));
     
-    container.innerHTML = emails.map(email => {
-        const order = email.sequenceOrder || email.order || 1;
-        const statusBadge = email.status === 'live' ? '✅ Live' : '📝 Draft';
-        const scheduleText = email.scheduledSendTime 
-            ? `⏰ Scheduled: ${new Date(email.scheduledSendTime).toLocaleString()}`
-            : '';
-        
-        return `
-            <div class="email-card">
-                <div class="email-card-header">
-                    <div>
-                        <div class="email-card-title">#${order}: ${email.subject}</div>
-                        <div class="email-card-meta">
-                            ${statusBadge} ${scheduleText}
+    // Load delivery stats for all emails
+    loadEmailDeliveryStats(emails).then(emailStats => {
+        container.innerHTML = emails.map(email => {
+            const order = email.sequenceOrder || email.order || 1;
+            const statusBadge = email.status === 'live' ? '✅ Live' : '📝 Draft';
+            const scheduleText = email.scheduledSendTime 
+                ? `⏰ ${new Date(email.scheduledSendTime).toLocaleString()}`
+                : '';
+            
+            // Get delivery stats for this email
+            const stats = emailStats[email.id] || { sent: 0, total: 0 };
+            const deliveryBadge = stats.total > 0 
+                ? `📊 Sent: ${stats.sent}/${stats.total}` 
+                : '';
+            
+            const isLive = email.status === 'live';
+            const editButtonText = isLive ? '👁️ View' : '✏️ Edit';
+            
+            return `
+                <div class="email-card">
+                    <div class="email-card-header">
+                        <div>
+                            <div class="email-card-title">#${order}: ${email.subject}</div>
+                            <div class="email-card-meta">
+                                ${statusBadge} ${scheduleText} ${deliveryBadge}
+                            </div>
+                        </div>
+                        <div class="email-card-actions">
+                            ${!isLive && order > 1 ? `<button class="btn-sm" onclick="moveEmailUp('${email.id}')">↑</button>` : ''}
+                            ${!isLive && order < emails.length ? `<button class="btn-sm" onclick="moveEmailDown('${email.id}')">↓</button>` : ''}
+                            <button class="btn-sm" onclick="editSequenceEmailInline('${email.id}')">${editButtonText}</button>
                         </div>
                     </div>
-                    <div class="email-card-actions">
-                        ${order > 1 ? `<button class="btn-sm" onclick="moveEmailUp('${email.id}')">↑</button>` : ''}
-                        ${order < emails.length ? `<button class="btn-sm" onclick="moveEmailDown('${email.id}')">↓</button>` : ''}
-                        <button class="btn-sm" onclick="editSequenceEmailInline('${email.id}')">✏️ Edit</button>
-                    </div>
                 </div>
-            </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
+    });
+    
+    // Load recipient delivery overview
+    loadRecipientDeliveryOverview();
 }
 
 async function loadSequenceStatsForEvent() {
@@ -1211,6 +1226,127 @@ async function loadSequenceStatsForEvent() {
     } catch (error) {
         console.error('Failed to load sequence stats:', error);
         statsContainer.innerHTML = '';
+    }
+}
+
+async function loadEmailDeliveryStats(emails) {
+    if (!currentEvent || !emails || emails.length === 0) {
+        return {};
+    }
+    
+    try {
+        const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${currentEvent.id}`);
+        if (!response.ok) return {};
+        
+        const data = await response.json();
+        const { deliveries, leads } = data;
+        const verifiedLeads = leads.filter(l => l.verified);
+        
+        // Calculate stats for each email
+        const stats = {};
+        emails.forEach(email => {
+            const emailDeliveries = deliveries.filter(d => d.campaignId === email.id);
+            const sentCount = emailDeliveries.filter(d => d.status === 'sent').length;
+            stats[email.id] = {
+                sent: sentCount,
+                total: verifiedLeads.length
+            };
+        });
+        
+        return stats;
+    } catch (error) {
+        console.error('Failed to load email delivery stats:', error);
+        return {};
+    }
+}
+
+async function loadRecipientDeliveryOverview() {
+    const overviewSection = document.getElementById('recipient-delivery-overview');
+    const headerEl = document.getElementById('recipient-overview-header');
+    const bodyEl = document.getElementById('recipient-overview-body');
+    
+    if (!currentEvent || !currentEvent.sequenceId) {
+        overviewSection.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${currentEvent.id}`);
+        if (!response.ok) throw new Error('Failed to load deliveries');
+        
+        const data = await response.json();
+        const { deliveries, leads, campaigns } = data;
+        
+        if (!campaigns || campaigns.length === 0) {
+            overviewSection.style.display = 'none';
+            return;
+        }
+        
+        // Show the section
+        overviewSection.style.display = 'block';
+        
+        // Build header with email columns
+        const sortedCampaigns = campaigns.sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
+        headerEl.innerHTML = `
+            <tr>
+                <th style="text-align: left;">Recipient</th>
+                ${sortedCampaigns.map((c, i) => `<th style="text-align: center;">#${i+1}</th>`).join('')}
+                <th style="text-align: center;">Total</th>
+            </tr>
+        `;
+        
+        // Get verified leads
+        const verifiedLeads = leads.filter(l => l.verified);
+        
+        if (verifiedLeads.length === 0) {
+            bodyEl.innerHTML = '<tr><td colspan="' + (campaigns.length + 2) + '" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">No verified leads yet</td></tr>';
+            return;
+        }
+        
+        // Build rows for each recipient
+        const rows = verifiedLeads.map(lead => {
+            const recipientDeliveries = deliveries.filter(d => d.leadId === lead.id);
+            
+            // Check each campaign
+            const emailStatuses = sortedCampaigns.map(campaign => {
+                const delivery = recipientDeliveries.find(d => d.campaignId === campaign.id);
+                if (!delivery) return { sent: false, symbol: '-', style: 'color: var(--admin-text-muted);' };
+                if (delivery.status === 'sent') return { sent: true, symbol: '✓', style: 'color: #10b981;' };
+                if (delivery.status === 'failed') return { sent: false, symbol: '✗', style: 'color: #ef4444;' };
+                return { sent: false, symbol: '⏳', style: 'color: var(--admin-text-muted);' };
+            });
+            
+            const sentCount = emailStatuses.filter(s => s.sent).length;
+            const totalCount = sortedCampaigns.length;
+            const completion = totalCount > 0 ? Math.round((sentCount / totalCount) * 100) : 0;
+            
+            return {
+                name: lead.firstName && lead.lastName ? `${lead.firstName} ${lead.lastName}` : lead.email,
+                email: lead.email,
+                statuses: emailStatuses,
+                sentCount,
+                totalCount,
+                completion
+            };
+        });
+        
+        // Sort by completion (lowest first to highlight gaps)
+        rows.sort((a, b) => a.completion - b.completion);
+        
+        bodyEl.innerHTML = rows.map(row => `
+            <tr>
+                <td style="text-align: left;">
+                    <div style="font-weight: 500;">${row.name}</div>
+                    <div style="font-size: 0.85rem; color: var(--admin-text-muted);">${row.email}</div>
+                </td>
+                ${row.statuses.map(s => `<td style="text-align: center; ${s.style}">${s.symbol}</td>`).join('')}
+                <td style="text-align: center; font-weight: 600;">${row.sentCount}/${row.totalCount}</td>
+            </tr>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Failed to load recipient delivery overview:', error);
+        overviewSection.style.display = 'none';
     }
 }
 

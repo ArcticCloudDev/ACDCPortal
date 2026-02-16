@@ -4,7 +4,9 @@
   "description": "ACDC Team Registration Portal",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "build": "echo 'No build step required - static files'",
+    "test": "echo 'No tests configured yet'"
   },
   "keywords": ["azure", "static-web-apps", "entra", "otp"],
   "author": "",
