@@ -44,18 +44,176 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 .map(d => d.campaignId)
         );
 
+        // Filter campaigns that haven't been sent yet
+        const campaignsToSend = sequenceCampaigns.filter(campaign => !userDeliveries.has(campaign.id));
+        
+        if (campaignsToSend.length === 0) {
+            context.log(`[SEQUENCE] All emails already sent to ${lead.email}`);
+            return;
+        }
+
+        context.log(`[SEQUENCE] ${campaignsToSend.length} email(s) to send to ${lead.email}`);
+
         let sent = 0;
-        for (const campaign of sequenceCampaigns) {
-            context.log(`[SEQUENCE] Processing campaign ${campaign.id}, order ${campaign.sequenceOrder}`);
+
+        // If multiple emails to send, combine into one digest email
+        if (campaignsToSend.length > 1) {
+            context.log(`[SEQUENCE] Combining ${campaignsToSend.length} emails into digest`);
             
-            // Skip if already sent
-            if (userDeliveries.has(campaign.id)) {
-                context.log(`[SEQUENCE] Skipping campaign ${campaign.id} - already sent`);
-                continue;
-            }
+            // Create digest email
+            const digestSubject = `${event.name} — Your ${campaignsToSend.length} Updates`;
+            
+            const messageBlocks = campaignsToSend.map((campaign, index) => `
+                  <!-- Message ${index + 1} -->
+                  <tr>
+                    <td style="padding: 0;">
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                        <!-- Message header bar -->
+                        <tr>
+                          <td style="background-color: #1e293b; padding: 14px 40px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                              <tr>
+                                <td>
+                                  <span style="color: #94a3b8; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">UPDATE ${index + 1} OF ${campaignsToSend.length}</span>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style="padding-top: 4px;">
+                                  <span style="color: #ffffff; font-size: 18px; font-weight: 700;">${campaign.subject}</span>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                        <!-- Message content -->
+                        <tr>
+                          <td style="padding: 28px 40px 32px 40px; color: #334155; font-size: 15px; line-height: 1.75;">
+                            ${campaign.content}
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+            `).join('');
+
+            const digestContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #1a365d 0%, #2d4a6f 50%, #3b82f6 100%); padding: 40px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">${event.name}</h1>
+              <p style="color: #93c5fd; margin: 10px 0 0; font-size: 14px;">Your interest has been registered</p>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding: 32px 40px 24px 40px;">
+              <p style="color: #1a365d; font-size: 18px; line-height: 1.5; margin: 0; font-weight: 600;">
+                Hi ${lead.firstName || 'there'},
+              </p>
+              <p style="color: #475569; font-size: 15px; line-height: 1.7; margin: 12px 0 0 0;">
+                Thanks for registering your interest! We've been sharing updates with the community, and here's everything so far — in the order it was shared.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Update count banner -->
+          <tr>
+            <td style="padding: 0 40px 28px 40px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="background-color: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 14px 20px;">
+                    <span style="color: #1e40af; font-size: 14px; font-weight: 600;">${campaignsToSend.length} updates to catch up on</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Messages -->
+          ${messageBlocks}
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #1a365d; padding: 25px 40px; text-align: center;">
+              <p style="color: #93c5fd; font-size: 13px; margin: 0;">
+                Arctic Cloud Developer Challenge &bull; ${new Date().getFullYear()}
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 
             const delivery = {
-                id: 'del_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
+                id: generateGuid(),
+                campaignId: campaignsToSend.map(c => c.id).join(','), // Track all campaigns in digest
+                email: lead.email,
+                leadId: lead.id,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                isDigest: true,
+                digestCount: campaignsToSend.length
+            };
+
+            try {
+                context.log(`[SEQUENCE] Sending digest email to ${lead.email}`);
+                
+                await sendEmail({
+                    to: lead.email,
+                    subject: digestSubject,
+                    htmlContent: digestContent
+                });
+
+                context.log(`[SEQUENCE] Digest email sent successfully!`);
+                delivery.status = 'sent';
+                delivery.sentAt = new Date().toISOString();
+                sent = campaignsToSend.length; // Count as all campaigns sent
+                
+                // Create individual delivery records for each campaign (for tracking)
+                for (const campaign of campaignsToSend) {
+                    deliveryData.deliveries.push({
+                        id: generateGuid(),
+                        campaignId: campaign.id,
+                        email: lead.email,
+                        leadId: lead.id,
+                        status: 'sent',
+                        sentAt: delivery.sentAt,
+                        createdAt: delivery.createdAt,
+                        digestId: delivery.id // Link to digest
+                    });
+                }
+            } catch (err) {
+                context.log(`[SEQUENCE] ERROR sending digest email: ${err.message}`);
+                context.error(err);
+                delivery.status = 'failed';
+                delivery.error = err.message;
+            }
+
+            deliveryData.deliveries.push(delivery);
+        } else {
+            // Single email - send normally
+            const campaign = campaignsToSend[0];
+            context.log(`[SEQUENCE] Sending single email to ${lead.email}: "${campaign.subject}"`);
+            
+            const delivery = {
+                id: generateGuid(),
                 campaignId: campaign.id,
                 email: lead.email,
                 leadId: lead.id,
@@ -64,8 +222,6 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
             };
 
             try {
-                context.log(`[SEQUENCE] Sending email to ${lead.email}: "${campaign.subject}"`);
-                
                 await sendEmail({
                     to: lead.email,
                     subject: campaign.subject,
@@ -84,7 +240,6 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 context.error(err);
                 delivery.status = 'failed';
                 delivery.error = err.message;
-                context.log(`Failed to send sequence email to ${lead.email}: ${err.message}`);
             }
 
             deliveryData.deliveries.push(delivery);
@@ -94,7 +249,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
             await deliveriesStorage.saveRaw(deliveryData);
         }
 
-        context.log(`[SEQUENCE] COMPLETE: Sent ${sent}/${sequenceCampaigns.length} sequence emails to ${lead.email} for event ${event.id}`);
+        context.log(`[SEQUENCE] COMPLETE: Sent ${sent}/${campaignsToSend.length} sequence emails to ${lead.email} for event ${event.id}`);
     } catch (error) {
         // Don't fail the main operation if this fails
         context.log(`[SEQUENCE] WARNING: Failed to trigger sequence emails: ${error.message}`);
@@ -415,7 +570,7 @@ app.http('interest-list', {
                 createdAt: l.createdAt
             }));
 
-            return { status: 200, jsonBody: sanitizedLeads };
+            return { status: 200, jsonBody: { leads: sanitizedLeads } };
         } catch (error) {
             context.error('Error listing leads:', error);
             return { status: 500, jsonBody: { error: 'Failed to list leads' } };
@@ -479,6 +634,17 @@ app.http('interest-restart-sequence', {
 
             context.log(`[RESTART] Manually restarting sequence for ${lead.email}`);
 
+            // Delete existing delivery records for this lead to allow resend
+            const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
+            const beforeCount = deliveryData.deliveries.length;
+            deliveryData.deliveries = deliveryData.deliveries.filter(d => d.leadId !== leadId);
+            const removedCount = beforeCount - deliveryData.deliveries.length;
+            
+            if (removedCount > 0) {
+                await deliveriesStorage.saveRaw(deliveryData);
+                context.log(`[RESTART] Deleted ${removedCount} existing delivery records for lead ${leadId}`);
+            }
+
             // Fetch event to get sequenceId
             const events = await eventsStorage.getAll();
             context.log(`[RESTART] Loaded ${events.length} events`);
@@ -492,9 +658,9 @@ app.http('interest-restart-sequence', {
             // Trigger sequence emails
             await triggerSequenceEmailsForLead(lead, event, context);
 
-            // Get delivery count
-            const deliveryData = await deliveriesStorage.getRaw();
-            const leadDeliveries = (deliveryData?.deliveries || [])
+            // Get delivery count after sending
+            const updatedDeliveryData = await deliveriesStorage.getRaw();
+            const leadDeliveries = (updatedDeliveryData?.deliveries || [])
                 .filter(d => d.leadId === leadId && d.status === 'sent');
 
             return {

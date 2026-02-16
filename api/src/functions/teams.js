@@ -3,6 +3,7 @@
 const { app } = require('@azure/functions');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
+const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
 
 const eventsStorage = new GenericStorage('events');
 
@@ -130,6 +131,19 @@ app.http('teams-create', {
             
             // Save team
             const savedTeam = Storage.teams.create(newTeam);
+            
+            // Send welcome email to team admin (async, don't wait)
+            if (newTeam.adminEmail && newTeam.eventId) {
+                sendTeamWelcomeEmail(newTeam.adminEmail, newTeam.eventId, context)
+                    .then(result => {
+                        if (result.success) {
+                            context.log(`Team welcome email sent to ${newTeam.adminEmail}: ${result.emailsSent} sent, ${result.emailsFailed} failed`);
+                        }
+                    })
+                    .catch(error => {
+                        context.error(`Failed to send team welcome email to ${newTeam.adminEmail}:`, error);
+                    });
+            }
             
             context.log(`Team created: ${newTeam.teamName}`);
             return {

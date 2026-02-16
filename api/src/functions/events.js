@@ -213,6 +213,7 @@ app.http('events-create', {
                 minTeamSize: body.minTeamSize || 3,
                 maxTeamSize: body.maxTeamSize || 5,
                 sequenceId: body.sequenceId || null,
+                teamWelcomeEmailId: body.teamWelcomeEmailId || null,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 createdAt: new Date().toISOString()
@@ -332,6 +333,7 @@ app.http('events-update', {
                 id: existingEvent.id, // Preserve ID
                 createdAt: existingEvent.createdAt, // Preserve creation date
                 sequenceId: body.sequenceId !== undefined ? body.sequenceId : existingEvent.sequenceId,
+                teamWelcomeEmailId: body.teamWelcomeEmailId !== undefined ? body.teamWelcomeEmailId : existingEvent.teamWelcomeEmailId,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()

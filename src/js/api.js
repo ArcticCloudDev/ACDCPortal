@@ -491,6 +491,20 @@ const API = {
                 body: JSON.stringify({ targetEventId })
             });
         }
+    },
+
+    // Deliveries endpoints
+    deliveries: {
+        async getEventDeliveries(eventId) {
+            return API.request(`/deliveries/event/${eventId}`);
+        },
+
+        async retry(deliveryId) {
+            return API.request('/deliveries/retry', {
+                method: 'POST',
+                body: JSON.stringify({ deliveryId })
+            });
+        }
     }
 };
 

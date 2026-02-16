@@ -94,6 +94,10 @@ function renderSequences() {
                             Created ${createdDate}
                         </div>
                     </div>
+                    <div class="sequence-actions" onclick="event.stopPropagation()">
+                        <button class="btn btn-sm btn-secondary" onclick="editSequence('${seq.id}')">✏️ Edit</button>
+                        <button class="btn btn-sm btn-secondary" onclick="duplicateSequence('${seq.id}')">📋 Duplicate</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -285,7 +289,7 @@ function renderEmails() {
                 <td><span style="color: var(--admin-danger);">${email.stats?.failed || 0}</span></td>
                 <td>${createdDate}</td>
                 <td>
-                    <span style="color: var(--admin-text-muted); font-size: 0.85rem;">View only</span>
+                    <button class="btn btn-sm btn-secondary" onclick="editEmail('${email.id}')">✏️ Edit</button>
                 </td>
             </tr>
         `;

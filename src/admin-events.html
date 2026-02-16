@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Events - ACDC Committee</title>
     <link rel="stylesheet" href="css/admin-styles.css">
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <style>
         /* Page-specific styles */
         .main-content {
@@ -115,6 +116,110 @@
         .form-actions { display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--admin-border); }
 
         .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
+
+        /* Deliveries Tab Styles */
+        .recipient-card {
+            background: white;
+            border: 1px solid var(--admin-border);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        
+        .recipient-card.complete { border-left: 4px solid var(--admin-success); }
+        .recipient-card.partial { border-left: 4px solid #f59e0b; }
+        .recipient-card.none { border-left: 4px solid var(--admin-danger); }
+        
+        .recipient-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .recipient-header:hover { background: var(--admin-bg); }
+        
+        .recipient-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .status-icon { font-size: 1.5rem; }
+        
+        .recipient-stats {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .email-count {
+            font-weight: 500;
+            color: var(--admin-text);
+        }
+        
+        .expand-icon {
+            color: var(--admin-text-muted);
+            transition: transform 0.2s;
+        }
+        
+        .recipient-details {
+            border-top: 1px solid var(--admin-border);
+            background: var(--admin-bg);
+            padding: 16px;
+        }
+        
+        .deliveries-table {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .delivery-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid var(--admin-border);
+        }
+        
+        .delivery-row.sent { background: #f0fdf4; }
+        .delivery-row.failed { background: #fef2f2; }
+        .delivery-row.pending { background: #fafafa; }
+        
+        .delivery-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+        
+        .sequence-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: var(--admin-primary);
+            color: white;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .delivery-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-align: right;
+        }
+        
+        .error-message {
+            font-size: 0.75rem;
+            color: var(--admin-danger);
+            margin-top: 4px;
+        }
 
         .access-denied {
             max-width: 400px;
@@ -419,6 +524,101 @@
             margin-top: 16px;
         }
 
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--admin-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Quill editor container */
+        #email-editor-container {
+            height: 300px;
+            background: white;
+        }
+
+        /* Email cards in sequence list */
+        .email-card {
+            background: white;
+            border: 1px solid var(--admin-border);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: box-shadow 0.2s;
+        }
+
+        .email-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .email-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 8px;
+        }
+
+        .email-card-title {
+            font-weight: 600;
+            color: var(--admin-sidebar);
+            font-size: 1rem;
+        }
+
+        .email-card-meta {
+            font-size: 0.85rem;
+            color: var(--admin-text-muted);
+            margin-top: 4px;
+        }
+
+        .email-card-actions {
+            display: flex;
+            gap: 8px;
+        }
+
         /* Responsive adjustments */
         @media (max-width: 1000px) {
             .form-layout {
@@ -509,6 +709,8 @@
                         <button class="tab-btn" data-tab="judges" id="judges-tab-btn">⚖️ Judges</button>
                         <button class="tab-btn" data-tab="leads" id="leads-tab-btn">📧 Interest Leads</button>
                         <button class="tab-btn" data-tab="teams" id="teams-tab-btn">👥 Teams</button>
+                        <button class="tab-btn" data-tab="deliveries" id="deliveries-tab-btn">📬 Deliveries</button>
+                        <button class="tab-btn" data-tab="sequence" id="sequence-tab-btn">📧 Sequence</button>
                     </div>
 
                     <!-- Tab Panels -->
@@ -596,11 +798,23 @@
                                             <select id="event-sequence">
                                                 <option value="">No sequence (no automated emails)</option>
                                             </select>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Choose an email sequence to send to interest leads for this event.</small>
+                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                <strong>One sequence per event.</strong> Each event can have exactly one email sequence. 
+                                                This sequence will be sent to all verified interest leads for this event.
+                                            </small>
                                         </div>
 
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label>�📁 File Upload Categories</label>
+                                        <div class="form-group" style="margin-top: 16px;">                                            <label>👋 Team Welcome Email</label>
+                                            <select id="event-team-welcome-email">
+                                                <option value="">No welcome email</option>
+                                            </select>
+                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                <strong>Welcome email for new team members.</strong> This email will be sent when someone creates a team or is added to a team.
+                                                If the member was NOT an interest lead, they will also receive a digest of all sequence emails.
+                                            </small>
+                                        </div>
+
+                                        <div class="form-group" style="margin-top: 16px;">                                            <label>�📁 File Upload Categories</label>
                                             <input type="text" id="event-file-categories" placeholder="e.g. Presentation, Source Code, Architecture Diagram, Demo Video">
                                             <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Comma-separated list. Teams will pick from these when uploading files.</small>
                                         </div>
@@ -762,6 +976,74 @@
                     </div>
                 </div>
 
+                <!-- Deliveries Tab -->
+                <div class="tab-panel" id="deliveries-panel">
+                    <div class="panel">
+                        <div class="panel-body padded">
+                            <div class="invite-section">
+                                <h3>📬 Email Deliveries</h3>
+                                <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 16px;">
+                                    Track sequence email deliveries to interest leads. Click a recipient to see individual email details.
+                                </p>
+                                
+                                <div class="members-list">
+                                    <div id="deliveries-loading" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">
+                                        Loading deliveries...
+                                    </div>
+                                    <div id="deliveries-content" style="display: none;">
+                                        <div id="deliveries-list"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sequence Tab -->
+                <div class="tab-panel" id="sequence-panel">
+                    <!-- Sequence List View -->
+                    <div id="sequence-list-view">
+                        <div class="panel">
+                            <div class="panel-body padded">
+                                <!-- No Sequence State -->
+                                <div id="no-sequence-state">
+                                    <div style="text-align: center; padding: 40px 20px;">
+                                        <div style="font-size: 3rem; margin-bottom: 16px;">📧</div>
+                                        <h3 style="margin: 0 0 8px 0; color: var(--admin-sidebar);">No Email Sequence Yet</h3>
+                                        <p style="color: var(--admin-text-muted); margin-bottom: 24px;">
+                                            Create an email sequence to send automated emails to interest leads for this event.
+                                        </p>
+                                        <button type="button" id="create-sequence-btn" class="btn-sm primary">
+                                            ✉️ Create Email Sequence
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Sequence Exists State -->
+                                <div id="sequence-exists-state" style="display: none;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                        <div>
+                                            <h3 style="margin: 0 0 4px 0; color: var(--admin-sidebar);">📧 Email Sequence</h3>
+                                            <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin: 0;">
+                                                Manage automated emails sent to verified interest leads
+                                            </p>
+                                        </div>
+                                        <button type="button" id="add-sequence-email-btn" class="btn-sm primary">
+                                            ➕ Add Email
+                                        </button>
+                                    </div>
+
+                                    <!-- Sequence Stats -->
+                                    <div id="sequence-stats-section" style="margin-bottom: 20px;"></div>
+
+                                    <!-- Email List -->
+                                    <div id="sequence-emails-list"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </main>
     </div>
@@ -772,11 +1054,53 @@
         <a href="events.html" class="btn-sm primary">Go to Events</a>
     </div>
 
+    <!-- Create Sequence Modal -->
+    <div id="create-sequence-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📧 Create Email Sequence</h3>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--admin-text-muted); margin-bottom: 16px;">
+                    Would you like to start from scratch or copy from another event?
+                </p>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 12px;">
+                        <input type="radio" name="sequence-create-option" value="scratch" checked style="margin-right: 8px;">
+                        <span>✨ Start from scratch</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="sequence-create-option" value="copy" style="margin-right: 8px;">
+                        <span>📋 Copy from another event</span>
+                    </label>
+                </div>
+
+                <div id="copy-from-event-section" style="display: none; margin-top: 16px;">
+                    <div class="form-group">
+                        <label>Select Event to Copy From</label>
+                        <select id="copy-from-event-select" style="width: 100%; padding: 8px; border: 1px solid var(--admin-border); border-radius: 4px;">
+                            <option value="">Loading events...</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-sm" onclick="closeCreateSequenceModal()">Cancel</button>
+                <button class="btn-sm primary" onclick="confirmCreateSequence()">Create Sequence</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    <script src="https://unpkg.com/quill-image-resize-module@3.0.0/image-resize.min.js"></script>
+    <script src="https://unpkg.com/quill-image-drop-module@1.0.3/image-drop.min.js"></script>
     <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/admin-sidebar.js"></script>
     <script src="js/admin-events.js"></script>
+    <script src="js/admin-deliveries.js"></script>
 </body>
 </html>

@@ -250,22 +250,13 @@
         <main class="main-content" id="admin-content">
             <!-- Sequences List View -->
             <div id="view-sequences" class="view">
-                <!-- Read-Only Banner -->
-                <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde047 100%); border: 2px solid #eab308; border-radius: 8px; padding: 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
-                    <div style="font-size: 2rem;">📖</div>
-                    <div style="flex: 1;">
-                        <div style="font-weight: 600; font-size: 1rem; color: #78350f; margin-bottom: 4px;">Read-Only Mode</div>
-                        <div style="color: #92400e; font-size: 0.9rem;">
-                            Sequences are now managed within Events. To create or edit sequences, go to <strong>Events</strong> → Edit an event → <strong>Sequence</strong> tab.
-                            This page is for viewing and reference only.
-                        </div>
-                    </div>
-                </div>
-
                 <div class="page-header">
                     <div>
                         <h1 class="page-title">📧 Email Sequences</h1>
-                        <p class="page-subtitle">View sequences assigned to events</p>
+                        <p class="page-subtitle">Reusable email sequences that can be assigned to events</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-primary" onclick="showCreateSequenceModal()">➕ New Sequence</button>
                     </div>
                 </div>
 
@@ -282,6 +273,10 @@
                     <div>
                         <h1 class="page-title" id="detail-sequence-name"></h1>
                         <p class="page-subtitle" id="detail-sequence-meta"></p>
+                    </div>
+                    <div>
+                        <button class="btn btn-secondary btn-sm" onclick="editCurrentSequence()">✏️ Edit Sequence</button>
+                        <button class="btn btn-primary" onclick="showCreateEmailForm()">➕ Add Email</button>
                     </div>
                 </div>
 
@@ -307,7 +302,7 @@
                             </tr>
                         </thead>
                         <tbody id="emails-body">
-                            <tr><td colspan="7" class="empty-state-small">No emails in this sequence.</td></tr>
+                            <tr><td colspan="7" class="empty-state-small">No emails yet. Click "Add Email" to create the first email in this sequence.</td></tr>
                         </tbody>
                     </table>
                 </div>

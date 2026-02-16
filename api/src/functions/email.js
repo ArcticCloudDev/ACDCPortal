@@ -70,13 +70,23 @@ app.http('email-preview', {
                 return { status: 400, jsonBody: { error: 'templateId is required' } };
             }
             
+            // Ensure data has defaults for required fields
+            const templateData = {
+                subject: data?.subject || 'Preview Subject',
+                firstName: data?.firstName || 'User',
+                content: data?.content || '<p>Your content will appear here...</p>',
+                ctaUrl: data?.ctaUrl || null,
+                ctaText: data?.ctaText || 'Learn More',
+                ...data // Override with any provided data
+            };
+            
             const template = await getTemplate(templateId);
-            const preview = processTemplate(template, data || {});
+            const preview = processTemplate(template, templateData);
             
             return { status: 200, jsonBody: { html: preview } };
         } catch (error) {
             context.error('Error previewing email:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { error: error.message, stack: error.stack } };
         }
     }
 });

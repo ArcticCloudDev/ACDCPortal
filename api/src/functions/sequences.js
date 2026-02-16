@@ -248,6 +248,8 @@ app.http('sequences-copy', {
                 id: generateId('camp'),
                 sequenceId: newSequence.id,
                 createdAt: new Date().toISOString(),
+                status: 'draft',  // Always set copied emails to draft
+                scheduledSendTime: null,  // Clear any scheduled time
                 stats: { sent: 0, failed: 0 }
             }));
             

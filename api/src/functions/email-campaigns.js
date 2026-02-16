@@ -59,6 +59,29 @@ app.http('email-campaigns-list', {
     }
 });
 
+// GET /api/campaigns/:id - Get campaign by ID (short route)
+app.http('campaigns-get', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'campaigns/{id}',
+    handler: async (request, context) => {
+        try {
+            const campaignId = request.params.id;
+            const data = await campaignsStorage.getRaw();
+            const campaign = (data?.campaigns || []).find(c => c.id === campaignId);
+
+            if (!campaign) {
+                return { status: 404, jsonBody: { error: 'Campaign not found' } };
+            }
+
+            return { status: 200, jsonBody: campaign };
+        } catch (error) {
+            context.error('Campaign get error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to get campaign' } };
+        }
+    }
+});
+
 // GET /api/email/campaigns/:id - Get campaign with deliveries
 app.http('email-campaigns-get', {
     methods: ['GET'],
@@ -109,6 +132,47 @@ app.http('email-campaigns-get', {
     }
 });
 
+// POST /api/campaigns - Create campaign (short route)
+app.http('campaigns-create', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'campaigns',
+    handler: async (request, context) => {
+        try {
+            const body = await request.json();
+            const { sequenceId, subject, content, ctaUrl, ctaText, type, sequenceOrder, status, scheduledSendTime } = body;
+
+            if (!subject || !content) {
+                return { status: 400, jsonBody: { error: 'subject and content are required' } };
+            }
+
+            const data = await campaignsStorage.getRaw() || { campaigns: [] };
+
+            const campaign = {
+                id: generateId(),
+                sequenceId: sequenceId || null,
+                subject,
+                content,
+                ctaUrl: ctaUrl || null,
+                ctaText: ctaText || null,
+                type: type || 'sequence',
+                sequenceOrder: sequenceOrder || null,
+                status: status || 'draft',
+                scheduledSendTime: scheduledSendTime || null,
+                createdAt: new Date().toISOString()
+            };
+
+            data.campaigns.push(campaign);
+            await campaignsStorage.saveRaw(data);
+
+            return { status: 201, jsonBody: campaign };
+        } catch (error) {
+            context.error('Campaign create error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to create campaign' } };
+        }
+    }
+});
+
 // POST /api/email/campaigns - Create a new campaign
 app.http('email-campaigns-create', {
     methods: ['POST'],
@@ -117,7 +181,7 @@ app.http('email-campaigns-create', {
     handler: async (request, context) => {
         try {
             const body = await request.json();
-            const { sequenceId, subject, content, ctaUrl, ctaText, createdBy } = body;
+            const { sequenceId, subject, content, ctaUrl, ctaText, createdBy, status, scheduledSendTime } = body;
 
             if (!sequenceId || !subject || !content) {
                 return { status: 400, jsonBody: { error: 'sequenceId, subject, and content are required' } };
@@ -138,6 +202,8 @@ app.http('email-campaigns-create', {
                 ctaText: ctaText || null,
                 type: 'sequence',
                 sequenceOrder,
+                status: status || 'draft', // draft or live
+                scheduledSendTime: scheduledSendTime || null, // ISO timestamp
                 createdAt: new Date().toISOString(),
                 createdBy: createdBy || null
             };
@@ -149,6 +215,44 @@ app.http('email-campaigns-create', {
         } catch (error) {
             context.error('Campaign create error:', error);
             return { status: 500, jsonBody: { error: 'Failed to create campaign' } };
+        }
+    }
+});
+
+// PUT /api/campaigns/:id - Update campaign (short route)
+app.http('campaigns-update', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'campaigns/{id}',
+    handler: async (request, context) => {
+        try {
+            const campaignId = request.params.id;
+            const body = await request.json();
+            const data = await campaignsStorage.getRaw();
+
+            const index = (data?.campaigns || []).findIndex(c => c.id === campaignId);
+            if (index === -1) {
+                return { status: 404, jsonBody: { error: 'Campaign not found' } };
+            }
+
+            const campaign = data.campaigns[index];
+            if (body.subject !== undefined) campaign.subject = body.subject;
+            if (body.content !== undefined) campaign.content = body.content;
+            if (body.ctaUrl !== undefined) campaign.ctaUrl = body.ctaUrl;
+            if (body.ctaText !== undefined) campaign.ctaText = body.ctaText;
+            if (body.type !== undefined) campaign.type = body.type;
+            if (body.sequenceOrder !== undefined) campaign.sequenceOrder = body.sequenceOrder;
+            if (body.status !== undefined) campaign.status = body.status;
+            if (body.scheduledSendTime !== undefined) campaign.scheduledSendTime = body.scheduledSendTime;
+            campaign.updatedAt = new Date().toISOString();
+
+            data.campaigns[index] = campaign;
+            await campaignsStorage.saveRaw(data);
+
+            return { status: 200, jsonBody: campaign };
+        } catch (error) {
+            context.error('Campaign update error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to update campaign' } };
         }
     }
 });
@@ -176,6 +280,8 @@ app.http('email-campaigns-update', {
             if (body.ctaUrl !== undefined) campaign.ctaUrl = body.ctaUrl;
             if (body.ctaText !== undefined) campaign.ctaText = body.ctaText;
             if (body.sequenceOrder !== undefined) campaign.sequenceOrder = body.sequenceOrder;
+            if (body.status !== undefined) campaign.status = body.status; // draft or live
+            if (body.scheduledSendTime !== undefined) campaign.scheduledSendTime = body.scheduledSendTime;
             campaign.updatedAt = new Date().toISOString();
 
             data.campaigns[index] = campaign;
@@ -185,6 +291,37 @@ app.http('email-campaigns-update', {
         } catch (error) {
             context.error('Campaign update error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update campaign' } };
+        }
+    }
+});
+
+// DELETE /api/campaigns/:id - Delete campaign (short route)
+app.http('campaigns-delete', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'campaigns/{id}',
+    handler: async (request, context) => {
+        try {
+            const campaignId = request.params.id;
+
+            const campaignData = await campaignsStorage.getRaw();
+            const index = (campaignData?.campaigns || []).findIndex(c => c.id === campaignId);
+            if (index === -1) {
+                return { status: 404, jsonBody: { error: 'Campaign not found' } };
+            }
+            campaignData.campaigns.splice(index, 1);
+            await campaignsStorage.saveRaw(campaignData);
+
+            const deliveryData = await deliveriesStorage.getRaw();
+            if (deliveryData?.deliveries) {
+                deliveryData.deliveries = deliveryData.deliveries.filter(d => d.campaignId !== campaignId);
+                await deliveriesStorage.saveRaw(deliveryData);
+            }
+
+            return { status: 200, jsonBody: { message: 'Campaign deleted' } };
+        } catch (error) {
+            context.error('Campaign delete error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to delete campaign' } };
         }
     }
 });

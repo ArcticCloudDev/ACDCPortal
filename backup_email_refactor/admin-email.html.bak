@@ -230,6 +230,14 @@
                                     <div class="icon">⏰</div>
                                     <div class="name">Reminder</div>
                                 </div>
+                                <div class="template-card" data-template="welcome">
+                                    <div class="icon">🎉</div>
+                                    <div class="name">Welcome</div>
+                                </div>
+                                <div class="template-card" data-template="invitation">
+                                    <div class="icon">✉️</div>
+                                    <div class="name">Invitation</div>
+                                </div>
                             </div>
                         </div>
 
@@ -279,33 +287,9 @@
                             <input type="text" id="cta-text" placeholder="Learn More" value="Learn More">
                         </div>
 
-                        <div class="form-group">
-                            <label>Status *</label>
-                            <div style="display: flex; gap: 16px; margin-top: 8px;">
-                                <label style="display: flex; align-items: center; cursor: pointer;">
-                                    <input type="radio" name="email-status" value="draft" checked style="margin-right: 6px;">
-                                    <span>📝 Draft (save without sending)</span>
-                                </label>
-                                <label style="display: flex; align-items: center; cursor: pointer;">
-                                    <input type="radio" name="email-status" value="live" style="margin-right: 6px;">
-                                    <span>✅ Live (will send)</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="form-group" id="schedule-group" style="display: none;">
-                            <label>Send On (optional) <span id="timezone-display" style="font-weight: normal; color: var(--admin-text-muted);"></span></label>
-                            <input type="datetime-local" id="scheduled-send-time">
-                            <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;">
-                                Leave empty to send immediately when status changes to Live.
-                            </p>
-                            <p id="schedule-preview" style="font-size: 0.85rem; color: var(--admin-accent); margin-top: 8px; padding: 8px; background: var(--admin-bg-secondary); border-radius: 4px; display: none;"></p>
-                        </div>
-
                         <div class="btn-row">
                             <button class="btn btn-secondary" onclick="previewEmail()">👁️ Preview</button>
-                            <button class="btn btn-primary" onclick="sendEmail()" id="send-btn">📤 Send Email</button>
-                            <button class="btn btn-secondary" onclick="cancelSequenceEdit()" id="cancel-btn" style="display: none;">Cancel</button>
+                            <button class="btn btn-primary" onclick="sendEmail()">📤 Send Email</button>
                         </div>
                     </div>
                 </div>
@@ -324,7 +308,7 @@
                 <div class="panel">
                     <div class="panel-header">Send History</div>
                     <table class="data-table">
-                        <thead id="history-header">
+                        <thead>
                             <tr>
                                 <th>Date</th>
                                 <th>Subject</th>
@@ -353,14 +337,6 @@
         let selectedTemplate = 'announcement';
         let recipients = [];
         let allEvents = [];
-        
-        // Sequence mode detection
-        const urlParams = new URLSearchParams(window.location.search);
-        const isSequenceMode = urlParams.get('mode') === 'sequence';
-        const sequenceId = urlParams.get('sequenceId');
-        const eventId = urlParams.get('eventId');
-        const emailId = urlParams.get('emailId');
-        const emailOrder = parseInt(urlParams.get('order')) || 1;
 
         document.addEventListener('DOMContentLoaded', async () => {
             renderAdminSidebar('email');
@@ -391,9 +367,7 @@
 
             // Event selection change
             document.getElementById('event-select').addEventListener('change', () => {
-                if (!isSequenceMode) {
-                    loadRecipients();
-                }
+                loadRecipients();
             });
 
             // Recipient filter change
@@ -401,28 +375,12 @@
                 const customRecipients = document.getElementById('custom-recipients');
                 customRecipients.classList.toggle('visible', e.target.value === 'custom');
 
-                if (e.target.value !== 'custom' && !isSequenceMode) {
+                if (e.target.value !== 'custom') {
                     loadRecipients();
                 }
             });
 
             document.getElementById('custom-emails').addEventListener('input', parseCustomEmails);
-
-            // Status change handler
-            document.querySelectorAll('input[name="email-status"]').forEach(radio => {
-                radio.addEventListener('change', (e) => {
-                    if (e.target.value === 'live') {
-                        document.getElementById('schedule-group').style.display = 'block';
-                        displayUserTimezone();
-                    } else {
-                        document.getElementById('schedule-group').style.display = 'none';
-                    }
-                });
-            });
-
-            // Schedule change handler
-            document.getElementById('scheduled-send-time').addEventListener('change', updateSchedulePreview);
-            document.getElementById('scheduled-send-time').addEventListener('input', updateSchedulePreview);
 
             // Auto-preview on content change
             quill.on('text-change', debounce(previewEmail, 500));
@@ -432,92 +390,10 @@
 
             // Initial load
             await loadEvents();
-            
-            // If sequence mode, load the email data and lock fields
-            if (isSequenceMode) {
-                await loadSequenceEmail();
-                
-                // Update button UI for sequence mode
-                const sendBtn = document.getElementById('send-btn');
-                const cancelBtn = document.getElementById('cancel-btn');
-                sendBtn.textContent = emailId ? '💾 Update Email' : '💾 Save Email';
-                cancelBtn.style.display = 'inline-block';
-            } else {
-                await loadRecipients();
-            }
-            
-            // Load history for both modes
+            await loadRecipients();
             await loadHistory();
-            
             previewEmail();
         });
-        
-        function cancelSequenceEdit() {
-            window.location.href = `admin-events.html?id=${eventId}&tab=sequence`;
-        }
-        
-        async function loadSequenceEmail() {
-            try {
-                // Lock event selector
-                const eventSelect = document.getElementById('event-select');
-                eventSelect.value = eventId;
-                eventSelect.disabled = true;
-                eventSelect.style.background = 'var(--admin-bg)';
-                eventSelect.style.cursor = 'not-allowed';
-                
-                // Lock recipient filter to event-contacts (all event-related contacts)
-                const recipientFilter = document.getElementById('recipient-filter');
-                recipientFilter.innerHTML = '<option value="event-contacts">Event Contacts (All)</option>';
-                recipientFilter.disabled = true;
-                recipientFilter.style.background = 'var(--admin-bg)';
-                recipientFilter.style.cursor = 'not-allowed';
-                
-                // Load event contacts for count
-                await loadRecipients();
-                
-                // If editing existing email, load its data
-                if (emailId) {
-                    const response = await fetch(`${CONFIG.api.baseUrl}/campaigns/${emailId}`);
-                    if (response.ok) {
-                        const email = await response.json();
-                        
-                        document.getElementById('subject').value = email.subject;
-                        quill.root.innerHTML = email.content || '';
-                        
-                        // Set template - use template field if exists, or handle old campaigns with type="sequence"
-                        selectedTemplate = email.template || email.type || 'announcement';
-                        if (selectedTemplate === 'sequence') {
-                            selectedTemplate = 'announcement'; // Default for old campaigns
-                        }
-                        document.querySelector(`[data-template="${selectedTemplate}"]`)?.classList.add('selected');
-                        
-                        // Set CTA fields
-                        if (email.ctaUrl) document.getElementById('cta-url').value = email.ctaUrl;
-                        if (email.ctaText) document.getElementById('cta-text').value = email.ctaText;
-                        
-                        // Set status
-                        if (email.status) {
-                            document.querySelector(`input[name="email-status"][value="${email.status}"]`).checked = true;
-                            if (email.status === 'live') {
-                                document.getElementById('schedule-group').style.display = 'block';
-                            }
-                        }
-                        
-                        // Set schedule
-                        if (email.scheduledSendTime) {
-                            const localDate = new Date(email.scheduledSendTime);
-                            const offset = localDate.getTimezoneOffset();
-                            const localISO = new Date(localDate.getTime() - offset * 60000).toISOString().slice(0, 16);
-                            document.getElementById('scheduled-send-time').value = localISO;
-                            updateSchedulePreview();
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading sequence email:', error);
-                showStatus('Error loading email data', 'error');
-            }
-        }
 
         async function loadEvents() {
             try {
@@ -562,27 +438,6 @@
         async function loadRecipients() {
             const eventId = document.getElementById('event-select').value;
             const filter = document.getElementById('recipient-filter').value;
-
-            // Event contacts includes all event-related contacts (for sequence mode)
-            if (filter === 'event-contacts') {
-                if (!eventId) {
-                    recipients = [];
-                    document.getElementById('recipient-count').textContent = '0';
-                    return;
-                }
-                try {
-                    // Load all event-related contacts (teams, interest leads, judges, etc.)
-                    const response = await fetch(`${CONFIG.api.baseUrl}/email/recipients?eventId=${eventId}&filter=all-event-contacts`);
-                    if (!response.ok) throw new Error('Failed to load');
-                    recipients = await response.json();
-                    document.getElementById('recipient-count').textContent = recipients.length;
-                } catch (error) {
-                    console.error('Error loading event contacts:', error);
-                    recipients = [];
-                    document.getElementById('recipient-count').textContent = '0';
-                }
-                return;
-            }
 
             // Interest queue doesn't require an event
             if (filter === 'interest-queue') {
@@ -666,11 +521,6 @@
         }
 
         async function sendEmail() {
-            // If in sequence mode, save to campaigns instead of sending
-            if (isSequenceMode) {
-                return await saveSequenceEmail();
-            }
-            
             if (recipients.length === 0) {
                 showStatus('Please select recipients', 'error');
                 return;
@@ -686,10 +536,6 @@
                 return;
             }
 
-            const status = document.querySelector('input[name="email-status"]:checked').value;
-            const scheduleInput = document.getElementById('scheduled-send-time').value;
-            const scheduledSendTime = scheduleInput ? new Date(scheduleInput).toISOString() : null;
-            
             try {
                 const response = await fetch(`${CONFIG.api.baseUrl}/email/send`, {
                     method: 'POST',
@@ -700,8 +546,6 @@
                         content: quill.root.innerHTML,
                         ctaUrl: document.getElementById('cta-url').value,
                         ctaText: document.getElementById('cta-text').value || 'Learn More',
-                        status,
-                        scheduledSendTime,
                         recipients: recipients.map(r => ({
                             email: r.email,
                             name: r.displayName || r.email
@@ -723,167 +567,22 @@
                 showStatus('Error sending email: ' + error.message, 'error');
             }
         }
-        
-        async function saveSequenceEmail() {
-            const subject = document.getElementById('subject').value;
-            if (!subject) {
-                showStatus('Please enter a subject', 'error');
-                return;
-            }
-            
-            const content = quill.root.innerHTML;
-            if (!content || content === '<p><br></p>') {
-                showStatus('Please enter email content', 'error');
-                return;
-            }
-            
-            const status = document.querySelector('input[name="email-status"]:checked').value;
-            const scheduleInput = document.getElementById('scheduled-send-time').value;
-            const scheduledSendTime = scheduleInput ? new Date(scheduleInput).toISOString() : null;
-            
-            const emailData = {
-                sequenceId: sequenceId,
-                subject: subject,
-                content: content,
-                template: selectedTemplate, // Store template name for preview
-                type: 'sequence', // Keep type as 'sequence' for filtering
-                sequenceOrder: emailOrder,
-                status: status,
-                scheduledSendTime: scheduledSendTime,
-                ctaUrl: document.getElementById('cta-url').value,
-                ctaText: document.getElementById('cta-text').value || 'Learn More'
-            };
-            
-            try {
-                let response;
-                if (emailId) {
-                    // Update existing email
-                    response = await fetch(`${CONFIG.api.baseUrl}/campaigns/${emailId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(emailData)
-                    });
-                } else {
-                    // Create new email
-                    response = await fetch(`${CONFIG.api.baseUrl}/campaigns`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(emailData)
-                    });
-                }
-                
-                if (response.ok) {
-                    showStatus('✅ Email saved successfully', 'success');
-                    
-                    // Redirect back to event editor after short delay
-                    setTimeout(() => {
-                        window.location.href = `admin-events.html?id=${eventId}&tab=sequence`;
-                    }, 1000);
-                } else {
-                    const error = await response.json();
-                    showStatus('❌ Failed to save: ' + (error.error || 'Unknown error'), 'error');
-                }
-            } catch (error) {
-                console.error('Error saving sequence email:', error);
-                showStatus('❌ Error saving email: ' + error.message, 'error');
-            }
-        }
 
         async function loadHistory() {
-            console.log('[loadHistory] Starting to load email history');
             try {
-                const tbody = document.getElementById('history-body');
-                const thead = document.getElementById('history-header');
-                
-                // If we're viewing a specific sequence email, show deliveries for THIS email only
-                if (isSequenceMode && emailId) {
-                    console.log('[loadHistory] Loading deliveries for campaign:', emailId);
-                    
-                    // Update table headers for individual deliveries
-                    thead.innerHTML = `
-                        <tr>
-                            <th>Date & Time</th>
-                            <th>Recipient</th>
-                            <th>Send Type</th>
-                            <th></th>
-                            <th>Status</th>
-                        </tr>
-                    `;
-                    
-                    const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${eventId}`);
-                    
-                    if (!response.ok) {
-                        throw new Error(`Deliveries not available: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    console.log('[loadHistory] Received deliveries data:', data);
-                    
-                    // Filter deliveries for this specific campaign
-                    const thisEmailDeliveries = data.deliveries.filter(d => d.campaignId === emailId);
-                    console.log('[loadHistory] Filtered to', thisEmailDeliveries.length, 'deliveries for this email');
-                    
-                    if (thisEmailDeliveries.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Not sent yet</td></tr>`;
-                        return;
-                    }
-                    
-                    // Show individual recipient deliveries
-                    tbody.innerHTML = thisEmailDeliveries.map(delivery => {
-                        const date = new Date(delivery.sentAt || delivery.createdAt).toLocaleDateString();
-                        const time = new Date(delivery.sentAt || delivery.createdAt).toLocaleTimeString();
-                        const statusClass = delivery.status === 'sent' ? 'success' : 
-                                          delivery.status === 'failed' ? 'error' : 'warning';
-                        const statusText = delivery.status === 'sent' ? 'Sent' : 
-                                         delivery.status === 'failed' ? 'Failed' : 'Pending';
-                        
-                        return `
-                            <tr>
-                                <td>${date} ${time}</td>
-                                <td>${delivery.email}</td>
-                                <td>Sequence</td>
-                                <td></td>
-                                <td><span class="badge badge-${statusClass}">${statusText}</span></td>
-                            </tr>
-                        `;
-                    }).join('');
-                    
-                    console.log('[loadHistory] Rendered', thisEmailDeliveries.length, 'deliveries');
-                    return;
-                }
-                
-                // Otherwise show general email log (quick emails + campaign summaries)
-                // Update table headers for summary view
-                thead.innerHTML = `
-                    <tr>
-                        <th>Date</th>
-                        <th>Subject</th>
-                        <th>Template</th>
-                        <th>Recipients</th>
-                        <th>Status</th>
-                    </tr>
-                `;
-                
-                const url = `${CONFIG.api.baseUrl}/email/history`;
-                console.log('[loadHistory] Fetching general history from:', url);
-                
-                const response = await fetch(url);
-                console.log('[loadHistory] Response status:', response.status, response.ok);
-                
+                const response = await fetch(`${CONFIG.api.baseUrl}/email/history`);
                 if (!response.ok) {
-                    throw new Error(`History not available: ${response.status}`);
+                    throw new Error('History not available');
                 }
-                
                 const history = await response.json();
-                console.log('[loadHistory] Received history:', history);
+
+                const tbody = document.getElementById('history-body');
 
                 if (!history || history.length === 0) {
-                    console.log('[loadHistory] No history found, showing empty state');
                     tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No emails sent yet</td></tr>`;
                     return;
                 }
 
-                console.log('[loadHistory] Rendering', history.length, 'history items');
                 tbody.innerHTML = history.slice(0, 10).map(email => {
                     const date = new Date(email.sentAt).toLocaleDateString();
                     const statusClass = email.status === 'completed' ? 'success' :
@@ -901,45 +600,10 @@
                         </tr>
                     `;
                 }).join('');
-                console.log('[loadHistory] History rendered successfully');
             } catch (error) {
-                console.error('[loadHistory] Error loading history:', error);
+                console.error('Error loading history:', error);
                 document.getElementById('history-body').innerHTML = `<tr><td colspan="5" class="empty-state">No emails sent yet</td></tr>`;
             }
-        }
-
-        function displayUserTimezone() {
-            const offset = new Date().getTimezoneOffset();
-            const hours = Math.abs(Math.floor(offset / 60));
-            const minutes = Math.abs(offset % 60);
-            const sign = offset <= 0 ? '+' : '-';
-            const tzDisplay = `(GMT${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')})`;
-            const tzElement = document.getElementById('timezone-display');
-            if (tzElement) {
-                tzElement.textContent = tzDisplay;
-            }
-        }
-
-        function updateSchedulePreview() {
-            const scheduleInput = document.getElementById('scheduled-send-time').value;
-            const preview = document.getElementById('schedule-preview');
-            
-            if (!scheduleInput) {
-                preview.style.display = 'none';
-                return;
-            }
-            
-            const localDate = new Date(scheduleInput);
-            const utcDate = localDate.toISOString();
-            
-            const offset = localDate.getTimezoneOffset();
-            const hours = Math.abs(Math.floor(offset / 60));
-            const minutes = Math.abs(offset % 60);
-            const sign = offset <= 0 ? '+' : '-';
-            const gmtOffset = `GMT${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-            
-            preview.innerHTML = `📅 Will send on: <strong>${localDate.toLocaleString()}</strong> (${gmtOffset})<br>UTC: ${utcDate}`;
-            preview.style.display = 'block';
         }
 
         function showStatus(message, type) {

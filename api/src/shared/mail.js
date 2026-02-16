@@ -38,6 +38,52 @@ async function getAccessToken() {
 }
 
 /**
+ * Extract base64 images from HTML and convert to inline attachments
+ * @param {string} html - HTML content with potential base64 images
+ * @returns {Object} - { html: processed HTML, attachments: array of attachment objects }
+ */
+function extractInlineImages(html) {
+    const attachments = [];
+    let processedHtml = html;
+    
+    // Match base64 images: <img src="data:image/...;base64,..." />
+    const base64ImageRegex = /<img[^>]+src="data:image\/(png|jpeg|jpg|gif|webp);base64,([^"]+)"[^>]*>/gi;
+    
+    let match;
+    let imageIndex = 0;
+    
+    while ((match = base64ImageRegex.exec(html)) !== null) {
+        const fullMatch = match[0];
+        const imageType = match[1];
+        const base64Data = match[2];
+        
+        // Generate unique Content-ID
+        const contentId = `image${imageIndex}@acdc.blog`;
+        imageIndex++;
+        
+        // Replace base64 src with cid reference
+        const cidImg = fullMatch.replace(
+            /src="data:image\/[^;]+;base64,[^"]+"/,
+            `src="cid:${contentId}"`
+        );
+        
+        processedHtml = processedHtml.replace(fullMatch, cidImg);
+        
+        // Add to attachments array
+        attachments.push({
+            '@odata.type': '#microsoft.graph.fileAttachment',
+            name: `image${imageIndex}.${imageType}`,
+            contentType: `image/${imageType}`,
+            contentBytes: base64Data,
+            contentId: contentId,
+            isInline: true
+        });
+    }
+    
+    return { html: processedHtml, attachments };
+}
+
+/**
  * Send an email using Microsoft Graph API
  * @param {Object} options - Email options
  * @param {string|string[]} options.to - Recipient email(s)
@@ -52,12 +98,15 @@ async function sendEmail({ to, subject, htmlContent, textContent }) {
     // Normalize to array
     const recipients = Array.isArray(to) ? to : [to];
     
+    // Extract and convert base64 images to inline attachments
+    const { html: processedHtml, attachments } = extractInlineImages(htmlContent);
+    
     const message = {
         message: {
             subject: subject,
             body: {
                 contentType: 'HTML',
-                content: htmlContent
+                content: processedHtml
             },
             toRecipients: recipients.map(email => ({
                 emailAddress: { address: email }
@@ -65,6 +114,11 @@ async function sendEmail({ to, subject, htmlContent, textContent }) {
         },
         saveToSentItems: true
     };
+    
+    // Add inline attachments if any base64 images were found
+    if (attachments.length > 0) {
+        message.message.attachments = attachments;
+    }
     
     const response = await fetch(
         `https://graph.microsoft.com/v1.0/users/${SENDER_EMAIL}/sendMail`,
@@ -119,18 +173,20 @@ async function sendBulkEmail({ to, subject, htmlContent }) {
  * @param {Object} data - Key-value pairs for replacement
  * @returns {string} - Processed HTML
  */
-function processTemplate(template, data) {
+function processTemplate(template, data = {}) {
     let result = template;
     
-    // Replace simple placeholders
-    for (const [key, value] of Object.entries(data)) {
-        const placeholder = new RegExp(`{{${key}}}`, 'g');
-        result = result.replace(placeholder, value || '');
-    }
-    
-    // Handle conditional blocks {{#if key}}...{{/if}}
+    // Handle conditional blocks FIRST (before replacing placeholders)
+    // {{#if key}}...{{/if}}
     result = result.replace(/{{#if (\w+)}}([\s\S]*?){{\/if}}/g, (match, key, content) => {
         return data[key] ? content : '';
+    });
+    
+    // Replace simple placeholders
+    // Match {{placeholder}} and replace with value or empty string
+    result = result.replace(/{{(\w+)}}/g, (match, key) => {
+        // Return the value if it exists, otherwise empty string
+        return data[key] !== undefined && data[key] !== null ? String(data[key]) : '';
     });
     
     return result;

@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const Email = require('../shared/email');
 const Graph = require('../shared/graph');
+const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
 
 // Add member to team
 app.http('members-add', {
@@ -83,6 +84,19 @@ app.http('members-add', {
             
             // Send notification email
             await Email.sendVerificationCode(email, 'You have been added to team: ' + team.teamName);
+            
+            // Send welcome email to new member (async, don't wait)
+            if (team.eventId) {
+                sendTeamWelcomeEmail(email, team.eventId, context)
+                    .then(result => {
+                        if (result.success) {
+                            context.log(`Team welcome email sent to ${email}: ${result.emailsSent} sent, ${result.emailsFailed} failed`);
+                        }
+                    })
+                    .catch(error => {
+                        context.error(`Failed to send team welcome email to ${email}:`, error);
+                    });
+            }
             
             context.log(`Member ${email} added to team ${teamId}`);
             return {
