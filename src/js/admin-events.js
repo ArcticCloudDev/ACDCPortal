@@ -56,8 +56,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Load events
         await loadEvents();
-        await loadSequences();
-        await loadCampaigns();
 
         // Setup event listeners
         setupEventListeners();
@@ -103,43 +101,11 @@ async function loadEvents() {
     }
 }
 
-async function loadSequences() {
-    try {
-        const response = await API.sequences.list();
-        allSequences = response.sequences || [];
-        populateSequencesDropdown();
-    } catch (err) {
-        console.error('Failed to load sequences:', err);
-    }
-}
+// Email sequence is now a boolean checkbox
+// Sequence content is configured in the Sequence tab
 
-async function loadCampaigns() {
-    try {
-        const response = await API.campaigns.list();
-        allCampaigns = response.campaigns || [];
-        populateCampaignsDropdown();
-    } catch (err) {
-        console.error('Failed to load campaigns:', err);
-    }
-}
-
-function populateSequencesDropdown() {
-    const select = document.getElementById('event-sequence');
-    if (!select) return;
-    select.innerHTML = '<option value="">No sequence (no automated emails)</option>';
-    allSequences.forEach(seq => {
-        select.innerHTML += `<option value="${seq.id}">${seq.name}</option>`;
-    });
-}
-
-function populateCampaignsDropdown() {
-    const select = document.getElementById('event-team-welcome-email');
-    if (!select) return;
-    select.innerHTML = '<option value="">No welcome email</option>';
-    allCampaigns.forEach(campaign => {
-        select.innerHTML += `<option value="${campaign.id}">${campaign.subject}</option>`;
-    });
-}
+// Team welcome email is now a boolean checkbox
+// Theme/content is configured in Email Templates page
 
 function renderEventsList() {
     const eventsTableBody = document.getElementById('events-table-body');
@@ -421,8 +387,8 @@ function showForm(event = null) {
         document.getElementById('min-team-size').value = event.minTeamSize || 3;
         document.getElementById('max-team-size').value = event.maxTeamSize || 5;
         document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
-        document.getElementById('event-sequence').value = event.sequenceId || '';
-        document.getElementById('event-team-welcome-email').value = event.teamWelcomeEmailId || '';
+        document.getElementById('event-sequence').checked = event.sequenceEnabled || false;
+        document.getElementById('event-team-welcome-email').checked = event.sendWelcomeEmail || false;
         
         // Set registration type
         const regType = event.registrationType || 'team';
@@ -515,8 +481,8 @@ async function handleFormSubmit(e) {
             location: document.getElementById('event-location').value.trim(),
             registrationType: registrationType,
             status: document.getElementById('event-status').value || 'draft',
-            sequenceId: document.getElementById('event-sequence').value || null,
-            teamWelcomeEmailId: document.getElementById('event-team-welcome-email').value || null,
+            sequenceEnabled: document.getElementById('event-sequence').checked,
+            sendWelcomeEmail: document.getElementById('event-team-welcome-email').checked,
             fileCategories: document.getElementById('event-file-categories').value
                 .split(',')
                 .map(c => c.trim())

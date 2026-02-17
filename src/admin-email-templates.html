@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Templates - ACDC Committee</title>
+    <link rel="stylesheet" href="css/admin-styles.css">
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+    <style>
+        .template-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .template-option {
+            padding: 20px;
+            border: 2px solid var(--admin-border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .template-option:hover {
+            border-color: var(--admin-primary);
+            background: var(--admin-bg);
+        }
+
+        .template-option.selected {
+            border-color: var(--admin-primary);
+            background: #eff6ff;
+        }
+
+        .template-option .icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .template-option .name {
+            font-weight: 600;
+            color: var(--admin-sidebar);
+        }
+
+        .editor-section {
+            margin-bottom: 24px;
+        }
+
+        .editor-section label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--admin-sidebar);
+            margin-bottom: 8px;
+        }
+
+        .editor-container {
+            border: 1px solid var(--admin-border);
+            border-radius: 6px;
+            background: white;
+            min-height: 120px;
+        }
+
+        .theme-upload {
+            border: 2px dashed var(--admin-border);
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .theme-upload:hover {
+            border-color: var(--admin-primary);
+            background: var(--admin-bg);
+        }
+
+        .theme-upload.has-image {
+            border-style: solid;
+            padding: 0;
+        }
+
+        .theme-preview {
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .preview-pane {
+            position: sticky;
+            top: 20px;
+            background: white;
+            border: 1px solid var(--admin-border);
+            border-radius: 8px;
+            padding: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .preview-header {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--admin-sidebar);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .preview-content {
+            font-size: 0.875rem;
+        }
+
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 24px;
+        }
+
+        .merge-fields {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .merge-field-tag {
+            padding: 4px 12px;
+            background: var(--admin-bg);
+            border: 1px solid var(--admin-border);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-family: monospace;
+            color: var(--admin-text-muted);
+            cursor: copy;
+        }
+
+        .merge-field-tag:hover {
+            background: #dbeafe;
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">📧 Email Templates</h1>
+                <p style="color: var(--admin-text-muted);">Manage automated system email templates with custom themes and text</p>
+            </div>
+
+            <!-- Template Selector -->
+            <div class="panel" style="margin-bottom: 24px;">
+                <div class="panel-header" style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border);">
+                    <span style="font-weight: 600;">Select Template Type</span>
+                </div>
+                <div class="panel-body padded">
+                    <div class="template-selector" id="template-selector">
+                        <div class="template-option selected" data-template="team-welcome">
+                            <div class="icon">👋</div>
+                            <div class="name">Team Welcome</div>
+                        </div>
+                        <!-- More templates can be added here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Event & Theme Selection -->
+            <div class="panel" style="margin-bottom: 24px;">
+                <div class="panel-header" style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border);">
+                    <span style="font-weight: 600;">Event & Theme</span>
+                </div>
+                <div class="panel-body padded">
+                    <div class="form-group">
+                        <label for="event-select">Select Event</label>
+                        <select id="event-select" style="width: 100%;">
+                            <option value="">Loading events...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Theme Image (optional)</label>
+                        <div style="font-size: 0.875rem; color: var(--admin-text-muted); margin-bottom: 8px;">
+                            Paste an image directly into the Introduction section below, or use a rich editor to add images
+                        </div>
+                        <div id="theme-editor" class="editor-container" style="min-height: 150px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Editor Area -->
+            <div class="two-column">
+                <div>
+                    <!-- Editable Sections -->
+                    <div class="panel">
+                        <div class="panel-header" style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border);">
+                            <span style="font-weight: 600;">Customize Text</span>
+                        </div>
+                        <div class="panel-body padded">
+                            <!-- Merge Fields Helper -->
+                            <div style="margin-bottom: 20px; padding: 12px; background: #fef3c7; border-radius: 6px;">
+                                <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 8px;">Available Merge Fields:</div>
+                                <div class="merge-fields" id="merge-fields"></div>
+                                <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px;">Click to copy • Paste into text sections below</div>
+                            </div>
+
+                            <div class="editor-section">
+                                <label for="body-editor">Body Text</label>
+                                <div id="body-editor" class="editor-container"></div>
+                            </div>
+
+                            <div class="editor-section">
+                                <label for="closing-editor">Closing Text</label>
+                                <div id="closing-editor" class="editor-container"></div>
+                            </div>
+
+                            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                                <button onclick="saveTemplate()" class="btn btn-primary">💾 Save Template</button>
+                                <button onclick="sendTestEmail()" class="btn">📤 Send Test Email</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Pane -->
+                <div>
+                    <div class="preview-pane">
+                        <div class="preview-header">📧 Email Preview</div>
+                        <div class="preview-content" id="preview-content">
+                            <p style="color: var(--admin-text-muted); text-align: center; padding: 40px 20px;">
+                                Select an event to preview
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="status-bar" class="status-bar"></div>
+        </main>
+    </div>
+
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/admin-sidebar.js"></script>
+    <script>
+        let themeEditor, bodyEditor, closingEditor;
+        let currentTemplate = 'team-welcome';
+        let currentEvent = null;
+        let allEvents = [];
+        let templateConfig = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            renderAdminSidebar('email-templates');
+            
+            // Initialize Quill editors (same as admin-email.html)
+            themeEditor = new Quill('#theme-editor', {
+                theme: 'snow',
+                placeholder: 'Paste theme image here or leave empty...',
+                modules: {
+                    toolbar: [
+                        ['bold', 'italic'],
+                        ['image'],
+                        ['clean']
+                    ]
+                }
+            });
+
+            bodyEditor = new Quill('#body-editor', {
+                theme: 'snow',
+                placeholder: 'Enter body text...',
+                modules: {
+                    toolbar: [['bold', 'italic', 'underline'], [{ 'list': 'bullet' }], ['clean']]
+                }
+            });
+
+            closingEditor = new Quill('#closing-editor', {
+                theme: 'snow',
+                placeholder: 'Enter closing text...',
+                modules: {
+                    toolbar: [['bold', 'italic', 'underline'], ['clean']]
+                }
+            });
+
+            // Listen to editor changes for live preview
+            themeEditor.on('text-change', updatePreview);
+            bodyEditor.on('text-change', updatePreview);
+            closingEditor.on('text-change', updatePreview);
+
+            // Load data
+            await loadEvents();
+            await loadTemplateConfig();
+            renderMergeFields();
+        });
+
+        async function loadEvents() {
+            try {
+                const response = await fetch(`${CONFIG.api.baseUrl}/events`);
+                allEvents = await response.json();
+                
+                const select = document.getElementById('event-select');
+                select.innerHTML = '<option value="">Select an event...</option>' +
+                    allEvents.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+                
+                select.addEventListener('change', (e) => {
+                    currentEvent = allEvents.find(ev => ev.id === e.target.value);
+                    if (currentEvent) {
+                        loadTemplateForEvent();
+                        updatePreview();
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading events:', error);
+            }
+        }
+
+        async function loadTemplateConfig() {
+            try {
+                const response = await fetch(`${CONFIG.api.baseUrl}/system-emails/config`);
+                if (response.ok) {
+                    templateConfig = await response.json();
+                } else {
+                    // Initialize default config
+                    templateConfig = {
+                        templates: {
+                            "team-welcome": {
+                                name: "Team Welcome Email",
+                                subject: "Welcome to {{eventName}}",
+                                mergeFields: ["teamName", "fullName", "eventName", "teamAdminName"],
+                                editableSections: {
+                                    body: "<p>Hi {{fullName}},</p><p>We're excited to have you participate in {{eventName}}.</p><p>Your team admin {{teamAdminName}} has added you to {{teamName}}.</p><p>Please complete your profile!</p>",
+                                    closing: "<p>Good luck in the competition!</p>"
+                                },
+                                eventThemes: {}
+                            }
+                        }
+                    };
+                }
+            } catch (error) {
+                console.error('Error loading template config:', error);
+            }
+        }
+
+        function loadTemplateForEvent() {
+            if (!currentEvent || !templateConfig) return;
+
+            const template = templateConfig.templates[currentTemplate];
+            const globalDefaults = template.editableSections;
+            const eventTheme = template.eventThemes[currentEvent.id] || {};
+
+            // Load event-specific sections (with fallback to global defaults)
+            themeEditor.root.innerHTML = eventTheme.themeImage || '';
+            bodyEditor.root.innerHTML = eventTheme.body || globalDefaults.body || '';
+            closingEditor.root.innerHTML = eventTheme.closing || globalDefaults.closing || '';
+        }
+
+        function renderMergeFields() {
+            const template = templateConfig.templates[currentTemplate];
+            const container = document.getElementById('merge-fields');
+            
+            container.innerHTML = template.mergeFields.map(field => 
+                `<span class="merge-field-tag" onclick="copyMergeField('${field}')">{{${field}}}</span>`
+            ).join('');
+        }
+
+        function copyMergeField(field) {
+            navigator.clipboard.writeText(`{{${field}}}`);
+            showStatus(`Copied {{${field}}} to clipboard`, 'success');
+        }
+
+        function updatePreview() {
+            if (!currentEvent) return;
+
+            const themeHtml = themeEditor.root.innerHTML;
+            const bodyText = bodyEditor.root.innerHTML;
+            const closingText = closingEditor.root.innerHTML;
+
+            // Sample merge data
+            const mergeData = {
+                teamName: 'Sample Team Alpha',
+                fullName: 'John Doe',
+                eventName: currentEvent.name,
+                teamAdminName: 'Jane Smith',
+                portalUrl: window.location.origin + '/my-page.html'
+            };
+
+            // Extract theme image if present
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = themeHtml;
+            const imgTag = tempDiv.querySelector('img');
+            const themeImageHtml = imgTag ? `<img src="${imgTag.src}" style="width: 100%; height: auto; display: block;">` : '';
+
+            // Build preview HTML
+            let previewHTML = `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                    ${themeImageHtml}
+                    <div style="padding: 24px;">
+                        <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #1e293b;">Welcome to ${mergeData.eventName}!</h2>
+                        <div style="margin: 0 0 16px 0; color: #475569;">${bodyText}</div>
+                        <div style="margin: 16px 0; padding: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; border-radius: 6px; font-weight: 600;">
+                            Sign in
+                        </div>
+                        <div style="margin: 16px 0 0 0; color: #475569;">${closingText}</div>
+                        <p style="margin: 16px 0 0 0; color: #475569;">
+                            Best regards,<br><strong>The ${mergeData.eventName} Team</strong>
+                        </p>
+                    </div>
+                    <div style="padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e5e7eb; font-size: 12px; color: #64748b; text-align: center;">
+                        This is an automated email from ${mergeData.eventName}.
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('preview-content').innerHTML = previewHTML;
+        }
+
+        async function saveTemplate() {
+            if (!currentEvent) {
+                showStatus('Please select an event', 'error');
+                return;
+            }
+
+            try {
+                const template = templateConfig.templates[currentTemplate];
+                
+                // Create event theme object if it doesn't exist
+                if (!template.eventThemes[currentEvent.id]) {
+                    template.eventThemes[currentEvent.id] = {};
+                }
+                
+                // Store all sections per-event (theme image + body/closing text)
+                template.eventThemes[currentEvent.id].themeImage = themeEditor.root.innerHTML;
+                template.eventThemes[currentEvent.id].body = bodyEditor.root.innerHTML;
+                template.eventThemes[currentEvent.id].closing = closingEditor.root.innerHTML;
+
+                // Save to backend
+                const response = await fetch(`${CONFIG.api.baseUrl}/system-emails/config`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(templateConfig)
+                });
+
+                if (response.ok) {
+                    showStatus('Template saved successfully!', 'success');
+                } else {
+                    showStatus('Failed to save template', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving template:', error);
+                showStatus('Error saving template', 'error');
+            }
+        }
+
+        async function sendTestEmail() {
+            if (!currentEvent) {
+                showStatus('Please select an event', 'error');
+                return;
+            }
+
+            const email = prompt('Enter email address to send test:');
+            if (!email) return;
+
+            try {
+                const response = await fetch(`${CONFIG.api.baseUrl}/system-emails/test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        templateType: currentTemplate,
+                        eventId: currentEvent.id,
+                        testEmail: email,
+                        data: {
+                            teamName: 'Sample Team Alpha',
+                            fullName: 'Test User',
+                            teamAdminName: 'Admin User'
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    showStatus('Test email sent!', 'success');
+                } else {
+                    showStatus('Failed to send test email', 'error');
+                }
+            } catch (error) {
+                console.error('Error sending test:', error);
+                showStatus('Error sending test email', 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const bar = document.getElementById('status-bar');
+            bar.textContent = message;
+            bar.className = `status-bar ${type}`;
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    bar.className = 'status-bar';
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>

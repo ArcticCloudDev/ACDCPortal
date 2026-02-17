@@ -17,20 +17,94 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
             return { success: false, reason: 'Event not found' };
         }
 
-        // Check if event has a team welcome email configured
-        if (!event.teamWelcomeEmailId) {
-            context.log(`Event ${eventId} has no team welcome email configured`);
-            return { success: false, reason: 'No team welcome email configured' };
+        // Check if event has welcome email enabled
+        if (!event.sendWelcomeEmail) {
+            context.log(`Event ${eventId} does not have welcome email enabled`);
+            return { success: false, reason: 'Welcome email not enabled for event' };
         }
 
-        // Get the welcome email campaign
-        const campaigns = Storage.emailCampaigns.getAll();
-        const welcomeCampaign = campaigns.find(c => c.id === event.teamWelcomeEmailId);
-        
-        if (!welcomeCampaign) {
-            context.warn(`Team welcome email campaign ${event.teamWelcomeEmailId} not found`);
-            return { success: false, reason: 'Welcome email campaign not found' };
+        // Get member's team to get team name and admin info
+        const teams = Storage.teams.getAll();
+        const memberTeam = teams.find(t => 
+            t.eventId === eventId && 
+            (t.adminEmail?.toLowerCase() === memberEmail.toLowerCase() || 
+             t.members?.some(m => m.email?.toLowerCase() === memberEmail.toLowerCase()))
+        );
+
+        if (!memberTeam) {
+            context.warn(`Team not found for member ${memberEmail} in event ${eventId}`);
+            return { success: false, reason: 'Team not found' };
         }
+
+        // Get team admin name
+        const users = Storage.users.getAll();
+        const adminUser = users.find(u => u.email?.toLowerCase() === memberTeam.adminEmail?.toLowerCase());
+        const teamAdminName = adminUser ? `${adminUser.firstName} ${adminUser.lastName}` : memberTeam.adminEmail;
+
+        // Get member's full name
+        const memberUser = users.find(u => u.email?.toLowerCase() === memberEmail.toLowerCase());
+        const fullName = memberUser ? `${memberUser.firstName} ${memberUser.lastName}` : memberEmail;
+
+        // Send the welcome email using system email template
+        const fs = require('fs').promises;
+        const path = require('path');
+        const { processTemplate } = require('./mail');
+
+        // Load system email config
+        const configPath = path.join(__dirname, '../../../data/system-email-config.json');
+        const configData = await fs.readFile(configPath, 'utf-8');
+        const config = JSON.parse(configData);
+        const template = config.templates['team-welcome'];
+
+        if (!template) {
+            context.warn('Team welcome template not found in system-email-config.json');
+            return { success: false, reason: 'Template not configured' };
+        }
+
+        // Get event-specific theme or use global defaults
+        const eventTheme = template.eventThemes[eventId] || {};
+        const globalDefaults = template.editableSections;
+
+        // Extract image src from HTML
+        const extractImageSrc = (html) => {
+            if (!html) return '';
+            const match = html.match(/src="([^"]+)"/);
+            return match ? match[1] : html;
+        };
+
+        const themeImageSrc = extractImageSrc(eventTheme.themeImage || '');
+
+        // Build merge data
+        const mergeData = {
+            teamName: memberTeam.teamName,
+            fullName: fullName,
+            eventName: event.name,
+            teamAdminName: teamAdminName,
+            themeImage: themeImageSrc,
+            bodyText: eventTheme.body || globalDefaults.body || '',
+            closingText: eventTheme.closing || globalDefaults.closing || '',
+            portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'
+        };
+
+        // Load HTML template file
+        const templatePath = path.join(__dirname, '../../../data/email-templates/team-welcome.html');
+        const templateHtml = await fs.readFile(templatePath, 'utf-8');
+
+        // Process template with merge data
+        const htmlContent = processTemplate(templateHtml, mergeData);
+
+        // Process subject with merge fields
+        const subject = processTemplate(template.subject, mergeData);
+
+        // Send email
+        const { sendEmail } = require('./mail');
+        await sendEmail({
+            to: memberEmail,
+            subject: subject,
+            htmlContent: htmlContent
+        });
+
+        context.log(`Team welcome email sent to ${memberEmail}`);
 
         // Check if member was an interest lead (verified)
         const interestLeads = Storage.interestLeads.getAll();
@@ -42,78 +116,54 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
 
         context.log(`Member ${memberEmail} ${wasInterestLead ? 'was' : 'was not'} an interest lead for event ${eventId}`);
 
-        // Prepare emails to send
-        const emailsToSend = [];
+        let emailsSent = 1; // Welcome email was sent
+        let emailsFailed = 0;
 
-        // 1. Always send the welcome email
-        emailsToSend.push({
-            subject: welcomeCampaign.subject,
-            body: welcomeCampaign.body,
-            type: 'team-welcome'
-        });
+        // 2. If member was NOT an interest lead and sequence is enabled, send digest of sequence emails they missed
+        if (!wasInterestLead && event.sequenceEnabled && event.sequenceId) {
+            try {
+                const campaigns = Storage.emailCampaigns.getAll();
+                const sequenceCampaigns = campaigns
+                    .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence' && c.status === 'live')
+                    .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
 
-        // 2. If member was NOT an interest lead, send digest of sequence emails they missed
-        if (!wasInterestLead && event.sequenceId) {
-            const sequences = Storage.sequences.getAll();
-            const sequence = sequences.find(s => s.id === event.sequenceId);
-            
-            if (sequence && sequence.emails && sequence.emails.length > 0) {
-                // Get all live/scheduled emails from the sequence
-                const unsentEmails = sequence.emails.filter(email => 
-                    email.status === 'live' || email.status === 'scheduled'
-                ).sort((a, b) => a.order - b.order);
-
-                if (unsentEmails.length > 0) {
+                if (sequenceCampaigns.length > 0) {
                     // Create digest email
                     let digestBody = `<h2>Important Information You Should Know</h2>`;
                     digestBody += `<p>Since you joined the team, we've sent some important updates about ${event.name}. Here's what you need to know:</p>`;
                     digestBody += `<hr style="margin: 20px 0; border: none; border-top: 2px solid #ddd;">`;
                     
-                    unsentEmails.forEach((email, index) => {
+                    sequenceCampaigns.forEach((campaign, index) => {
                         digestBody += `<div style="margin: 30px 0;">`;
-                        digestBody += `<h3>${email.subject}</h3>`;
-                        digestBody += email.body;
-                        if (index < unsentEmails.length - 1) {
+                        digestBody += `<h3>${campaign.subject}</h3>`;
+                        digestBody += campaign.content;
+                        if (index < sequenceCampaigns.length - 1) {
                             digestBody += `<hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">`;
                         }
                         digestBody += `</div>`;
                     });
 
-                    emailsToSend.push({
+                    // Send digest email
+                    await sendEmail({
+                        to: memberEmail,
                         subject: `${event.name} - Important Updates`,
-                        body: digestBody,
-                        type: 'sequence-digest'
+                        htmlContent: digestBody
                     });
 
-                    context.log(`Including digest of ${unsentEmails.length} sequence emails for ${memberEmail}`);
+                    emailsSent++;
+                    context.log(`Sent digest of ${sequenceCampaigns.length} sequence emails to ${memberEmail}`);
                 }
-            }
-        }
-
-        // Send all emails
-        const results = [];
-        for (const emailData of emailsToSend) {
-            try {
-                await Email.sendEmail({
-                    to: memberEmail,
-                    subject: emailData.subject,
-                    htmlContent: emailData.body
-                });
-                
-                results.push({ type: emailData.type, success: true });
-                context.log(`Sent ${emailData.type} email to ${memberEmail}`);
             } catch (error) {
-                context.error(`Failed to send ${emailData.type} email to ${memberEmail}:`, error);
-                results.push({ type: emailData.type, success: false, error: error.message });
+                context.error(`Failed to send sequence digest to ${memberEmail}:`, error);
+                emailsFailed++;
             }
         }
 
         return {
             success: true,
             wasInterestLead,
-            emailsSent: results.filter(r => r.success).length,
-            emailsFailed: results.filter(r => !r.success).length,
-            results
+            emailsSent,
+            emailsFailed
         };
 
     } catch (error) {

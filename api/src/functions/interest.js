@@ -15,7 +15,13 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
     try {
         context.log(`[SEQUENCE] Starting sequence emails for ${lead.email}, event: ${event.name}`);
         
-        // Check if event has a sequence assigned
+        // Check if event has sequence enabled
+        if (!event.sequenceEnabled) {
+            context.log(`[SEQUENCE] Sequence not enabled for event ${event.id}`);
+            return;
+        }
+        
+        // Check if event has a sequence assigned (backward compatibility)
         if (!event.sequenceId) {
             context.log(`[SEQUENCE] No sequence assigned to event ${event.id}`);
             return;

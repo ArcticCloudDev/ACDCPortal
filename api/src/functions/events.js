@@ -213,7 +213,9 @@ app.http('events-create', {
                 minTeamSize: body.minTeamSize || 3,
                 maxTeamSize: body.maxTeamSize || 5,
                 sequenceId: body.sequenceId || null,
+                sequenceEnabled: body.sequenceEnabled !== undefined ? body.sequenceEnabled : (body.sequenceId ? true : false),
                 teamWelcomeEmailId: body.teamWelcomeEmailId || null,
+                sendWelcomeEmail: body.sendWelcomeEmail !== undefined ? body.sendWelcomeEmail : (body.teamWelcomeEmailId ? true : false),
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 createdAt: new Date().toISOString()
@@ -295,16 +297,6 @@ app.http('events-update', {
             
             const existingEvent = events[index];
             
-            // If this event is being set to active status, deactivate others
-            const newStatus = body.status || existingEvent.status;
-            if (isActiveStatus(newStatus) && !isActiveStatus(existingEvent.status)) {
-                events.forEach(e => {
-                    if (e.id !== id && isActiveStatus(e.status)) {
-                        e.status = 'completed';
-                    }
-                });
-            }
-            
             // Remove legacy fields if present in body
             delete body.isActive;
             delete body.registrationOpen;
@@ -333,7 +325,9 @@ app.http('events-update', {
                 id: existingEvent.id, // Preserve ID
                 createdAt: existingEvent.createdAt, // Preserve creation date
                 sequenceId: body.sequenceId !== undefined ? body.sequenceId : existingEvent.sequenceId,
+                sequenceEnabled: body.sequenceEnabled !== undefined ? body.sequenceEnabled : existingEvent.sequenceEnabled,
                 teamWelcomeEmailId: body.teamWelcomeEmailId !== undefined ? body.teamWelcomeEmailId : existingEvent.teamWelcomeEmailId,
+                sendWelcomeEmail: body.sendWelcomeEmail !== undefined ? body.sendWelcomeEmail : existingEvent.sendWelcomeEmail,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()

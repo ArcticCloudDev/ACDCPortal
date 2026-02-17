@@ -794,23 +794,24 @@
                                         </div>
 
                                         <div class="form-group" style="margin-top: 16px;">
-                                            <label>� Email Sequence</label>
-                                            <select id="event-sequence">
-                                                <option value="">No sequence (no automated emails)</option>
-                                            </select>
+                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                <input type="checkbox" id="event-sequence" style="width: auto;">
+                                                <span>📧 Enable Email Sequence</span>
+                                            </label>
                                             <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                <strong>One sequence per event.</strong> Each event can have exactly one email sequence. 
-                                                This sequence will be sent to all verified interest leads for this event.
+                                                <strong>Automated emails for interest leads.</strong> When enabled, the email sequence will be sent to verified interest leads.
+                                                Configure the sequence content in the <strong>Sequence</strong> tab below.
                                             </small>
                                         </div>
 
-                                        <div class="form-group" style="margin-top: 16px;">                                            <label>👋 Team Welcome Email</label>
-                                            <select id="event-team-welcome-email">
-                                                <option value="">No welcome email</option>
-                                            </select>
+                                        <div class="form-group" style="margin-top: 16px;">
+                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                <input type="checkbox" id="event-team-welcome-email" style="width: auto;">
+                                                <span>👋 Send Team Welcome Email</span>
+                                            </label>
                                             <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                <strong>Welcome email for new team members.</strong> This email will be sent when someone creates a team or is added to a team.
-                                                If the member was NOT an interest lead, they will also receive a digest of all sequence emails.
+                                                <strong>Welcome email for new team members.</strong> When enabled, team members will receive a welcome email when they join a team.
+                                                Customize the email theme and text in <strong>Email Templates</strong> under Theme section.
                                             </small>
                                         </div>
 
@@ -1124,3 +1125,5 @@
     <script src="js/admin-deliveries.js"></script>
 </body>
 </html>
+
+

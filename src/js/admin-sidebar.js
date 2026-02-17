@@ -37,6 +37,11 @@ function renderAdminSidebar(activePage = '') {
                     <span class="icon">📧</span><span>Sequences</span>
                 </a>
 
+                <div class="nav-section">Theme</div>
+                <a href="admin-email-templates.html" class="nav-item ${activePage === 'email-templates' ? 'active' : ''}">
+                    <span class="icon">📝</span><span>Email Templates</span>
+                </a>
+
                 <div class="nav-section">Settings</div>
                 <a href="admin-branding.html" class="nav-item ${activePage === 'branding' ? 'active' : ''}">
                     <span class="icon">🎨</span><span>Branding</span>
