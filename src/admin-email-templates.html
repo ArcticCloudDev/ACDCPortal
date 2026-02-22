@@ -160,9 +160,12 @@
                     <div class="template-selector" id="template-selector">
                         <div class="template-option selected" data-template="team-welcome">
                             <div class="icon">👋</div>
-                            <div class="name">Team Welcome</div>
+                            <div class="name">Welcome</div>
                         </div>
-                        <!-- More templates can be added here -->
+                        <div class="template-option" data-template="interest-acknowledgment">
+                            <div class="icon">✉️</div>
+                            <div class="name">Interest</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -291,6 +294,20 @@
             bodyEditor.on('text-change', updatePreview);
             closingEditor.on('text-change', updatePreview);
 
+            // Template selector click handlers
+            document.querySelectorAll('.template-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    document.querySelectorAll('.template-option').forEach(o => o.classList.remove('selected'));
+                    option.classList.add('selected');
+                    currentTemplate = option.dataset.template;
+                    renderMergeFields();
+                    if (currentEvent) {
+                        loadTemplateForEvent();
+                        updatePreview();
+                    }
+                });
+            });
+
             // Load data
             await loadEvents();
             await loadTemplateConfig();
@@ -379,14 +396,36 @@
             const bodyText = bodyEditor.root.innerHTML;
             const closingText = closingEditor.root.innerHTML;
 
-            // Sample merge data
-            const mergeData = {
-                teamName: 'Sample Team Alpha',
-                fullName: 'John Doe',
-                eventName: currentEvent.name,
-                teamAdminName: 'Jane Smith',
-                portalUrl: window.location.origin + '/my-page.html'
+            // Template-specific preview config
+            const previewConfig = {
+                'team-welcome': {
+                    mergeData: {
+                        teamName: 'Sample Team Alpha',
+                        fullName: 'John Doe',
+                        eventName: currentEvent.name,
+                        teamAdminName: 'Jane Smith',
+                        portalUrl: window.location.origin + '/my-page.html'
+                    },
+                    heading: (name) => `Welcome to ${name}!`,
+                    ctaText: 'Sign in',
+                    signature: (name) => `The ${name} Team`,
+                    footer: (name) => `This is an automated email from ${name}.`
+                },
+                'interest-acknowledgment': {
+                    mergeData: {
+                        fullName: 'John Doe',
+                        eventName: currentEvent.name,
+                        interestLink: window.location.origin + '/event.html'
+                    },
+                    heading: (name) => `Thanks for your interest in ${name}!`,
+                    ctaText: 'Confirm Your Interest',
+                    signature: (name) => `The ACDC Team`,
+                    footer: (name) => `You're receiving this email because you expressed interest in ${name}.`
+                }
             };
+
+            const config = previewConfig[currentTemplate] || previewConfig['team-welcome'];
+            const mergeData = config.mergeData;
 
             // Extract theme image if present
             const tempDiv = document.createElement('div');
@@ -394,23 +433,27 @@
             const imgTag = tempDiv.querySelector('img');
             const themeImageHtml = imgTag ? `<img src="${imgTag.src}" style="width: 100%; height: auto; display: block;">` : '';
 
+            // For interest-acknowledgment, show ACDC logo header if no theme image
+            const headerHtml = currentTemplate === 'interest-acknowledgment' && !imgTag
+                ? `<div style="padding: 30px 40px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center;">
+                       <img src="https://cdn.prod.website-files.com/621f541df60bb50feebe0c73/6298c86d5680c5d9eb3a3fec_acdc_alone_white_trans.png" alt="ACDC Logo" style="width: 120px; height: auto;">
+                   </div>`
+                : themeImageHtml;
+
             // Build preview HTML
             let previewHTML = `
                 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-                    ${themeImageHtml}
+                    ${headerHtml}
                     <div style="padding: 24px;">
-                        <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #1e293b;">Welcome to ${mergeData.eventName}!</h2>
+                        <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #1e293b;">${config.heading(mergeData.eventName)}</h2>
                         <div style="margin: 0 0 16px 0; color: #475569;">${bodyText}</div>
-                        <div style="margin: 16px 0; padding: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; border-radius: 6px; font-weight: 600;">
-                            Sign in
-                        </div>
                         <div style="margin: 16px 0 0 0; color: #475569;">${closingText}</div>
                         <p style="margin: 16px 0 0 0; color: #475569;">
-                            Best regards,<br><strong>The ${mergeData.eventName} Team</strong>
+                            Best regards,<br><strong>${config.signature(mergeData.eventName)}</strong>
                         </p>
                     </div>
                     <div style="padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e5e7eb; font-size: 12px; color: #64748b; text-align: center;">
-                        This is an automated email from ${mergeData.eventName}.
+                        ${config.footer(mergeData.eventName)}
                     </div>
                 </div>
             `;

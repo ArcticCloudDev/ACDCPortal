@@ -29,6 +29,11 @@ function renderAdminSidebar(activePage = '') {
                     <span class="icon">📋</span><span>Interest Queue</span>
                 </a>
 
+                <div class="nav-section">Competition</div>
+                <a href="admin-badges.html" class="nav-item ${activePage === 'badges' ? 'active' : ''}">
+                    <span class="icon">🏅</span><span>Badges</span>
+                </a>
+
                 <div class="nav-section">Communication</div>
                 <a href="admin-email.html" class="nav-item ${activePage === 'email' ? 'active' : ''}">
                     <span class="icon">✉️</span><span>Quick Email</span>

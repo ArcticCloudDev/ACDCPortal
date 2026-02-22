@@ -779,9 +779,9 @@
                 if (response.ok) {
                     showStatus('✅ Email saved successfully', 'success');
                     
-                    // Redirect back to event editor after short delay
+                    // Redirect back to event's sequence tab
                     setTimeout(() => {
-                        window.location.href = `admin-events.html?id=${eventId}&tab=sequence`;
+                        window.location.href = `admin-events.html?event=${eventId}&tab=sequence`;
                     }, 1000);
                 } else {
                     const error = await response.json();

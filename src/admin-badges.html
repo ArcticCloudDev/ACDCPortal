@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Badges - ACDC Committee</title>
+    <link rel="stylesheet" href="css/admin-styles.css">
+    <style>
+        .main-content { padding: 24px 40px; }
+
+        /* Tab navigation */
+        .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--admin-border); margin-bottom: 24px; }
+        .tab-btn {
+            padding: 10px 20px; font-size: 0.85rem; font-weight: 500; color: var(--admin-text-muted);
+            background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .tab-btn:hover { color: var(--admin-text); }
+        .tab-btn.active { color: var(--admin-primary); border-bottom-color: var(--admin-primary); font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Badge cards grid */
+        .badge-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px; margin-bottom: 24px;
+        }
+        .badge-card {
+            background: white; border: 1px solid var(--admin-border); border-radius: 8px;
+            padding: 16px; transition: all 0.15s; position: relative;
+        }
+        .badge-card:hover { border-color: var(--admin-primary); box-shadow: 0 2px 8px rgba(59,130,246,0.1); }
+        .badge-card .badge-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .badge-card .badge-name { font-weight: 600; font-size: 0.95rem; color: var(--admin-sidebar); }
+        .badge-card .badge-desc { font-size: 0.8rem; color: var(--admin-text-muted); line-height: 1.4; margin-bottom: 12px; }
+        .badge-card .badge-footer { display: flex; justify-content: space-between; align-items: center; }
+        .badge-card .badge-points { font-weight: 600; color: var(--admin-primary); font-size: 0.85rem; }
+        .badge-card .badge-actions { display: flex; gap: 6px; }
+
+        /* Category pills */
+        .category-pill {
+            display: inline-flex; padding: 2px 8px; border-radius: 12px;
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .category-pill.soft { background: #dbeafe; color: #1e40af; }
+        .category-pill.low-code { background: #d1fae5; color: #065f46; }
+        .category-pill.pro-code { background: #ede9fe; color: #5b21b6; }
+        .category-pill.sponsor { background: #fef3c7; color: #92400e; }
+
+        /* Status pills */
+        .status-pill {
+            display: inline-flex; padding: 2px 8px; border-radius: 12px;
+            font-size: 0.7rem; font-weight: 600;
+        }
+        .status-pill.pending { background: #fef3c7; color: #92400e; }
+        .status-pill.approved { background: #d1fae5; color: #065f46; }
+        .status-pill.declined { background: #fee2e2; color: #991b1b; }
+
+        /* Category section headers */
+        .category-header {
+            display: flex; align-items: center; gap: 8px;
+            margin: 24px 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid var(--admin-border);
+        }
+        .category-header:first-child { margin-top: 0; }
+        .category-header h3 { font-size: 0.9rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
+        .category-count { font-size: 0.75rem; color: var(--admin-text-muted); }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
+        }
+        .modal-overlay.visible { display: flex; }
+        .modal {
+            background: white; border-radius: 12px; width: 500px; max-width: 90vw;
+            max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            padding: 20px 24px 16px; border-bottom: 1px solid var(--admin-border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-header h2 { margin: 0; font-size: 1.1rem; color: var(--admin-sidebar); }
+        .modal-close { background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--admin-text-muted); padding: 4px; }
+        .modal-close:hover { color: var(--admin-text); }
+        .modal-body { padding: 24px; }
+        .modal-footer { padding: 16px 24px; border-top: 1px solid var(--admin-border); display: flex; justify-content: flex-end; gap: 8px; }
+
+        /* Form elements */
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text); margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 8px 12px; border: 1px solid var(--admin-border); border-radius: 6px;
+            font-size: 0.85rem; font-family: inherit;
+        }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none; border-color: var(--admin-primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+        }
+
+        /* Event badges - assignment toggle */
+        .event-badge-row {
+            display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+            border-bottom: 1px solid var(--admin-border); transition: background 0.1s;
+        }
+        .event-badge-row:hover { background: var(--admin-bg); }
+        .event-badge-row:last-child { border-bottom: none; }
+        .event-badge-toggle { width: auto; cursor: pointer; }
+        .event-badge-info { flex: 1; }
+        .event-badge-info .name { font-weight: 500; font-size: 0.85rem; }
+        .event-badge-info .desc { font-size: 0.75rem; color: var(--admin-text-muted); }
+        .event-badge-judge { width: 200px; }
+        .event-badge-judge select {
+            width: 100%; padding: 4px 8px; font-size: 0.8rem;
+            border: 1px solid var(--admin-border); border-radius: 4px;
+        }
+
+        /* Claims table */
+        .claim-evidence { max-width: 300px; font-size: 0.8rem; color: var(--admin-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .claim-actions { display: flex; gap: 6px; }
+
+        /* Stat cards row */
+        .stat-row { display: flex; gap: 16px; margin-bottom: 24px; }
+        .stat-card {
+            flex: 1; background: white; border: 1px solid var(--admin-border); border-radius: 8px;
+            padding: 16px 20px; text-align: center;
+        }
+        .stat-card .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--admin-sidebar); }
+        .stat-card .stat-label { font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px; }
+
+        /* Filter bar */
+        .filter-bar { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+        .filter-bar select, .filter-bar input {
+            padding: 6px 12px; font-size: 0.8rem; border: 1px solid var(--admin-border);
+            border-radius: 6px; background: white;
+        }
+
+        /* Event selector */
+        .event-selector { margin-bottom: 24px; }
+        .event-selector select {
+            padding: 8px 16px; font-size: 0.9rem; border: 1px solid var(--admin-border);
+            border-radius: 6px; background: white; min-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <div id="loading" style="text-align: center; padding: 60px;">Loading...</div>
+
+            <div id="admin-content" class="hidden">
+                <div class="page-header">
+                    <h1 class="page-title">🏅 Badges</h1>
+                </div>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="master">Badge Library</button>
+                    <button class="tab-btn" data-tab="event-badges">Event Badges</button>
+                    <button class="tab-btn" data-tab="claims">Badge Claims</button>
+                </div>
+
+                <!-- ===== TAB 1: Master Badge Library ===== -->
+                <div id="tab-master" class="tab-content active">
+                    <div class="stat-row">
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-total">0</div>
+                            <div class="stat-label">Total Badges</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-soft">0</div>
+                            <div class="stat-label">Soft Code</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-lowcode">0</div>
+                            <div class="stat-label">Low Code</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-procode">0</div>
+                            <div class="stat-label">Pro Code</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-sponsor">0</div>
+                            <div class="stat-label">Sponsor</div>
+                        </div>
+                    </div>
+
+                    <div class="filter-bar">
+                        <select id="filter-category">
+                            <option value="">All Categories</option>
+                            <option value="soft">🟦 Soft Code</option>
+                            <option value="low-code">🟩 Low Code</option>
+                            <option value="pro-code">🟪 Pro Code</option>
+                            <option value="sponsor">🟨 Sponsor</option>
+                        </select>
+                        <input type="text" id="filter-search" placeholder="Search badges..." style="flex: 1; max-width: 300px;">
+                        <div style="margin-left: auto;">
+                            <button class="btn-sm primary" id="add-badge-btn">+ Add Badge</button>
+                        </div>
+                    </div>
+
+                    <div id="badges-container"></div>
+                </div>
+
+                <!-- ===== TAB 2: Event Badges ===== -->
+                <div id="tab-event-badges" class="tab-content">
+                    <div class="event-selector">
+                        <label style="font-size: 0.85rem; font-weight: 600; margin-right: 8px;">Select Event:</label>
+                        <select id="event-badge-selector">
+                            <option value="">— Choose an event —</option>
+                        </select>
+                    </div>
+
+                    <div id="event-badges-content" class="hidden">
+                        <div class="stat-row">
+                            <div class="stat-card">
+                                <div class="stat-value" id="eb-stat-assigned">0</div>
+                                <div class="stat-label">Badges Assigned</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="eb-stat-judges">0</div>
+                                <div class="stat-label">Judges Assigned</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="eb-stat-claims">0</div>
+                                <div class="stat-label">Total Claims</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="eb-stat-points">0</div>
+                                <div class="stat-label">Max Points Available</div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h3 style="margin: 0; font-size: 0.95rem; color: var(--admin-sidebar);">Badge Assignments</h3>
+                            <button class="btn-sm primary" id="save-event-badges-btn">💾 Save Changes</button>
+                        </div>
+
+                        <div id="event-badges-list"></div>
+                    </div>
+
+                    <div id="event-badges-empty" class="empty-state">
+                        <p style="font-size: 1.5rem; margin: 0 0 8px;">📅</p>
+                        <p>Select an event to manage badge assignments</p>
+                    </div>
+                </div>
+
+                <!-- ===== TAB 3: Badge Claims ===== -->
+                <div id="tab-claims" class="tab-content">
+                    <div class="filter-bar">
+                        <select id="claims-event-filter">
+                            <option value="">All Events</option>
+                        </select>
+                        <select id="claims-status-filter">
+                            <option value="">All Statuses</option>
+                            <option value="pending">⏳ Pending</option>
+                            <option value="approved">✅ Approved</option>
+                            <option value="declined">❌ Declined</option>
+                        </select>
+                        <select id="claims-category-filter">
+                            <option value="">All Categories</option>
+                            <option value="soft">Soft Code</option>
+                            <option value="low-code">Low Code</option>
+                            <option value="pro-code">Pro Code</option>
+                            <option value="sponsor">Sponsor</option>
+                        </select>
+                    </div>
+
+                    <div class="stat-row">
+                        <div class="stat-card">
+                            <div class="stat-value" id="cl-stat-total">0</div>
+                            <div class="stat-label">Total Claims</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="cl-stat-pending" style="color: var(--admin-warning);">0</div>
+                            <div class="stat-label">Pending Review</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="cl-stat-approved" style="color: var(--admin-success);">0</div>
+                            <div class="stat-label">Approved</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="cl-stat-declined" style="color: var(--admin-danger);">0</div>
+                            <div class="stat-label">Declined</div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Badge</th>
+                                    <th>Category</th>
+                                    <th>Team</th>
+                                    <th>Evidence</th>
+                                    <th>Status</th>
+                                    <th>Claimed</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="claims-tbody"></tbody>
+                        </table>
+                        <div id="claims-empty" class="empty-state hidden">
+                            <p>No badge claims found</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Badge Create/Edit Modal -->
+    <div class="modal-overlay" id="badge-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="badge-modal-title">Add Badge</h2>
+                <button class="modal-close" onclick="closeBadgeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="badge-edit-id">
+                <div class="form-group">
+                    <label>Badge Name *</label>
+                    <input type="text" id="badge-name" placeholder="e.g. Community Champion">
+                </div>
+                <div class="form-group">
+                    <label>Category *</label>
+                    <select id="badge-category">
+                        <option value="">Select category...</option>
+                        <option value="soft">🟦 Soft Code</option>
+                        <option value="low-code">🟩 Low Code</option>
+                        <option value="pro-code">🟪 Pro Code</option>
+                        <option value="sponsor">🟨 Sponsor</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="badge-description" placeholder="What does this badge reward?"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Points</label>
+                    <input type="number" id="badge-points" placeholder="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Image URL</label>
+                    <input type="text" id="badge-imageUrl" placeholder="https://...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-sm" onclick="closeBadgeModal()">Cancel</button>
+                <button class="btn-sm primary" id="badge-save-btn" onclick="saveBadge()">Save Badge</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Claim Review Modal -->
+    <div class="modal-overlay" id="review-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Review Badge Claim</h2>
+                <button class="modal-close" onclick="closeReviewModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="review-claim-id">
+                <div style="background: var(--admin-bg); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                    <div style="font-weight: 600; margin-bottom: 4px;" id="review-badge-name"></div>
+                    <div style="font-size: 0.8rem; color: var(--admin-text-muted);" id="review-team-name"></div>
+                    <div style="margin-top: 12px; font-size: 0.85rem;" id="review-evidence"></div>
+                </div>
+                <div class="form-group">
+                    <label>Decision</label>
+                    <select id="review-decision">
+                        <option value="">Select...</option>
+                        <option value="approved">✅ Approve</option>
+                        <option value="declined">❌ Decline</option>
+                    </select>
+                </div>
+                <div class="form-group" id="decline-reason-group" style="display: none;">
+                    <label>Reason for Declining *</label>
+                    <textarea id="review-decline-reason" placeholder="Explain why the claim was declined..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-sm" onclick="closeReviewModal()">Cancel</button>
+                <button class="btn-sm primary" onclick="submitReview()">Submit Review</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin-sidebar.js"></script>
+    <script src="js/admin-badges.js"></script>
+</body>
+</html>

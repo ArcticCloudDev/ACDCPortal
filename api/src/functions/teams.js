@@ -4,6 +4,7 @@ const { app } = require('@azure/functions');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
+const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 
 const eventsStorage = new GenericStorage('events');
 
@@ -142,6 +143,17 @@ app.http('teams-create', {
                     })
                     .catch(error => {
                         context.error(`Failed to send team welcome email to ${newTeam.adminEmail}:`, error);
+                    });
+
+                // Send interest acknowledgment email if member was a verified interest lead
+                sendInterestAcknowledgmentEmail(newTeam.adminEmail, newTeam.eventId, context)
+                    .then(result => {
+                        if (result.success) {
+                            context.log(`Interest acknowledgment email sent to ${newTeam.adminEmail}`);
+                        }
+                    })
+                    .catch(error => {
+                        context.error(`Failed to send interest acknowledgment email to ${newTeam.adminEmail}:`, error);
                     });
             }
             

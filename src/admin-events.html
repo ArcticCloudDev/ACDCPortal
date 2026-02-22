@@ -575,6 +575,21 @@
             gap: 10px;
         }
 
+        /* Radio button option styling */
+        label:has(input[type="radio"]) {
+            position: relative;
+        }
+        
+        label:has(input[type="radio"]:checked) {
+            border-color: var(--admin-primary) !important;
+            background: rgba(99, 102, 241, 0.05);
+        }
+        
+        label:has(input[type="radio"]):hover {
+            border-color: var(--admin-primary);
+            background: rgba(99, 102, 241, 0.02);
+        }
+
         /* Quill editor container */
         #email-editor-container {
             height: 300px;
@@ -815,7 +830,19 @@
                                             </small>
                                         </div>
 
-                                        <div class="form-group" style="margin-top: 16px;">                                            <label>�📁 File Upload Categories</label>
+                                        <div class="form-group" style="margin-top: 16px;">
+                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                <input type="checkbox" id="event-interest-acknowledgment" style="width: auto;">
+                                                <span>✉️ Send Interest Acknowledgment Email</span>
+                                            </label>
+                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                <strong>Acknowledgment email for interest leads joining a team.</strong> When enabled, members who previously registered interest will receive an acknowledgment email when they join a team.
+                                                Customize the email in <strong>Email Templates</strong> under the Interest template.
+                                            </small>
+                                        </div>
+
+                                        <div class="form-group" style="margin-top: 16px;">
+                                            <label>📁 File Upload Categories</label>
                                             <input type="text" id="event-file-categories" placeholder="e.g. Presentation, Source Code, Architecture Diagram, Demo Video">
                                             <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Comma-separated list. Teams will pick from these when uploading files.</small>
                                         </div>
@@ -1082,25 +1109,24 @@
                 <h3>📧 Create Email Sequence</h3>
             </div>
             <div class="modal-body">
-                <p style="color: var(--admin-text-muted); margin-bottom: 16px;">
-                    Would you like to start from scratch or copy from another event?
-                </p>
-                
                 <div class="form-group">
-                    <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 12px;">
-                        <input type="radio" name="sequence-create-option" value="scratch" checked style="margin-right: 8px;">
-                        <span>✨ Start from scratch</span>
+                    <label style="display: block; margin-bottom: 16px; padding: 16px; border: 2px solid var(--admin-border); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                        <input type="radio" name="sequence-create-option" value="scratch" checked style="position: absolute; opacity: 0; pointer-events: none;">
+                        <span style="font-weight: 500; font-size: 1rem;">✨ Start from scratch</span>
+                        <div style="color: var(--admin-text-muted); font-size: 0.85rem; margin-top: 4px;">Create a new empty sequence</div>
                     </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input type="radio" name="sequence-create-option" value="copy" style="margin-right: 8px;">
-                        <span>📋 Copy from another event</span>
+                    
+                    <label style="display: block; padding: 16px; border: 2px solid var(--admin-border); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                        <input type="radio" name="sequence-create-option" value="copy" style="position: absolute; opacity: 0; pointer-events: none;">
+                        <span style="font-weight: 500; font-size: 1rem;">📋 Copy from another event</span>
+                        <div style="color: var(--admin-text-muted); font-size: 0.85rem; margin-top: 4px;">Duplicate an existing sequence</div>
                     </label>
                 </div>
 
-                <div id="copy-from-event-section" style="display: none; margin-top: 16px;">
-                    <div class="form-group">
-                        <label>Select Event to Copy From</label>
-                        <select id="copy-from-event-select" style="width: 100%; padding: 8px; border: 1px solid var(--admin-border); border-radius: 4px;">
+                <div id="copy-from-event-section" style="display: none; margin-top: 16px; padding: 16px; background: var(--admin-bg-secondary); border-radius: 8px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Select Event</label>
+                        <select id="copy-from-event-select" style="width: 100%;">
                             <option value="">Loading events...</option>
                         </select>
                     </div>

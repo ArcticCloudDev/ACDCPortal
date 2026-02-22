@@ -6,6 +6,7 @@ const Storage = require('../shared/storage');
 const Email = require('../shared/email');
 const Graph = require('../shared/graph');
 const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
+const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 
 // Add member to team
 app.http('members-add', {
@@ -95,6 +96,17 @@ app.http('members-add', {
                     })
                     .catch(error => {
                         context.error(`Failed to send team welcome email to ${email}:`, error);
+                    });
+
+                // Send interest acknowledgment email if member was a verified interest lead
+                sendInterestAcknowledgmentEmail(email, team.eventId, context)
+                    .then(result => {
+                        if (result.success) {
+                            context.log(`Interest acknowledgment email sent to ${email}`);
+                        }
+                    })
+                    .catch(error => {
+                        context.error(`Failed to send interest acknowledgment email to ${email}:`, error);
                     });
             }
             

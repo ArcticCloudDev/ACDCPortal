@@ -52,8 +52,8 @@ app.http('deliveries-event', {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
 
-            // Check if event has sequence enabled
-            if (!event.sequenceEnabled || !event.sequenceId) {
+            // Check if event has a sequence (show deliveries even if sequence is now disabled)
+            if (!event.sequenceId) {
                 return { 
                     status: 200, 
                     jsonBody: { 

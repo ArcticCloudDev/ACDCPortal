@@ -216,6 +216,7 @@ app.http('events-create', {
                 sequenceEnabled: body.sequenceEnabled !== undefined ? body.sequenceEnabled : (body.sequenceId ? true : false),
                 teamWelcomeEmailId: body.teamWelcomeEmailId || null,
                 sendWelcomeEmail: body.sendWelcomeEmail !== undefined ? body.sendWelcomeEmail : (body.teamWelcomeEmailId ? true : false),
+                sendInterestAcknowledgment: body.sendInterestAcknowledgment || false,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 createdAt: new Date().toISOString()
@@ -328,6 +329,7 @@ app.http('events-update', {
                 sequenceEnabled: body.sequenceEnabled !== undefined ? body.sequenceEnabled : existingEvent.sequenceEnabled,
                 teamWelcomeEmailId: body.teamWelcomeEmailId !== undefined ? body.teamWelcomeEmailId : existingEvent.teamWelcomeEmailId,
                 sendWelcomeEmail: body.sendWelcomeEmail !== undefined ? body.sendWelcomeEmail : existingEvent.sendWelcomeEmail,
+                sendInterestAcknowledgment: body.sendInterestAcknowledgment !== undefined ? body.sendInterestAcknowledgment : existingEvent.sendInterestAcknowledgment,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()

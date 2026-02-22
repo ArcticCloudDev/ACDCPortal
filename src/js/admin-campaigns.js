@@ -65,9 +65,66 @@ async function loadSequences() {
     try {
         const response = await API.sequences.list();
         allSequences = response.sequences || [];
+        
+        // Get all campaigns to count emails per sequence
+        const campaignsResponse = await API.campaigns.list();
+        const allCampaigns = campaignsResponse.campaigns || [];
+        
+        // Load stats for each sequence
+        for (const seq of allSequences) {
+            // Count emails
+            seq.emailCount = allCampaigns.filter(c => c.sequenceId === seq.id).length;
+            // Load delivery stats
+            seq.stats = await getSequenceStats(seq.id);
+        }
+        
         renderSequences();
     } catch (err) {
         console.error('Failed to load sequences:', err);
+    }
+}
+
+async function getSequenceStats(sequenceId) {
+    try {
+        // Get campaigns for this sequence
+        const campaignsResponse = await API.campaigns.list();
+        const campaigns = campaignsResponse.campaigns || [];
+        const sequenceCampaigns = campaigns.filter(c => c.sequenceId === sequenceId);
+        
+        if (sequenceCampaigns.length === 0) {
+            return { sent: 0, failed: 0 };
+        }
+        
+        // Get events using this sequence to fetch deliveries
+        const eventsUsingSequence = allEvents.filter(e => e.sequenceId === sequenceId);
+        
+        if (eventsUsingSequence.length === 0) {
+            return { sent: 0, failed: 0 };
+        }
+        
+        // Fetch deliveries for all events
+        let totalSent = 0;
+        let totalFailed = 0;
+        
+        for (const event of eventsUsingSequence) {
+            try {
+                const deliveriesResponse = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${event.id}`);
+                if (deliveriesResponse.ok) {
+                    const data = await deliveriesResponse.json();
+                    const deliveries = data.deliveries || [];
+                    
+                    totalSent += deliveries.filter(d => d.status === 'sent').length;
+                    totalFailed += deliveries.filter(d => d.status === 'failed').length;
+                }
+            } catch (err) {
+                console.error(`Failed to load deliveries for event ${event.id}:`, err);
+            }
+        }
+        
+        return { sent: totalSent, failed: totalFailed };
+    } catch (err) {
+        console.error('Failed to get sequence stats:', err);
+        return { sent: 0, failed: 0 };
     }
 }
 

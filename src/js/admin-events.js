@@ -389,6 +389,7 @@ function showForm(event = null) {
         document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
         document.getElementById('event-sequence').checked = event.sequenceEnabled || false;
         document.getElementById('event-team-welcome-email').checked = event.sendWelcomeEmail || false;
+        document.getElementById('event-interest-acknowledgment').checked = event.sendInterestAcknowledgment || false;
         
         // Set registration type
         const regType = event.registrationType || 'team';
@@ -483,6 +484,7 @@ async function handleFormSubmit(e) {
             status: document.getElementById('event-status').value || 'draft',
             sequenceEnabled: document.getElementById('event-sequence').checked,
             sendWelcomeEmail: document.getElementById('event-team-welcome-email').checked,
+            sendInterestAcknowledgment: document.getElementById('event-interest-acknowledgment').checked,
             fileCategories: document.getElementById('event-file-categories').value
                 .split(',')
                 .map(c => c.trim())
@@ -1087,6 +1089,7 @@ function renderTeamsTable() {
 
 // ===== Sequence Management =====
 async function loadEventSequence() {
+    // Show sequence if it exists, regardless of whether it's currently enabled
     if (!currentEvent || !currentEvent.sequenceId) {
         document.getElementById('no-sequence-state').style.display = 'block';
         document.getElementById('sequence-exists-state').style.display = 'none';
@@ -1231,6 +1234,7 @@ async function loadRecipientDeliveryOverview() {
     const headerEl = document.getElementById('recipient-overview-header');
     const bodyEl = document.getElementById('recipient-overview-body');
     
+    // Show delivery stats if sequence exists, regardless of whether it's currently enabled
     if (!currentEvent || !currentEvent.sequenceId) {
         overviewSection.style.display = 'none';
         return;
@@ -1389,19 +1393,21 @@ async function confirmCreateSequence() {
     
     try {
         if (option === 'scratch') {
-            // Create new empty sequence
+            // Create new empty sequence (1:1 relationship with event, user never sees this)
             const response = await API.sequences.create({
-                name: `${currentEvent.name} - Email Sequence`,
-                description: `Automated email sequence for ${currentEvent.name}`,
+                name: `${currentEvent.name} ${currentEvent.startDate} - ${currentEvent.endDate}`,
+                description: `Email sequence for ${currentEvent.name}`,
                 emails: []
             });
             
-            // Link sequence to event
+            // Link sequence to event and enable it by default
             await API.events.update(currentEvent.id, {
-                sequenceId: response.sequence.id
+                sequenceId: response.sequence.id,
+                sequenceEnabled: true
             });
             
             currentEvent.sequenceId = response.sequence.id;
+            currentEvent.sequenceEnabled = true;
             currentEventSequence = response.sequence;
             
         } else {
@@ -1421,17 +1427,20 @@ async function confirmCreateSequence() {
             // Duplicate the sequence
             const response = await API.sequences.duplicate(sourceEvent.sequenceId);
             
-            // Rename it for this event
+            // Update sequence name for this event
             await API.sequences.update(response.sequence.id, {
-                name: `${currentEvent.name} - Email Sequence (copied from ${sourceEvent.name})`
+                name: `${currentEvent.name} ${currentEvent.startDate} - ${currentEvent.endDate}`,
+                description: `Copied from ${sourceEvent.name} ${sourceEvent.startDate} - ${sourceEvent.endDate}`
             });
             
-            // Link to current event
+            // Link to current event and enable it by default
             await API.events.update(currentEvent.id, {
-                sequenceId: response.sequence.id
+                sequenceId: response.sequence.id,
+                sequenceEnabled: true
             });
             
             currentEvent.sequenceId = response.sequence.id;
+            currentEvent.sequenceEnabled = true;
             
             // Reload the sequence
             const seqResponse = await API.sequences.get(response.sequence.id);

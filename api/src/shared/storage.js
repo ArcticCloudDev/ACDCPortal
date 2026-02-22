@@ -229,6 +229,22 @@ const Storage = {
             }
             return registrations.length - active.length; // Return count of removed
         }
+    },
+
+    // Interest Leads (wrapped as { leads: [...] })
+    interestLeads: {
+        getAll() {
+            const data = readJsonFile('interest-leads.json');
+            return data.leads || data || [];
+        }
+    },
+
+    // Email Campaigns (wrapped as { campaigns: [...] })
+    emailCampaigns: {
+        getAll() {
+            const data = readJsonFile('email-campaigns.json');
+            return data.campaigns || data || [];
+        }
     }
 };
 

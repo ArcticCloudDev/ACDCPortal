@@ -17,6 +17,7 @@ const interestQueueStorage = new Storage('interest-queue');
 const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
 const { sendEmail } = require('../shared/mail');
+const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 
 // Helper to check if event status means it's active (visible to public)
 function isActiveStatus(status) {
@@ -437,6 +438,21 @@ app.http('participations-add-team-membership', {
             if (isParticipant) {
                 await removeFromInterestQueue(participation.userId, participation.eventId, context);
                 await triggerSequenceEmails(participation.userId, participation.eventId, context);
+
+                // Send interest acknowledgment email if applicable
+                const users = await usersStorage.getAll();
+                const user = users.find(u => u.id === participation.userId);
+                if (user?.email) {
+                    sendInterestAcknowledgmentEmail(user.email, participation.eventId, context)
+                        .then(result => {
+                            if (result.success) {
+                                context.log(`Interest acknowledgment email sent to ${user.email}`);
+                            }
+                        })
+                        .catch(error => {
+                            context.error(`Failed to send interest acknowledgment email to ${user.email}:`, error);
+                        });
+                }
             }
             
             context.log(`Team membership updated for participation ${id}, team ${teamId}`);
@@ -614,6 +630,21 @@ app.http('participations-toggle-participant', {
             // If user became a participant, check interest queue
             if (isParticipant) {
                 await removeFromInterestQueue(participation.userId, participation.eventId, context);
+
+                // Send interest acknowledgment email if applicable
+                const users = await usersStorage.getAll();
+                const user = users.find(u => u.id === participation.userId);
+                if (user?.email) {
+                    sendInterestAcknowledgmentEmail(user.email, participation.eventId, context)
+                        .then(result => {
+                            if (result.success) {
+                                context.log(`Interest acknowledgment email sent to ${user.email}`);
+                            }
+                        })
+                        .catch(error => {
+                            context.error(`Failed to send interest acknowledgment email to ${user.email}:`, error);
+                        });
+                }
             }
             
             context.log(`Participant status toggled for participation ${id}, team ${teamId}: ${isParticipant}`);

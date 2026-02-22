@@ -1,0 +1,734 @@
+// Badges API - Master badges, event-badge assignments, and badge claims
+// Azure Functions v4 Programming Model
+const { app } = require('@azure/functions');
+const Storage = require('../shared/storage');
+const { Storage: GenericStorage } = require('../shared/storage');
+
+const badgesStorage = new GenericStorage('badges');
+const eventBadgesStorage = new GenericStorage('event-badges');
+const badgeClaimsStorage = new GenericStorage('badge-claims');
+const eventsStorage = new GenericStorage('events');
+
+// Helper to generate GUID
+function generateGuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// ============================================================
+// MASTER BADGES - CRUD
+// ============================================================
+
+// GET /api/badges - List all master badges
+app.http('badges-list', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'badges',
+    handler: async (request, context) => {
+        try {
+            const category = request.query.get('category');
+            let badges = await badgesStorage.getAll();
+
+            if (category) {
+                badges = badges.filter(b => b.category === category);
+            }
+
+            // Sort by category then name
+            const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3 };
+            badges.sort((a, b) => {
+                const catDiff = (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99);
+                if (catDiff !== 0) return catDiff;
+                return a.name.localeCompare(b.name);
+            });
+
+            return {
+                status: 200,
+                jsonBody: badges
+            };
+        } catch (error) {
+            context.error('Badges LIST error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to list badges' } };
+        }
+    }
+});
+
+// GET /api/badges/:id - Get single badge
+app.http('badges-get', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'badges/{id}',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const badges = await badgesStorage.getAll();
+            const badge = badges.find(b => b.id === id);
+
+            if (!badge) {
+                return { status: 404, jsonBody: { error: 'Badge not found' } };
+            }
+
+            return { status: 200, jsonBody: badge };
+        } catch (error) {
+            context.error('Badges GET error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to get badge' } };
+        }
+    }
+});
+
+// POST /api/badges - Create a new master badge
+app.http('badges-create', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'badges',
+    handler: async (request, context) => {
+        try {
+            const body = await request.json();
+
+            if (!body.name) {
+                return { status: 400, jsonBody: { error: 'Badge name is required' } };
+            }
+            if (!body.category) {
+                return { status: 400, jsonBody: { error: 'Badge category is required' } };
+            }
+
+            const validCategories = ['soft', 'low-code', 'pro-code', 'sponsor'];
+            if (!validCategories.includes(body.category)) {
+                return { status: 400, jsonBody: { error: `Category must be one of: ${validCategories.join(', ')}` } };
+            }
+
+            const newBadge = {
+                id: generateGuid(),
+                name: body.name,
+                description: body.description || '',
+                category: body.category,
+                imageUrl: body.imageUrl || '',
+                points: parseInt(body.points) || 0,
+                createdAt: new Date().toISOString()
+            };
+
+            const badges = await badgesStorage.getAll();
+            badges.push(newBadge);
+            await badgesStorage.saveAll(badges);
+
+            context.log(`Badge created: ${newBadge.name}`);
+            return { status: 201, jsonBody: newBadge };
+        } catch (error) {
+            context.error('Badges CREATE error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to create badge' } };
+        }
+    }
+});
+
+// PUT /api/badges/:id - Update a master badge
+app.http('badges-update', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'badges/{id}',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const body = await request.json();
+
+            const badges = await badgesStorage.getAll();
+            const index = badges.findIndex(b => b.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Badge not found' } };
+            }
+
+            if (body.category) {
+                const validCategories = ['soft', 'low-code', 'pro-code', 'sponsor'];
+                if (!validCategories.includes(body.category)) {
+                    return { status: 400, jsonBody: { error: `Category must be one of: ${validCategories.join(', ')}` } };
+                }
+            }
+
+            badges[index] = {
+                ...badges[index],
+                name: body.name !== undefined ? body.name : badges[index].name,
+                description: body.description !== undefined ? body.description : badges[index].description,
+                category: body.category !== undefined ? body.category : badges[index].category,
+                imageUrl: body.imageUrl !== undefined ? body.imageUrl : badges[index].imageUrl,
+                points: body.points !== undefined ? parseInt(body.points) : badges[index].points,
+                updatedAt: new Date().toISOString()
+            };
+
+            await badgesStorage.saveAll(badges);
+
+            context.log(`Badge updated: ${badges[index].name}`);
+            return { status: 200, jsonBody: badges[index] };
+        } catch (error) {
+            context.error('Badges UPDATE error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to update badge' } };
+        }
+    }
+});
+
+// DELETE /api/badges/:id - Delete a master badge
+app.http('badges-delete', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'badges/{id}',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+
+            const badges = await badgesStorage.getAll();
+            const index = badges.findIndex(b => b.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Badge not found' } };
+            }
+
+            const badgeName = badges[index].name;
+            badges.splice(index, 1);
+            await badgesStorage.saveAll(badges);
+
+            // Also clean up event-badge assignments
+            const eventBadges = await eventBadgesStorage.getAll();
+            const cleaned = eventBadges.filter(eb => eb.badgeId !== id);
+            if (cleaned.length !== eventBadges.length) {
+                await eventBadgesStorage.saveAll(cleaned);
+            }
+
+            context.log(`Badge deleted: ${badgeName}`);
+            return { status: 200, jsonBody: { message: 'Badge deleted' } };
+        } catch (error) {
+            context.error('Badges DELETE error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to delete badge' } };
+        }
+    }
+});
+
+
+// ============================================================
+// EVENT-BADGES - Many-to-many with judge assignment
+// ============================================================
+
+// GET /api/events/:eventId/badges - List badges assigned to an event
+app.http('event-badges-list', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/badges',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+            const eventBadges = await eventBadgesStorage.getAll();
+            const badges = await badgesStorage.getAll();
+
+            // Get event-badge assignments for this event
+            const assignments = eventBadges.filter(eb => eb.eventId === eventId);
+
+            // Enrich with badge details
+            const enriched = assignments.map(eb => {
+                const badge = badges.find(b => b.id === eb.badgeId);
+                return {
+                    ...eb,
+                    badge: badge || null
+                };
+            });
+
+            // Sort by category then name
+            const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3 };
+            enriched.sort((a, b) => {
+                if (!a.badge || !b.badge) return 0;
+                const catDiff = (categoryOrder[a.badge.category] || 99) - (categoryOrder[b.badge.category] || 99);
+                if (catDiff !== 0) return catDiff;
+                return a.badge.name.localeCompare(b.badge.name);
+            });
+
+            return { status: 200, jsonBody: enriched };
+        } catch (error) {
+            context.error('Event badges LIST error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to list event badges' } };
+        }
+    }
+});
+
+// POST /api/events/:eventId/badges - Add badge(s) to event
+app.http('event-badges-add', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/badges',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+            const body = await request.json();
+
+            // Support single badgeId or array of badgeIds
+            const badgeIds = body.badgeIds || (body.badgeId ? [body.badgeId] : []);
+            if (badgeIds.length === 0) {
+                return { status: 400, jsonBody: { error: 'badgeId or badgeIds is required' } };
+            }
+
+            // Validate event exists
+            const events = await eventsStorage.getAll();
+            const event = events.find(e => e.id === eventId);
+            if (!event) {
+                return { status: 404, jsonBody: { error: 'Event not found' } };
+            }
+
+            // Validate badges exist
+            const badges = await badgesStorage.getAll();
+            const eventBadges = await eventBadgesStorage.getAll();
+
+            const added = [];
+            const skipped = [];
+
+            for (const badgeId of badgeIds) {
+                const badge = badges.find(b => b.id === badgeId);
+                if (!badge) {
+                    skipped.push({ badgeId, reason: 'Badge not found' });
+                    continue;
+                }
+
+                // Check if already assigned
+                const existing = eventBadges.find(eb => eb.eventId === eventId && eb.badgeId === badgeId);
+                if (existing) {
+                    skipped.push({ badgeId, reason: 'Already assigned' });
+                    continue;
+                }
+
+                const assignment = {
+                    id: generateGuid(),
+                    eventId: eventId,
+                    badgeId: badgeId,
+                    judgeUserId: body.judgeUserId || null,
+                    isActive: true,
+                    createdAt: new Date().toISOString()
+                };
+
+                eventBadges.push(assignment);
+                added.push(assignment);
+            }
+
+            if (added.length > 0) {
+                await eventBadgesStorage.saveAll(eventBadges);
+            }
+
+            context.log(`Added ${added.length} badges to event ${eventId}, skipped ${skipped.length}`);
+            return {
+                status: 201,
+                jsonBody: { added, skipped }
+            };
+        } catch (error) {
+            context.error('Event badges ADD error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to add badges to event' } };
+        }
+    }
+});
+
+// PUT /api/events/:eventId/badges/:id - Update event-badge (assign judge, toggle active)
+app.http('event-badges-update', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/badges/{id}',
+    handler: async (request, context) => {
+        try {
+            const { eventId, id } = request.params;
+            const body = await request.json();
+
+            const eventBadges = await eventBadgesStorage.getAll();
+            const index = eventBadges.findIndex(eb => eb.id === id && eb.eventId === eventId);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Event-badge assignment not found' } };
+            }
+
+            eventBadges[index] = {
+                ...eventBadges[index],
+                judgeUserId: body.judgeUserId !== undefined ? body.judgeUserId : eventBadges[index].judgeUserId,
+                isActive: body.isActive !== undefined ? body.isActive : eventBadges[index].isActive,
+                updatedAt: new Date().toISOString()
+            };
+
+            await eventBadgesStorage.saveAll(eventBadges);
+
+            context.log(`Event-badge ${id} updated for event ${eventId}`);
+            return { status: 200, jsonBody: eventBadges[index] };
+        } catch (error) {
+            context.error('Event badges UPDATE error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to update event badge' } };
+        }
+    }
+});
+
+// DELETE /api/events/:eventId/badges/:id - Remove badge from event
+app.http('event-badges-remove', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/badges/{id}',
+    handler: async (request, context) => {
+        try {
+            const { eventId, id } = request.params;
+
+            const eventBadges = await eventBadgesStorage.getAll();
+            const index = eventBadges.findIndex(eb => eb.id === id && eb.eventId === eventId);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Event-badge assignment not found' } };
+            }
+
+            eventBadges.splice(index, 1);
+            await eventBadgesStorage.saveAll(eventBadges);
+
+            // Also clean up claims for this event-badge
+            const claims = await badgeClaimsStorage.getAll();
+            const cleaned = claims.filter(c => c.eventBadgeId !== id);
+            if (cleaned.length !== claims.length) {
+                await badgeClaimsStorage.saveAll(cleaned);
+            }
+
+            context.log(`Badge removed from event ${eventId}`);
+            return { status: 200, jsonBody: { message: 'Badge removed from event' } };
+        } catch (error) {
+            context.error('Event badges REMOVE error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to remove badge from event' } };
+        }
+    }
+});
+
+// POST /api/events/:eventId/badges/bulk - Bulk add/remove badges for an event
+app.http('event-badges-bulk', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/badges/bulk',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+            const body = await request.json();
+            const { selectedBadgeIds } = body; // Array of badge IDs that should be assigned
+
+            if (!Array.isArray(selectedBadgeIds)) {
+                return { status: 400, jsonBody: { error: 'selectedBadgeIds array is required' } };
+            }
+
+            const eventBadges = await eventBadgesStorage.getAll();
+
+            // Get current assignments for this event
+            const currentAssignments = eventBadges.filter(eb => eb.eventId === eventId);
+            const currentBadgeIds = currentAssignments.map(eb => eb.badgeId);
+
+            // Determine adds and removes
+            const toAdd = selectedBadgeIds.filter(id => !currentBadgeIds.includes(id));
+            const toRemove = currentAssignments.filter(eb => !selectedBadgeIds.includes(eb.badgeId));
+
+            // Remove
+            const removeIds = new Set(toRemove.map(eb => eb.id));
+            const remaining = eventBadges.filter(eb => !removeIds.has(eb.id));
+
+            // Add
+            for (const badgeId of toAdd) {
+                remaining.push({
+                    id: generateGuid(),
+                    eventId: eventId,
+                    badgeId: badgeId,
+                    judgeUserId: null,
+                    isActive: true,
+                    createdAt: new Date().toISOString()
+                });
+            }
+
+            await eventBadgesStorage.saveAll(remaining);
+
+            // Clean up claims for removed badges
+            if (toRemove.length > 0) {
+                const claims = await badgeClaimsStorage.getAll();
+                const cleaned = claims.filter(c => !removeIds.has(c.eventBadgeId));
+                if (cleaned.length !== claims.length) {
+                    await badgeClaimsStorage.saveAll(cleaned);
+                }
+            }
+
+            context.log(`Bulk update for event ${eventId}: added ${toAdd.length}, removed ${toRemove.length}`);
+            return {
+                status: 200,
+                jsonBody: {
+                    added: toAdd.length,
+                    removed: toRemove.length,
+                    total: remaining.filter(eb => eb.eventId === eventId).length
+                }
+            };
+        } catch (error) {
+            context.error('Event badges BULK error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to bulk update event badges' } };
+        }
+    }
+});
+
+
+// ============================================================
+// BADGE CLAIMS - Teams claim badges, judges review
+// ============================================================
+
+// GET /api/badge-claims - List claims (filterable by eventId, teamId, status)
+app.http('badge-claims-list', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'badge-claims',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.query.get('eventId');
+            const teamId = request.query.get('teamId');
+            const status = request.query.get('status');
+            const badgeId = request.query.get('badgeId');
+
+            let claims = await badgeClaimsStorage.getAll();
+
+            if (eventId) claims = claims.filter(c => c.eventId === eventId);
+            if (teamId) claims = claims.filter(c => c.teamId === teamId);
+            if (status) claims = claims.filter(c => c.status === status);
+            if (badgeId) claims = claims.filter(c => c.badgeId === badgeId);
+
+            // Enrich with badge details
+            const badges = await badgesStorage.getAll();
+            const teams = Storage.teams.getAll();
+
+            const enriched = claims.map(c => ({
+                ...c,
+                badge: badges.find(b => b.id === c.badgeId) || null,
+                team: teams.find(t => t.id === c.teamId) ? { id: c.teamId, teamName: teams.find(t => t.id === c.teamId).teamName } : null
+            }));
+
+            // Sort by claimed date (newest first)
+            enriched.sort((a, b) => new Date(b.claimedAt) - new Date(a.claimedAt));
+
+            return { status: 200, jsonBody: enriched };
+        } catch (error) {
+            context.error('Badge claims LIST error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to list badge claims' } };
+        }
+    }
+});
+
+// POST /api/badge-claims - Team claims a badge
+app.http('badge-claims-create', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'badge-claims',
+    handler: async (request, context) => {
+        try {
+            const body = await request.json();
+
+            if (!body.eventBadgeId || !body.teamId) {
+                return { status: 400, jsonBody: { error: 'eventBadgeId and teamId are required' } };
+            }
+
+            // Validate event-badge assignment exists and is active
+            const eventBadges = await eventBadgesStorage.getAll();
+            const eventBadge = eventBadges.find(eb => eb.id === body.eventBadgeId && eb.isActive);
+            if (!eventBadge) {
+                return { status: 404, jsonBody: { error: 'Event-badge assignment not found or inactive' } };
+            }
+
+            // Check if this team already claimed this badge for this event
+            const claims = await badgeClaimsStorage.getAll();
+            const existingClaim = claims.find(c =>
+                c.eventBadgeId === body.eventBadgeId &&
+                c.teamId === body.teamId &&
+                c.status !== 'declined'
+            );
+            if (existingClaim) {
+                return { status: 409, jsonBody: { error: 'Team has already claimed this badge', existingClaim } };
+            }
+
+            const newClaim = {
+                id: generateGuid(),
+                eventBadgeId: body.eventBadgeId,
+                eventId: eventBadge.eventId,
+                badgeId: eventBadge.badgeId,
+                teamId: body.teamId,
+                status: 'pending',
+                evidence: body.evidence || '',
+                claimedBy: body.claimedBy || null,
+                claimedAt: new Date().toISOString()
+            };
+
+            claims.push(newClaim);
+            await badgeClaimsStorage.saveAll(claims);
+
+            context.log(`Badge claim created: team ${body.teamId} claims badge ${eventBadge.badgeId}`);
+            return { status: 201, jsonBody: newClaim };
+        } catch (error) {
+            context.error('Badge claims CREATE error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to create badge claim' } };
+        }
+    }
+});
+
+// PUT /api/badge-claims/:id/review - Judge reviews a claim (approve/decline)
+app.http('badge-claims-review', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'badge-claims/{id}/review',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const body = await request.json();
+
+            if (!body.status || !['approved', 'declined'].includes(body.status)) {
+                return { status: 400, jsonBody: { error: 'status must be "approved" or "declined"' } };
+            }
+
+            if (body.status === 'declined' && !body.declineReason) {
+                return { status: 400, jsonBody: { error: 'declineReason is required when declining' } };
+            }
+
+            const claims = await badgeClaimsStorage.getAll();
+            const index = claims.findIndex(c => c.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Badge claim not found' } };
+            }
+
+            claims[index] = {
+                ...claims[index],
+                status: body.status,
+                declineReason: body.status === 'declined' ? body.declineReason : null,
+                reviewedBy: body.reviewedBy || null,
+                reviewedAt: new Date().toISOString()
+            };
+
+            await badgeClaimsStorage.saveAll(claims);
+
+            context.log(`Badge claim ${id} ${body.status} by ${body.reviewedBy || 'unknown'}`);
+            return { status: 200, jsonBody: claims[index] };
+        } catch (error) {
+            context.error('Badge claims REVIEW error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to review badge claim' } };
+        }
+    }
+});
+
+// PUT /api/badge-claims/:id - Update a claim (e.g. update evidence)
+app.http('badge-claims-update', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'badge-claims/{id}',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const body = await request.json();
+
+            const claims = await badgeClaimsStorage.getAll();
+            const index = claims.findIndex(c => c.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Badge claim not found' } };
+            }
+
+            // Only allow updating evidence and re-claiming if declined
+            if (claims[index].status === 'approved') {
+                return { status: 400, jsonBody: { error: 'Cannot modify an approved claim' } };
+            }
+
+            claims[index] = {
+                ...claims[index],
+                evidence: body.evidence !== undefined ? body.evidence : claims[index].evidence,
+                // If re-claiming after decline, reset to pending
+                status: claims[index].status === 'declined' && body.reclaim ? 'pending' : claims[index].status,
+                updatedAt: new Date().toISOString()
+            };
+
+            await badgeClaimsStorage.saveAll(claims);
+
+            context.log(`Badge claim ${id} updated`);
+            return { status: 200, jsonBody: claims[index] };
+        } catch (error) {
+            context.error('Badge claims UPDATE error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to update badge claim' } };
+        }
+    }
+});
+
+// DELETE /api/badge-claims/:id - Delete a claim
+app.http('badge-claims-delete', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'badge-claims/{id}',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+
+            const claims = await badgeClaimsStorage.getAll();
+            const index = claims.findIndex(c => c.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Badge claim not found' } };
+            }
+
+            claims.splice(index, 1);
+            await badgeClaimsStorage.saveAll(claims);
+
+            context.log(`Badge claim ${id} deleted`);
+            return { status: 200, jsonBody: { message: 'Badge claim deleted' } };
+        } catch (error) {
+            context.error('Badge claims DELETE error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to delete badge claim' } };
+        }
+    }
+});
+
+// GET /api/events/:eventId/badge-summary - Get badge summary for an event (points per team)
+app.http('event-badge-summary', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/badge-summary',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+
+            const claims = await badgeClaimsStorage.getAll();
+            const badges = await badgesStorage.getAll();
+            const teams = Storage.teams.getAll();
+
+            // Get approved claims for this event
+            const eventClaims = claims.filter(c => c.eventId === eventId && c.status === 'approved');
+
+            // Calculate points per team
+            const teamPoints = {};
+            for (const claim of eventClaims) {
+                const badge = badges.find(b => b.id === claim.badgeId);
+                const points = badge ? badge.points : 0;
+
+                if (!teamPoints[claim.teamId]) {
+                    const team = teams.find(t => t.id === claim.teamId);
+                    teamPoints[claim.teamId] = {
+                        teamId: claim.teamId,
+                        teamName: team ? team.teamName : 'Unknown Team',
+                        totalPoints: 0,
+                        approvedBadges: 0,
+                        badges: []
+                    };
+                }
+
+                teamPoints[claim.teamId].totalPoints += points;
+                teamPoints[claim.teamId].approvedBadges++;
+                teamPoints[claim.teamId].badges.push({
+                    badgeId: claim.badgeId,
+                    badgeName: badge ? badge.name : 'Unknown',
+                    category: badge ? badge.category : '',
+                    points: points
+                });
+            }
+
+            // Sort by total points descending
+            const leaderboard = Object.values(teamPoints).sort((a, b) => b.totalPoints - a.totalPoints);
+
+            return {
+                status: 200,
+                jsonBody: {
+                    eventId,
+                    totalClaims: eventClaims.length,
+                    leaderboard
+                }
+            };
+        } catch (error) {
+            context.error('Badge summary error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to get badge summary' } };
+        }
+    }
+});
