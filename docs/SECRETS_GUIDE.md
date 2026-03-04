@@ -6,34 +6,25 @@ This document describes all the secrets and configuration needed for the ACDC Po
 
 | Secret | Purpose | Where Used |
 |--------|---------|------------|
-| `AZURE_CLIENT_ID` | Entra External ID app for user authentication | Frontend (public) |
-| `AZURE_TENANT_ID` | Entra tenant for authentication | Frontend (public) |
-| `AZURE_CLIENT_SECRET` | Token validation (optional) | API |
+| `JWT_SECRET` | Signing JWT tokens for user sessions | API |
+| `RECAPTCHA_SECRET_KEY` | reCAPTCHA v3 verification | API |
 | `MAIL_CLIENT_ID` | Graph API app for sending emails | API |
 | `MAIL_CLIENT_SECRET` | Graph API authentication | API |
 | `MAIL_TENANT_ID` | Graph API tenant | API |
+| `MAIL_SENDER` | Sender email address | API |
 | `SHAREPOINT_CLIENT_ID` | SharePoint/Graph app for file storage | API |
 | `SHAREPOINT_CLIENT_SECRET` | SharePoint authentication | API |
 
 ## App Registrations Needed
 
-### 1. User Authentication (Entra External ID)
-**Purpose:** Allow users to sign in with email OTP
-
-- **Type:** Single Page Application (SPA)
-- **Permissions:** Delegated - `openid`, `profile`, `email`, `offline_access`
-- **Redirect URIs:** 
-  - `http://localhost:4280` (dev)
-  - `https://your-swa.azurestaticapps.net` (prod)
-
-### 2. Email Sending (Graph API)
-**Purpose:** Send verification codes, invitations, announcements
+### 1. Email Sending (Graph API)
+**Purpose:** Send OTP codes, invitations, announcements
 
 - **Type:** Daemon/Service (Client Credentials)
 - **Permissions:** Application - `Mail.Send`
 - **Admin Consent:** Required
 
-### 3. SharePoint File Storage (Graph API)
+### 2. SharePoint File Storage (Graph API)
 **Purpose:** Store team submission files in SharePoint
 
 - **Type:** Daemon/Service (Client Credentials)
@@ -70,10 +61,8 @@ All scripts are in the `/scripts` folder:
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "AzureWebJobsStorage": "",
     
-    "AZURE_CLIENT_ID": "your-entra-client-id",
-    "AZURE_CLIENT_SECRET": "your-entra-client-secret",
-    "AZURE_TENANT_ID": "your-entra-tenant-id",
-    "ENTRA_ISSUER_DOMAIN": "yourtenant.onmicrosoft.com",
+    "JWT_SECRET": "your-jwt-secret-min-32-chars",
+    "RECAPTCHA_SECRET_KEY": "your-recaptcha-secret",
     
     "MAIL_CLIENT_ID": "your-mail-app-client-id",
     "MAIL_CLIENT_SECRET": "your-mail-app-secret",
@@ -93,13 +82,12 @@ All scripts are in the `/scripts` folder:
 
 ### Frontend Configuration (`src/js/config.js`)
 
-Only public, non-secret values:
+No secrets in frontend — auth is handled via JWT tokens from the API:
 ```javascript
 const CONFIG = {
     auth: {
-        clientId: 'your-entra-client-id',  // Public - used in browser
-        tenantId: 'your-entra-tenant-id',   // Public - used in browser
-        // NO SECRETS in frontend config!
+        tokenKey: 'acdc_token',   // localStorage key for JWT
+        userKey: 'acdc_user',     // localStorage key for user data
     }
 };
 ```
@@ -165,13 +153,14 @@ In Azure Portal → Static Web App → Configuration → Application settings:
 
 ## Troubleshooting
 
-### "AADSTS700016: Application not found"
-- Check the Client ID is correct
-- Ensure the app registration exists in the correct tenant
+### "JWT verification failed"
+- Check that `JWT_SECRET` is set and matches between environments
+- Ensure the token hasn't expired (24h default)
 
-### "Insufficient privileges"
-- Admin consent may be required for application permissions
-- Run: `az ad app permission admin-consent --id <app-id>`
+### "OTP not sending"
+- Verify `MAIL_CLIENT_ID`, `MAIL_CLIENT_SECRET`, `MAIL_TENANT_ID` are set
+- Check that `MAIL_SENDER` email exists in Exchange Online
+- Ensure `Mail.Send` application permission has admin consent
 
 ### "SharePoint site not found"
 - Verify the site URL format: `tenant.sharepoint.com:/sites/SiteName`

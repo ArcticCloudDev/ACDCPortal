@@ -48,6 +48,7 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .sidebar-header .logo {
@@ -57,6 +58,14 @@ body {
 .sidebar-header .title {
     font-weight: 600;
     font-size: 0.95rem;
+}
+
+.sidebar-role-label {
+    width: 100%;
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.5);
+    margin-top: -4px;
+    letter-spacing: 0.3px;
 }
 
 .sidebar-nav {

@@ -1,4 +1,4 @@
-// Auth Check Email - Check if email is in allowed list (for login)
+// Auth Check Email - Check if email exists in the system (for register/login routing)
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const Storage = require('../shared/storage');
@@ -21,31 +21,46 @@ app.http('auth-check-email', {
                 };
             }
             
-            // Check if email is in allowed list
+            // Check if user already exists in our system (users.json)
+            const existingUser = Storage.users.getByEmail(email);
+            
+            // Also check the allowed-emails list
             const isAllowed = Storage.allowedEmails.isAllowed(email);
             
-            if (!isAllowed) {
-                context.log(`Login attempt for unregistered email: ${email}`);
+            if (existingUser) {
+                // User exists → they should sign in, not register
+                context.log(`Existing user found: ${email}`);
                 return {
-                    status: 401,
+                    status: 200,
                     jsonBody: { 
-                        allowed: false,
-                        message: 'Invalid login - email not registered' 
+                        allowed: true,
+                        isNewUser: false,
+                        message: 'Email verified, proceed with login' 
                     }
                 };
             }
             
-            // Check if user already exists in our system (has logged in before)
-            const existingUser = Storage.users.getByEmail(email);
-            const isNewUser = !existingUser;
+            if (isAllowed) {
+                // In allowed list but no user record yet (e.g., invited but never logged in)
+                context.log(`Allowed email, new user: ${email}`);
+                return {
+                    status: 200,
+                    jsonBody: { 
+                        allowed: true,
+                        isNewUser: true,
+                        message: 'New user, proceed with sign-up' 
+                    }
+                };
+            }
             
-            context.log(`Email verified for login: ${email}, isNewUser: ${isNewUser}`);
+            // Not in system at all → brand new, needs to register
+            context.log(`Unknown email: ${email}`);
             return {
                 status: 200,
                 jsonBody: { 
-                    allowed: true,
-                    isNewUser: isNewUser,
-                    message: isNewUser ? 'New user, proceed with sign-up' : 'Email verified, proceed with login' 
+                    allowed: false,
+                    isNewUser: true,
+                    message: 'New email, proceed with registration' 
                 }
             };
             

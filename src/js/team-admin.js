@@ -14,12 +14,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     Auth.init();
     
     try {
-        // Handle any redirect from Entra
+        // Check auth state
         await Auth.handleRedirect();
         
         // Check if logged in
         if (!Auth.isLoggedIn()) {
-            window.location.href = '/login.html';
+            window.location.href = '/register.html';
             return;
         }
         

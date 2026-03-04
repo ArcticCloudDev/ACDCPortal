@@ -207,6 +207,113 @@ async function deleteEntraUser(email) {
 }
 
 /**
+ * Find Entra user by email using multiple lookup strategies
+ * Handles users created via Graph API, self-service sign-up, and CIAM tenants
+ * @param {string} email - User's email address
+ * @returns {string|null} - Entra user ID or null if not found
+ */
+async function findEntraUserByEmail(email) {
+    const client = getGraphClient();
+
+    // Strategy 1: Find by mail property
+    try {
+        const users = await client.api('/users')
+            .filter(`mail eq '${email}'`)
+            .select('id')
+            .get();
+        if (users.value && users.value.length > 0) {
+            console.log(`Found Entra user by mail property: ${email} (ID: ${users.value[0].id})`);
+            return users.value[0].id;
+        }
+    } catch (e) {
+        console.log(`Mail filter failed for ${email}: ${e.message}`);
+    }
+
+    // Strategy 2: Find by identities with configured issuer domain
+    try {
+        const users = await client.api('/users')
+            .filter(`identities/any(id:id/issuer eq '${config.issuerDomain}' and id/issuerAssignedId eq '${email}')`)
+            .select('id')
+            .get();
+        if (users.value && users.value.length > 0) {
+            console.log(`Found Entra user by identities (${config.issuerDomain}): ${email} (ID: ${users.value[0].id})`);
+            return users.value[0].id;
+        }
+    } catch (e) {
+        console.log(`Identities filter failed for ${email}: ${e.message}`);
+    }
+
+    // Strategy 3: Try CIAM login domain variant (for External ID tenants)
+    const ciamDomain = config.issuerDomain.replace('.onmicrosoft.com', '.ciamlogin.com');
+    if (ciamDomain !== config.issuerDomain) {
+        try {
+            const users = await client.api('/users')
+                .filter(`identities/any(id:id/issuer eq '${ciamDomain}' and id/issuerAssignedId eq '${email}')`)
+                .select('id')
+                .get();
+            if (users.value && users.value.length > 0) {
+                console.log(`Found Entra user by CIAM identities (${ciamDomain}): ${email} (ID: ${users.value[0].id})`);
+                return users.value[0].id;
+            }
+        } catch (e) {
+            console.log(`CIAM identities filter failed for ${email}: ${e.message}`);
+        }
+    }
+
+    // Strategy 4: Find by otherMails (self-service sign-up may store email here)
+    try {
+        const users = await client.api('/users')
+            .filter(`otherMails/any(o:o eq '${email}')`)
+            .select('id')
+            .get();
+        if (users.value && users.value.length > 0) {
+            console.log(`Found Entra user by otherMails: ${email} (ID: ${users.value[0].id})`);
+            return users.value[0].id;
+        }
+    } catch (e) {
+        console.log(`otherMails filter failed for ${email}: ${e.message}`);
+    }
+
+    // Strategy 5: Last resort — list users with identities and manually search
+    // This handles cases where special characters in email (like +) break OData filters
+    try {
+        const allUsers = await client.api('/users')
+            .select('id,identities,mail,otherMails')
+            .top(999)
+            .get();
+        if (allUsers.value) {
+            const normalizedEmail = email.toLowerCase();
+            for (const user of allUsers.value) {
+                // Check mail property
+                if (user.mail && user.mail.toLowerCase() === normalizedEmail) {
+                    console.log(`Found Entra user by manual scan (mail): ${email} (ID: ${user.id})`);
+                    return user.id;
+                }
+                // Check otherMails
+                if (user.otherMails && user.otherMails.some(m => m.toLowerCase() === normalizedEmail)) {
+                    console.log(`Found Entra user by manual scan (otherMails): ${email} (ID: ${user.id})`);
+                    return user.id;
+                }
+                // Check identities
+                if (user.identities) {
+                    for (const identity of user.identities) {
+                        if (identity.issuerAssignedId && identity.issuerAssignedId.toLowerCase() === normalizedEmail) {
+                            console.log(`Found Entra user by manual scan (identity): ${email} (ID: ${user.id})`);
+                            return user.id;
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.log(`Manual user scan failed for ${email}: ${e.message}`);
+    }
+
+    console.log(`User not found in Entra by any method: ${email}`);
+    return null;
+}
+
+/**
  * Update a user's profile in Entra External ID
  * @param {string} email - User's email address
  * @param {object} profile - Profile data to update (firstName, lastName, displayName, phone)
@@ -216,27 +323,12 @@ async function updateEntraUser(email, profile) {
     const client = getGraphClient();
 
     try {
-        // For Email OTP self-service sign-up users, the email is stored in the 'mail' property
-        // Try searching by mail first, then fall back to identities filter
-        let users = await client.api('/users')
-            .filter(`mail eq '${email}'`)
-            .select('id,displayName,givenName,surname,mail')
-            .get();
+        const userId = await findEntraUserByEmail(email);
 
-        // If not found by mail, try the identities filter (for programmatically created users)
-        if (!users.value || users.value.length === 0) {
-            users = await client.api('/users')
-                .filter(`identities/any(id:id/issuer eq '${config.issuerDomain}' and id/issuerAssignedId eq '${email}')`)
-                .select('id,displayName,givenName,surname')
-                .get();
-        }
-
-        if (!users.value || users.value.length === 0) {
+        if (!userId) {
             console.log(`User not found in Entra for update: ${email}`);
             return null;
         }
-
-        const userId = users.value[0].id;
         
         // Build update payload - only include fields that are provided
         const updatePayload = {};
@@ -260,7 +352,7 @@ async function updateEntraUser(email, profile) {
         // Only update if there's something to update
         if (Object.keys(updatePayload).length === 0) {
             console.log(`No fields to update for user: ${email}`);
-            return users.value[0];
+            return { id: userId };
         }
 
         // Update the user
@@ -278,5 +370,6 @@ module.exports = {
     createEntraUser,
     createEntraUsers,
     deleteEntraUser,
-    updateEntraUser
+    updateEntraUser,
+    findEntraUserByEmail
 };

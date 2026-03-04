@@ -2,6 +2,8 @@ const { app } = require('@azure/functions');
 const { readData, writeData } = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
 const { uploadFile } = require('../shared/storage');
+const { buildInvitationEmail } = require('../shared/invitation-email');
+const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -137,31 +139,66 @@ app.http('system-emails-test', {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
 
-            // Build merge data
-            const eventTheme = template.eventThemes[eventId] || {};
-            const globalDefaults = template.editableSections;
-            
-            // Extract image src from HTML (themeImage is stored as HTML with <img> tag)
-            const themeImageSrc = extractImageSrc(eventTheme.themeImage || '');
-            
-            const mergeData = {
-                ...data,
-                eventName: event.name,
-                themeImage: themeImageSrc,
-                bodyText: eventTheme.body || globalDefaults.body || '',
-                closingText: eventTheme.closing || globalDefaults.closing || '',
-                portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'
-            };
+            let htmlContent, subject;
 
-            // Load HTML template file
-            const templatePath = path.join(__dirname, '../../../data/email-templates', `${templateType}.html`);
-            const templateHtml = await fs.readFile(templatePath, 'utf-8');
-            
-            // Process template with merge data
-            const htmlContent = processTemplate(templateHtml, mergeData);
-            
-            // Process subject with merge fields
-            const subject = processTemplate(template.subject, mergeData);
+            // For invitation templates, route through the proper build functions
+            // so the test email matches what a real invitation would produce
+            if (templateType === 'invitation-judge' || templateType === 'invitation-committee') {
+                // Create a synthetic invitation object for the test
+                const fakeInvitation = {
+                    id: uuidv4(),
+                    email: testEmail,
+                    eventId: eventId,
+                    role: templateType === 'invitation-judge' ? 'judge' : 'committee',
+                    inviterName: data?.teamAdminName || 'Event Organizer',
+                    inviterEmail: testEmail,
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                };
+
+                const result = await buildInvitationEmail(fakeInvitation, context);
+
+                if (!result.success) {
+                    return { status: 500, jsonBody: { error: `Template build failed: ${result.reason}` } };
+                }
+                htmlContent = result.htmlContent;
+                subject = result.subject;
+            } else {
+                // Non-invitation templates — use generic path
+                const eventTheme = template.eventThemes[eventId] || {};
+                const globalDefaults = template.editableSections;
+                
+                // Extract image src from HTML (themeImage is stored as HTML with <img> tag)
+                const themeImageSrc = extractImageSrc(eventTheme.themeImage || '');
+                
+                const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
+                const fakeInviteId = uuidv4();
+
+                const mergeData = {
+                    firstName: data?.fullName?.split(' ')[0] || 'Test',
+                    fullName: data?.fullName || 'Test User',
+                    ...data,
+                    eventName: event.name,
+                    themeImage: themeImageSrc,
+                    noThemeImage: !themeImageSrc,
+                    bodyText: eventTheme.body || globalDefaults.body || '',
+                    closingText: eventTheme.closing || globalDefaults.closing || '',
+                    portalUrl: portalUrl,
+                    acceptUrl: `${portalUrl}?invite=${fakeInviteId}`,
+                    inviteId: fakeInviteId,
+                    inviterName: data?.teamAdminName || 'Event Organizer'
+                };
+
+                // Load HTML template file
+                const templatePath = path.join(__dirname, '../../../data/email-templates', `${templateType}.html`);
+                const templateHtml = await fs.readFile(templatePath, 'utf-8');
+                
+                // Process template with merge data
+                htmlContent = processTemplate(templateHtml, mergeData);
+                
+                // Process subject with merge fields
+                subject = processTemplate(template.subject, mergeData);
+            }
 
             // Send test email
             await sendEmail({

@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupProfileModal();
     
     try {
-        // Handle any redirect from Entra
+        // Check auth state
         await Auth.handleRedirect();
         
         // Check if logged in (but don't require it)
@@ -44,16 +44,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 if (!currentUser.profileComplete) {
-                    window.location.href = 'complete-registration.html';
-                    return;
+                    // Allow interest-only users through — check interest leads by email
+                    let hasInterest = false;
+                    try {
+                        const resp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            const leads = Array.isArray(data) ? data : (data.leads || []);
+                            hasInterest = leads.some(l => l.email.toLowerCase() === currentUser.email.toLowerCase());
+                        }
+                    } catch (e) { /* ignore */ }
+                    if (!hasInterest) {
+                        window.location.href = 'complete-registration.html';
+                        return;
+                    }
                 }
                 
-                // Show committee link if user is portal admin
+                // Show admin link if user is portal admin (immediate)
                 if (currentUser.isPortalAdmin) {
-                    const committeeLink = document.getElementById('committee-link');
-                    if (committeeLink) {
-                        committeeLink.classList.remove('hidden');
-                    }
+                    showAdminLink('⚙️ Admin');
                 }
             } catch (error) {
                 console.error('Error loading user:', error);
@@ -68,6 +77,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const allParticipations = await API.participations.list();
                 userParticipations = allParticipations.filter(p => p.userId === currentUser.id);
+                
+                // Show admin link for committee/judge roles (if not already shown for portalAdmin)
+                if (!currentUser.isPortalAdmin) {
+                    const hasCommitteeRole = userParticipations.some(p => (p.roles || []).includes('committee'));
+                    const hasJudgeRole = userParticipations.some(p => (p.roles || []).includes('judge'));
+                    if (hasCommitteeRole) {
+                        showAdminLink('⚙️ Committee');
+                    } else if (hasJudgeRole) {
+                        showAdminLink('⚖️ Judge Portal');
+                    }
+                }
             } catch (error) {
                 console.warn('Could not load participations:', error);
                 userParticipations = [];
@@ -77,7 +97,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const response = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
                 if (response.ok) {
-                    const leads = await response.json();
+                    const data = await response.json();
+                    const leads = Array.isArray(data) ? data : (data.leads || []);
                     userInterestLeads = leads.filter(l => l.email.toLowerCase() === currentUser.email.toLowerCase());
                 }
             } catch (error) {
@@ -114,7 +135,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.error('Error loading page:', error);
         loadingDiv.innerHTML = `<p class="error-message">Error loading: ${error.message}</p>
-                               <a href="/" class="btn btn-primary">Back to home</a>`;
+                               <a href="/events.html" class="btn btn-primary">Back to events</a>`;
+    }
+    
+    // Show the admin navigation link with the given label
+    function showAdminLink(label) {
+        const committeeLink = document.getElementById('committee-link');
+        if (committeeLink && committeeLink.classList.contains('hidden')) {
+            committeeLink.textContent = label;
+            committeeLink.classList.remove('hidden');
+        }
     }
     
     // Process pending invitation from URL
@@ -157,24 +187,38 @@ document.addEventListener('DOMContentLoaded', async () => {
             const result = await API.invitations.accept(inviteId, currentUser.id, currentUser.email);
             
             if (result.success) {
-                // Update local user data
-                currentUser.teamId = result.teamId;
-                
-                showNotification(`🎉 You've joined team "${result.teamName}"!`, 'success');
-                
                 // Clear the pending invitation
                 sessionStorage.removeItem('pendingInvitation');
                 
-                // Redirect to the event page where the team is
-                if (result.eventId) {
-                    setTimeout(() => {
-                        window.location.href = `event.html?id=${result.eventId}`;
-                    }, 2000);
+                // Role-specific success messages and redirects
+                if (invitation.role === 'judge') {
+                    showNotification(`⚖️ You've been registered as a Judge for "${invitation.eventName || 'the event'}"!`, 'success');
+                    if (result.eventId) {
+                        setTimeout(() => {
+                            window.location.href = `event.html?id=${result.eventId}`;
+                        }, 2000);
+                    }
+                } else if (invitation.role === 'committee') {
+                    showNotification(`🏛️ You've joined the Committee for "${invitation.eventName || 'the event'}"!`, 'success');
+                    if (result.eventId) {
+                        setTimeout(() => {
+                            window.location.href = `event.html?id=${result.eventId}`;
+                        }, 2000);
+                    }
                 } else {
-                    // Reload the page to show updated team membership
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
+                    // Team participant invitation
+                    currentUser.teamId = result.teamId;
+                    showNotification(`🎉 You've joined team "${result.teamName}"!`, 'success');
+                    
+                    if (result.eventId) {
+                        setTimeout(() => {
+                            window.location.href = `event.html?id=${result.eventId}`;
+                        }, 2000);
+                    } else {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                    }
                 }
             }
         } catch (error) {
@@ -333,8 +377,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Create an event card HTML
     function createEventCard(event, isActive) {
-        const startDate = new Date(event.startDate);
-        const endDate = event.endDate ? new Date(event.endDate) : null;
+        const startDate = new Date(event.startDate + 'T12:00:00');
+        const endDate = event.endDate ? new Date(event.endDate + 'T12:00:00') : null;
         
         const dateStr = formatDateRange(startDate, endDate);
         
@@ -360,17 +404,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         let buttonHref = `event.html?id=${event.id}`;
         let buttonClass = 'btn btn-primary btn-small btn-card-action';
         
+        // Check if user has a special role for this event
+        const userRoles = ctx.participation?.roles || [];
+        const isJudge = userRoles.includes('judge');
+        const isCommittee = userRoles.includes('committee');
+        const isInterest = userRoles.includes('interest');
+        let roleBadge = '';
+        if (isJudge) {
+            roleBadge = '<div style=\"margin-bottom: 10px;\"><span style=\"display: inline-block; background: #fef3c7; color: #92400e; font-size: 0.8rem; font-weight: 600; padding: 4px 12px; border-radius: 20px; border: 1px solid #fbbf24;\">⚖️ You\'re a Judge</span></div>';
+        } else if (isCommittee) {
+            roleBadge = '<div style=\"margin-bottom: 10px;\"><span style=\"display: inline-block; background: #dbeafe; color: #1e40af; font-size: 0.8rem; font-weight: 600; padding: 4px 12px; border-radius: 20px; border: 1px solid #60a5fa;\">🏛️ Committee Member</span></div>';
+        } else if (isInterest) {
+            roleBadge = '<div style=\"margin-bottom: 10px;\"><span style=\"display: inline-block; background: #dcfce7; color: #15803d; font-size: 0.8rem; font-weight: 600; padding: 4px 12px; border-radius: 20px; border: 1px solid #4ade80;\">🔔 Interest Registered</span></div>';
+        }
+        
         if (status === 'pre-registration') {
-            if (ctx.hasInterest) {
-                buttonText = '✓ Interest Registered';
-                buttonHref = ''; // No navigation - just visual feedback
-                buttonClass = 'btn btn-secondary btn-small btn-card-action';
+            if (ctx.hasInterest || isInterest) {
+                buttonText = 'View Event';
+                buttonHref = `event.html?id=${event.id}`;
             } else {
                 buttonText = '🔔 Register Interest';
-                buttonHref = `interest.html?eventId=${event.id}`;
+                buttonHref = `register.html?intent=interest&eventId=${event.id}`;
             }
         } else if (status === 'registration') {
-            if (ctx.hasTeam) {
+            if (ctx.hasTeam || isJudge || isCommittee || isInterest) {
                 buttonText = 'View Event';
                 buttonHref = `event.html?id=${event.id}`;
             } else if (!currentUser) {
@@ -396,6 +453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                 </div>
                 <div class="event-card-body">
+                    ${roleBadge}
                     <div class="event-location">
                         📍 ${escapeHtml(event.location || 'Location TBD')}
                     </div>

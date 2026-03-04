@@ -126,9 +126,9 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "The following secrets should be stored in Key Vault:" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "Authentication (Entra External ID):" -ForegroundColor White
-Write-Host "  - entra-client-id         : Your Entra app client ID" -ForegroundColor Gray
-Write-Host "  - entra-tenant-id         : Your Entra tenant ID" -ForegroundColor Gray
+Write-Host "Authentication (Custom OTP + JWT):" -ForegroundColor White
+Write-Host "  - jwt-secret              : Secret key for signing JWT tokens (min 32 chars)" -ForegroundColor Gray
+Write-Host "  - recaptcha-secret-key    : reCAPTCHA v3 secret key" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Email (Microsoft Graph):" -ForegroundColor White
 Write-Host "  - graph-client-id         : Graph API app client ID" -ForegroundColor Gray
@@ -150,17 +150,17 @@ if ($storeNow -eq 'y') {
     Write-Host "Enter secrets (press Enter to skip):" -ForegroundColor Yellow
     Write-Host ""
     
-    # Entra/Auth secrets
-    $entraClientId = Read-Host "Entra Client ID"
-    if ($entraClientId) {
-        az keyvault secret set --vault-name $KeyVaultName --name "entra-client-id" --value $entraClientId | Out-Null
-        Write-Host "  ✓ entra-client-id stored" -ForegroundColor Green
+    # Auth secrets (JWT)
+    $jwtSecret = Read-Host "JWT Secret (min 32 chars for production)"
+    if ($jwtSecret) {
+        az keyvault secret set --vault-name $KeyVaultName --name "jwt-secret" --value $jwtSecret | Out-Null
+        Write-Host "  ✓ jwt-secret stored" -ForegroundColor Green
     }
     
-    $entraTenantId = Read-Host "Entra Tenant ID"
-    if ($entraTenantId) {
-        az keyvault secret set --vault-name $KeyVaultName --name "entra-tenant-id" --value $entraTenantId | Out-Null
-        Write-Host "  ✓ entra-tenant-id stored" -ForegroundColor Green
+    $recaptchaSecret = Read-Host "reCAPTCHA Secret Key"
+    if ($recaptchaSecret) {
+        az keyvault secret set --vault-name $KeyVaultName --name "recaptcha-secret-key" --value $recaptchaSecret | Out-Null
+        Write-Host "  ✓ recaptcha-secret-key stored" -ForegroundColor Green
     }
     
     # Graph/Email secrets

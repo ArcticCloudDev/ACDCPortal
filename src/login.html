@@ -4,79 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - ACDC Portal</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <script>
+        // login.html now redirects to the unified register/sign-in page
+        // Preserves query params (email, redirect) for seamless handoff
+        const params = new URLSearchParams(window.location.search);
+        const target = 'register.html' + (params.toString() ? '?' + params.toString() : '');
+        window.location.replace(target);
+    </script>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🏔️ ACDC Portal</h1>
-            <p class="subtitle">Team Login</p>
-        </header>
-
-        <main>
-            <!-- Step 1: Email Input -->
-            <div id="step-email" class="card">
-                <h2>Login</h2>
-                <p>Enter your email to receive a one-time password.</p>
-                
-                <form id="email-form">
-                    <div class="form-group">
-                        <label for="email">Email *</label>
-                        <input type="email" id="email" name="email" required 
-                               placeholder="your@email.com">
-                    </div>
-                    
-                    <div id="email-error" class="error-message hidden"></div>
-                    
-                    <button type="submit" class="btn btn-primary" id="email-btn">
-                        <span class="btn-text">Continue</span>
-                        <span class="btn-loading hidden">Checking...</span>
-                    </button>
-                </form>
-                
-                <p class="form-footer">
-                    Don't have an account? <a href="register.html">Register your team</a>
-                </p>
-            </div>
-
-            <!-- Step 2: OTP Input -->
-            <div id="step-otp" class="card hidden">
-                <h2>Enter One-Time Password</h2>
-                <p>📧 A code has been sent to <strong id="otp-email"></strong></p>
-                
-                <form id="otp-form">
-                    <div class="form-group">
-                        <label for="otpCode">One-Time Password</label>
-                        <input type="text" id="otpCode" name="otpCode" 
-                               required pattern="[0-9]{6,8}" maxlength="8" 
-                               placeholder="Enter code"
-                               class="code-input">
-                    </div>
-                    
-                    <div id="otp-error" class="error-message hidden"></div>
-                    
-                    <button type="submit" class="btn btn-primary" id="otp-btn">
-                        <span class="btn-text">Login</span>
-                        <span class="btn-loading hidden">Verifying...</span>
-                    </button>
-                </form>
-                
-                <p class="form-footer">
-                    <a href="#" id="back-to-email">← Use different email</a>
-                </p>
-            </div>
-        </main>
-
-        <footer>
-            <p>&copy; 2026 ACDC Portal</p>
-        </footer>
-    </div>
-
-    <!-- MSAL for Entra External ID Email OTP -->
-    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
-    <script src="js/config.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/login.js"></script>
+    <p>Redirecting to sign in...</p>
 </body>
 </html>

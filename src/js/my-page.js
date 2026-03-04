@@ -15,12 +15,12 @@ console.log('My-page redirecting to events.html');
     setupModals();
     
     try {
-        // Handle any redirect from Entra
+        // Check auth state
         await Auth.handleRedirect();
         
         // Check if logged in
         if (!Auth.isLoggedIn()) {
-            window.location.href = '/';
+            window.location.href = '/events.html';
             return;
         }
         
@@ -102,7 +102,7 @@ console.log('My-page redirecting to events.html');
     } catch (error) {
         console.error('Error loading dashboard:', error);
         loadingDiv.innerHTML = `<p class="error-message">Error loading: ${error.message}</p>
-                               <a href="/" class="btn btn-primary">Back to home</a>`;
+                               <a href="/events.html" class="btn btn-primary">Back to events</a>`;
     }
 
     // Populate event selector dropdown

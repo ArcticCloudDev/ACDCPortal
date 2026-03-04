@@ -99,11 +99,18 @@ app.http('badges-create', {
                 return { status: 400, jsonBody: { error: `Category must be one of: ${validCategories.join(', ')}` } };
             }
 
+            const validClaimTypes = ['common', 'exclusive'];
+            const claimType = body.claimType || 'common';
+            if (!validClaimTypes.includes(claimType)) {
+                return { status: 400, jsonBody: { error: `claimType must be one of: ${validClaimTypes.join(', ')}` } };
+            }
+
             const newBadge = {
                 id: generateGuid(),
                 name: body.name,
                 description: body.description || '',
                 category: body.category,
+                claimType: claimType,
                 imageUrl: body.imageUrl || '',
                 points: parseInt(body.points) || 0,
                 createdAt: new Date().toISOString()
@@ -146,11 +153,19 @@ app.http('badges-update', {
                 }
             }
 
+            if (body.claimType) {
+                const validClaimTypes = ['common', 'exclusive'];
+                if (!validClaimTypes.includes(body.claimType)) {
+                    return { status: 400, jsonBody: { error: `claimType must be one of: ${validClaimTypes.join(', ')}` } };
+                }
+            }
+
             badges[index] = {
                 ...badges[index],
                 name: body.name !== undefined ? body.name : badges[index].name,
                 description: body.description !== undefined ? body.description : badges[index].description,
                 category: body.category !== undefined ? body.category : badges[index].category,
+                claimType: body.claimType !== undefined ? body.claimType : (badges[index].claimType || 'common'),
                 imageUrl: body.imageUrl !== undefined ? body.imageUrl : badges[index].imageUrl,
                 points: body.points !== undefined ? parseInt(body.points) : badges[index].points,
                 updatedAt: new Date().toISOString()
@@ -529,10 +544,33 @@ app.http('badge-claims-create', {
             const existingClaim = claims.find(c =>
                 c.eventBadgeId === body.eventBadgeId &&
                 c.teamId === body.teamId &&
-                c.status !== 'declined'
+                c.status !== 'declined' &&
+                c.status !== 'draft'
             );
             if (existingClaim) {
                 return { status: 409, jsonBody: { error: 'Team has already claimed this badge', existingClaim } };
+            }
+
+            // Check if there's a draft claim (from assigning) - upgrade it
+            const draftIndex = claims.findIndex(c =>
+                c.eventBadgeId === body.eventBadgeId &&
+                c.teamId === body.teamId &&
+                c.status === 'draft'
+            );
+
+            if (draftIndex >= 0) {
+                // Upgrade draft to pending claim
+                claims[draftIndex] = {
+                    ...claims[draftIndex],
+                    status: 'pending',
+                    blogUrl: body.blogUrl || body.evidence || '',
+                    evidence: body.evidence || body.blogUrl || '',
+                    claimedBy: body.claimedBy || null,
+                    claimedAt: new Date().toISOString()
+                };
+                await badgeClaimsStorage.saveAll(claims);
+                context.log(`Badge draft upgraded to claim: team ${body.teamId} claims badge ${eventBadge.badgeId}`);
+                return { status: 201, jsonBody: claims[draftIndex] };
             }
 
             const newClaim = {
@@ -542,7 +580,9 @@ app.http('badge-claims-create', {
                 badgeId: eventBadge.badgeId,
                 teamId: body.teamId,
                 status: 'pending',
-                evidence: body.evidence || '',
+                blogUrl: body.blogUrl || body.evidence || '',
+                evidence: body.evidence || body.blogUrl || '',
+                assignedToUserId: body.assignedToUserId || null,
                 claimedBy: body.claimedBy || null,
                 claimedAt: new Date().toISOString()
             };
@@ -620,7 +660,7 @@ app.http('badge-claims-update', {
                 return { status: 404, jsonBody: { error: 'Badge claim not found' } };
             }
 
-            // Only allow updating evidence and re-claiming if declined
+            // Only allow updating evidence/blogUrl and re-claiming if declined
             if (claims[index].status === 'approved') {
                 return { status: 400, jsonBody: { error: 'Cannot modify an approved claim' } };
             }
@@ -628,6 +668,8 @@ app.http('badge-claims-update', {
             claims[index] = {
                 ...claims[index],
                 evidence: body.evidence !== undefined ? body.evidence : claims[index].evidence,
+                blogUrl: body.blogUrl !== undefined ? body.blogUrl : (claims[index].blogUrl || ''),
+                assignedToUserId: body.assignedToUserId !== undefined ? body.assignedToUserId : claims[index].assignedToUserId,
                 // If re-claiming after decline, reset to pending
                 status: claims[index].status === 'declined' && body.reclaim ? 'pending' : claims[index].status,
                 updatedAt: new Date().toISOString()
@@ -668,6 +710,133 @@ app.http('badge-claims-delete', {
         } catch (error) {
             context.error('Badge claims DELETE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to delete badge claim' } };
+        }
+    }
+});
+
+// POST /api/badge-claims/award - Judge awards an exclusive badge to a team (no blog URL required)
+app.http('badge-claims-award', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'badge-claims/award',
+    handler: async (request, context) => {
+        try {
+            const body = await request.json();
+
+            if (!body.eventBadgeId || !body.teamId) {
+                return { status: 400, jsonBody: { error: 'eventBadgeId and teamId are required' } };
+            }
+
+            // Validate event-badge assignment exists and is active
+            const eventBadges = await eventBadgesStorage.getAll();
+            const eventBadge = eventBadges.find(eb => eb.id === body.eventBadgeId && eb.isActive);
+            if (!eventBadge) {
+                return { status: 404, jsonBody: { error: 'Event-badge assignment not found or inactive' } };
+            }
+
+            // Validate badge is exclusive type
+            const badges = await badgesStorage.getAll();
+            const badge = badges.find(b => b.id === eventBadge.badgeId);
+            if (!badge || (badge.claimType || 'common') !== 'exclusive') {
+                return { status: 400, jsonBody: { error: 'Only exclusive badges can be awarded by judges' } };
+            }
+
+            // Check if this team already has this badge awarded
+            const claims = await badgeClaimsStorage.getAll();
+            const existingClaim = claims.find(c =>
+                c.eventBadgeId === body.eventBadgeId &&
+                c.teamId === body.teamId &&
+                c.status !== 'declined'
+            );
+            if (existingClaim) {
+                return { status: 409, jsonBody: { error: 'This badge has already been awarded to this team', existingClaim } };
+            }
+
+            const newClaim = {
+                id: generateGuid(),
+                eventBadgeId: body.eventBadgeId,
+                eventId: eventBadge.eventId,
+                badgeId: eventBadge.badgeId,
+                teamId: body.teamId,
+                status: 'approved',  // Exclusive badges are instantly approved when awarded by judge
+                blogUrl: body.blogUrl || '',
+                evidence: '',
+                assignedToUserId: null,
+                claimedBy: null,
+                awardedBy: body.awardedBy || null,
+                claimedAt: new Date().toISOString(),
+                reviewedBy: body.awardedBy || null,
+                reviewedAt: new Date().toISOString()
+            };
+
+            claims.push(newClaim);
+            await badgeClaimsStorage.saveAll(claims);
+
+            context.log(`Exclusive badge awarded: ${badge.name} to team ${body.teamId} by ${body.awardedBy || 'unknown'}`);
+            return { status: 201, jsonBody: newClaim };
+        } catch (error) {
+            context.error('Badge claims AWARD error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to award badge' } };
+        }
+    }
+});
+
+// PUT /api/badge-claims/assign - Assign a team member to a badge (creates draft claim if none exists)
+app.http('badge-claims-assign', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'badge-claims/assign',
+    handler: async (request, context) => {
+        try {
+            const body = await request.json();
+
+            if (!body.eventBadgeId || !body.teamId) {
+                return { status: 400, jsonBody: { error: 'eventBadgeId and teamId are required' } };
+            }
+
+            // Validate event-badge exists
+            const eventBadges = await eventBadgesStorage.getAll();
+            const eventBadge = eventBadges.find(eb => eb.id === body.eventBadgeId);
+            if (!eventBadge) {
+                return { status: 404, jsonBody: { error: 'Event-badge assignment not found' } };
+            }
+
+            const claims = await badgeClaimsStorage.getAll();
+
+            // Find existing claim for this team + event-badge
+            const existingIndex = claims.findIndex(c =>
+                c.eventBadgeId === body.eventBadgeId &&
+                c.teamId === body.teamId
+            );
+
+            if (existingIndex >= 0) {
+                // Update assignment on existing claim
+                claims[existingIndex].assignedToUserId = body.assignedToUserId || null;
+                claims[existingIndex].updatedAt = new Date().toISOString();
+                await badgeClaimsStorage.saveAll(claims);
+                return { status: 200, jsonBody: claims[existingIndex] };
+            } else {
+                // Create a draft claim with just assignment
+                const draft = {
+                    id: generateGuid(),
+                    eventBadgeId: body.eventBadgeId,
+                    eventId: eventBadge.eventId,
+                    badgeId: eventBadge.badgeId,
+                    teamId: body.teamId,
+                    status: 'draft',
+                    blogUrl: '',
+                    evidence: '',
+                    assignedToUserId: body.assignedToUserId || null,
+                    claimedBy: null,
+                    claimedAt: new Date().toISOString()
+                };
+                claims.push(draft);
+                await badgeClaimsStorage.saveAll(claims);
+                return { status: 201, jsonBody: draft };
+            }
+        } catch (error) {
+            context.error('Badge claims ASSIGN error:', error);
+            return { status: 500, jsonBody: { error: 'Failed to assign badge' } };
         }
     }
 });

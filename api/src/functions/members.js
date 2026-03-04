@@ -4,7 +4,6 @@ const { app } = require('@azure/functions');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const Email = require('../shared/email');
-const Graph = require('../shared/graph');
 const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
 const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 
@@ -73,18 +72,6 @@ app.http('members-add', {
             
             // Add to allowed emails
             Storage.allowedEmails.add(email, team.adminUserId);
-            
-            // Create user in Entra External ID for Email OTP login
-            try {
-                const entraResult = await Graph.createEntraUser(email);
-                context.log(`Entra user creation for ${email}: ${entraResult.exists ? 'already existed' : 'created new'}`);
-            } catch (entraError) {
-                // Log error but don't fail - user can still be created later
-                context.error('Failed to create Entra user (will retry on next login):', entraError.message);
-            }
-            
-            // Send notification email
-            await Email.sendVerificationCode(email, 'You have been added to team: ' + team.teamName);
             
             // Send welcome email to new member (async, don't wait)
             if (team.eventId) {
@@ -159,15 +146,6 @@ app.http('members-remove', {
             
             // Remove from allowed emails
             Storage.allowedEmails.remove(user.email);
-            
-            // Delete user from Entra External ID
-            try {
-                await Graph.deleteEntraUser(user.email);
-                context.log(`Deleted Entra user: ${user.email}`);
-            } catch (entraError) {
-                // Log error but don't fail - user will just exist in Entra without access
-                context.error('Failed to delete Entra user:', entraError.message);
-            }
             
             // Delete user
             Storage.users.delete(memberId);

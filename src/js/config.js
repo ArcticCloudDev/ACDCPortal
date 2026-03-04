@@ -1,18 +1,7 @@
 // ACDC Portal - Configuration
-// Uses Entra External ID with Email OTP (no password)
+// Custom OTP authentication (no external auth provider)
 
 const CONFIG = {
-    // Entra External ID Configuration
-    auth: {
-        clientId: 'c14c3e9e-a80f-4c83-ab48-52673788cf8f',
-        tenantId: '6faefb57-2c64-4298-a1c2-28d08a434986',
-        tenantName: 'acdcregistration',
-        // For External ID tenants, use ciamlogin.com
-        authority: 'https://acdcregistration.ciamlogin.com/',
-        redirectUri: window.location.origin,
-        scopes: ['openid', 'profile', 'email']
-    },
-    
     // API Configuration
     api: {
         baseUrl: '/api'
@@ -21,27 +10,16 @@ const CONFIG = {
     // App settings
     app: {
         name: 'ACDC Portal',
-        version: '1.0.0'
-    }
-};
-
-// MSAL Configuration for Entra External ID
-const msalConfig = {
-    auth: {
-        clientId: CONFIG.auth.clientId,
-        authority: CONFIG.auth.authority,
-        redirectUri: CONFIG.auth.redirectUri,
-        knownAuthorities: [CONFIG.auth.authority]
+        version: '2.0.0'
     },
-    cache: {
-        cacheLocation: 'sessionStorage',
-        storeAuthStateInCookie: false
+
+    // Auth settings
+    auth: {
+        tokenKey: 'acdc_token',       // localStorage key for JWT
+        userKey: 'acdc_user',         // localStorage key for user data
+        otpLength: 6,
+        otpExpiryMinutes: 10
     }
 };
 
-// Login request - will use Email OTP as configured in Entra
-const loginRequest = {
-    scopes: CONFIG.auth.scopes
-};
-
-console.log('Config loaded - Entra External ID with Email OTP');
+console.log('Config loaded - Custom OTP Authentication');

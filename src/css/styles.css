@@ -452,3 +452,224 @@ hr {
 .recaptcha-notice a {
     color: var(--text-muted);
 }
+
+/* Progress Steps Indicator */
+.progress-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    padding: 0 20px;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.step-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--border-color);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.progress-step.active .step-circle {
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.3);
+}
+
+.progress-step.completed .step-circle {
+    background: var(--success-color);
+    color: white;
+}
+
+.step-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.progress-step.active .step-label {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.progress-step.completed .step-label {
+    color: var(--success-color);
+}
+
+.progress-line {
+    flex: 1;
+    height: 2px;
+    background: var(--border-color);
+    margin: 0 12px;
+    margin-bottom: 22px;
+    transition: background 0.3s ease;
+}
+
+/* Info Notice Box */
+.info-notice {
+    background: #f0f7ff;
+    border: 1px solid #b3d4fc;
+    border-left: 4px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.info-notice strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.info-notice ul {
+    margin: 8px 0 8px 20px;
+    padding: 0;
+}
+
+.info-notice li {
+    margin-bottom: 4px;
+}
+
+.info-notice em {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.info-notice p {
+    margin: 8px 0 0;
+}
+
+.info-notice-success {
+    background: #f0faf0;
+    border-color: #b3e6b3;
+    border-left-color: var(--success-color);
+}
+
+/* Full Width Button */
+.btn-full {
+    width: 100%;
+    text-align: center;
+    display: block;
+}
+
+/* Spinner */
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   Shared Site Header / Event Banner
+   ============================================================ */
+.event-banner {
+    background: linear-gradient(135deg, #0078d4 0%, #00bcf2 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.event-banner.inactive {
+    background: linear-gradient(135deg, #6c757d 0%, #adb5bd 100%);
+}
+
+.event-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.event-banner h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.event-banner .event-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9rem;
+    opacity: 0.95;
+}
+
+.event-banner .status-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.8rem;
+}
+
+.banner-controls {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-left: auto;
+    justify-content: flex-end;
+}
+
+.banner-btn {
+    padding: 6px 12px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: var(--border-radius);
+    background: rgba(255,255,255,0.15);
+    color: white;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.banner-btn:hover {
+    background: rgba(255,255,255,0.25);
+}
+
+.banner-btn.btn-logout:hover {
+    background: rgba(220,53,69,0.8);
+}
+
+.banner-btn.hidden {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .event-banner {
+        align-items: flex-start;
+    }
+}

@@ -63,7 +63,7 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
         const extractImageSrc = (html) => {
             if (!html) return '';
             const match = html.match(/src="([^"]+)"/);
-            return match ? match[1] : html;
+            return match ? match[1] : '';
         };
 
         const themeImageSrc = extractImageSrc(eventTheme.themeImage || '');
@@ -73,6 +73,7 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
             fullName: fullName,
             eventName: event.name,
             themeImage: themeImageSrc,
+            noThemeImage: !themeImageSrc,
             bodyText: eventTheme.body || globalDefaults.body || '',
             closingText: eventTheme.closing || globalDefaults.closing || ''
         };

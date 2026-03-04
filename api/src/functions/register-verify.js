@@ -3,7 +3,6 @@
 const { app } = require('@azure/functions');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
-const Graph = require('../shared/graph');
 
 app.http('register-verify', {
     methods: ['POST'],
@@ -96,16 +95,6 @@ app.http('register-verify', {
             
             // Add email to allowed list
             Storage.allowedEmails.add(registration.email, null);
-            
-            // Create user in Entra External ID for Email OTP login
-            try {
-                const displayName = `${registration.firstName} ${registration.lastName}`;
-                const entraResult = await Graph.createEntraUser(registration.email, displayName);
-                context.log(`Entra user creation: ${entraResult.exists ? 'already existed' : 'created new'}`);
-            } catch (entraError) {
-                // Log error but don't fail registration - user can still be created later
-                context.error('Failed to create Entra user (will retry on next login):', entraError.message);
-            }
             
             // Delete pending registration
             Storage.pendingRegistrations.delete(registrationId);

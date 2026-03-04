@@ -21,81 +21,7 @@
             color: var(--primary-color);
         }
         
-        .event-banner {
-            background: linear-gradient(135deg, #0078d4 0%, #00bcf2 100%);
-            color: white;
-            padding: 15px 20px;
-            border-radius: var(--border-radius);
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        
-        .event-banner.inactive {
-            background: linear-gradient(135deg, #6c757d 0%, #adb5bd 100%);
-        }
-        
-        .event-banner-left {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        
-        .event-banner h1 {
-            margin: 0;
-            font-size: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .event-banner .event-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            font-size: 0.9rem;
-            opacity: 0.95;
-        }
-        
-        .event-banner .status-badge {
-            display: inline-block;
-            background: rgba(255,255,255,0.2);
-            padding: 4px 12px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-        }
-        
-        .banner-controls {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        
-        .banner-btn {
-            padding: 6px 12px;
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: var(--border-radius);
-            background: rgba(255,255,255,0.15);
-            color: white;
-            font-size: 0.85rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: background 0.2s;
-        }
-        
-        .banner-btn:hover {
-            background: rgba(255,255,255,0.25);
-        }
-        
-        .banner-btn.btn-logout:hover {
-            background: rgba(220,53,69,0.8);
-        }
+        /* Banner CSS now in css/styles.css */
         
         /* Teams section - no outer box */
         .teams-section {
@@ -260,6 +186,34 @@
             background: #d4edda;
             color: #155724;
         }
+
+        /* Hotel status indicator on participant cards */
+        .participant-card .hotel-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 8px;
+            white-space: nowrap;
+        }
+        .participant-card .hotel-status.ok {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .participant-card .hotel-status.missing {
+            background: #fee2e2;
+            color: #991b1b;
+            cursor: pointer;
+            animation: pulse-hotel 2s ease-in-out 3;
+        }
+        .participant-card .hotel-status.missing:hover {
+            background: #fecaca;
+        }
+        @keyframes pulse-hotel {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+        }
         
         .empty-slot {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
@@ -305,6 +259,35 @@
             background: #fff8e1;
             border: 2px dashed #ffc107;
             position: relative;
+        }
+
+        /* Pending invitation cards */
+        .participant-card.pending-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px dashed #f59e0b;
+            position: relative;
+        }
+        .participant-card.pending-card .pending-icon {
+            font-size: 1.8rem;
+            margin-bottom: 4px;
+        }
+        .participant-card.pending-card .name {
+            color: #92400e;
+            font-weight: 600;
+        }
+        .participant-card.pending-card .detail-row.email {
+            color: #b45309;
+            font-size: 0.78rem;
+        }
+        .participant-card .role-tag.pending {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+        }
+        .participant-card.pending-card .pending-date {
+            font-size: 0.7rem;
+            color: #b45309;
+            margin-top: 6px;
         }
         
         .tbd-badge {
@@ -813,6 +796,181 @@
             color: #a16207;
         }
 
+        /* Role confirmation section (judge/committee) */
+        .role-confirmed-section {
+            border-radius: var(--border-radius);
+            padding: 40px 30px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .role-confirmed-section.judge {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border: 2px solid #d97706;
+        }
+        .role-confirmed-section.committee {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 2px solid #2563eb;
+        }
+        .role-confirmed-section.interest {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 2px solid #16a34a;
+        }
+        .role-confirmed-section .role-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+        .role-confirmed-section h2 {
+            margin: 0 0 12px;
+            font-size: 1.4rem;
+        }
+        .role-confirmed-section.judge h2 { color: #92400e; }
+        .role-confirmed-section.committee h2 { color: #1e40af; }
+        .role-confirmed-section.interest h2 { color: #15803d; }
+        .role-confirmed-section p {
+            font-size: 1rem;
+            margin: 0 0 8px;
+            line-height: 1.5;
+            color: #475569;
+        }
+        .role-confirmed-section .role-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-top: 16px;
+        }
+        .role-confirmed-section.judge .role-badge {
+            background: #fef3c7;
+            color: #92400e;
+            border: 2px solid #d97706;
+        }
+        .role-confirmed-section.committee .role-badge {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 2px solid #2563eb;
+        }
+        .role-confirmed-section.interest .role-badge {
+            background: #dcfce7;
+            color: #15803d;
+            border: 2px solid #16a34a;
+        }
+        .role-confirmed-section .role-details {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(0,0,0,0.1);
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        .role-confirmed-section .admin-portal-link {
+            display: inline-block;
+            margin-top: 24px;
+            padding: 12px 28px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            transition: opacity 0.15s;
+        }
+        .role-confirmed-section .admin-portal-link:hover { opacity: 0.85; }
+        .role-confirmed-section.judge .admin-portal-link {
+            background: #92400e;
+            color: white;
+        }
+        .role-confirmed-section.committee .admin-portal-link {
+            background: #1e40af;
+            color: white;
+        }
+        .role-confirmed-section.interest .admin-portal-link {
+            background: #15803d;
+            color: white;
+        }
+
+        /* Interest upgrade actions */
+        .interest-upgrade {
+            margin-top: 28px;
+            padding-top: 24px;
+            border-top: 2px dashed #86efac;
+        }
+        .interest-upgrade .upgrade-heading {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #166534;
+            margin: 0 0 16px;
+        }
+        .interest-upgrade .upgrade-buttons {
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .interest-upgrade .upgrade-btn {
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .interest-upgrade .upgrade-hint {
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        /* Hotel urgency alert for judges/committee */
+        .hotel-urgency-alert {
+            margin-top: 20px;
+            padding: 16px 24px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #fef2f2, #fff7ed);
+            border: 2px solid #f87171;
+            animation: hotel-pulse 2s ease-in-out 3;
+            text-align: center;
+        }
+        .hotel-urgency-alert .alert-icon {
+            font-size: 2rem;
+            margin-bottom: 6px;
+        }
+        .hotel-urgency-alert .alert-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #991b1b;
+            margin-bottom: 4px;
+        }
+        .hotel-urgency-alert .alert-message {
+            font-size: 0.9rem;
+            color: #7c2d12;
+            margin-bottom: 12px;
+        }
+        .hotel-urgency-alert button {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .hotel-urgency-alert button:hover {
+            background: #b91c1c;
+        }
+        @keyframes hotel-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); }
+            50% { transform: scale(1.01); box-shadow: 0 0 16px 4px rgba(248, 113, 113, 0.3); }
+        }
+        .hotel-ok-badge {
+            margin-top: 16px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+
         /* Create team button - standalone */
         .create-team-section {
             text-align: center;
@@ -933,6 +1091,338 @@
             margin-bottom: 15px;
         }
         
+        /* ============================================================ */
+        /* EVENT PAGE NAV TABS                                          */
+        /* ============================================================ */
+        .event-nav {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 24px;
+            margin-top: 4px;
+        }
+        .event-nav-tab {
+            padding: 12px 24px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            cursor: pointer;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .event-nav-tab:hover {
+            color: var(--text-color);
+        }
+        .event-nav-tab.active {
+            color: #4f46e5;
+            border-bottom-color: #4f46e5;
+        }
+        .event-nav-tab .nav-count {
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: #e0e7ff;
+            color: #4f46e5;
+            padding: 1px 7px;
+            border-radius: 10px;
+        }
+        .event-nav-tab.active .nav-count {
+            background: #4f46e5;
+            color: #fff;
+        }
+        .event-tab-content {
+            display: none;
+        }
+        .event-tab-content.active {
+            display: block;
+        }
+
+        /* ============================================================ */
+        /* BADGE SECTION                                                */
+        /* ============================================================ */
+        .badges-section {
+            margin-top: 0;
+        }
+        .badges-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .badges-section-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .badge-stats {
+            font-weight: 400;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Category tabs */
+        .badge-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 8px;
+            overflow-x: auto;
+        }
+        .badge-tab {
+            padding: 10px 16px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            cursor: pointer;
+            color: var(--text-muted);
+            white-space: nowrap;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .badge-tab:hover {
+            color: var(--text-color);
+        }
+        .badge-tab.active {
+            color: #4f46e5;
+            border-bottom-color: #4f46e5;
+        }
+        .badge-tab-count {
+            font-weight: 400;
+            font-size: 0.7rem;
+            opacity: 0.7;
+            margin-left: 2px;
+        }
+
+        /* Panels */
+        .badge-panel {
+            display: none;
+        }
+        .badge-panel.active {
+            display: block;
+        }
+
+        /* Badge row — single-line layout */
+        .badge-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            background: #f8fafc;
+            border: 1px solid transparent;
+            transition: background 0.15s;
+            min-height: 40px;
+        }
+        .badge-row:hover {
+            background: #f1f5f9;
+        }
+        .badge-row.claimed {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+        .badge-row.pending {
+            background: #fffbeb;
+            border-color: #fde68a;
+        }
+        .badge-row.exclusive {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .badge-row-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+        .badge-row-mid {
+            flex-shrink: 0;
+        }
+        .badge-row-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .badge-claim-status {
+            font-size: 1rem;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        .badge-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .badge-points {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #6366f1;
+            white-space: nowrap;
+            flex-shrink: 0;
+            min-width: 36px;
+            text-align: right;
+        }
+
+        /* Examples button */
+        .btn-badge-examples {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 5px;
+            text-decoration: none;
+            background: #f3f4f6;
+            color: #6366f1;
+            border: 1px solid #e5e7eb;
+            white-space: nowrap;
+            transition: background 0.15s;
+        }
+        .btn-badge-examples:hover {
+            background: #e5e7eb;
+            color: #4338ca;
+        }
+
+        /* Blog post link button */
+        .btn-badge-blog {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 5px;
+            text-decoration: none;
+            background: #eff6ff;
+            color: #2563eb;
+            border: 1px solid #dbeafe;
+            white-space: nowrap;
+        }
+        .btn-badge-blog:hover {
+            background: #dbeafe;
+        }
+
+        /* Claim & Award buttons */
+        .btn-badge-claim,
+        .btn-badge-award {
+            font-size: 0.82rem;
+            padding: 5px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            white-space: nowrap;
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+        .btn-badge-claim {
+            background: #4f46e5;
+            color: #fff;
+        }
+        .btn-badge-claim:hover {
+            background: #4338ca;
+        }
+        .btn-badge-award {
+            background: #f59e0b;
+            color: #fff;
+        }
+        .btn-badge-award:hover {
+            background: #d97706;
+        }
+
+        /* Assign dropdown inline */
+        .badge-assign-select {
+            font-size: 0.8rem;
+            padding: 3px 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: white;
+            color: var(--text-muted);
+            max-width: 150px;
+            cursor: pointer;
+        }
+        .badge-assign-select:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 2px rgba(99,102,241,0.15);
+        }
+        .badge-assigned-name {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Badge Claim Modal */
+        #badge-claim-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #badge-claim-modal.hidden {
+            display: none;
+        }
+        .badge-modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+        }
+        .badge-modal-dialog {
+            position: relative;
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 440px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            z-index: 1;
+        }
+        .badge-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .badge-modal-header h3 {
+            margin: 0;
+            font-size: 1rem;
+        }
+        .badge-modal-body {
+            padding: 20px;
+        }
+        .badge-modal-body .form-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .badge-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 12px 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+
         /* Create Team Modal */
         .modal-overlay {
             position: fixed;
@@ -1071,21 +1561,8 @@
 
         <!-- Event Content -->
         <div id="content" class="hidden">
-            <!-- Event Banner -->
-            <div id="event-banner" class="event-banner">
-                <div class="event-banner-left">
-                    <h1><span id="event-name">ACDC 2026</span></h1>
-                    <div class="event-info">
-                        <span>📅 <span id="event-dates">Mar 12-15, 2026</span></span>
-                        <span>📍 <span id="event-location">Tromsø</span></span>
-                        <span id="event-status" class="status-badge">✓ Open</span>
-                    </div>
-                </div>
-                <div class="banner-controls">
-                    <button id="profile-btn" class="banner-btn">👤 Profile</button>
-                    <button id="logout-btn" class="banner-btn btn-logout">Log Out</button>
-                </div>
-            </div>
+            <!-- Event Banner (rendered by SiteHeader) -->
+            <div id="site-header"></div>
 
             <!-- Pre-Registration Info (shown when event is in pre-registration status) -->
             <div id="pre-reg-section" class="pre-reg-section hidden">
@@ -1096,34 +1573,85 @@
                 <p class="pre-reg-hint">No account needed — just your name and email.</p>
             </div>
 
-            <!-- Teams Section -->
-            <div class="teams-section">
-                <div id="my-teams-container" class="my-teams-container">
-                    <!-- User's team cards will be inserted here -->
+            <!-- Role Confirmation (shown for judges/committee members) -->
+            <div id="role-confirmed-section" class="role-confirmed-section hidden">
+                <div class="role-icon" id="role-confirmed-icon"></div>
+                <h2 id="role-confirmed-title"></h2>
+                <p id="role-confirmed-message"></p>
+                <div class="role-badge" id="role-confirmed-badge"></div>
+                <div class="role-details" id="role-confirmed-details"></div>
+                <div id="role-hotel-alert"></div>
+
+                <!-- Upgrade options for interest-only users -->
+                <div id="interest-upgrade-actions" class="interest-upgrade hidden">
+                    <p class="upgrade-heading">Ready to participate?</p>
+                    <div class="upgrade-buttons">
+                        <a href="register.html?intent=team" class="btn btn-primary btn-lg upgrade-btn">
+                            👥 Register a Team
+                        </a>
+                        <button id="interest-solo-btn" class="btn btn-secondary btn-lg upgrade-btn" onclick="document.getElementById('solo-queue-modal').classList.add('active')">
+                            🎲 Join Solo Queue
+                        </button>
+                    </div>
+                    <p class="upgrade-hint">No team? Join solo and we'll match you with others!</p>
+                </div>
+
+                <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                    <button id="edit-details-btn" onclick="openSelfEdit()" class="btn btn-secondary" style="border-radius: 10px; padding: 12px 28px; font-weight: 600; font-size: 0.95rem;">
+                        ✏️ Update My Details &amp; Hotel
+                    </button>
+                    <a id="role-admin-link" href="admin-dashboard.html" class="admin-portal-link hidden"></a>
+                </div>
+            </div>
+
+            <!-- Event Page Navigation Tabs -->
+            <div id="event-nav" class="event-nav hidden">
+                <button class="event-nav-tab active" data-tab="team" onclick="switchEventTab('team')">
+                    👥 My Team
+                </button>
+                <button class="event-nav-tab" data-tab="badges" onclick="switchEventTab('badges')">
+                    🏅 Badges <span class="nav-count" id="badges-nav-count">0</span>
+                </button>
+            </div>
+
+            <!-- TAB: My Team -->
+            <div id="tab-content-team" class="event-tab-content active">
+                <!-- Teams Section -->
+                <div class="teams-section">
+                    <div id="my-teams-container" class="my-teams-container">
+                        <!-- User's team cards will be inserted here -->
+                    </div>
+                    
+                    <div id="no-teams" class="empty-teams hidden">
+                        <div class="icon">👥</div>
+                        <p>You are not part of any team for this event yet</p>
+                    </div>
                 </div>
                 
-                <div id="no-teams" class="empty-teams hidden">
-                    <div class="icon">👥</div>
-                    <p>You are not part of any team for this event yet</p>
+                <div id="create-team-section" class="create-team-section">
+                    <div class="action-buttons">
+                        <button id="create-team-btn" class="btn btn-primary btn-lg">+ Create New Team</button>
+                        <button id="join-solo-btn" class="btn btn-secondary btn-lg">🎲 Join Solo Queue</button>
+                    </div>
+                    <p class="solo-hint">No team? Join solo and we'll match you with others!</p>
+                </div>
+                
+                <!-- Solo Queue Status (shown when in queue) -->
+                <div id="solo-queue-status" class="solo-queue-status hidden">
+                    <div class="queue-card">
+                        <div class="queue-icon">🎲</div>
+                        <h3>You're in the Solo Queue!</h3>
+                        <p>We'll match you with other solo players or teams looking for members.</p>
+                        <p class="queue-position">Position: <span id="queue-position">-</span></p>
+                        <button id="leave-queue-btn" class="btn btn-outline">Leave Queue</button>
+                    </div>
                 </div>
             </div>
-            
-            <div id="create-team-section" class="create-team-section">
-                <div class="action-buttons">
-                    <button id="create-team-btn" class="btn btn-primary btn-lg">+ Create New Team</button>
-                    <button id="join-solo-btn" class="btn btn-secondary btn-lg">🎲 Join Solo Queue</button>
-                </div>
-                <p class="solo-hint">No team? Join solo and we'll match you with others!</p>
-            </div>
-            
-            <!-- Solo Queue Status (shown when in queue) -->
-            <div id="solo-queue-status" class="solo-queue-status hidden">
-                <div class="queue-card">
-                    <div class="queue-icon">🎲</div>
-                    <h3>You're in the Solo Queue!</h3>
-                    <p>We'll match you with other solo players or teams looking for members.</p>
-                    <p class="queue-position">Position: <span id="queue-position">-</span></p>
-                    <button id="leave-queue-btn" class="btn btn-outline">Leave Queue</button>
+
+            <!-- TAB: Badges -->
+            <div id="tab-content-badges" class="event-tab-content">
+                <div id="badges-section" class="badges-section">
+                    <!-- Badge content rendered by JS -->
                 </div>
             </div>
         </div>
@@ -1430,11 +1958,61 @@
         </div>
     </div>
 
-    <!-- MSAL for Entra External ID Email OTP -->
-    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <!-- Badge Claim Modal -->
+    <div id="badge-claim-modal" class="hidden">
+        <div class="badge-modal-backdrop" onclick="closeBadgeClaimModal()"></div>
+        <div class="badge-modal-dialog">
+            <div class="badge-modal-header">
+                <h3 id="badge-claim-title">Claim Badge</h3>
+                <button class="modal-close" onclick="closeBadgeClaimModal()">&times;</button>
+            </div>
+            <div class="badge-modal-body">
+                <input type="hidden" id="badge-claim-eb-id">
+                <input type="hidden" id="badge-claim-team-id">
+                <div class="form-group">
+                    <label for="badge-claim-url">Blog Post URL *</label>
+                    <input type="url" id="badge-claim-url" placeholder="https://acdc.blog/your-team/badge-post" required>
+                    <p class="form-hint">Enter the URL to the blog post that demonstrates this badge.</p>
+                </div>
+                <div id="badge-claim-error" class="error-message hidden"></div>
+            </div>
+            <div class="badge-modal-footer">
+                <button class="btn btn-secondary" onclick="closeBadgeClaimModal()">Cancel</button>
+                <button class="btn btn-primary" id="badge-claim-submit-btn" onclick="submitBadgeClaim()">Save Claim</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Badge Award Modal (Exclusive badges — judges pick a team) -->
+    <div id="badge-award-modal" class="hidden">
+        <div class="badge-modal-backdrop" onclick="closeAwardModal()"></div>
+        <div class="badge-modal-dialog">
+            <div class="badge-modal-header">
+                <h3 id="badge-award-title">Award Badge</h3>
+                <button class="modal-close" onclick="closeAwardModal()">&times;</button>
+            </div>
+            <div class="badge-modal-body">
+                <input type="hidden" id="badge-award-eb-id">
+                <div class="form-group">
+                    <label for="badge-award-team">Award to Team *</label>
+                    <select id="badge-award-team" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+                        <option value="">Select a team...</option>
+                    </select>
+                    <p class="form-hint">Select the team that wins this exclusive badge.</p>
+                </div>
+                <div id="badge-award-error" class="error-message hidden"></div>
+            </div>
+            <div class="badge-modal-footer">
+                <button class="btn btn-secondary" onclick="closeAwardModal()">Cancel</button>
+                <button class="btn btn-primary" id="badge-award-submit-btn" onclick="submitBadgeAward()" style="background: #f59e0b; border-color: #f59e0b;">🏆 Award Badge</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/site-header.js"></script>
     <script src="js/event-page.js"></script>
 </body>
 </html>

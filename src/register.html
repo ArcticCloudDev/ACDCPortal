@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register Team - ACDC Portal</title>
+    <title>Sign In - ACDC Portal</title>
     <link rel="stylesheet" href="css/styles.css">
     <!-- reCAPTCHA v3 -->
     <script src="https://www.google.com/recaptcha/api.js?render=6LcjN1YsAAAAALq6PKDAsDnRc4KnDzUJnScPTxiy"></script>
@@ -12,49 +12,95 @@
     <div class="container">
         <header>
             <h1>🏔️ ACDC Portal</h1>
-            <p class="subtitle">Team Registration</p>
+            <p class="subtitle" id="page-subtitle">Sign In</p>
         </header>
 
         <main>
-            <!-- Step 1: Registration Form -->
-            <div id="step-form" class="card">
-                <h2>Register Your Team</h2>
+            <!-- Progress Steps Indicator -->
+            <div class="progress-steps" id="progress-steps">
+                <div class="progress-step active" data-step="1">
+                    <div class="step-circle">1</div>
+                    <span class="step-label">Email</span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step" data-step="2">
+                    <div class="step-circle">2</div>
+                    <span class="step-label">Details</span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step" data-step="3">
+                    <div class="step-circle">3</div>
+                    <span class="step-label">Verify</span>
+                </div>
+            </div>
+
+            <!-- Step 1: Email Check -->
+            <div id="step-email" class="card">
+                <h2 id="email-heading">Sign In</h2>
+                <p id="email-subheading">Enter your email address to sign in.</p>
+
+                <div class="info-notice">
+                    <strong>🔑 No password needed</strong>
+                    <p>We'll send a one-time code to your email to verify your identity.</p>
+                </div>
+
+                <form id="email-check-form">
+                    <div class="form-group">
+                        <label for="checkEmail">Email address *</label>
+                        <input type="email" id="checkEmail" name="checkEmail" required
+                               placeholder="you@company.com" autofocus>
+                    </div>
+
+                    <div id="email-check-error" class="error-message hidden"></div>
+
+                    <button type="submit" class="btn btn-primary btn-full" id="email-check-btn">
+                        <span class="btn-text">Continue →</span>
+                        <span class="btn-loading hidden">Checking...</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Step 2: Registration Form -->
+            <div id="step-form" class="card hidden">
+                <h2 id="form-heading">Create Your Account</h2>
+                <p id="form-subheading">Complete the form below to get started.</p>
+
                 <form id="registration-form">
                     <fieldset>
                         <legend>Personal Information</legend>
-                        
+
+                        <div class="form-group">
+                            <label for="regEmail">Email</label>
+                            <input type="email" id="regEmail" name="email" readonly class="readonly">
+                        </div>
+
                         <div class="form-group">
                             <label for="firstName">First Name *</label>
                             <input type="text" id="firstName" name="firstName" required minlength="2" maxlength="50">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="lastName">Last Name *</label>
                             <input type="text" id="lastName" name="lastName" required minlength="2" maxlength="50">
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="email">Email *</label>
-                            <input type="email" id="email" name="email" required>
-                        </div>
-                        
-                        <div class="form-group">
+
+                        <div class="form-group" id="phone-group">
                             <label for="phone">Phone *</label>
                             <input type="tel" id="phone" name="phone" required>
                         </div>
                     </fieldset>
 
-                    <fieldset>
+                    <fieldset id="team-fieldset" class="hidden">
                         <legend>Team Information</legend>
-                        
+
                         <div class="form-group">
                             <label for="teamName">Team Name *</label>
-                            <input type="text" id="teamName" name="teamName" required minlength="2" maxlength="100">
+                            <input type="text" id="teamName" name="teamName" minlength="2" maxlength="100">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="numberOfParticipants">Number of Participants *</label>
-                            <select id="numberOfParticipants" name="numberOfParticipants" required>
+                            <select id="numberOfParticipants" name="numberOfParticipants">
                                 <option value="">Select...</option>
                                 <option value="1">1</option>
                                 <option value="2">2</option>
@@ -65,37 +111,86 @@
                         </div>
                     </fieldset>
 
+                    <fieldset id="role-fieldset" class="hidden">
+                        <legend>Your Role</legend>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="willParticipate" name="willParticipate" checked>
+                                <span>I will be participating in the event myself</span>
+                            </label>
+                            <p class="field-hint">Uncheck this if you are only registering the team as an admin and will not be competing.</p>
+                        </div>
+                    </fieldset>
+
                     <div id="form-error" class="error-message hidden"></div>
-                    
-                    <button type="submit" class="btn btn-primary" id="submit-btn">
-                        <span class="btn-text">Register Team</span>
+
+                    <button type="submit" class="btn btn-primary btn-full" id="submit-btn">
+                        <span class="btn-text" id="submit-btn-text">Create Account →</span>
                         <span class="btn-loading hidden">Preparing...</span>
                     </button>
-                    
+
                     <p class="recaptcha-notice">
                         Protected by reCAPTCHA. 
                         <a href="https://policies.google.com/privacy" target="_blank">Privacy</a> · 
                         <a href="https://policies.google.com/terms" target="_blank">Terms</a>
                     </p>
                 </form>
-                
+
                 <p class="form-footer">
-                    Already have an account? <a href="login.html">Login here</a>
+                    <a href="#" id="back-to-email">← Use a different email</a>
                 </p>
             </div>
 
-            <!-- Step 2: Completing (shown during MS login redirect) -->
+            <!-- Step 3: OTP Verification (inline, no redirect) -->
+            <div id="step-otp" class="card hidden">
+                <div id="otp-welcome-back" class="info-notice info-notice-success hidden" style="margin-bottom: 16px;">
+                    <strong>👋 Welcome back!</strong>
+                    <p>We've sent a verification code to your email.</p>
+                </div>
+                <h2>📧 Check Your Email</h2>
+                <p>We sent a 6-digit code to <strong id="otp-email-display"></strong></p>
+
+                <form id="otp-form">
+                    <div class="form-group">
+                        <label for="otpCode">Verification Code</label>
+                        <input type="text" id="otpCode" name="otpCode" required
+                               placeholder="000000" maxlength="6" pattern="[0-9]{6}"
+                               inputmode="numeric" autocomplete="one-time-code"
+                               style="font-size: 1.8rem; text-align: center; letter-spacing: 8px; font-family: 'Courier New', monospace;">
+                    </div>
+
+                    <div id="otp-error" class="error-message hidden"></div>
+
+                    <button type="submit" class="btn btn-primary btn-full" id="verify-otp-btn">
+                        <span class="btn-text" id="verify-btn-text">Verify &amp; Complete Registration →</span>
+                        <span class="btn-loading hidden">Verifying...</span>
+                    </button>
+                </form>
+
+                <p class="form-footer">
+                    Didn't receive the code? <a href="#" id="resend-otp-btn">Resend code</a>
+                </p>
+                <p class="form-footer">
+                    <a href="#" id="back-to-email-otp">← Use a different email</a>
+                </p>
+                <p class="form-footer" style="font-size: 0.8rem; color: var(--text-muted);">
+                    Code expires in 10 minutes.
+                </p>
+            </div>
+
+            <!-- Step 4: Completing -->
             <div id="step-completing" class="card hidden">
-                <h2>⏳ Completing Registration...</h2>
-                <p>Finalizing your team registration. Please wait...</p>
+                <h2>⏳ <span id="completing-heading">Completing...</span></h2>
+                <p id="completing-text">Please wait...</p>
                 <div id="completing-error" class="error-message hidden"></div>
             </div>
 
-            <!-- Step 3: Success -->
+            <!-- Step 5: Success -->
             <div id="step-success" class="card hidden">
-                <h2>✅ Registration Complete!</h2>
-                <p>Your team <strong id="success-team-name"></strong> has been registered successfully.</p>
-                <p>You are now logged in. Let's complete your profile!</p>
+                <h2>✅ <span id="success-heading-text">Account Created!</span></h2>
+                <p id="success-team-line" class="hidden">Your team <strong id="success-team-name"></strong> has been registered successfully.</p>
+                <p id="success-profile-line" class="hidden">Your account has been created. You are now signed in!</p>
+                <p id="success-interest-line" class="hidden">Your interest in <strong id="success-event-name"></strong> has been registered. We'll notify you when registration opens!</p>
                 <a href="events.html" class="btn btn-primary">Go to Events</a>
             </div>
         </main>
@@ -105,7 +200,6 @@
         </footer>
     </div>
 
-    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>

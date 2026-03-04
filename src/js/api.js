@@ -27,7 +27,7 @@ const API = {
         return response.json();
     },
 
-    // Registration endpoints (new flow with reCAPTCHA + Entra)
+    // Registration endpoints (reCAPTCHA + OTP)
     register: {
         async start(data) {
             return API.request('/register/start', {
@@ -79,6 +79,16 @@ const API = {
             return API.request('/auth/verify-otp', {
                 method: 'POST',
                 body: JSON.stringify({ email, code })
+            });
+        }
+    },
+
+    // Interest endpoints
+    interest: {
+        async record(data) {
+            return API.request('/interest/record', {
+                method: 'POST',
+                body: JSON.stringify(data)
             });
         }
     },
@@ -149,6 +159,12 @@ const API = {
 
         async getMembers(teamId) {
             return API.request(`/teams/${teamId}/members`);
+        },
+
+        async delete(teamId) {
+            return API.request(`/teams/${teamId}`, {
+                method: 'DELETE'
+            });
         }
     },
 
@@ -323,6 +339,19 @@ const API = {
             });
         },
 
+        async update(participationId, data) {
+            return API.request(`/participations/${participationId}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        },
+
+        async delete(participationId) {
+            return API.request(`/participations/${participationId}`, {
+                method: 'DELETE'
+            });
+        },
+
         async updateHotel(participationId, hotelNights) {
             return API.request(`/participations/${participationId}/hotel`, {
                 method: 'PUT',
@@ -330,7 +359,37 @@ const API = {
             });
         },
 
-        // Team membership endpoints
+        // Roles management (v2)
+        async addRoles(participationId, roles) {
+            return API.request(`/participations/${participationId}/roles`, {
+                method: 'PUT',
+                body: JSON.stringify({ add: roles })
+            });
+        },
+
+        async removeRoles(participationId, roles) {
+            return API.request(`/participations/${participationId}/roles`, {
+                method: 'PUT',
+                body: JSON.stringify({ remove: roles })
+            });
+        },
+
+        async setRoles(participationId, roles) {
+            return API.request(`/participations/${participationId}/roles`, {
+                method: 'PUT',
+                body: JSON.stringify({ set: roles })
+            });
+        },
+
+        // Team assignment (v2)
+        async assignTeam(participationId, teamId, isTeamAdmin = false) {
+            return API.request(`/participations/${participationId}/team`, {
+                method: 'PUT',
+                body: JSON.stringify({ teamId, isTeamAdmin })
+            });
+        },
+
+        // Legacy team membership endpoints (still work during migration)
         async addTeamMembership(participationId, teamId, isAdmin, isParticipant) {
             return API.request(`/participations/${participationId}/team-membership`, {
                 method: 'POST',
@@ -358,16 +417,23 @@ const API = {
             });
         },
 
+        // Query endpoints
         async getTeamCount(teamId) {
             return API.request(`/participations/team/${teamId}/count`);
         },
 
-        async getByEvent(eventId) {
-            return API.request(`/participations/event/${eventId}`);
+        async getByEvent(eventId, role = null) {
+            let url = `/participations/event/${eventId}`;
+            if (role) url += `?role=${role}`;
+            return API.request(url);
         },
 
         async getByTeam(teamId) {
             return API.request(`/participations/team/${teamId}`);
+        },
+
+        async getByPerson(email) {
+            return API.request(`/participations/person/${encodeURIComponent(email)}`);
         },
 
         async getAll() {
@@ -503,6 +569,72 @@ const API = {
             return API.request('/deliveries/retry', {
                 method: 'POST',
                 body: JSON.stringify({ deliveryId })
+            });
+        }
+    },
+
+    // Badge endpoints
+    badges: {
+        async list(category = null) {
+            const url = category ? `/badges?category=${category}` : '/badges';
+            return API.request(url);
+        },
+
+        async getEventBadges(eventId) {
+            return API.request(`/events/${eventId}/badges`);
+        }
+    },
+
+    // Badge Claims endpoints
+    badgeClaims: {
+        async list(filters = {}) {
+            const params = [];
+            if (filters.eventId) params.push(`eventId=${filters.eventId}`);
+            if (filters.teamId) params.push(`teamId=${filters.teamId}`);
+            if (filters.status) params.push(`status=${filters.status}`);
+            if (filters.badgeId) params.push(`badgeId=${filters.badgeId}`);
+            const url = '/badge-claims' + (params.length ? '?' + params.join('&') : '');
+            return API.request(url);
+        },
+
+        async create(data) {
+            return API.request('/badge-claims', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+        },
+
+        async update(claimId, data) {
+            return API.request(`/badge-claims/${claimId}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        },
+
+        async review(claimId, data) {
+            return API.request(`/badge-claims/${claimId}/review`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        },
+
+        async delete(claimId) {
+            return API.request(`/badge-claims/${claimId}`, {
+                method: 'DELETE'
+            });
+        },
+
+        async assign(data) {
+            return API.request('/badge-claims/assign', {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        },
+
+        async award(data) {
+            return API.request('/badge-claims/award', {
+                method: 'POST',
+                body: JSON.stringify(data)
             });
         }
     }

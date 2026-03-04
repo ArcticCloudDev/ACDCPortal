@@ -1,11 +1,12 @@
-// Register API - Two-phase registration with reCAPTCHA + Entra External ID
+// Register API - Two-phase registration with reCAPTCHA + Custom OTP
+// Phase 1: Validate captcha → Store pending data
+// Phase 2: After OTP verification, complete registration (save team/user to JSON)
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
-const Graph = require('../shared/graph');
 
-// Phase 1: Start registration - validate captcha, create Entra user
+// Phase 1: Start registration - validate captcha, store pending data
 app.http('register-start', {
     methods: ['POST'],
     authLevel: 'anonymous',
@@ -15,13 +16,30 @@ app.http('register-start', {
         
         try {
             const body = await request.json();
-            const { email, firstName, lastName, captchaToken } = body;
+            const { email, firstName, lastName, phone, teamName, numberOfParticipants, willParticipate, captchaToken, registrationType } = body;
             
-            // Validate required fields
+            // Validate required fields (personal info always required)
             if (!email || !firstName || !lastName) {
                 return {
                     status: 400,
-                    jsonBody: { message: 'Email, first name, and last name are required' }
+                    jsonBody: { message: 'Name and email are required' }
+                };
+            }
+
+            // Phone required for non-interest registrations
+            if (registrationType !== 'interest' && !phone) {
+                return {
+                    status: 400,
+                    jsonBody: { message: 'Phone is required' }
+                };
+            }
+            
+            // Team fields required only for team registration
+            const isTeamRegistration = registrationType === 'team';
+            if (isTeamRegistration && (!teamName || !numberOfParticipants)) {
+                return {
+                    status: 400,
+                    jsonBody: { message: 'Team name and number of participants are required for team registration' }
                 };
             }
             
@@ -50,16 +68,41 @@ app.http('register-start', {
                 };
             }
             
-            // reCAPTCHA passed, email not registered - ready for sign-up
-            // We don't create Entra user here - let the user flow handle it
-            // This ensures pure Email OTP with no password
+            // Store pending registration data server-side
+            const pendingId = uuidv4();
+            const pendingData = {
+                id: pendingId,
+                email: email.toLowerCase().trim(),
+                firstName,
+                lastName,
+                phone: phone || null,
+                registrationType: isTeamRegistration ? 'team' : 'profile',
+                createdAt: new Date().toISOString(),
+                expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 min expiry
+            };
             
-            context.log(`Registration validated for: ${email}`);
+            // Include team fields only for team registration
+            if (isTeamRegistration) {
+                pendingData.teamName = teamName;
+                pendingData.numberOfParticipants = parseInt(numberOfParticipants);
+                pendingData.willParticipate = willParticipate !== false;
+            }
+            
+            Storage.pendingRegistrations.create(pendingData);
+            
+            // Temporarily add email to allowed-emails so auth-send-otp will accept it
+            if (!Storage.allowedEmails.isAllowed(email)) {
+                Storage.allowedEmails.add(email.toLowerCase().trim(), null);
+                context.log(`Temporarily added ${email} to allowed-emails for OTP`);
+            }
+            
+            context.log(`Registration started for: ${email}, pendingId: ${pendingId}`);
             return {
                 status: 200,
                 jsonBody: { 
                     success: true,
-                    message: 'Validation passed. Proceed to sign-up.'
+                    pendingId: pendingId,
+                    message: 'Account prepared. Proceed to email verification.'
                 }
             };
             
@@ -73,7 +116,8 @@ app.http('register-start', {
     }
 });
 
-// Phase 2: Complete registration - save team data (called after MS OTP verified)
+// Phase 2: Complete registration - retrieve pending data and save team/user
+// Called after the user verifies their OTP code
 app.http('register-complete', {
     methods: ['POST'],
     authLevel: 'anonymous',
@@ -83,68 +127,103 @@ app.http('register-complete', {
         
         try {
             const body = await request.json();
-            const { email, firstName, lastName, phone, teamName, numberOfParticipants } = body;
+            const { email } = body;
             
-            // Validate required fields
-            if (!email || !firstName || !lastName || !phone || !teamName || !numberOfParticipants) {
+            if (!email) {
                 return {
                     status: 400,
-                    jsonBody: { message: 'All fields are required' }
+                    jsonBody: { message: 'Email is required' }
                 };
             }
             
             // Check if already fully registered
             const existingUser = Storage.users.getByEmail(email);
             if (existingUser) {
+                // Already done — could be a double-submit. Just return success.
                 return {
-                    status: 400,
-                    jsonBody: { message: 'Registration already complete. Please login.' }
+                    status: 200,
+                    jsonBody: { 
+                        success: true,
+                        message: 'Registration already complete.',
+                        userId: existingUser.id
+                    }
                 };
             }
             
-            // Create team and user
+            // Retrieve pending registration data from server storage
+            const pending = Storage.pendingRegistrations.getByEmail(email);
+            if (!pending) {
+                return {
+                    status: 400,
+                    jsonBody: { message: 'No pending registration found for this email. Please start again.' }
+                };
+            }
+            
+            // Check expiry
+            if (new Date(pending.expiresAt) < new Date()) {
+                Storage.pendingRegistrations.delete(pending.id);
+                return {
+                    status: 400,
+                    jsonBody: { message: 'Registration expired. Please start again.' }
+                };
+            }
+            
+            const { firstName, lastName, phone, teamName, numberOfParticipants, willParticipate, registrationType } = pending;
+            const isTeamRegistration = registrationType === 'team';
+            const isParticipant = isTeamRegistration ? (willParticipate !== false) : false;
+            
+            // Create user
             const now = new Date().toISOString();
             const userId = uuidv4();
-            const teamId = uuidv4();
             
             const user = {
                 id: userId,
                 email: email.toLowerCase().trim(),
-                firstName: firstName,
-                lastName: lastName,
-                phone: phone,
-                allergies: null,
-                hotelWedThu: false,
-                hotelThuSun: true,
-                hotelSunMon: false,
+                firstName,
+                lastName,
+                phone: phone || null,
                 profileComplete: false,
                 createdAt: now,
-                updatedAt: now
+                updatedAt: now,
+                gamertag: '',
+                allergies: ''
             };
             
-            const team = {
-                id: teamId,
-                teamName: teamName,
-                numberOfParticipants: parseInt(numberOfParticipants),
-                adminUserId: userId,
-                createdAt: now,
-                updatedAt: now
-            };
-            
-            // Save to storage
             Storage.users.create(user);
-            Storage.teams.create(team);
             Storage.allowedEmails.add(email, null);
             
-            context.log(`Registration complete: ${email}, team: ${teamName}`);
+            // Create team only for team registrations
+            let teamId = null;
+            if (isTeamRegistration && teamName) {
+                teamId = uuidv4();
+                const team = {
+                    id: teamId,
+                    teamName: teamName,
+                    numberOfParticipants: parseInt(numberOfParticipants),
+                    adminUserId: userId,
+                    createdAt: now,
+                    updatedAt: now
+                };
+                Storage.teams.create(team);
+                context.log(`Registration complete: ${email}, team: ${teamName}, isParticipant: ${isParticipant}`);
+            } else {
+                context.log(`Profile registration complete: ${email} (no team)`);
+            }
+            
+            // Clean up pending registration
+            Storage.pendingRegistrations.delete(pending.id);
             
             return {
                 status: 200,
                 jsonBody: { 
                     success: true,
-                    message: 'Registration complete!',
+                    registrationType: isTeamRegistration ? 'team' : 'profile',
+                    message: isTeamRegistration
+                        ? (isParticipant ? 'Registration complete!' : 'Registration complete! You are registered as team admin only.')
+                        : 'Account created successfully!',
                     userId: userId,
-                    teamId: teamId
+                    teamId: teamId,
+                    isParticipant: isParticipant
                 }
             };
             
@@ -163,8 +242,15 @@ async function verifyCaptcha(token, context) {
     const secret = process.env.RECAPTCHA_SECRET_KEY;
     
     if (!secret) {
-        context.warn('RECAPTCHA_SECRET_KEY not set - skipping verification in dev mode');
-        return true; // Allow in dev if not configured
+        // Fail-closed: only skip in local dev (localhost), reject in production
+        const isLocal = (process.env.AZURE_FUNCTIONS_ENVIRONMENT === 'Development' 
+            || process.env.FUNCTIONS_WORKER_RUNTIME === 'node' && !process.env.WEBSITE_HOSTNAME);
+        if (isLocal) {
+            context.warn('RECAPTCHA_SECRET_KEY not set - allowing in local dev');
+            return true;
+        }
+        context.error('RECAPTCHA_SECRET_KEY not configured in production!');
+        return false;
     }
     
     try {

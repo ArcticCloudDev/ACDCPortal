@@ -1,22 +1,11 @@
 // Sequences API - Manage email sequences (one per event)
 const { app } = require('@azure/functions');
 const { Storage } = require('../shared/storage');
+const { v4: uuidv4 } = require('uuid');
 
 const sequencesStorage = new Storage('sequences');
 const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
-
-function generateGuid() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
-
-function generateId(prefix = 'seq') {
-    return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-}
 
 // GET /api/sequences - List all sequences
 app.http('sequences-list', {
@@ -126,7 +115,7 @@ app.http('sequences-create', {
             const data = await sequencesStorage.getRaw() || { sequences: [] };
             
             const sequence = {
-                id: generateGuid(),
+                id: uuidv4(),
                 name,
                 description: description || '',
                 createdAt: new Date().toISOString(),
@@ -227,7 +216,7 @@ app.http('sequences-copy', {
             
             // Create new sequence (duplicate)
             const newSequence = {
-                id: generateGuid(),
+                id: uuidv4(),
                 name: sourceSequence.name + ' (Copy)',
                 description: sourceSequence.description,
                 createdAt: new Date().toISOString(),
@@ -245,7 +234,7 @@ app.http('sequences-copy', {
             
             const newEmails = sourceEmails.map(email => ({
                 ...email,
-                id: generateId('camp'),
+                id: uuidv4(),
                 sequenceId: newSequence.id,
                 createdAt: new Date().toISOString(),
                 status: 'draft',  // Always set copied emails to draft

@@ -3,6 +3,7 @@
 const { app } = require('@azure/functions');
 const { Storage } = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
+const { v4: uuidv4 } = require('uuid');
 
 const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
@@ -11,11 +12,11 @@ const participationsStorage = new Storage('participations');
 const teamsStorage = new Storage('teams');
 
 function generateId() {
-    return 'camp_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+    return uuidv4();
 }
 
 function generateDeliveryId() {
-    return 'del_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+    return uuidv4();
 }
 
 // GET /api/email/campaigns - List campaigns for an event

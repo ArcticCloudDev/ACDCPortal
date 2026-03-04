@@ -6,6 +6,7 @@ let currentSequence = null;
 let currentSequenceId = null;
 let currentEmails = [];
 let copyingSequenceId = null;
+let currentPermissions = null;
 
 function escapeHtml(text) {
     if (!text) return '';
@@ -15,14 +16,12 @@ function escapeHtml(text) {
 }
 
 async function init() {
-    Auth.init();
-    renderAdminSidebar('campaigns');
-    await Auth.handleRedirect();
+    // Resolve permissions (handles auth check, sidebar render, access denied)
+    currentPermissions = await Permissions.initAdminPage('campaigns', {
+        loadingEl: document.getElementById('loading')
+    });
 
-    if (!Auth.isLoggedIn()) {
-        window.location.href = '/login.html';
-        return;
-    }
+    if (!currentPermissions) return;
 
     // Initialize Quill editor
     quill = new Quill('#editor', {
@@ -55,7 +54,9 @@ async function init() {
 async function loadEvents() {
     try {
         const response = await API.events.list();
-        allEvents = response.events || response || [];
+        let events = response.events || response || [];
+        // Scope events to permitted events for non-admin users
+        allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
     } catch (err) {
         console.error('Failed to load events:', err);
     }

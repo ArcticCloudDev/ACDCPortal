@@ -127,6 +127,16 @@
         /* No team */
         .no-team-section td { background: #fef3c7; }
 
+        /* Committee group */
+        .committee-section td { background: #dbeafe; }
+
+        /* Judge group */
+        .judge-section td { background: #fef3c7; }
+
+        /* Role badges */
+        .badge.judge { background: #fef3c7; color: #92400e; }
+        .badge.committee { background: #dbeafe; color: #1e40af; }
+
         /* Hotel night cells */
         .night-cell { text-align: center; width: 45px; }
         .night-cell.checked { color: var(--admin-success); font-weight: 600; }
@@ -268,22 +278,17 @@
                 </div>
                 <div class="panel-body">
                     <table class="data-table" id="participants-table">
-                        <thead>
+                        <thead id="participants-thead">
                             <tr>
                                 <th>Name</th>
                                 <th>Email</th>
                                 <th>Phone</th>
-                                <th class="night-cell">Wed</th>
-                                <th class="night-cell">Thu</th>
-                                <th class="night-cell">Fri</th>
-                                <th class="night-cell">Sat</th>
-                                <th class="night-cell">Sun</th>
                                 <th>Nights</th>
                                 <th>Allergies / Dietary</th>
                             </tr>
                         </thead>
                         <tbody id="participants-body">
-                            <tr><td colspan="10" class="empty-state">Loading...</td></tr>
+                            <tr><td colspan="5" class="empty-state">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -309,21 +314,66 @@
         <a href="index.html" class="btn-sm primary" style="margin-top: 20px; display: inline-block;">Go to Portal</a>
     </div>
 
-    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/admin-sidebar.js"></script>
+    <script src="js/permissions.js"></script>
     <script>
         let currentEvent = null;
         let currentUser = null;
         let allParticipants = [];
         let allTeams = [];
         let allUsers = [];
+        let currentPermissions = null;
 
-        // Hotel night keys in order
-        const NIGHT_KEYS = ['wed-thu', 'thu-fri', 'fri-sat', 'sat-sun', 'sun-mon'];
-        const NIGHT_LABELS = ['Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        // Hotel night keys — computed dynamically from event dates
+        let NIGHT_KEYS = [];
+        let NIGHT_LABELS = [];   // short day labels for table headers
+        let NIGHT_ARROWS = {};   // nightId → 'Wed → Thu' for hotel summary
+
+        // Compute hotel dates from event start/end (1 day before to 1 day after)
+        function computeHotelColumns(startDate, endDate) {
+            const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const start = new Date(startDate + 'T12:00:00');
+            start.setDate(start.getDate() - 1);
+            const end = new Date(endDate + 'T12:00:00');
+            end.setDate(end.getDate() + 1);
+
+            const dates = [];
+            const current = new Date(start);
+            while (current <= end) {
+                dates.push({ dayLabel: dayLabels[current.getDay()] });
+                current.setDate(current.getDate() + 1);
+            }
+
+            NIGHT_KEYS = [];
+            NIGHT_LABELS = [];
+            NIGHT_ARROWS = {};
+            for (let i = 0; i < dates.length - 1; i++) {
+                const from = dates[i].dayLabel;
+                const to = dates[i + 1].dayLabel;
+                const key = `${from.toLowerCase()}-${to.toLowerCase()}`;
+                NIGHT_KEYS.push(key);
+                NIGHT_LABELS.push(from);
+                NIGHT_ARROWS[key] = `${from} → ${to}`;
+            }
+        }
+
+        // Build dynamic table headers after hotel columns are known
+        function buildTableHeaders() {
+            const thead = document.getElementById('participants-thead');
+            const nightHeaders = NIGHT_LABELS.map(l => `<th class="night-cell">${l}</th>`).join('');
+            const colCount = 4 + NIGHT_KEYS.length + 2;  // Name,Email,Phone + nights + Nights,Allergies + Actions
+            thead.innerHTML = `<tr>
+                <th>Name</th><th>Email</th><th>Phone</th>
+                ${nightHeaders}
+                <th>Nights</th><th>Allergies / Dietary</th><th style="width:50px"></th>
+            </tr>`;
+            // Update any colspan in the loading row
+            const body = document.getElementById('participants-body');
+            body.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">Loading...</td></tr>`;
+        }
 
         function escapeHtml(text) {
             if (!text) return '';
@@ -333,33 +383,30 @@
         }
 
         async function init() {
-            Auth.init();
-            renderAdminSidebar('events');
-            
+            // Resolve permissions (handles auth check, sidebar render, access denied)
+            currentPermissions = await Permissions.initAdminPage('event-participants', {
+                contentEl: document.getElementById('admin-content'),
+                accessDeniedEl: document.getElementById('not-committee')
+            });
+
+            if (!currentPermissions) return;
+
+            currentUser = currentPermissions.user;
+
             try {
-                await Auth.handleRedirect();
-
-                if (!Auth.isLoggedIn()) {
-                    window.location.href = '/login.html';
-                    return;
-                }
-
-                const authUser = Auth.getUser();
-                currentUser = await API.users.get(authUser.email);
-
-                if (!currentUser.isPortalAdmin) {
-                    document.getElementById('admin-content').classList.add('hidden');
-                    document.querySelector('.sidebar').classList.add('hidden');
-                    document.getElementById('not-committee').classList.remove('hidden');
-                    return;
-                }
-
                 // Get event ID from URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const eventId = urlParams.get('id');
 
                 if (!eventId) {
                     window.location.href = 'admin-events.html';
+                    return;
+                }
+
+                // Check event access for scoped users
+                if (!Permissions.canAccessEvent(currentPermissions, eventId)) {
+                    document.getElementById('admin-content').classList.add('hidden');
+                    document.getElementById('not-committee').classList.remove('hidden');
                     return;
                 }
 
@@ -389,12 +436,16 @@
                 currentEvent = events.find(e => e.id === eventId);
                 if (!currentEvent) {
                     document.getElementById('participants-body').innerHTML = 
-                        '<tr><td colspan="10" class="empty-state">Event not found</td></tr>';
+                        '<tr><td colspan="20" class="empty-state">Event not found</td></tr>';
                     return;
                 }
 
                 // Filter teams for this event
                 allTeams = allTeams.filter(t => t.eventId === eventId);
+
+                // Compute dynamic hotel columns from event dates
+                computeHotelColumns(currentEvent.startDate, currentEvent.endDate);
+                buildTableHeaders();
 
                 // Filter participations for this event
                 const eventParticipations = participations.filter(p => p.eventId === eventId);
@@ -418,7 +469,9 @@
                         teamId: team?.id || null,
                         teamName: team?.teamName || null,
                         isTeamAdmin: teamMembership?.isAdmin || false,
-                        hotelNights: p.hotelNights || {}
+                        hotelNights: p.hotelNights || {},
+                        hotelPaidBy: p.hotelPaidBy || null,
+                        roles: p.roles || []
                     };
                 });
 
@@ -427,7 +480,7 @@
             } catch (err) {
                 console.error('Failed to load data:', err);
                 document.getElementById('participants-body').innerHTML = 
-                    '<tr><td colspan="10" class="empty-state">Failed to load data</td></tr>';
+                    '<tr><td colspan="20" class="empty-state">Failed to load data</td></tr>';
             }
         }
 
@@ -441,8 +494,8 @@
             document.getElementById('event-name-breadcrumb').textContent = currentEvent.name;
             document.getElementById('stat-event-name').textContent = currentEvent.name;
             
-            const startDate = new Date(currentEvent.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            const endDate = new Date(currentEvent.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const startDate = new Date(currentEvent.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const endDate = new Date(currentEvent.endDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             document.getElementById('stat-event-dates').textContent = `${startDate} - ${endDate}`;
 
             const status = currentEvent.status || 'draft';
@@ -472,7 +525,8 @@
             document.getElementById('participant-count').textContent = `${filtered.length} participants`;
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No participants match the filter</td></tr>';
+                const colCount = 3 + NIGHT_KEYS.length + 2;
+                tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">No participants match the filter</td></tr>`;
                 return;
             }
 
@@ -484,8 +538,10 @@
         }
 
         function renderGroupedByTeam(tbody, participants) {
-            // Group by team
+            // Group into: teams, committee, judges, individuals
             const teamGroups = {};
+            const committee = [];
+            const judges = [];
             const noTeam = [];
 
             participants.forEach(p => {
@@ -494,6 +550,10 @@
                         teamGroups[p.teamId] = { name: p.teamName, members: [] };
                     }
                     teamGroups[p.teamId].members.push(p);
+                } else if (p.roles.includes('committee')) {
+                    committee.push(p);
+                } else if (p.roles.includes('judge')) {
+                    judges.push(p);
                 } else {
                     noTeam.push(p);
                 }
@@ -506,12 +566,13 @@
                 const teamNights = group.members.reduce((sum, m) => sum + countHotelNights(m.hotelNights), 0);
                 html += `
                     <tr class="team-header-row">
-                        <td colspan="8">
+                        <td colspan="${3 + NIGHT_KEYS.length}">
                             <span class="badge team" style="margin-right: 8px;">👥 Team</span>
                             ${escapeHtml(group.name)} 
                             <span style="font-weight: normal; color: var(--admin-text-muted); margin-left: 8px;">(${group.members.length} members)</span>
                         </td>
                         <td><strong>${teamNights}</strong></td>
+                        <td></td>
                         <td></td>
                     </tr>
                 `;
@@ -520,11 +581,51 @@
                 });
             });
 
-            // Render no-team participants
+            // Render committee as virtual group
+            if (committee.length > 0) {
+                const committeeNights = committee.reduce((sum, m) => sum + countHotelNights(m.hotelNights), 0);
+                html += `
+                    <tr class="team-header-row committee-section">
+                        <td colspan="${3 + NIGHT_KEYS.length}">
+                            <span class="badge committee" style="margin-right: 8px;">🏛️ Committee</span>
+                            Committee Members
+                            <span style="font-weight: normal; color: var(--admin-text-muted); margin-left: 8px;">(${committee.length} members)</span>
+                        </td>
+                        <td><strong>${committeeNights}</strong></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                `;
+                committee.forEach(p => {
+                    html += renderParticipantRow(p, true);
+                });
+            }
+
+            // Render judges as virtual group
+            if (judges.length > 0) {
+                const judgeNights = judges.reduce((sum, m) => sum + countHotelNights(m.hotelNights), 0);
+                html += `
+                    <tr class="team-header-row judge-section">
+                        <td colspan="${3 + NIGHT_KEYS.length}">
+                            <span class="badge judge" style="margin-right: 8px;">⚖️ Judges</span>
+                            Judges Panel
+                            <span style="font-weight: normal; color: var(--admin-text-muted); margin-left: 8px;">(${judges.length} members)</span>
+                        </td>
+                        <td><strong>${judgeNights}</strong></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                `;
+                judges.forEach(p => {
+                    html += renderParticipantRow(p, true);
+                });
+            }
+
+            // Render remaining no-team individual participants
             if (noTeam.length > 0) {
                 html += `
                     <tr class="team-header-row no-team-section">
-                        <td colspan="10">
+                        <td colspan="${3 + NIGHT_KEYS.length + 3}">
                             <span class="badge single" style="margin-right: 8px;">👤 No Team</span>
                             Individual Participants
                             <span style="font-weight: normal; color: var(--admin-text-muted); margin-left: 8px;">(${noTeam.length} participants)</span>
@@ -557,6 +658,15 @@
 
             const totalNights = countHotelNights(nights);
 
+            // Hotel paid-by badge
+            const paidByLabels = { team: '👥 Team', committee: '🏛️ Org', self: '👤 Self' };
+            const paidByColors = { team: '#3b82f6', committee: '#8b5cf6', self: '#f59e0b' };
+            const paidByLabel = p.hotelPaidBy ? paidByLabels[p.hotelPaidBy] || p.hotelPaidBy : '';
+            const paidByColor = p.hotelPaidBy ? paidByColors[p.hotelPaidBy] || '#94a3b8' : '';
+            const paidByBadge = p.hotelPaidBy && totalNights > 0
+                ? `<span style="display:inline-block;font-size:0.65rem;padding:1px 5px;border-radius:4px;background:${paidByColor}15;color:${paidByColor};border:1px solid ${paidByColor}40;margin-left:4px;">${paidByLabel}</span>`
+                : '';
+
             let allergyHtml = '';
             if (p.allergies && p.allergies.trim()) {
                 // Split by comma or newline
@@ -567,18 +677,31 @@
             }
 
             const adminBadge = p.isTeamAdmin ? '<span class="badge admin" style="margin-left: 6px;">Admin</span>' : '';
+            const roleBadge = p.roles.includes('judge')
+                ? '<span class="badge judge" style="margin-left: 6px;">Judge</span>'
+                : p.roles.includes('committee')
+                    ? '<span class="badge committee" style="margin-left: 6px;">Committee</span>'
+                    : '';
+
+            // Delete button — only for portalAdmin/committee, and not for team members (teams have their own delete)
+            const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
+            const isTeamMember = !!p.teamId;
+            const deleteBtn = canDelete && !isTeamMember
+                ? `<button class="btn-sm btn-delete-participant" data-id="${p.id}" data-name="${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}" data-role="${p.roles.join(', ')}" title="Remove participation" style="color:#dc2626;border-color:#fca5a5;padding:2px 6px;font-size:0.75rem;">🗑️</button>`
+                : '';
 
             return `
                 <tr class="${isGrouped ? 'team-member-row' : ''}">
                     <td>
                         <strong>${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}</strong>
-                        ${adminBadge}
+                        ${adminBadge}${roleBadge}
                     </td>
                     <td>${escapeHtml(p.email)}</td>
                     <td>${escapeHtml(p.phone)}</td>
                     ${nightCells}
-                    <td><strong>${totalNights}</strong></td>
+                    <td><strong>${totalNights}</strong>${paidByBadge}</td>
                     <td class="allergy-cell">${allergyHtml}</td>
+                    <td>${deleteBtn}</td>
                 </tr>
             `;
         }
@@ -603,17 +726,9 @@
                 });
             });
 
-            const dayLabels = {
-                'wed-thu': 'Wed → Thu',
-                'thu-fri': 'Thu → Fri',
-                'fri-sat': 'Fri → Sat',
-                'sat-sun': 'Sat → Sun',
-                'sun-mon': 'Sun → Mon'
-            };
-
             summary.innerHTML = NIGHT_KEYS.map(key => `
                 <div class="hotel-night-stat">
-                    <div class="day">${dayLabels[key]}</div>
+                    <div class="day">${NIGHT_ARROWS[key] || key}</div>
                     <div class="count">${nightCounts[key]}</div>
                     <div class="day">rooms</div>
                 </div>
@@ -624,26 +739,52 @@
             document.getElementById('group-filter').addEventListener('change', renderParticipants);
             document.getElementById('show-filter').addEventListener('change', renderParticipants);
             document.getElementById('export-btn').addEventListener('click', exportCSV);
+
+            // Event delegation for delete buttons
+            document.getElementById('participants-body').addEventListener('click', async (e) => {
+                const btn = e.target.closest('.btn-delete-participant');
+                if (!btn) return;
+
+                const id = btn.dataset.id;
+                const name = btn.dataset.name;
+                const role = btn.dataset.role;
+
+                if (!confirm(`Remove "${name}" (${role || 'participant'}) from this event?\n\nThis will delete their participation record including hotel bookings.`)) {
+                    return;
+                }
+
+                try {
+                    await API.participations.delete(id);
+                    allParticipants = allParticipants.filter(p => p.id !== id);
+                    updateUI();
+                } catch (error) {
+                    console.error('Error deleting participation:', error);
+                    alert('Failed to delete: ' + error.message);
+                }
+            });
         }
 
         function exportCSV() {
+            const nightHeaders = NIGHT_KEYS.map(k => NIGHT_ARROWS[k] || k);
             const rows = [
-                ['Team', 'Name', 'Email', 'Phone', 'Wed-Thu', 'Thu-Fri', 'Fri-Sat', 'Sat-Sun', 'Sun-Mon', 'Total Nights', 'Allergies']
+                ['Group', 'Role', 'Name', 'Email', 'Phone', ...nightHeaders, 'Total Nights', 'Paid By', 'Allergies']
             ];
 
             allParticipants.forEach(p => {
                 const nights = p.hotelNights || {};
+                const group = p.teamName || (p.roles.includes('committee') ? 'Committee' : p.roles.includes('judge') ? 'Judges' : 'Individual');
+                const role = p.roles.includes('judge') ? 'Judge' : p.roles.includes('committee') ? 'Committee' : p.isTeamAdmin ? 'Team Admin' : 'Participant';
+                const nightValues = NIGHT_KEYS.map(k => nights[k] ? 'Yes' : 'No');
+                const paidBy = p.hotelPaidBy || '';
                 rows.push([
-                    p.teamName || 'No Team',
+                    group,
+                    role,
                     `${p.firstName} ${p.lastName}`,
                     p.email,
                     p.phone,
-                    nights['wed-thu'] ? 'Yes' : 'No',
-                    nights['thu-fri'] ? 'Yes' : 'No',
-                    nights['fri-sat'] ? 'Yes' : 'No',
-                    nights['sat-sun'] ? 'Yes' : 'No',
-                    nights['sun-mon'] ? 'Yes' : 'No',
+                    ...nightValues,
                     countHotelNights(nights),
+                    paidBy,
                     p.allergies || ''
                 ]);
             });

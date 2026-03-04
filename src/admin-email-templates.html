@@ -9,13 +9,13 @@
     <style>
         .template-selector {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
             margin-bottom: 24px;
         }
 
         .template-option {
-            padding: 20px;
+            padding: 14px;
             border: 2px solid var(--admin-border);
             border-radius: 8px;
             cursor: pointer;
@@ -34,12 +34,13 @@
         }
 
         .template-option .icon {
-            font-size: 2rem;
-            margin-bottom: 8px;
+            font-size: 1.5rem;
+            margin-bottom: 6px;
         }
 
         .template-option .name {
             font-weight: 600;
+            font-size: 0.85rem;
             color: var(--admin-sidebar);
         }
 
@@ -166,6 +167,18 @@
                             <div class="icon">✉️</div>
                             <div class="name">Interest</div>
                         </div>
+                        <div class="template-option" data-template="invitation-judge">
+                            <div class="icon">⚖️</div>
+                            <div class="name">Judge Invite</div>
+                        </div>
+                        <div class="template-option" data-template="invitation-committee">
+                            <div class="icon">👔</div>
+                            <div class="name">Committee Invite</div>
+                        </div>
+                        <div class="template-option" data-template="team-registration">
+                            <div class="icon">📋</div>
+                            <div class="name">Registration</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -244,21 +257,25 @@
         </main>
     </div>
 
-    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
     <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/api.js"></script>
     <script src="js/admin-sidebar.js"></script>
+    <script src="js/permissions.js"></script>
     <script>
         let themeEditor, bodyEditor, closingEditor;
         let currentTemplate = 'team-welcome';
         let currentEvent = null;
         let allEvents = [];
         let templateConfig = null;
+        let currentPermissions = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            renderAdminSidebar('email-templates');
+            // Resolve permissions (handles auth check, sidebar render, access denied)
+            currentPermissions = await Permissions.initAdminPage('email-templates');
+
+            if (!currentPermissions) return;
             
             // Initialize Quill editors (same as admin-email.html)
             themeEditor = new Quill('#theme-editor', {
@@ -353,6 +370,36 @@
                                     closing: "<p>Good luck in the competition!</p>"
                                 },
                                 eventThemes: {}
+                            },
+                            "invitation-judge": {
+                                name: "Judge Invitation Email",
+                                subject: "You're invited to judge {{eventName}}!",
+                                mergeFields: ["firstName", "fullName", "eventName", "inviterName", "message", "acceptUrl"],
+                                editableSections: {
+                                    body: "<p>Hi {{firstName}},</p><p>You've been selected to serve as a <strong>judge</strong> for {{eventName}}.</p><p>Please click the button below to accept.</p>",
+                                    closing: "<p>We look forward to having you on the judging panel!</p>"
+                                },
+                                eventThemes: {}
+                            },
+                            "invitation-committee": {
+                                name: "Committee Invitation Email",
+                                subject: "You're invited to join the {{eventName}} committee!",
+                                mergeFields: ["firstName", "fullName", "eventName", "inviterName", "message", "acceptUrl"],
+                                editableSections: {
+                                    body: "<p>Hi {{firstName}},</p><p>You've been invited to join the <strong>organizing committee</strong> for {{eventName}}.</p><p>Please click the button below to accept.</p>",
+                                    closing: "<p>We look forward to working with you!</p>"
+                                },
+                                eventThemes: {}
+                            },
+                            "team-registration": {
+                                name: "Team Registration Confirmed",
+                                subject: "Team Registered: {{teamName}} for {{eventName}}",
+                                mergeFields: ["teamName", "fullName", "eventName", "committedParticipants"],
+                                editableSections: {
+                                    body: "<p>Hi {{fullName}},</p><p>Your team <strong>{{teamName}}</strong> has been successfully registered for <strong>{{eventName}}</strong>!</p><p>You can now invite team members and manage your team from the portal.</p>",
+                                    closing: "<p>Good luck in the competition!</p>"
+                                },
+                                eventThemes: {}
                             }
                         }
                     };
@@ -421,7 +468,45 @@
                     ctaText: 'Confirm Your Interest',
                     signature: (name) => `The ACDC Team`,
                     footer: (name) => `You're receiving this email because you expressed interest in ${name}.`
-                }
+                },
+                'invitation-judge': {
+                    mergeData: {
+                        firstName: 'John',
+                        fullName: 'John Doe',
+                        eventName: currentEvent.name,
+                        inviterName: 'Jane Smith',
+                        acceptUrl: '#'
+                    },
+                    heading: (name) => `⚖️ You're Invited to Judge ${name}`,
+                    ctaText: 'Accept Judge Invitation',
+                    signature: (name) => `The ${name} Team`,
+                    footer: (name) => `You received this email because you were invited to judge ${name}.`
+                },
+                'invitation-committee': {
+                    mergeData: {
+                        firstName: 'John',
+                        fullName: 'John Doe',
+                        eventName: currentEvent.name,
+                        inviterName: 'Jane Smith',
+                        acceptUrl: '#'
+                    },
+                    heading: (name) => `👔 You're Invited to Join the Committee`,
+                    ctaText: 'Accept Committee Invitation',
+                    signature: (name) => `The ${name} Team`,
+                    footer: (name) => `You received this email because you were invited to the ${name} committee.`
+                },
+                'team-registration': {
+                    mergeData: {
+                        teamName: 'Sample Team Alpha',
+                        fullName: 'John Doe',
+                        eventName: currentEvent.name,
+                        committedParticipants: '4'
+                    },
+                    heading: (name) => `📋 Team Registration Confirmed`,
+                    ctaText: 'Manage Your Team',
+                    signature: (name) => `The ${name} Team`,
+                    footer: (name) => `This is an automated email from ${name}. Please do not reply to this email.`
+                },
             };
 
             const config = previewConfig[currentTemplate] || previewConfig['team-welcome'];
@@ -433,12 +518,15 @@
             const imgTag = tempDiv.querySelector('img');
             const themeImageHtml = imgTag ? `<img src="${imgTag.src}" style="width: 100%; height: auto; display: block;">` : '';
 
-            // For interest-acknowledgment, show ACDC logo header if no theme image
-            const headerHtml = currentTemplate === 'interest-acknowledgment' && !imgTag
-                ? `<div style="padding: 30px 40px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center;">
-                       <img src="https://cdn.prod.website-files.com/621f541df60bb50feebe0c73/6298c86d5680c5d9eb3a3fec_acdc_alone_white_trans.png" alt="ACDC Logo" style="width: 120px; height: auto;">
-                   </div>`
-                : themeImageHtml;
+            const headerHtml = themeImageHtml;
+
+            // Check if current template is an invitation type
+            const isInvitation = currentTemplate.startsWith('invitation-');
+
+            // Build CTA button
+            const ctaColor = isInvitation
+                ? (currentTemplate === 'invitation-committee' ? '#2563eb' : '#1e3a5f')
+                : '#667eea';
 
             // Build preview HTML
             let previewHTML = `
@@ -447,6 +535,12 @@
                     <div style="padding: 24px;">
                         <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #1e293b;">${config.heading(mergeData.eventName)}</h2>
                         <div style="margin: 0 0 16px 0; color: #475569;">${bodyText}</div>
+                        <div style="margin: 16px 0;">
+                            <span style="display: inline-block; padding: 12px 28px; background-color: ${ctaColor}; color: white; border-radius: 6px; font-weight: 600; font-size: 14px;">
+                                ${config.ctaText}
+                            </span>
+                        </div>
+                        ${isInvitation ? '<p style="margin: 8px 0 16px; font-size: 12px; color: #92400e; background: #fef3c7; display: inline-block; padding: 6px 14px; border-radius: 12px;">⏰ This invitation expires in 7 days</p>' : ''}
                         <div style="margin: 16px 0 0 0; color: #475569;">${closingText}</div>
                         <p style="margin: 16px 0 0 0; color: #475569;">
                             Best regards,<br><strong>${config.signature(mergeData.eventName)}</strong>

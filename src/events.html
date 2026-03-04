@@ -3,405 +3,498 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Events - ACDC Portal</title>
+    <title>ACDC Portal</title>
     <link rel="stylesheet" href="css/styles.css">
     <style>
-        /* Events page styles */
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 25px;
-            background: var(--card-bg);
-            border-radius: var(--border-radius);
-            margin-bottom: 25px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        
-        .page-header h1 {
-            margin: 0;
-            font-size: 1.6rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .header-actions {
-            display: inline-block;
-            white-space: nowrap;
-        }
-        
-        .header-actions > * {
-            display: inline-block;
-            margin-left: 10px;
-            vertical-align: middle;
-            position: static !important;
-        }
-        
-        .header-actions .btn {
-            white-space: nowrap;
-        }
-        
-        .events-section {
-            margin-bottom: 30px;
-        }
-        
-        .section-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid var(--primary-color);
-        }
-        
-        .section-header h2 {
-            margin: 0;
-            font-size: 1.2rem;
-            color: var(--text-color);
-        }
-        
-        .section-header .badge {
-            background: var(--primary-color);
-            color: white;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-        }
-        
+        /* Event grid */
         .events-grid {
             display: grid;
-            gap: 20px;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
         }
-        
+
+        /* Event cards — standalone, compact */
         .event-card {
-            background: var(--card-bg);
-            border-radius: var(--border-radius);
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-            cursor: pointer;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: left;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            transition: box-shadow 0.2s;
         }
-        
         .event-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
         }
-        
-        .event-card.active .event-card-header {
-            background: linear-gradient(135deg, #0078d4 0%, #00bcf2 100%);
+        .event-card.pre-registration {
+            background: #fffdf5;
         }
-        
-        .event-card.inactive .event-card-header {
-            background: linear-gradient(135deg, #6c757d 0%, #adb5bd 100%);
+        .event-card.registration {
+            background: #f7fdf9;
         }
-        
-        .event-card.inactive {
-            opacity: 0.8;
-        }
-        
-        .event-card-header {
-            padding: 20px;
-            color: white;
-        }
-        
-        .event-card-header h3 {
-            margin: 0 0 10px 0;
-            font-size: 1.4rem;
-        }
-        
-        .event-card-header .event-dates {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-        
-        .event-card-body {
-            padding: 20px;
-        }
-        
-        .event-card-body .event-location {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: var(--text-muted);
-            margin-bottom: 15px;
-        }
-        
-        .event-card-body .event-stats {
-            display: flex;
-            gap: 20px;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-        }
-        
-        .event-card-body .event-stats span {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .event-card-footer {
-            padding: 15px 20px;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .status-badge {
+
+        /* Status pill */
+        .event-card .status-badge {
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 3px 10px;
+            border-radius: 100px;
+            margin-bottom: 10px;
         }
-        
-        .status-badge.open {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .status-badge.closed {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .status-badge.ended {
-            background: #e9ecef;
-            color: #6c757d;
-        }
-        
-        .status-badge.waitlist {
-            background: #fff3cd;
-            color: #856404;
-        }
-        
-        .status-badge.preregistration {
+        .event-card.pre-registration .status-badge {
             background: #fef3c7;
-            color: #a16207;
+            color: #92400e;
         }
-        
-        .status-badge.live {
+        .event-card.registration .status-badge {
             background: #d1fae5;
             color: #065f46;
         }
-        
-        .event-card-footer .btn {
+
+        .event-card h3 {
+            margin: 0 0 4px;
+            font-size: 1.15rem;
+            color: #1e293b;
+        }
+        .event-card .event-meta {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin: 0 0 4px;
+        }
+        .event-card .description {
             font-size: 0.85rem;
+            color: #475569;
+            margin: 0 0 12px;
+            line-height: 1.4;
         }
-        
-        /* Empty state */
-        .empty-state {
+
+        /* Action buttons row */
+        .event-card .btn-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .event-card .btn-event {
+            display: inline-block;
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: opacity 0.15s;
+        }
+        .event-card .btn-event:hover {
+            opacity: 0.88;
+        }
+        .btn-event.primary {
+            background: #059669;
+            color: white;
+        }
+        .btn-event.secondary {
+            background: #ca8a04;
+            color: white;
+        }
+        .btn-event.interest-only {
+            background: #ca8a04;
+            color: white;
+        }
+
+        .event-card .helper-text {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin: 8px 0 0;
+        }
+
+        /* Banner CSS now in css/styles.css */
+
+        .my-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 4px 10px;
+            border-radius: 100px;
+            margin-bottom: 8px;
+        }
+        .my-status-pill.interest {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+        .event-status-row {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .event-status-row .status-badge,
+        .event-status-row .my-status-pill {
+            margin-bottom: 0;
+        }
+        .event-status-row .my-status-pill {
+            margin-left: auto;
+        }
+        .no-events-message {
             text-align: center;
-            padding: 40px;
+            padding: 20px;
             color: var(--text-muted);
-        }
-        
-        .empty-state .icon {
-            font-size: 3rem;
-            margin-bottom: 15px;
-        }
-        
-        /* Historical section styling */
-        .events-section.historical .section-header {
-            border-bottom-color: #6c757d;
-        }
-        
-        .events-section.historical .section-header .badge {
-            background: #6c757d;
         }
     </style>
 </head>
 <body>
-    <div class="container" style="max-width: 1000px;">
-        <!-- Page Header -->
-        <header class="page-header">
-            <h1>🏔️ ACDC Portal</h1>
-            <div class="header-actions">
-                <a id="committee-link" href="admin-dashboard.html" class="btn btn-primary btn-small hidden" style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);">⚙️ Committee</a>
-                <!-- Shown when NOT logged in -->
-                <button id="login-btn" class="btn btn-primary btn-small">🔑 Sign In</button>
-                <!-- Shown when logged in -->
-                <button id="profile-btn" class="btn btn-secondary btn-small hidden">👤 Profile</button>
-                <button id="logout-btn" class="btn btn-secondary btn-small hidden">Log Out</button>
-            </div>
-        </header>
+    <div class="container">
+        <header id="site-header"></header>
 
-        <!-- Loading -->
-        <div id="loading" class="card">
-            <p>Loading events...</p>
-        </div>
-
-        <!-- Events Content -->
-        <div id="content" class="hidden">
-            <!-- Active Events Section -->
-            <section class="events-section active-events">
-                <div class="section-header">
-                    <h2>🎯 Active Events</h2>
-                    <span class="badge" id="active-count">0</span>
+        <main class="landing">
+                <!-- Event section - dynamically populated -->
+                <div id="events-section">
+                    <div class="loading" style="padding: 20px; text-align: center; color: var(--text-muted);">
+                        Loading events...
+                    </div>
                 </div>
-                <div class="events-grid" id="active-events-grid">
-                    <!-- Active event cards will be inserted here -->
-                </div>
-                <div id="no-active-events" class="empty-state hidden">
-                    <div class="icon">📅</div>
-                    <p>No active events at the moment</p>
-                    <p style="color: var(--text-muted); margin-top: 10px; font-size: 0.9rem;">
-                        Want to be notified when registration opens?
-                    </p>
-                    <a href="interest.html" class="btn btn-primary" style="margin-top: 15px;">
-                        🔔 Join Interest List
-                    </a>
-                </div>
-            </section>
-
-            <!-- Historical Events Section -->
-            <section class="events-section historical">
-                <div class="section-header">
-                    <h2>📚 Past Events</h2>
-                    <span class="badge" id="historical-count">0</span>
-                </div>
-                <div class="events-grid" id="historical-events-grid">
-                    <!-- Historical event cards will be inserted here -->
-                </div>
-                <div id="no-historical-events" class="empty-state hidden">
-                    <div class="icon">📜</div>
-                    <p>No past events yet</p>
-                </div>
-            </section>
-        </div>
+        </main>
 
         <footer>
             <p>&copy; 2026 ACDC Portal</p>
         </footer>
     </div>
-
-    <!-- Profile Modal -->
-    <div id="profile-modal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>👤 Your Profile</h2>
-                <button class="modal-close" id="close-profile">&times;</button>
-            </div>
-            
-            <form id="profile-form">
-                <div class="form-group">
-                    <label for="firstName">First Name *</label>
-                    <input type="text" id="firstName" name="firstName" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="lastName">Last Name *</label>
-                    <input type="text" id="lastName" name="lastName" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" readonly class="readonly">
-                </div>
-                
-                <div class="form-group">
-                    <label for="phone">Phone *</label>
-                    <input type="tel" id="phone" name="phone" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="gamertag">Gamertag</label>
-                    <input type="text" id="gamertag" name="gamertag" 
-                           placeholder="Your gaming username (optional)">
-                </div>
-                
-                <div class="form-group">
-                    <label for="allergies">Allergies / Dietary Requirements</label>
-                    <textarea id="allergies" name="allergies" rows="3" 
-                              maxlength="500" placeholder="Enter any allergies or dietary requirements..."></textarea>
-                </div>
-
-                <div id="profile-error" class="error-message hidden"></div>
-                <div id="profile-success" class="success-message hidden"></div>
-                
-                <button type="submit" class="btn btn-primary" id="save-btn">
-                    <span class="btn-text">Save Profile</span>
-                    <span class="btn-loading hidden">Saving...</span>
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal Styles (inline for this page) -->
-    <style>
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-        }
-        
-        .modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .modal {
-            background: var(--card-bg);
-            border-radius: var(--border-radius);
-            padding: 30px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-            transform: translateY(-20px);
-            transition: transform 0.3s ease;
-        }
-        
-        .modal-overlay.active .modal {
-            transform: translateY(0);
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        .modal-header h2 {
-            margin: 0;
-        }
-        
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--text-muted);
-        }
-        
-        .modal-close:hover {
-            color: var(--text-color);
-        }
-    </style>
-
-    <!-- MSAL for Entra External ID Email OTP -->
-    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
-    <script src="js/events.js"></script>
+    <script src="js/site-header.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initialize Auth
+            Auth.init();
+
+            // Render shared header
+            SiteHeader.render({ containerId: 'site-header' });
+
+            let authUser = null;
+            let currentUser = null;
+            let participationByEventId = new Map();
+            let interestLeadEventIds = new Set();
+            
+            // Check for invitation link parameter and store it
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteId = urlParams.get('invite');
+            if (inviteId) {
+                console.log('Storing invitation ID:', inviteId);
+                sessionStorage.setItem('pendingInvitation', inviteId);
+            }
+            
+            // Setup auth actions and load user context for interest/team status badges
+            try {
+                authUser = Auth.isLoggedIn() ? Auth.getUser() : null;
+                SiteHeader.update({ authUser });
+
+                if (authUser?.email) {
+                    currentUser = await API.users.getOrNull(authUser.email);
+                    SiteHeader.update({ authUser, user: currentUser });
+
+                    if (currentUser?.id) {
+                        try {
+                            const participationData = await API.participations.get(currentUser.id);
+                            const participationList = Array.isArray(participationData) ? participationData : [participationData];
+                            participationList.filter(Boolean).forEach(participation => {
+                                if (participation.eventId) {
+                                    participationByEventId.set(participation.eventId, participation);
+                                }
+                            });
+                        } catch (e) {
+                            console.log('Could not load participations for event status badges:', e);
+                        }
+
+                        try {
+                            const leadsResp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
+                            if (leadsResp.ok) {
+                                const leadsData = await leadsResp.json();
+                                const leads = Array.isArray(leadsData) ? leadsData : (leadsData.leads || []);
+                                leads
+                                    .filter(lead => lead.email?.toLowerCase() === currentUser.email.toLowerCase())
+                                    .forEach(lead => interestLeadEventIds.add(lead.eventId));
+                            }
+                        } catch (e) {
+                            console.log('Could not load interest leads for badges:', e);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Auth/user context error:', error);
+            }
+            
+            // If this is a role-based invitation, show the dedicated acceptance page
+            if (inviteId) {
+                try {
+                    const invitation = await API.invitations.get(inviteId);
+                    if (invitation && invitation.status === 'pending' && !invitation.isExpired 
+                        && invitation.role && invitation.role !== 'participant') {
+                        showRoleInvitationPage(invitation);
+                        return; // Don't load regular page
+                    }
+                    // For team invites or invalid invites, fall through to normal page
+                    if (invitation && invitation.status === 'pending' && !invitation.isExpired) {
+                        showTeamInvitationWelcome(invitation);
+                    }
+                } catch (err) {
+                    console.log('Could not load invitation:', err);
+                }
+            }
+            
+            // Regular page: load events + sign-in section
+            await loadEvents();
+            SiteHeader.update({ authUser, user: currentUser });
+            
+            // ============================================================
+            // ROLE-BASED INVITE: Dedicated acceptance page (judge/committee)
+            // ============================================================
+            function showRoleInvitationPage(invitation) {
+                const isJudge = invitation.role === 'judge';
+                const roleLabel = isJudge ? 'Judge' : 'Committee Member';
+                const roleIcon = isJudge ? '⚖️' : '🏛️';
+                const accentColor = isJudge ? '#92400e' : '#1e40af';
+                const bgGradient = isJudge 
+                    ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' 
+                    : 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)';
+                const borderColor = isJudge ? '#d97706' : '#2563eb';
+                const btnBg = isJudge ? '#b45309' : '#1d4ed8';
+                const btnHover = isJudge ? '#92400e' : '#1e40af';
+                
+                // Format event dates
+                let eventMeta = '';
+                if (invitation.eventStartDate || invitation.eventLocation) {
+                    const parts = [];
+                    if (invitation.eventStartDate) {
+                        parts.push(`📅 ${formatDateRange(invitation.eventStartDate, invitation.eventEndDate)}`);
+                    }
+                    if (invitation.eventLocation) {
+                        parts.push(`📍 ${invitation.eventLocation}`);
+                    }
+                    eventMeta = `<p style="margin: 12px 0 0; font-size: 0.9rem; color: #64748b;">${parts.join(' • ')}</p>`;
+                }
+                
+                const mainEl = document.querySelector('main.landing');
+                mainEl.innerHTML = `
+                    <div class="card" style="max-width: 500px; margin: 0 auto;">
+                        <!-- Role invitation header -->
+                        <div style="background: ${bgGradient}; border-radius: 12px; padding: 28px; margin-bottom: 24px; text-align: center;">
+                            <div style="font-size: 2.5rem; margin-bottom: 12px;">${roleIcon}</div>
+                            <h2 style="margin: 0 0 8px; color: ${accentColor}; font-size: 1.3rem;">
+                                ${roleLabel} Invitation
+                            </h2>
+                            <p style="margin: 0; color: #475569; font-size: 1rem; line-height: 1.5;">
+                                <strong>${invitation.inviterName}</strong> has invited you to serve as a 
+                                <strong style="color: ${accentColor};">${roleLabel}</strong> for
+                            </p>
+                            <p style="margin: 8px 0 0; font-size: 1.2rem; font-weight: 700; color: ${accentColor};">
+                                ${invitation.eventName || 'this event'}
+                            </p>
+                            ${eventMeta}
+                        </div>
+                        
+                        <!-- Single clear CTA -->
+                        <div style="text-align: center; padding: 0 20px;">
+                            <p style="margin: 0 0 20px; color: #475569; font-size: 0.95rem; line-height: 1.5;">
+                                Click the button below to accept and complete your registration. 
+                                We'll send a one-time code to your email — no password needed.
+                            </p>
+                            <button id="accept-role-btn" style="
+                                display: inline-block;
+                                width: 100%;
+                                padding: 16px 32px;
+                                background: ${btnBg};
+                                color: white;
+                                border: none;
+                                border-radius: 10px;
+                                font-size: 1.05rem;
+                                font-weight: 600;
+                                cursor: pointer;
+                                transition: background 0.2s;
+                            ">
+                                ${roleIcon} Accept ${roleLabel} Invitation
+                            </button>
+                            <p style="margin: 16px 0 0; font-size: 0.8rem; color: #94a3b8;">
+                                This invitation expires ${formatExpiry(invitation.expiresAt)}
+                            </p>
+                        </div>
+                    </div>
+                `;
+                
+                // Button hover effect
+                const btn = document.getElementById('accept-role-btn');
+                btn.addEventListener('mouseenter', () => btn.style.background = btnHover);
+                btn.addEventListener('mouseleave', () => btn.style.background = btnBg);
+                btn.addEventListener('click', async () => {
+                    try {
+                        await Auth.login();
+                    } catch (error) {
+                        console.error('Sign-in error:', error);
+                        alert('Error signing in. Please try again.');
+                    }
+                });
+            }
+            
+            function formatExpiry(dateStr) {
+                if (!dateStr) return 'soon';
+                const expiry = new Date(dateStr);
+                const now = new Date();
+                const days = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+                if (days <= 0) return 'soon';
+                if (days === 1) return 'tomorrow';
+                return `in ${days} days`;
+            }
+            
+            // ============================================================
+            // TEAM INVITE: Banner on top of regular page
+            // ============================================================
+            function showTeamInvitationWelcome(invitation) {
+                const section = document.getElementById('events-section');
+                const welcomeHtml = `
+                    <div style="background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                        <p style="margin: 0 0 8px; color: #1e40af; font-weight: 600;">🎉 You've been invited!</p>
+                        <p style="margin: 0; color: #475569;">
+                            <strong>${invitation.inviterName}</strong> has invited you to join team 
+                            <strong style="color: #1e40af;">${invitation.teamName}</strong>
+                        </p>
+                        <p style="margin: 8px 0 0; color: #64748b; font-size: 14px;">
+                            Sign in below to accept the invitation and join the team.
+                        </p>
+                    </div>
+                `;
+                section.insertAdjacentHTML('beforebegin', welcomeHtml);
+            }
+
+            // ============================================================
+            // REGULAR PAGE: Events list + sign-in
+            // ============================================================
+            
+            async function loadEvents() {
+                const section = document.getElementById('events-section');
+                
+                try {
+                    const response = await fetch(`${CONFIG.api.baseUrl}/events`);
+                    if (!response.ok) throw new Error('Failed to load events');
+                    
+                    const events = await response.json();
+                    
+                    // Get events that are in pre-registration or registration status
+                    const activeEvents = events.filter(e => 
+                        e.status === 'pre-registration' || e.status === 'registration'
+                    );
+                    
+                    if (activeEvents.length === 0) {
+                        section.innerHTML = `
+                            <div class="no-events-message">
+                                <h2 style="margin-bottom: 12px;">Welcome!</h2>
+                                <p>No events are currently open for registration.</p>
+                                <p style="margin-top: 8px;">Check back later or sign in to see your profile.</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    section.innerHTML = '<div class="events-grid">' + activeEvents.map(event => {
+                        const participation = participationByEventId.get(event.id) || null;
+                        const roles = participation?.roles || [];
+                        const isInterestRegistered = roles.includes('interest') || interestLeadEventIds.has(event.id);
+                        const isJudge = roles.includes('judge');
+                        const isCommittee = roles.includes('committee');
+                        const hasTeam = !!participation?.teamId;
+
+                        const isPreReg = event.status === 'pre-registration';
+                        const statusIcon = isPreReg ? '🔔' : '✅';
+                        const statusText = isPreReg ? 'Coming Soon' : 'Registration Open';
+                        const statusPill = isInterestRegistered ? '<div class="my-status-pill interest">✓ Interest Registered</div>' : '';
+                        
+                        const meta = `📅 ${formatDateRange(event.startDate, event.endDate)}${event.location ? ` · 📍 ${event.location}` : ''}`;
+                        const desc = event.description ? `<p class="description">${event.description}</p>` : '';
+                        
+                        if (isPreReg) {
+                            const preRegActions = isInterestRegistered
+                                ? `<a href="event.html?id=${event.id}" class="btn-event interest-only">View Event</a>`
+                                : `<a href="register.html?intent=interest&eventId=${event.id}" class="btn-event interest-only">Register Interest</a>`;
+
+                            return `
+                                <div class="event-card pre-registration">
+                                    <div class="event-status-row">
+                                        <div class="status-badge">${statusIcon} ${statusText}</div>
+                                        ${statusPill}
+                                    </div>
+                                    <h3>${event.name}</h3>
+                                    ${desc}
+                                    <p class="event-meta">${meta}</p>
+                                    <div class="btn-row">
+                                        ${preRegActions}
+                                    </div>
+                                    <p class="helper-text">Be the first to know when registration opens!</p>
+                                </div>
+                            `;
+                        } else {
+                            let registrationActions = `
+                                <a href="register.html?intent=team" class="btn-event primary">Register Team</a>
+                                <a href="register.html?intent=interest&eventId=${event.id}" class="btn-event secondary">Register Interest</a>
+                            `;
+
+                            if (hasTeam || isJudge || isCommittee) {
+                                registrationActions = `<a href="event.html?id=${event.id}" class="btn-event primary">View Event</a>`;
+                            } else if (isInterestRegistered) {
+                                registrationActions = `
+                                    <a href="register.html?intent=team" class="btn-event primary">Register Team</a>
+                                    <a href="event.html?id=${event.id}" class="btn-event secondary">View Event</a>
+                                `;
+                            }
+
+                            return `
+                                <div class="event-card registration">
+                                    <div class="event-status-row">
+                                        <div class="status-badge">${statusIcon} ${statusText}</div>
+                                        ${statusPill}
+                                    </div>
+                                    <h3>${event.name}</h3>
+                                    ${desc}
+                                    <p class="event-meta">${meta}</p>
+                                    <div class="btn-row">
+                                        ${registrationActions}
+                                    </div>
+                                    <p class="helper-text">Register your team or express interest to stay informed</p>
+                                </div>
+                            `;
+                        }
+                    }).join('') + '</div>';
+                    
+                } catch (error) {
+                    console.error('Error loading events:', error);
+                    section.innerHTML = `
+                        <div class="no-events-message">
+                            <h2 style="margin-bottom: 12px;">Welcome!</h2>
+                            <p>Unable to load events. Please try again later.</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            function formatDateRange(start, end) {
+                const startDate = new Date(start);
+                const endDate = new Date(end);
+                
+                if (startDate.getMonth() === endDate.getMonth() && startDate.getFullYear() === endDate.getFullYear()) {
+                    return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.getDate()}, ${endDate.getFullYear()}`;
+                }
+                return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+            }
+        });
+    </script>
 </body>
 </html>

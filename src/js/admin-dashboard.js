@@ -3,6 +3,7 @@
 let currentUser = null;
 let allEvents = [];
 let allTeams = [];
+let currentPermissions = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loadingDiv = document.getElementById('loading');
@@ -10,33 +11,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const dashboardContent = document.getElementById('dashboard-content');
     const mainContent = document.getElementById('main-content');
 
-    // Initialize Auth
-    Auth.init();
-    renderAdminSidebar('dashboard');
+    // Resolve permissions (handles auth check, sidebar render, access denied)
+    currentPermissions = await Permissions.initAdminPage('dashboard', {
+        loadingEl: loadingDiv,
+        accessDeniedEl: notCommitteeDiv,
+        contentEl: mainContent
+    });
+
+    if (!currentPermissions) return;
+
+    currentUser = currentPermissions.user;
 
     try {
-        // Handle redirect
-        await Auth.handleRedirect();
-
-        // Check if logged in
-        if (!Auth.isLoggedIn()) {
-            window.location.href = '/login.html';
-            return;
-        }
-
-        const authUser = Auth.getUser();
-
-        // Load user data
-        currentUser = await API.users.get(authUser.email);
-
-        // Check if user is portal admin
-        if (!currentUser.isPortalAdmin) {
-            loadingDiv.classList.add('hidden');
-            mainContent.classList.add('hidden');
-            notCommitteeDiv.classList.remove('hidden');
-            return;
-        }
-
         // Load all data
         await loadDashboardData();
 
@@ -56,13 +42,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadDashboardData() {
     try {
-        // Load events
-        allEvents = await API.events.list();
+        // Load events (scoped by permissions)
+        let events = await API.events.list();
+        allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
         document.getElementById('stat-events').textContent = allEvents.length;
         renderEventsList();
 
-        // Load teams
-        allTeams = await API.teams.list();
+        // Load teams (scoped by permissions)
+        let teams = await API.teams.list();
+        allTeams = Permissions.filterByEvent(currentPermissions, teams);
         document.getElementById('stat-teams').textContent = allTeams.length;
         renderTeamsTable();
 
@@ -111,7 +99,7 @@ function renderEventsList() {
     eventsList.innerHTML = displayEvents.map(event => {
         const status = event.status || 'draft';
         const isActive = status === 'pre-registration' || status === 'registration' || status === 'live';
-        const startDate = new Date(event.startDate).toLocaleDateString('en-US', {
+        const startDate = new Date(event.startDate + 'T12:00:00').toLocaleDateString('en-US', {
             month: 'short', day: 'numeric', year: 'numeric'
         });
         

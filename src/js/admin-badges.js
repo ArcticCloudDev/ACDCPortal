@@ -5,8 +5,9 @@ let allBadges = [];
 let allEvents = [];
 let allEventBadges = [];
 let allClaims = [];
-let allUsers = [];
+let judgeUsers = [];
 let selectedEventId = null;
+let currentPermissions = null;
 
 // Category display config
 const CATEGORIES = {
@@ -22,31 +23,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loadingDiv = document.getElementById('loading');
     const adminContent = document.getElementById('admin-content');
 
-    Auth.init();
-    renderAdminSidebar('badges');
+    // Resolve permissions (handles auth check, sidebar render, access denied)
+    currentPermissions = await Permissions.initAdminPage('badges', {
+        loadingEl: loadingDiv,
+        contentEl: adminContent
+    });
+
+    if (!currentPermissions) return;
+
+    currentUser = currentPermissions.user;
 
     try {
-        await Auth.handleRedirect();
-
-        if (!Auth.isLoggedIn()) {
-            window.location.href = '/login.html';
-            return;
-        }
-
-        const authUser = Auth.getUser();
-        currentUser = await API.users.get(authUser.email);
-
-        if (!currentUser.isPortalAdmin) {
-            loadingDiv.classList.add('hidden');
-            loadingDiv.insertAdjacentHTML('afterend', `
-                <div class="access-denied">
-                    <h2>⛔ Access Denied</h2>
-                    <p>You need admin privileges to access this page.</p>
-                </div>
-            `);
-            return;
-        }
-
         // Load all data
         await loadAllData();
 
@@ -78,20 +65,34 @@ async function loadAllData() {
     ]);
 
     allBadges = badges;
-    allEvents = events;
+    // Scope events to permitted events for non-admin users
+    allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
     allClaims = claims;
-
-    // Load users for judge dropdown
-    try {
-        allUsers = await API.request('/users/all');
-    } catch (e) {
-        console.warn('Could not load users:', e);
-        allUsers = [];
-    }
 }
 
 async function loadEventBadges(eventId) {
     allEventBadges = await API.request(`/events/${eventId}/badges`);
+
+    // Load judges for this event from participations (role-based)
+    judgeUsers = [];
+    try {
+        const participations = await API.participations.getByEvent(eventId, 'judge');
+        if (participations && participations.length > 0) {
+            const allUsersData = await API.users.list();
+            judgeUsers = participations
+                .filter(p => p.userId)
+                .map(p => {
+                    const user = allUsersData.find(u => u.id === p.userId);
+                    return {
+                        id: p.userId,
+                        name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : (p.email || 'Unknown')
+                    };
+                })
+                .sort((a, b) => a.name.localeCompare(b.name));
+        }
+    } catch (e) {
+        console.warn('Could not load judges:', e);
+    }
 }
 
 
@@ -224,6 +225,7 @@ function renderBadgeLibrary() {
 
 function renderBadgeCard(badge) {
     const catConfig = CATEGORIES[badge.category] || { label: badge.category, emoji: '⬜' };
+    const claimLabel = (badge.claimType || 'common') === 'exclusive' ? '🏆 Exclusive' : '🎯 Common';
     return `
         <div class="badge-card">
             <div class="badge-header">
@@ -233,6 +235,7 @@ function renderBadgeCard(badge) {
             <div class="badge-desc">${escapeHtml(badge.description)}</div>
             <div class="badge-footer">
                 <span class="badge-points">🏆 ${badge.points} pts</span>
+                <span style="font-size: 0.75rem; color: var(--admin-text-muted);">${claimLabel}</span>
                 <div class="badge-actions">
                     <button class="btn-sm" onclick="openBadgeModal('${badge.id}')" title="Edit">✏️</button>
                     <button class="btn-sm danger" onclick="deleteBadge('${badge.id}')" title="Delete">🗑️</button>
@@ -397,15 +400,8 @@ async function saveEventBadges() {
 }
 
 function getJudgesForEvent(eventId) {
-    // Get all users — judges are those who might be on the judges team or any user
-    // For simplicity, return all users with names so admin can pick any user as judge
-    return allUsers
-        .filter(u => u.firstName || u.lastName || u.email)
-        .map(u => ({
-            id: u.id,
-            name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+    // Return members of the judges team for this event (loaded in loadEventBadges)
+    return judgeUsers;
 }
 
 
@@ -486,6 +482,7 @@ function openBadgeModal(badgeId = null) {
         document.getElementById('badge-edit-id').value = badge.id;
         document.getElementById('badge-name').value = badge.name;
         document.getElementById('badge-category').value = badge.category;
+        document.getElementById('badge-claimType').value = badge.claimType || 'common';
         document.getElementById('badge-description').value = badge.description;
         document.getElementById('badge-points').value = badge.points;
         document.getElementById('badge-imageUrl').value = badge.imageUrl || '';
@@ -494,6 +491,7 @@ function openBadgeModal(badgeId = null) {
         document.getElementById('badge-edit-id').value = '';
         document.getElementById('badge-name').value = '';
         document.getElementById('badge-category').value = '';
+        document.getElementById('badge-claimType').value = 'common';
         document.getElementById('badge-description').value = '';
         document.getElementById('badge-points').value = '';
         document.getElementById('badge-imageUrl').value = '';
@@ -511,6 +509,7 @@ async function saveBadge() {
     const data = {
         name: document.getElementById('badge-name').value.trim(),
         category: document.getElementById('badge-category').value,
+        claimType: document.getElementById('badge-claimType').value || 'common',
         description: document.getElementById('badge-description').value.trim(),
         points: parseInt(document.getElementById('badge-points').value) || 0,
         imageUrl: document.getElementById('badge-imageUrl').value.trim()

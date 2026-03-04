@@ -8,6 +8,7 @@ let editingEventId = null;
 let currentStatus = 'draft';
 let currentEventSequence = null;
 let emailEditor = null;
+let currentPermissions = null;
 
 // Status workflow - defines valid transitions
 const STATUS_ORDER = ['draft', 'pre-registration', 'registration', 'live', 'completed'];
@@ -33,27 +34,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const notCommitteeDiv = document.getElementById('not-committee');
     const adminContent = document.getElementById('admin-content');
 
-    // Initialize Auth
-    Auth.init();
-    renderAdminSidebar('events');
+    // Resolve permissions (handles auth check, sidebar render, access denied)
+    currentPermissions = await Permissions.initAdminPage('events', {
+        loadingEl: loadingDiv,
+        accessDeniedEl: notCommitteeDiv,
+        contentEl: adminContent
+    });
+
+    if (!currentPermissions) return;
+
+    currentUser = currentPermissions.user;
 
     try {
-        await Auth.handleRedirect();
-
-        if (!Auth.isLoggedIn()) {
-            window.location.href = '/login.html';
-            return;
-        }
-
-        const authUser = Auth.getUser();
-        currentUser = await API.users.get(authUser.email);
-
-        if (!currentUser.isPortalAdmin) {
-            loadingDiv.classList.add('hidden');
-            notCommitteeDiv.classList.remove('hidden');
-            return;
-        }
-
         // Load events
         await loadEvents();
 
@@ -94,7 +86,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadEvents() {
     try {
-        allEvents = await API.events.list();
+        let events = await API.events.list();
+        // Scope to permitted events for non-admin users
+        allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
         renderEventsList();
     } catch (error) {
         console.error('Error loading events:', error);
@@ -129,10 +123,10 @@ function renderEventsList() {
     });
 
     eventsTableBody.innerHTML = sortedEvents.map(event => {
-        const startDate = new Date(event.startDate).toLocaleDateString('en-US', {
+        const startDate = new Date(event.startDate + 'T12:00:00').toLocaleDateString('en-US', {
             month: 'short', day: 'numeric', year: 'numeric'
         });
-        const endDate = new Date(event.endDate).toLocaleDateString('en-US', {
+        const endDate = new Date(event.endDate + 'T12:00:00').toLocaleDateString('en-US', {
             month: 'short', day: 'numeric', year: 'numeric'
         });
 
@@ -390,6 +384,8 @@ function showForm(event = null) {
         document.getElementById('event-sequence').checked = event.sequenceEnabled || false;
         document.getElementById('event-team-welcome-email').checked = event.sendWelcomeEmail || false;
         document.getElementById('event-interest-acknowledgment').checked = event.sendInterestAcknowledgment || false;
+        document.getElementById('event-judge-invitation-email').checked = event.sendJudgeInvitationEmail || false;
+        document.getElementById('event-committee-invitation-email').checked = event.sendCommitteeInvitationEmail || false;
         
         // Set registration type
         const regType = event.registrationType || 'team';
@@ -410,6 +406,10 @@ function showForm(event = null) {
         statusSection.classList.add('hidden');
         form.reset();
         document.getElementById('event-id').value = '';
+        
+        // Default email toggles for new events
+        document.getElementById('event-judge-invitation-email').checked = true;
+        document.getElementById('event-committee-invitation-email').checked = true;
         
         // Reset registration type to team
         document.querySelectorAll('.radio-option').forEach(option => {
@@ -485,6 +485,8 @@ async function handleFormSubmit(e) {
             sequenceEnabled: document.getElementById('event-sequence').checked,
             sendWelcomeEmail: document.getElementById('event-team-welcome-email').checked,
             sendInterestAcknowledgment: document.getElementById('event-interest-acknowledgment').checked,
+            sendJudgeInvitationEmail: document.getElementById('event-judge-invitation-email').checked,
+            sendCommitteeInvitationEmail: document.getElementById('event-committee-invitation-email').checked,
             fileCategories: document.getElementById('event-file-categories').value
                 .split(',')
                 .map(c => c.trim())
@@ -620,12 +622,6 @@ async function loadCommitteeMembers() {
         return;
     }
 
-    if (!currentEvent.committeeTeamId) {
-        document.getElementById('committee-members-body').innerHTML = 
-            '<tr><td colspan="5" class="empty-state">Committee team not available for this event</td></tr>';
-        return;
-    }
-
     try {
         // Load all data
         [allParticipations, allUsers, allInvitations] = await Promise.all([
@@ -644,12 +640,6 @@ async function loadJudgesMembers() {
     if (!currentEventId || !currentEvent) {
         document.getElementById('judges-members-body').innerHTML = 
             '<tr><td colspan="5" class="empty-state">Save the event first to add judges</td></tr>';
-        return;
-    }
-
-    if (!currentEvent.judgesTeamId) {
-        document.getElementById('judges-members-body').innerHTML = 
-            '<tr><td colspan="5" class="empty-state">Judges team not available for this event</td></tr>';
         return;
     }
 
@@ -672,21 +662,17 @@ async function loadJudgesMembers() {
 function renderCommitteeMembers() {
     const tbody = document.getElementById('committee-members-body');
     
-    if (!currentEvent?.committeeTeamId) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Committee team not available</td></tr>';
-        return;
-    }
-    
-    // Find participations for the committee team
+    // Find participations with 'committee' role for this event
     const committeeParticipations = allParticipations.filter(p => 
         p.eventId === currentEventId && 
-        p.teamMemberships?.some(tm => tm.teamId === currentEvent.committeeTeamId)
+        p.roles?.includes('committee')
     );
 
-    // Find pending invitations for the committee team
+    // Find pending invitations for committee
     const pendingInvites = allInvitations.filter(i => 
-        i.teamId === currentEvent.committeeTeamId &&
-        i.status === 'pending'
+        i.status === 'pending' && 
+        i.role === 'committee' && 
+        i.eventId === currentEventId
     );
 
     const members = [];
@@ -701,7 +687,8 @@ function renderCommitteeMembers() {
                 status: 'registered',
                 registeredDate: new Date(p.createdAt).toLocaleDateString(),
                 type: 'user',
-                id: user.id
+                id: user.id,
+                participationId: p.id
             });
         }
     });
@@ -723,6 +710,8 @@ function renderCommitteeMembers() {
         return;
     }
 
+    const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
+
     tbody.innerHTML = members.map(m => `
         <tr>
             <td>${escapeHtml(m.name)}</td>
@@ -732,7 +721,7 @@ function renderCommitteeMembers() {
             <td>
                 ${m.type === 'invite' ? 
                     `<button class="btn-sm danger" onclick="revokeInvite('${m.id}', 'committee')">✕ Revoke</button>` : 
-                    ''}
+                    (canDelete ? `<button class="btn-sm danger" onclick="removeRegisteredMember('${m.participationId}', '${escapeHtml(m.name)}', 'committee')">🗑️ Remove</button>` : '')}
             </td>
         </tr>
     `).join('');
@@ -741,21 +730,17 @@ function renderCommitteeMembers() {
 function renderJudgesMembers() {
     const tbody = document.getElementById('judges-members-body');
     
-    if (!currentEvent?.judgesTeamId) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Judges team not available</td></tr>';
-        return;
-    }
-    
-    // Find participations for the judges team
+    // Find participations with 'judge' role for this event
     const judgesParticipations = allParticipations.filter(p => 
         p.eventId === currentEventId && 
-        p.teamMemberships?.some(tm => tm.teamId === currentEvent.judgesTeamId)
+        p.roles?.includes('judge')
     );
 
-    // Find pending invitations for the judges team
+    // Find pending invitations for judges
     const pendingInvites = allInvitations.filter(i => 
-        i.teamId === currentEvent.judgesTeamId &&
-        i.status === 'pending'
+        i.status === 'pending' && 
+        i.role === 'judge' && 
+        i.eventId === currentEventId
     );
 
     const members = [];
@@ -770,7 +755,8 @@ function renderJudgesMembers() {
                 status: 'registered',
                 registeredDate: new Date(p.createdAt).toLocaleDateString(),
                 type: 'user',
-                id: user.id
+                id: user.id,
+                participationId: p.id
             });
         }
     });
@@ -792,6 +778,8 @@ function renderJudgesMembers() {
         return;
     }
 
+    const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
+
     tbody.innerHTML = members.map(m => `
         <tr>
             <td>${escapeHtml(m.name)}</td>
@@ -801,7 +789,7 @@ function renderJudgesMembers() {
             <td>
                 ${m.type === 'invite' ? 
                     `<button class="btn-sm danger" onclick="revokeInvite('${m.id}', 'judge')">✕ Revoke</button>` : 
-                    ''}
+                    (canDelete ? `<button class="btn-sm danger" onclick="removeRegisteredMember('${m.participationId}', '${escapeHtml(m.name)}', 'judge')">🗑️ Remove</button>` : '')}
             </td>
         </tr>
     `).join('');
@@ -822,13 +810,6 @@ async function sendInvitation(role) {
         return;
     }
 
-    const teamId = role === 'committee' ? currentEvent.committeeTeamId : currentEvent.judgesTeamId;
-    
-    if (!teamId) {
-        alert(`${role === 'committee' ? 'Committee' : 'Judges'} team not available for this event`);
-        return;
-    }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
         alert('Please enter a valid email address');
@@ -838,7 +819,8 @@ async function sendInvitation(role) {
     try {
         await API.invitations.create({
             email: email,
-            teamId: teamId,
+            eventId: currentEventId,
+            role: role, // 'committee' or 'judge'
             inviterId: currentUser.id,
             inviterName: `${currentUser.firstName} ${currentUser.lastName}`,
             inviterEmail: currentUser.email,
@@ -847,6 +829,9 @@ async function sendInvitation(role) {
 
         alert(`Invitation sent to ${email}`);
         emailInput.value = '';
+
+        // Clear cached data so reload fetches fresh
+        allParticipations = [];
 
         // Reload the members list
         if (role === 'committee') {
@@ -870,6 +855,9 @@ async function revokeInvite(inviteId, role) {
     try {
         await API.invitations.delete(inviteId);
         
+        // Clear cached data so reload fetches fresh
+        allParticipations = [];
+
         // Reload the members list
         if (role === 'committee') {
             await loadCommitteeMembers();
@@ -880,6 +868,31 @@ async function revokeInvite(inviteId, role) {
     } catch (error) {
         console.error('Error revoking invitation:', error);
         alert('Error revoking invitation: ' + error.message);
+    }
+}
+
+async function removeRegisteredMember(participationId, name, role) {
+    const roleLabel = role === 'committee' ? 'committee member' : 'judge';
+    if (!confirm(`Remove ${roleLabel} "${name}" from this event?\n\nThis will delete their participation record including hotel bookings.`)) {
+        return;
+    }
+
+    try {
+        await API.participations.delete(participationId);
+        
+        // Clear cached data so reload fetches fresh
+        allParticipations = [];
+        
+        // Reload the members list
+        if (role === 'committee') {
+            await loadCommitteeMembers();
+        } else {
+            await loadJudgesMembers();
+        }
+
+    } catch (error) {
+        console.error('Error removing member:', error);
+        alert('Error removing member: ' + error.message);
     }
 }
 
@@ -895,7 +908,7 @@ async function loadInterestLeads() {
 
     // Set the interest link
     const baseUrl = window.location.origin;
-    const interestLink = `${baseUrl}/interest.html?event=${currentEventId}`;
+    const interestLink = `${baseUrl}/register.html?intent=interest&eventId=${currentEventId}`;
     document.getElementById('interest-link').value = interestLink;
 
     try {
@@ -1245,7 +1258,7 @@ async function loadRecipientDeliveryOverview() {
         if (!response.ok) throw new Error('Failed to load deliveries');
         
         const data = await response.json();
-        const { deliveries, leads, campaigns } = data;
+        const { deliveries, leads, recipients = [], campaigns } = data;
         
         if (!campaigns || campaigns.length === 0) {
             overviewSection.style.display = 'none';
@@ -1268,14 +1281,37 @@ async function loadRecipientDeliveryOverview() {
         // Get verified leads
         const verifiedLeads = leads.filter(l => l.verified);
         
-        if (verifiedLeads.length === 0) {
-            bodyEl.innerHTML = '<tr><td colspan="' + (campaigns.length + 2) + '" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">No verified leads yet</td></tr>';
+        // Combine leads and recipients (judges/committee/participants) into unified list
+        const allRecipients = [
+            ...verifiedLeads.map(lead => ({
+                id: lead.id,
+                name: lead.firstName && lead.lastName ? `${lead.firstName} ${lead.lastName}` : lead.email,
+                email: lead.email,
+                type: 'interest',
+                matchField: 'leadId'
+            })),
+            ...recipients.map(r => ({
+                id: r.id,
+                name: r.firstName && r.lastName ? `${r.firstName} ${r.lastName}` : r.email,
+                email: r.email,
+                type: r.type,
+                matchField: 'userId'
+            }))
+        ];
+        
+        if (allRecipients.length === 0) {
+            bodyEl.innerHTML = '<tr><td colspan="' + (campaigns.length + 2) + '" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">No recipients yet</td></tr>';
             return;
         }
         
         // Build rows for each recipient
-        const rows = verifiedLeads.map(lead => {
-            const recipientDeliveries = deliveries.filter(d => d.leadId === lead.id);
+        const rows = allRecipients.map(recipient => {
+            // Match deliveries by leadId for leads, userId for participants, fallback to email
+            const recipientDeliveries = deliveries.filter(d => {
+                if (recipient.matchField === 'leadId') return d.leadId === recipient.id;
+                if (recipient.matchField === 'userId') return d.userId === recipient.id;
+                return d.email?.toLowerCase() === recipient.email.toLowerCase();
+            });
             
             // Check each campaign
             const emailStatuses = sortedCampaigns.map(campaign => {
@@ -1290,9 +1326,18 @@ async function loadRecipientDeliveryOverview() {
             const totalCount = sortedCampaigns.length;
             const completion = totalCount > 0 ? Math.round((sentCount / totalCount) * 100) : 0;
             
+            const typeLabels = {
+                'interest': '<span style="font-size: 0.75rem; background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 3px;">Interest</span>',
+                'judge': '<span style="font-size: 0.75rem; background: #ede9fe; color: #6d28d9; padding: 1px 6px; border-radius: 3px;">Judge</span>',
+                'committee': '<span style="font-size: 0.75rem; background: #e0e7ff; color: #4338ca; padding: 1px 6px; border-radius: 3px;">Committee</span>',
+                'participant': '<span style="font-size: 0.75rem; background: #d1fae5; color: #065f46; padding: 1px 6px; border-radius: 3px;">Participant</span>'
+            };
+            const typeLabel = typeLabels[recipient.type] ? ' ' + typeLabels[recipient.type] : '';
+            
             return {
-                name: lead.firstName && lead.lastName ? `${lead.firstName} ${lead.lastName}` : lead.email,
-                email: lead.email,
+                name: recipient.name,
+                email: recipient.email,
+                typeLabel,
                 statuses: emailStatuses,
                 sentCount,
                 totalCount,
@@ -1306,7 +1351,7 @@ async function loadRecipientDeliveryOverview() {
         bodyEl.innerHTML = rows.map(row => `
             <tr>
                 <td style="text-align: left;">
-                    <div style="font-weight: 500;">${row.name}</div>
+                    <div style="font-weight: 500;">${row.name}${row.typeLabel || ''}</div>
                     <div style="font-size: 0.85rem; color: var(--admin-text-muted);">${row.email}</div>
                 </td>
                 ${row.statuses.map(s => `<td style="text-align: center; ${s.style}">${s.symbol}</td>`).join('')}

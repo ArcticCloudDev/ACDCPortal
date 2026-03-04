@@ -2,7 +2,6 @@
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const Storage = require('../shared/storage');
-const { updateEntraUser } = require('../shared/graph');
 
 // Get all users (for admin dashboard)
 app.http('users-get-all', {
@@ -137,21 +136,6 @@ app.http('users-update', {
             
             const updatedUser = Storage.users.update(userId, updates);
 
-            // Sync profile to Entra External ID if name or phone changed
-            if (updates.firstName || updates.lastName || updates.phone) {
-                try {
-                    await updateEntraUser(updatedUser.email, {
-                        firstName: updates.firstName || updatedUser.firstName,
-                        lastName: updates.lastName || updatedUser.lastName,
-                        phone: updates.phone || updatedUser.phone
-                    });
-                    context.log(`Synced profile to Entra for user ${userId}`);
-                } catch (entraError) {
-                    // Log but don't fail - local update succeeded
-                    context.warn(`Failed to sync to Entra: ${entraError.message}`);
-                }
-            }
-            
             context.log(`User ${userId} updated`);
             return {
                 status: 200,
@@ -211,3 +195,5 @@ app.http('users-create', {
         }
     }
 });
+
+

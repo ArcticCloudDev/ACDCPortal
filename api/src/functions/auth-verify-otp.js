@@ -1,8 +1,18 @@
-// Verify OTP API - Verify OTP code and create session
-// Azure Functions v4 Programming Model
+// Verify OTP API - Verify code and issue JWT session token
+// Security: timing-safe comparison, attempt limiting, hashed codes, single-use
 const { app } = require('@azure/functions');
-const { v4: uuidv4 } = require('uuid');
+const jwt = require('jsonwebtoken');
 const Storage = require('../shared/storage');
+const Email = require('../shared/email');
+
+// JWT configuration
+const JWT_SECRET = process.env.JWT_SECRET || 'acdc-dev-secret-change-in-production-' + require('os').hostname();
+const JWT_EXPIRY = '24h';
+
+// In-memory rate limiter for verify attempts by IP
+const verifyRateLimits = new Map(); // ip → { count, resetAt }
+const VERIFY_IP_MAX = 20;
+const VERIFY_WINDOW_MS = 15 * 60 * 1000;
 
 app.http('auth-verify-otp', {
     methods: ['POST'],
@@ -23,23 +33,41 @@ app.http('auth-verify-otp', {
             }
             
             const normalizedEmail = email.toLowerCase().trim();
+            const clientIp = request.headers.get('x-forwarded-for') || 
+                             request.headers.get('x-client-ip') || 'unknown';
             
-            // Get the stored OTP
-            const loginOtp = Storage.pendingRegistrations.getById(`login_${normalizedEmail}`);
+            // Rate limit by IP
+            const now = Date.now();
+            const ipEntry = verifyRateLimits.get(clientIp);
+            if (ipEntry && now < ipEntry.resetAt && ipEntry.count >= VERIFY_IP_MAX) {
+                context.warn(`Verify rate limit exceeded for IP: ${clientIp}`);
+                return {
+                    status: 429,
+                    jsonBody: { message: 'Too many attempts. Please try again later.' }
+                };
+            }
+            if (!ipEntry || now > ipEntry.resetAt) {
+                verifyRateLimits.set(clientIp, { count: 1, resetAt: now + VERIFY_WINDOW_MS });
+            } else {
+                ipEntry.count++;
+            }
             
-            if (!loginOtp) {
+            // Get the stored OTP record
+            const otpRecord = Storage.pendingRegistrations.getById(`otp_${normalizedEmail}`);
+            
+            if (!otpRecord) {
                 return {
                     status: 400,
                     jsonBody: { 
                         success: false,
-                        message: 'No OTP found. Please request a new code.' 
+                        message: 'No verification code found. Please request a new one.' 
                     }
                 };
             }
             
             // Check if expired
-            if (new Date(loginOtp.expiresAt) < new Date()) {
-                Storage.pendingRegistrations.delete(loginOtp.id);
+            if (new Date(otpRecord.expiresAt) < new Date()) {
+                Storage.pendingRegistrations.delete(otpRecord.id);
                 return {
                     status: 400,
                     jsonBody: { 
@@ -49,51 +77,71 @@ app.http('auth-verify-otp', {
                 };
             }
             
-            // Verify the code
-            if (loginOtp.verificationCode !== code) {
+            // Check attempt limit (5 wrong tries invalidates the code)
+            if (otpRecord.attempts >= (otpRecord.maxAttempts || 5)) {
+                Storage.pendingRegistrations.delete(otpRecord.id);
                 return {
                     status: 400,
                     jsonBody: { 
                         success: false,
-                        message: 'Invalid code. Please try again.' 
+                        message: 'Too many incorrect attempts. Please request a new code.' 
                     }
                 };
             }
             
-            // Code is valid! Get user data
-            const user = Storage.users.getByEmail(normalizedEmail);
+            // Timing-safe code verification
+            const isValid = Email.verifyCode(code, otpRecord.codeHash);
             
-            if (!user) {
+            if (!isValid) {
+                // Increment attempt counter
+                otpRecord.attempts = (otpRecord.attempts || 0) + 1;
+                Storage.pendingRegistrations.create(otpRecord); // Update in place
+                
+                const remaining = (otpRecord.maxAttempts || 5) - otpRecord.attempts;
                 return {
-                    status: 404,
+                    status: 400,
                     jsonBody: { 
                         success: false,
-                        message: 'User not found' 
+                        message: `Invalid code. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.` 
                     }
                 };
             }
             
-            // Clean up the OTP
-            Storage.pendingRegistrations.delete(loginOtp.id);
+            // Code is valid! Single-use: delete immediately
+            Storage.pendingRegistrations.delete(otpRecord.id);
             
-            // Generate a simple session token (in production, use JWT)
-            const sessionToken = uuidv4();
+            // Get user data (may not exist yet if this is registration OTP)
+            const user = Storage.users.getByEmail(normalizedEmail);
+            
+            // Build JWT payload
+            const tokenPayload = {
+                email: normalizedEmail,
+                userId: user ? user.id : null,
+                isPortalAdmin: user ? (user.isPortalAdmin || false) : false
+            };
+            
+            // Sign JWT
+            const token = jwt.sign(tokenPayload, JWT_SECRET, { 
+                expiresIn: JWT_EXPIRY,
+                issuer: 'acdc-portal'
+            });
             
             context.log(`Login successful for ${normalizedEmail}`);
             return {
                 status: 200,
                 jsonBody: { 
                     success: true,
-                    message: 'Login successful',
-                    token: sessionToken,
-                    user: {
+                    message: 'Verification successful',
+                    token: token,
+                    user: user ? {
                         id: user.id,
                         email: user.email,
                         firstName: user.firstName,
                         lastName: user.lastName,
-                        profileComplete: user.profileComplete,
+                        name: `${user.firstName} ${user.lastName}`,
+                        profileComplete: user.profileComplete || false,
                         isPortalAdmin: user.isPortalAdmin || false
-                    }
+                    } : null
                 }
             };
             
@@ -106,3 +154,6 @@ app.http('auth-verify-otp', {
         }
     }
 });
+
+// Export JWT_SECRET for use in auth middleware
+module.exports = { JWT_SECRET };

@@ -230,20 +230,24 @@
         </main>
     </div>
 
-    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/api.js"></script>
     <script src="js/admin-sidebar.js"></script>
+    <script src="js/permissions.js"></script>
     <script>
         let allEntries = [];
         let allEvents = [];
+        let currentPermissions = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            renderAdminSidebar('interest');
+            // Resolve permissions (handles auth check, sidebar render, access denied)
+            currentPermissions = await Permissions.initAdminPage('interest');
+
+            if (!currentPermissions) return;
             
             // Set share link
-            const shareLink = window.location.origin + '/interest.html';
+            const shareLink = window.location.origin + '/register.html?intent=interest';
             document.getElementById('share-link').value = shareLink;
 
             await loadData();
@@ -251,41 +255,48 @@
 
         async function loadData() {
             try {
-                // Load events first
-                const eventsResponse = await fetch(`${CONFIG.api.baseUrl}/events`);
-                if (eventsResponse.ok) {
-                    allEvents = await eventsResponse.json();
-                }
+                // Load events (scoped by permissions)
+                let events = await API.events.list();
+                allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
                 
-                // Load interest leads (people interested in events)
-                const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads`);
-                if (response.ok) {
-                    const data = await response.json();
-                    allEntries = (data.leads || []).map(lead => ({
-                        id: lead.id,
-                        email: lead.email,
-                        firstName: lead.firstName,
-                        lastName: lead.lastName,
-                        eventId: lead.eventId,
-                        createdAt: lead.createdAt,
-                        verified: lead.verified,
-                        registeredEventId: lead.registeredEventId || null
-                    }));
+                // Load participations with 'interest' role
+                const allParticipations = await API.participations.list();
+                let interestParticipations = allParticipations.filter(p => 
+                    p.roles?.includes('interest')
+                );
+                // Scope to permitted events
+                interestParticipations = Permissions.filterByEvent(currentPermissions, interestParticipations);
+                
+                allEntries = interestParticipations.map(p => {
+                    const firstName = p.interestFirstName || '';
+                    const lastName = p.interestLastName || '';
+                    const hasUpgraded = p.roles?.some(r => r !== 'interest');
                     
-                    // Sort by newest first
-                    allEntries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-                    
-                    // Calculate stats
-                    const total = allEntries.length;
-                    const verified = allEntries.filter(e => !e.registeredEventId).length;
-                    const converted = allEntries.filter(e => e.registeredEventId).length;
-                    
-                    document.getElementById('stat-total').textContent = total;
-                    document.getElementById('stat-verified').textContent = verified;
-                    document.getElementById('stat-converted').textContent = converted;
-                    
-                    renderTable();
-                }
+                    return {
+                        id: p.id,
+                        email: p.email,
+                        firstName,
+                        lastName,
+                        eventId: p.eventId,
+                        createdAt: p.interestDate || p.createdAt,
+                        verified: p.interestVerified !== false,
+                        converted: hasUpgraded || !!p.teamId
+                    };
+                });
+                
+                // Sort by newest first
+                allEntries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                
+                // Calculate stats
+                const total = allEntries.length;
+                const verified = allEntries.filter(e => !e.converted).length;
+                const converted = allEntries.filter(e => e.converted).length;
+                
+                document.getElementById('stat-total').textContent = total;
+                document.getElementById('stat-verified').textContent = verified;
+                document.getElementById('stat-converted').textContent = converted;
+                
+                renderTable();
             } catch (error) {
                 console.error('Error loading data:', error);
                 document.getElementById('queue-table-body').innerHTML = 
@@ -308,7 +319,7 @@
 
                 let status = 'notified';
                 let statusLabel = 'Verified';
-                if (entry.registeredEventId) {
+                if (entry.converted) {
                     status = 'registered';
                     statusLabel = 'Converted';
                 }
@@ -330,7 +341,7 @@
                         <td><span class="badge ${status}">${statusLabel}</span></td>
                         <td>
                             <div class="actions">
-                                ${!entry.registeredEventId ? `<button class="btn-sm danger" onclick="removeEntry('${entry.id}')">Remove</button>` : ''}
+                                ${!entry.converted ? `<button class="btn-sm danger" onclick="removeEntry('${entry.id}')">Remove</button>` : ''}
                             </div>
                         </td>
                     </tr>
@@ -378,18 +389,11 @@
             if (!confirm('Remove this interest lead?')) return;
 
             try {
-                const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads/${id}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    await loadData();
-                } else {
-                    alert('Failed to remove entry');
-                }
+                await API.participations.removeRoles(id, ['interest']);
+                await loadData();
             } catch (error) {
                 console.error('Error removing entry:', error);
-                alert('Error removing entry');
+                alert('Error removing entry: ' + error.message);
             }
         }
 

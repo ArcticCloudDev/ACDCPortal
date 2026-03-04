@@ -19,12 +19,10 @@
             </div>
 
             <div id="registration-card" class="card hidden">
-                <div id="invitation-banner" class="hidden" style="background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; border-left: 4px solid #2563eb;">
-                    <p style="margin: 0 0 8px; color: #1e40af; font-weight: 600;">🎉 You've been invited to join a team!</p>
+                <div id="invitation-banner" class="hidden" style="border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                    <p style="margin: 0 0 8px; font-weight: 600;" id="invitation-title"></p>
                     <p style="margin: 0; color: #475569;" id="invitation-details"></p>
-                    <p style="margin: 8px 0 0; color: #64748b; font-size: 14px;">
-                        Complete your profile below to accept the invitation.
-                    </p>
+                    <p style="margin: 8px 0 0; color: #64748b; font-size: 14px;" id="invitation-helper"></p>
                 </div>
                 <h2>Welcome! Let's get you set up</h2>
                 <p>Please complete your profile to continue.</p>
@@ -72,8 +70,6 @@
         </footer>
     </div>
 
-    <!-- MSAL for Auth -->
-    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
@@ -92,7 +88,7 @@
                 await Auth.handleRedirect();
                 
                 if (!Auth.isLoggedIn()) {
-                    window.location.href = '/';
+                    window.location.href = '/register.html';
                     return;
                 }
                 
@@ -137,9 +133,35 @@
                     try {
                         const invitation = await API.invitations.get(inviteId);
                         if (invitation && invitation.status === 'pending' && !invitation.isExpired) {
-                            document.getElementById('invitation-details').innerHTML = 
-                                `<strong>${invitation.inviterName}</strong> invited you to join team <strong style="color: #1e40af;">${invitation.teamName}</strong>`;
-                            document.getElementById('invitation-banner').classList.remove('hidden');
+                            const banner = document.getElementById('invitation-banner');
+                            const titleEl = document.getElementById('invitation-title');
+                            const detailsEl = document.getElementById('invitation-details');
+                            const helperEl = document.getElementById('invitation-helper');
+                            
+                            if (invitation.role === 'judge') {
+                                banner.style.background = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
+                                banner.style.borderLeft = '4px solid #d97706';
+                                titleEl.style.color = '#92400e';
+                                titleEl.textContent = '⚖️ Judge Invitation';
+                                detailsEl.innerHTML = `<strong>${invitation.inviterName}</strong> invited you to serve as a <strong style="color: #92400e;">Judge</strong> for <strong style="color: #92400e;">${invitation.eventName || 'the event'}</strong>`;
+                                helperEl.textContent = 'Complete your profile below to accept the judge invitation.';
+                            } else if (invitation.role === 'committee') {
+                                banner.style.background = 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)';
+                                banner.style.borderLeft = '4px solid #2563eb';
+                                titleEl.style.color = '#1e40af';
+                                titleEl.textContent = '🏛️ Committee Invitation';
+                                detailsEl.innerHTML = `<strong>${invitation.inviterName}</strong> invited you to join the <strong style="color: #1e40af;">Committee</strong> for <strong style="color: #1e40af;">${invitation.eventName || 'the event'}</strong>`;
+                                helperEl.textContent = 'Complete your profile below to accept the committee invitation.';
+                            } else {
+                                banner.style.background = 'linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%)';
+                                banner.style.borderLeft = '4px solid #2563eb';
+                                titleEl.style.color = '#1e40af';
+                                titleEl.textContent = '🎉 You\'ve been invited to join a team!';
+                                detailsEl.innerHTML = `<strong>${invitation.inviterName}</strong> invited you to join team <strong style="color: #1e40af;">${invitation.teamName}</strong>`;
+                                helperEl.textContent = 'Complete your profile below to accept the invitation.';
+                            }
+                            
+                            banner.classList.remove('hidden');
                         }
                     } catch (err) {
                         console.log('Could not load invitation:', err);
@@ -153,11 +175,11 @@
             } catch (error) {
                 console.error('Error:', error);
                 loadingDiv.innerHTML = `<p class="error-message">Error: ${error.message}</p>
-                                       <a href="/" class="btn btn-primary">Back to Home</a>`;
+                                       <a href="/events.html" class="btn btn-primary">Back to Events</a>`;
             }
 
             function generateId() {
-                return Date.now().toString(36) + Math.random().toString(36).substr(2);
+                return crypto.randomUUID();
             }
 
             // Form submission

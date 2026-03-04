@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { v4: uuidv4 } = require('uuid');
 const { Storage: GenericStorage } = require('../shared/storage');
 
 const soloQueueStorage = new GenericStorage('solo-queue.json');
@@ -97,7 +98,7 @@ app.http('solo-queue-join', {
             }
             
             const entry = {
-                id: `sq-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                id: uuidv4(),
                 userId,
                 eventId,
                 note: note || '',

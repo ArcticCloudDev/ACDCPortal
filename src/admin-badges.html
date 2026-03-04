@@ -334,6 +334,13 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label>Claim Type *</label>
+                    <select id="badge-claimType">
+                        <option value="common">🎯 Common — teams claim with blog post</option>
+                        <option value="exclusive">🏆 Exclusive — awarded by judges</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Description</label>
                     <textarea id="badge-description" placeholder="What does this badge reward?"></textarea>
                 </div>
@@ -387,11 +394,11 @@
         </div>
     </div>
 
-    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/admin-sidebar.js"></script>
+    <script src="js/permissions.js"></script>
     <script src="js/admin-badges.js"></script>
 </body>
 </html>

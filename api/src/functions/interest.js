@@ -2,6 +2,7 @@
 const { app } = require('@azure/functions');
 const { Storage } = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
+const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -9,6 +10,7 @@ const leadsStorage = new Storage('interest-leads');
 const eventsStorage = new Storage('events');
 const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
+const participationsStorage = new Storage('participations');
 
 // Helper to trigger sequence emails for interest leads
 async function triggerSequenceEmailsForLead(lead, event, context) {
@@ -69,12 +71,11 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
             // Create digest email
             const digestSubject = `${event.name} — Your ${campaignsToSend.length} Updates`;
             
+            // Build message blocks as HTML table rows
             const messageBlocks = campaignsToSend.map((campaign, index) => `
-                  <!-- Message ${index + 1} -->
                   <tr>
                     <td style="padding: 0;">
                       <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                        <!-- Message header bar -->
                         <tr>
                           <td style="background-color: #1e293b; padding: 14px 40px;">
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
@@ -91,7 +92,6 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                             </table>
                           </td>
                         </tr>
-                        <!-- Message content -->
                         <tr>
                           <td style="padding: 28px 40px 32px 40px; color: #334155; font-size: 15px; line-height: 1.75;">
                             ${campaign.content}
@@ -102,70 +102,16 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                   </tr>
             `).join('');
 
-            const digestContent = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-
-          <!-- Header -->
-          <tr>
-            <td style="background: linear-gradient(135deg, #1a365d 0%, #2d4a6f 50%, #3b82f6 100%); padding: 40px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 700;">${event.name}</h1>
-              <p style="color: #93c5fd; margin: 10px 0 0; font-size: 14px;">Your interest has been registered</p>
-            </td>
-          </tr>
-
-          <!-- Greeting -->
-          <tr>
-            <td style="padding: 32px 40px 24px 40px;">
-              <p style="color: #1a365d; font-size: 18px; line-height: 1.5; margin: 0; font-weight: 600;">
-                Hi ${lead.firstName || 'there'},
-              </p>
-              <p style="color: #475569; font-size: 15px; line-height: 1.7; margin: 12px 0 0 0;">
-                Thanks for registering your interest! We've been sharing updates with the community, and here's everything so far — in the order it was shared.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Update count banner -->
-          <tr>
-            <td style="padding: 0 40px 28px 40px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                <tr>
-                  <td style="background-color: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 14px 20px;">
-                    <span style="color: #1e40af; font-size: 14px; font-weight: 600;">${campaignsToSend.length} updates to catch up on</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Messages -->
-          ${messageBlocks}
-
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #1a365d; padding: 25px 40px; text-align: center;">
-              <p style="color: #93c5fd; font-size: 13px; margin: 0;">
-                Arctic Cloud Developer Challenge &bull; ${new Date().getFullYear()}
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+            // Load digest template
+            const digestTemplatePath = path.join(__dirname, '../../../data/email-templates/sequence-digest.html');
+            let digestTemplate = await fs.readFile(digestTemplatePath, 'utf-8');
+            const digestContent = processTemplate(digestTemplate, {
+                eventName: event.name,
+                firstName: lead.firstName || '',
+                digestCount: campaignsToSend.length.toString(),
+                digestContent: messageBlocks,
+                year: new Date().getFullYear().toString()
+            });
 
             const delivery = {
                 id: generateGuid(),
@@ -271,57 +217,18 @@ function generateVerificationCode() {
 
 // Helper to generate GUID
 function generateGuid() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
+    return uuidv4();
 }
 
-// Helper to get verification email HTML
-function getVerificationEmailHtml(code, eventName, firstName) {
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9;">
-        <tr>
-            <td align="center" style="padding: 40px 20px;">
-                <table role="presentation" width="500" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                    <tr>
-                        <td style="background: linear-gradient(135deg, #1a365d 0%, #2d4a6f 50%, #3b82f6 100%); padding: 30px; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 22px;">Verify Your Interest</h1>
-                            <p style="color: #93c5fd; margin: 8px 0 0; font-size: 14px;">${eventName}</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 30px; text-align: center;">
-                            <p style="color: #334155; font-size: 16px; margin: 0 0 20px;">
-                                Hi ${firstName},<br>
-                                Use this code to verify your interest registration:
-                            </p>
-                            <div style="background: #f1f5f9; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                                <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1a365d;">${code}</span>
-                            </div>
-                            <p style="color: #64748b; font-size: 14px; margin: 20px 0 0;">
-                                This code expires in 15 minutes.
-                            </p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
-                            <p style="color: #94a3b8; font-size: 12px; margin: 0;">Arctic Cloud Developer Challenge</p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
+// Helper to get verification email HTML from template
+async function getVerificationEmailHtml(code, eventName, firstName) {
+    const templatePath = path.join(__dirname, '../../../data/email-templates/verification.html');
+    const template = await fs.readFile(templatePath, 'utf-8');
+    return processTemplate(template, {
+        code: code,
+        eventName: eventName,
+        firstName: firstName
+    });
 }
 
 // POST /api/interest/register - Submit interest (sends verification code)
@@ -384,10 +291,11 @@ app.http('interest-register', {
 
             // Send verification email
             try {
+                const verificationHtml = await getVerificationEmailHtml(verificationCode, event.name, firstName);
                 await sendEmail({
                     to: email,
                     subject: `Verification Code for ${event.name}`,
-                    htmlContent: getVerificationEmailHtml(verificationCode, event.name, firstName)
+                    htmlContent: verificationHtml
                 });
                 context.log(`Verification email sent to ${email}`);
             } catch (emailError) {
@@ -499,6 +407,55 @@ app.http('interest-verify', {
             await leadsStorage.saveRaw({ leads });
 
             context.log(`Interest verified for ${verifiedLead.email}`);
+
+            // Mirror verified interest into participations with roles:['interest']
+            try {
+                const partData = await participationsStorage.getRaw();
+                const participations = partData?.participations || [];
+                const existingPart = participations.findIndex(p =>
+                    p.email?.toLowerCase() === verifiedLead.email.toLowerCase() &&
+                    p.eventId === verifiedLead.eventId
+                );
+
+                if (existingPart >= 0) {
+                    // Already has a participation — ensure 'interest' role is present
+                    if (!participations[existingPart].roles) participations[existingPart].roles = [];
+                    if (!participations[existingPart].roles.includes('interest')) {
+                        participations[existingPart].roles.push('interest');
+                    }
+                    participations[existingPart].interestVerified = true;
+                    participations[existingPart].interestDate = verifiedLead.verifiedAt;
+                    participations[existingPart].interestSource = 'interest-form';
+                    participations[existingPart].updatedAt = new Date().toISOString();
+                } else {
+                    // Create new participation (email-only, no userId yet)
+                    participations.push({
+                        id: generateGuid(),
+                        email: verifiedLead.email.toLowerCase(),
+                        userId: null,
+                        eventId: verifiedLead.eventId,
+                        roles: ['interest'],
+                        teamId: null,
+                        isTeamAdmin: false,
+                        hotelNights: {},
+                        interestVerified: true,
+                        interestDate: verifiedLead.verifiedAt,
+                        interestSource: 'interest-form',
+                        interestFirstName: verifiedLead.firstName,
+                        interestLastName: verifiedLead.lastName,
+                        teamMemberships: [],
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    });
+                }
+
+                await participationsStorage.saveRaw({ participations });
+                context.log(`Participation with interest role created/updated for ${verifiedLead.email}`);
+            } catch (partError) {
+                context.error('Warning: Failed to create interest participation:', partError);
+                // Don't fail the main flow
+            }
+
             context.log(`About to trigger sequences for lead:`, { email: verifiedLead.email, eventId: verifiedLead.eventId, firstName: verifiedLead.firstName });
             
             // Fetch event to get sequenceId
@@ -537,6 +494,156 @@ app.http('interest-verify', {
         } catch (error) {
             context.error('Error verifying interest:', error);
             return { status: 500, jsonBody: { error: 'Failed to verify' } };
+        }
+    }
+});
+
+// POST /api/interest/record - Record interest after authentication (called from unified register page)
+// Expects: { eventId, email, firstName, lastName }
+// The user has already authenticated via OTP, so no separate verification needed
+app.http('interest-record', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'interest/record',
+    handler: async (request, context) => {
+        try {
+            const body = await request.json();
+            const { eventId, email, firstName, lastName } = body;
+
+            if (!eventId || !email) {
+                return { status: 400, jsonBody: { error: 'eventId and email are required' } };
+            }
+
+            // Validate event exists
+            const events = await eventsStorage.getAll();
+            const event = events.find(e => e.id === eventId);
+            if (!event) {
+                return { status: 404, jsonBody: { error: 'Event not found' } };
+            }
+
+            const normalizedEmail = email.toLowerCase().trim();
+            const leadFirstName = (firstName || '').trim();
+            const leadLastName = (lastName || '').trim();
+
+            // Check for existing lead
+            const data = await leadsStorage.getRaw();
+            const leads = data.leads || [];
+            const existingIndex = leads.findIndex(l =>
+                l.eventId === eventId &&
+                l.email.toLowerCase() === normalizedEmail
+            );
+
+            if (existingIndex >= 0 && leads[existingIndex].verified) {
+                // Already registered interest — just return success
+                return {
+                    status: 200,
+                    jsonBody: {
+                        message: 'You have already registered interest for this event!',
+                        alreadyRegistered: true,
+                        eventName: event.name
+                    }
+                };
+            }
+
+            // Create or update lead as verified (no separate verification needed — already authenticated)
+            const lead = {
+                id: existingIndex >= 0 ? leads[existingIndex].id : generateGuid(),
+                eventId,
+                email: normalizedEmail,
+                firstName: leadFirstName,
+                lastName: leadLastName,
+                verificationCode: null,
+                codeExpiresAt: null,
+                verified: true,
+                verifiedAt: new Date().toISOString(),
+                createdAt: existingIndex >= 0 ? leads[existingIndex].createdAt : new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            if (existingIndex >= 0) {
+                leads[existingIndex] = lead;
+            } else {
+                leads.push(lead);
+            }
+            await leadsStorage.saveRaw({ leads });
+
+            context.log(`Interest recorded (authenticated) for ${normalizedEmail} on event ${event.name}`);
+
+            // Mirror into participations with roles:['interest']
+            try {
+                // Look up user to set userId on participation
+                const user = Storage.users.getByEmail(normalizedEmail);
+                const userId = user ? user.id : null;
+
+                const partData = await participationsStorage.getRaw();
+                const participations = partData?.participations || [];
+                const existingPart = participations.findIndex(p =>
+                    p.email?.toLowerCase() === normalizedEmail &&
+                    p.eventId === eventId
+                );
+
+                if (existingPart >= 0) {
+                    if (!participations[existingPart].roles) participations[existingPart].roles = [];
+                    if (!participations[existingPart].roles.includes('interest')) {
+                        participations[existingPart].roles.push('interest');
+                    }
+                    // Update userId if we found the user and it wasn't set before
+                    if (userId && !participations[existingPart].userId) {
+                        participations[existingPart].userId = userId;
+                    }
+                    participations[existingPart].interestVerified = true;
+                    participations[existingPart].interestDate = lead.verifiedAt;
+                    participations[existingPart].interestSource = 'unified-register';
+                    participations[existingPart].updatedAt = new Date().toISOString();
+                } else {
+                    participations.push({
+                        id: generateGuid(),
+                        email: normalizedEmail,
+                        userId: userId,
+                        eventId: eventId,
+                        roles: ['interest'],
+                        teamId: null,
+                        isTeamAdmin: false,
+                        hotelNights: {},
+                        interestVerified: true,
+                        interestDate: lead.verifiedAt,
+                        interestSource: 'unified-register',
+                        interestFirstName: leadFirstName,
+                        interestLastName: leadLastName,
+                        teamMemberships: [],
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    });
+                }
+
+                await participationsStorage.saveRaw({ participations });
+                context.log(`Participation with interest role created/updated for ${normalizedEmail}`);
+            } catch (partError) {
+                context.error('Warning: Failed to create interest participation:', partError);
+            }
+
+            // Trigger sequence emails
+            try {
+                await triggerSequenceEmailsForLead(lead, event, context);
+            } catch (seqError) {
+                context.error('[INTEREST-RECORD] Sequence email error:', seqError);
+            }
+
+            return {
+                status: 200,
+                jsonBody: {
+                    message: 'Thank you! Your interest has been registered.',
+                    eventName: event.name,
+                    lead: {
+                        firstName: leadFirstName,
+                        lastName: leadLastName,
+                        email: normalizedEmail
+                    }
+                }
+            };
+        } catch (error) {
+            context.error('Error recording interest:', error);
+            return { status: 500, jsonBody: { error: 'Failed to record interest' } };
         }
     }
 });
@@ -601,10 +708,49 @@ app.http('interest-delete', {
                 return { status: 404, jsonBody: { error: 'Lead not found' } };
             }
 
+            const lead = leads[leadIndex];
+            const email = lead.email;
+
+            // Remove the lead
             leads.splice(leadIndex, 1);
             await leadsStorage.saveRaw({ leads });
 
-            return { status: 200, jsonBody: { message: 'Lead deleted' } };
+            // Cascade: clean up email deliveries for this lead
+            let cleaned = { deliveries: 0, participations: 0 };
+            try {
+                const delData = await deliveriesStorage.getRaw() || { deliveries: [] };
+                const deliveries = delData.deliveries || [];
+                const before = deliveries.length;
+                const filtered = deliveries.filter(d => {
+                    if (d.leadId === id) return false;
+                    if (email && d.email?.toLowerCase() === email.toLowerCase() && !d.userId) return false;
+                    return true;
+                });
+                if (filtered.length < before) {
+                    cleaned.deliveries = before - filtered.length;
+                    await deliveriesStorage.saveRaw({ deliveries: filtered });
+                }
+            } catch (e) { context.log(`Warning: delivery cleanup failed: ${e.message}`); }
+
+            // Cascade: clean up interest-only participations for this email
+            try {
+                const partData = await participationsStorage.getRaw() || { participations: [] };
+                const participations = partData.participations || [];
+                const beforePart = participations.length;
+                const filteredPart = participations.filter(p => {
+                    if (email && p.email?.toLowerCase() === email.toLowerCase() &&
+                        p.roles?.length === 1 && p.roles[0] === 'interest') return false;
+                    return true;
+                });
+                if (filteredPart.length < beforePart) {
+                    cleaned.participations = beforePart - filteredPart.length;
+                    await participationsStorage.saveRaw({ participations: filteredPart });
+                }
+            } catch (e) { context.log(`Warning: participation cleanup failed: ${e.message}`); }
+
+            context.log(`Deleted lead ${id} (${email}). Cleaned: ${cleaned.deliveries} deliveries`);
+
+            return { status: 200, jsonBody: { message: 'Lead deleted', cleaned } };
         } catch (error) {
             context.error('Error deleting lead:', error);
             return { status: 500, jsonBody: { error: 'Failed to delete lead' } };

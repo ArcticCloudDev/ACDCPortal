@@ -101,6 +101,20 @@ async function sendEmail({ to, subject, htmlContent, textContent }) {
     // Extract and convert base64 images to inline attachments
     const { html: processedHtml, attachments } = extractInlineImages(htmlContent);
     
+    // DEBUG: Save the actual HTML being sent to a file for inspection
+    try {
+        const debugFs = require('fs');
+        const debugPath = require('path');
+        const debugFile = debugPath.join(__dirname, '../../../data/debug-last-email.html');
+        debugFs.writeFileSync(debugFile, processedHtml, 'utf-8');
+        console.log(`[DEBUG] Email HTML saved to ${debugFile}`);
+        console.log(`[DEBUG] Subject: ${subject}`);
+        console.log(`[DEBUG] To: ${recipients.join(', ')}`);
+        // Check for href values in the HTML
+        const hrefMatches = processedHtml.match(/href="([^"]+)"/g);
+        console.log(`[DEBUG] Links found:`, hrefMatches);
+    } catch (e) { console.log('[DEBUG] Could not save debug email:', e.message); }
+    
     const message = {
         message: {
             subject: subject,
@@ -176,6 +190,17 @@ async function sendBulkEmail({ to, subject, htmlContent }) {
 function processTemplate(template, data = {}) {
     let result = template;
     
+    // DEBUG: Log all merge data keys and values
+    console.log('[processTemplate] ===== MERGE DATA =====');
+    for (const [key, value] of Object.entries(data)) {
+        const display = typeof value === 'string' && value.length > 80 ? value.substring(0, 80) + '...' : value;
+        console.log(`[processTemplate]   ${key} = "${display}"`);
+    }
+    
+    // Find all placeholders in the template BEFORE replacement
+    const placeholders = template.match(/{{(\w+)}}/g) || [];
+    console.log(`[processTemplate] Placeholders in template: ${placeholders.join(', ')}`);
+    
     // Handle conditional blocks FIRST (before replacing placeholders)
     // {{#if key}}...{{/if}}
     result = result.replace(/{{#if (\w+)}}([\s\S]*?){{\/if}}/g, (match, key, content) => {
@@ -185,8 +210,11 @@ function processTemplate(template, data = {}) {
     // Replace simple placeholders
     // Match {{placeholder}} and replace with value or empty string
     result = result.replace(/{{(\w+)}}/g, (match, key) => {
-        // Return the value if it exists, otherwise empty string
-        return data[key] !== undefined && data[key] !== null ? String(data[key]) : '';
+        const val = data[key] !== undefined && data[key] !== null ? String(data[key]) : '';
+        if (key === 'acceptUrl' || key === 'inviteId') {
+            console.log(`[processTemplate] REPLACING {{${key}}} => "${val}"`);
+        }
+        return val;
     });
     
     return result;

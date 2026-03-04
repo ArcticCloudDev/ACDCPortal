@@ -1,137 +1,101 @@
-// ACDC Portal - Auth Module (MSAL for Entra External ID with Email OTP)
-
-let msalInstance = null;
+// ACDC Portal - Auth Module (Custom OTP + JWT)
+// No external auth provider — uses our own OTP verification + JWT sessions
+// Maintains the same interface as the old MSAL wrapper for compatibility
 
 const Auth = {
-    // Initialize MSAL
+    // Initialize — load session from localStorage
     init() {
-        if (typeof msal === 'undefined') {
-            console.warn('MSAL library not loaded');
-            return;
+        // Check if token is expired
+        const token = this._getToken();
+        if (token && this._isTokenExpired(token)) {
+            console.log('JWT expired, clearing session');
+            this._clearSession();
         }
-        msalInstance = new msal.PublicClientApplication(msalConfig);
-        console.log('MSAL initialized for Email OTP');
+        console.log('Auth initialized (Custom OTP + JWT)');
     },
 
-    // Check if user is logged in
+    // Check if user is logged in (has valid JWT)
     isLoggedIn() {
-        if (!msalInstance) return false;
-        const accounts = msalInstance.getAllAccounts();
-        return accounts.length > 0;
+        const token = this._getToken();
+        if (!token) return false;
+        if (this._isTokenExpired(token)) {
+            this._clearSession();
+            return false;
+        }
+        return true;
     },
 
-    // Get current user
+    // Get current user data
     getUser() {
-        if (!msalInstance) return null;
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length === 0) return null;
+        if (!this.isLoggedIn()) return null;
         
-        const account = accounts[0];
-        return {
-            email: account.username,
-            name: account.name || account.username
-        };
-    },
-
-    // Login with redirect (Entra will show Email OTP screen)
-    async login(loginHint) {
-        if (!msalInstance) {
-            throw new Error('MSAL not initialized');
-        }
-
-        const request = {
-            ...loginRequest,
-            loginHint: loginHint // Pre-fill email
-        };
-
+        const userData = localStorage.getItem(CONFIG.auth.userKey);
+        if (!userData) return null;
+        
         try {
-            await msalInstance.loginRedirect(request);
-        } catch (error) {
-            console.error('Login error:', error);
-            throw error;
-        }
-    },
-
-    // Sign up with redirect - for new user registration
-    // Goes directly to sign-up flow using Entra External ID's prompt parameter
-    async signUp(loginHint) {
-        if (!msalInstance) {
-            throw new Error('MSAL not initialized');
-        }
-
-        const request = {
-            ...loginRequest,
-            loginHint: loginHint,
-            prompt: 'create'  // Standard OIDC parameter for sign-up
-        };
-
-        try {
-            await msalInstance.loginRedirect(request);
-        } catch (error) {
-            console.error('Sign-up error:', error);
-            throw error;
-        }
-    },
-
-    // Handle redirect after login
-    async handleRedirect() {
-        if (!msalInstance) {
-            this.init();
-        }
-        if (!msalInstance) return null;
-
-        try {
-            const response = await msalInstance.handleRedirectPromise();
-            if (response) {
-                console.log('Login successful:', response.account.username);
-                return response.account;
-            }
+            return JSON.parse(userData);
+        } catch {
             return null;
-        } catch (error) {
-            console.error('Redirect error:', error);
-            throw error;
         }
     },
 
-    // Logout
+    // "Login" — redirect to unified register/sign-in page
+    // Pages that need auth call Auth.login() which sends the user to
+    // register.html where the email check routes to OTP (known) or registration (new).
+    login(loginHint) {
+        const params = new URLSearchParams();
+        if (loginHint) params.set('email', loginHint);
+        params.set('redirect', window.location.pathname + window.location.search);
+        window.location.href = `/register.html?${params.toString()}`;
+    },
+
+    // Store session after successful OTP verification
+    setSession(token, user) {
+        localStorage.setItem(CONFIG.auth.tokenKey, token);
+        localStorage.setItem(CONFIG.auth.userKey, JSON.stringify(user));
+    },
+
+    // Logout — clear session and redirect to home
     logout() {
-        if (!msalInstance) {
-            window.location.href = '/';
-            return;
-        }
-
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length === 0) {
-            window.location.href = '/';
-            return;
-        }
-
-        msalInstance.logoutRedirect({
-            account: accounts[0],
-            postLogoutRedirectUri: window.location.origin
-        });
+        this._clearSession();
+        window.location.href = '/events.html';
     },
 
-    // Get access token for API calls
-    async getToken() {
-        if (!msalInstance) return null;
+    // Handle redirect — kept for compatibility
+    // Old code calls `await Auth.handleRedirect()` on page load.
+    // With JWT, there's no redirect to handle — just return null.
+    async handleRedirect() {
+        // No-op: JWT auth doesn't use redirects
+        return null;
+    },
 
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length === 0) return null;
+    // Get JWT token for API calls (if needed in future)
+    getToken() {
+        if (!this.isLoggedIn()) return null;
+        return this._getToken();
+    },
 
+    // --- Private helpers ---
+
+    _getToken() {
+        return localStorage.getItem(CONFIG.auth.tokenKey);
+    },
+
+    _isTokenExpired(token) {
         try {
-            const response = await msalInstance.acquireTokenSilent({
-                ...loginRequest,
-                account: accounts[0]
-            });
-            return response.accessToken;
-        } catch (error) {
-            console.error('Token error:', error);
-            return null;
+            // JWT structure: header.payload.signature
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            // exp is in seconds, Date.now() is in ms
+            return payload.exp * 1000 < Date.now();
+        } catch {
+            return true; // Invalid token = expired
         }
+    },
+
+    _clearSession() {
+        localStorage.removeItem(CONFIG.auth.tokenKey);
+        localStorage.removeItem(CONFIG.auth.userKey);
     }
 };
 
-console.log('Auth module loaded (Entra Email OTP)');
-
-console.log('Auth module loaded (Pure OTP mode)');
+console.log('Auth module loaded (Custom OTP + JWT)');

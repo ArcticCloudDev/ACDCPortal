@@ -4,33 +4,25 @@ let currentUser = null;
 let allEvents = [];
 let allTeams = [];
 let teamCounts = {};
+let currentPermissions = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loadingDiv = document.getElementById('loading');
     const notCommitteeDiv = document.getElementById('not-committee');
     const adminContent = document.getElementById('admin-content');
 
-    // Initialize Auth
-    Auth.init();
-    renderAdminSidebar('teams');
+    // Resolve permissions (handles auth check, sidebar render, access denied)
+    currentPermissions = await Permissions.initAdminPage('teams', {
+        loadingEl: loadingDiv,
+        accessDeniedEl: notCommitteeDiv,
+        contentEl: adminContent
+    });
+
+    if (!currentPermissions) return;
+
+    currentUser = currentPermissions.user;
 
     try {
-        await Auth.handleRedirect();
-
-        if (!Auth.isLoggedIn()) {
-            window.location.href = '/login.html';
-            return;
-        }
-
-        const authUser = Auth.getUser();
-        currentUser = await API.users.get(authUser.email);
-
-        if (!currentUser.isPortalAdmin) {
-            loadingDiv.classList.add('hidden');
-            notCommitteeDiv.classList.remove('hidden');
-            return;
-        }
-
         // Load data
         await loadData();
 
@@ -48,12 +40,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadData() {
     try {
-        // Load events for filter
-        allEvents = await API.events.list();
+        // Load events for filter (scoped by permissions)
+        let events = await API.events.list();
+        allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
         populateEventFilter();
 
-        // Load all teams
-        allTeams = await API.teams.list();
+        // Load all teams (scoped by permissions)
+        let teams = await API.teams.list();
+        allTeams = Permissions.filterByEvent(currentPermissions, teams);
 
         // Load participant counts for each team
         for (const team of allTeams) {
@@ -149,6 +143,8 @@ function renderTeamsTable() {
             countClass = 'empty';
         }
 
+        const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
+
         return `
             <tr>
                 <td><strong>${escapeHtml(team.teamName)}</strong></td>
@@ -156,7 +152,10 @@ function renderTeamsTable() {
                 <td style="color: #64748b;">${escapeHtml(team.adminEmail || 'Unknown')}</td>
                 <td><span class="badge ${countClass}">${memberCount}/${committed}</span></td>
                 <td style="color: #64748b;">${createdDate}</td>
-                <td><a href="event.html?id=${team.eventId}" class="btn-sm">View Event</a></td>
+                <td style="display: flex; gap: 6px; align-items: center;">
+                    <a href="event.html?id=${team.eventId}" class="btn-sm">View Event</a>
+                    ${canDelete ? `<button class="btn-sm" style="color: #dc2626; border-color: #fca5a5;" onclick="deleteTeam('${team.id}', '${escapeHtml(team.teamName).replace(/'/g, "\\'")}')">🗑️</button>` : ''}
+                </td>
             </tr>
         `;
     }).join('');
@@ -199,6 +198,23 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+async function deleteTeam(teamId, teamName) {
+    if (!confirm(`Are you sure you want to delete team "${teamName}"?\n\nThis will also remove:\n• Team memberships from all participants\n• Hotel bookings (for participants with no other role)\n• Badge claims for this team\n• Pending invitations\n\nThis action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        await API.teams.delete(teamId);
+        allTeams = allTeams.filter(t => t.id !== teamId);
+        delete teamCounts[teamId];
+        renderTeamsTable();
+        updateStats();
+    } catch (error) {
+        console.error('Error deleting team:', error);
+        alert('Failed to delete team: ' + error.message);
+    }
 }
 
 console.log('Admin Teams page loaded');

@@ -7,6 +7,8 @@ const deliveriesStorage = new Storage('email-deliveries');
 const leadsStorage = new Storage('interest-leads');
 const campaignsStorage = new Storage('email-campaigns');
 const eventsStorage = new Storage('events');
+const usersStorage = new Storage('users');
+const participationsStorage = new Storage('participations');
 const runsStorage = new Storage('scheduled-runs');
 
 // GET /api/deliveries/scheduled-runs - Get recent scheduled email runs
@@ -81,11 +83,41 @@ app.http('deliveries-event', {
             const eventLeads = (leadsData.leads || [])
                 .filter(l => l.eventId === eventId && l.verified);
 
+            // Get all participations for this event to find judges, committee, and participants
+            const participationsData = await participationsStorage.getRaw();
+            const eventParticipations = (participationsData?.participations || [])
+                .filter(p => p.eventId === eventId);
+
+            // Build recipients from participations (with their roles)
+            const leadEmails = new Set(eventLeads.map(l => l.email.toLowerCase()));
+            const users = await usersStorage.getAll();
+            const recipients = eventParticipations
+                .map(p => {
+                    const user = users.find(u => u.id === p.userId);
+                    if (!user) return null;
+                    // Skip if already an interest lead (they appear in leads)
+                    if (leadEmails.has(user.email.toLowerCase())) return null;
+                    // Determine primary role
+                    const roles = p.roles || [];
+                    let type = 'participant';
+                    if (roles.includes('judge')) type = 'judge';
+                    else if (roles.includes('committee')) type = 'committee';
+                    return {
+                        id: user.id,
+                        email: user.email,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        type: type
+                    };
+                })
+                .filter(Boolean);
+
             return {
                 status: 200,
                 jsonBody: {
                     deliveries: eventDeliveries,
                     leads: eventLeads,
+                    recipients: recipients,
                     campaigns: sequenceCampaigns,
                     totalSequenceEmails: sequenceCampaigns.length
                 }

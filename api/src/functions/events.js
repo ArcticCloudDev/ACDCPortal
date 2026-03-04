@@ -30,18 +30,20 @@ function generateHotelDates(startDate, endDate) {
     const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dayLabelsFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     
-    // Start from 1 day before event
-    const start = new Date(startDate);
+    // Use noon to avoid timezone date-shifting (YYYY-MM-DD parsed as UTC midnight can shift)
+    const start = new Date(startDate + 'T12:00:00');
     start.setDate(start.getDate() - 1);
     
-    // End 1 day after event
-    const end = new Date(endDate);
+    const end = new Date(endDate + 'T12:00:00');
     end.setDate(end.getDate() + 1);
     
     // Generate dates
     const current = new Date(start);
     while (current <= end) {
-        const dateStr = current.toISOString().split('T')[0];
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, '0');
+        const d = String(current.getDate()).padStart(2, '0');
+        const dateStr = `${y}-${m}-${d}`;
         const dayOfWeek = current.getDay();
         dates.push({
             date: dateStr,
@@ -59,13 +61,13 @@ function generateDefaultHotelNights(hotelDates, eventStartDate, eventEndDate) {
     const defaults = [];
     const dayLabels = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     
-    const eventStart = new Date(eventStartDate);
-    const eventEnd = new Date(eventEndDate);
+    // Use noon to avoid timezone issues
+    const eventStart = new Date(eventStartDate + 'T12:00:00');
+    const eventEnd = new Date(eventEndDate + 'T12:00:00');
     
-    // For each date except the last one (since it's check-in date, next day is checkout)
     for (let i = 0; i < hotelDates.length - 1; i++) {
-        const currentDate = new Date(hotelDates[i].date);
-        const nextDate = new Date(hotelDates[i + 1].date);
+        const currentDate = new Date(hotelDates[i].date + 'T12:00:00');
+        const nextDate = new Date(hotelDates[i + 1].date + 'T12:00:00');
         
         // Skip the night before the event starts (day before -> first day)
         if (currentDate < eventStart) {
@@ -73,6 +75,7 @@ function generateDefaultHotelNights(hotelDates, eventStartDate, eventEndDate) {
         }
         
         // Include nights from event start through event end
+        // (last event day → next morning checkout is a valid default)
         if (currentDate >= eventStart && currentDate <= eventEnd) {
             const fromDay = dayLabels[currentDate.getDay()];
             const toDay = dayLabels[nextDate.getDay()];
@@ -217,45 +220,14 @@ app.http('events-create', {
                 teamWelcomeEmailId: body.teamWelcomeEmailId || null,
                 sendWelcomeEmail: body.sendWelcomeEmail !== undefined ? body.sendWelcomeEmail : (body.teamWelcomeEmailId ? true : false),
                 sendInterestAcknowledgment: body.sendInterestAcknowledgment || false,
+                sendJudgeInvitationEmail: body.sendJudgeInvitationEmail !== undefined ? body.sendJudgeInvitationEmail : true,
+                sendCommitteeInvitationEmail: body.sendCommitteeInvitationEmail !== undefined ? body.sendCommitteeInvitationEmail : true,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 createdAt: new Date().toISOString()
             };
 
-            // For team-based events, automatically create Committee and Judges teams
-            if (newEvent.registrationType === 'team') {
-                const teams = await teamsStorage.getAll();
-                
-                // Create Committee team
-                const committeeTeam = {
-                    id: generateGuid(),
-                    teamName: `Committee - ${newEvent.name}`,
-                    eventId: newEvent.id,
-                    isSpecialTeam: true,
-                    specialTeamType: 'committee',
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                };
-                teams.push(committeeTeam);
-                
-                // Create Judges team
-                const judgesTeam = {
-                    id: generateGuid(),
-                    teamName: `Judges - ${newEvent.name}`,
-                    eventId: newEvent.id,
-                    isSpecialTeam: true,
-                    specialTeamType: 'judges',
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                };
-                teams.push(judgesTeam);
-                
-                await teamsStorage.saveAll(teams);
-                
-                // Add team IDs to event
-                newEvent.committeeTeamId = committeeTeam.id;
-                newEvent.judgesTeamId = judgesTeam.id;
-            }
+            // Note: Committee/Judge roles are managed via participations (roles[]) — no special teams needed
             
             events.push(newEvent);
             await eventsStorage.saveAll(events);
@@ -330,49 +302,14 @@ app.http('events-update', {
                 teamWelcomeEmailId: body.teamWelcomeEmailId !== undefined ? body.teamWelcomeEmailId : existingEvent.teamWelcomeEmailId,
                 sendWelcomeEmail: body.sendWelcomeEmail !== undefined ? body.sendWelcomeEmail : existingEvent.sendWelcomeEmail,
                 sendInterestAcknowledgment: body.sendInterestAcknowledgment !== undefined ? body.sendInterestAcknowledgment : existingEvent.sendInterestAcknowledgment,
+                sendJudgeInvitationEmail: body.sendJudgeInvitationEmail !== undefined ? body.sendJudgeInvitationEmail : existingEvent.sendJudgeInvitationEmail,
+                sendCommitteeInvitationEmail: body.sendCommitteeInvitationEmail !== undefined ? body.sendCommitteeInvitationEmail : existingEvent.sendCommitteeInvitationEmail,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()
             };
 
-            // If event is team-based and doesn't have special teams yet, create them
-            if (updatedEvent.registrationType === 'team' && 
-                (!updatedEvent.committeeTeamId || !updatedEvent.judgesTeamId)) {
-                
-                const teams = await teamsStorage.getAll();
-                
-                // Create Committee team if not exists
-                if (!updatedEvent.committeeTeamId) {
-                    const committeeTeam = {
-                        id: generateGuid(),
-                        teamName: `Committee - ${updatedEvent.name}`,
-                        eventId: updatedEvent.id,
-                        isSpecialTeam: true,
-                        specialTeamType: 'committee',
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString()
-                    };
-                    teams.push(committeeTeam);
-                    updatedEvent.committeeTeamId = committeeTeam.id;
-                }
-                
-                // Create Judges team if not exists
-                if (!updatedEvent.judgesTeamId) {
-                    const judgesTeam = {
-                        id: generateGuid(),
-                        teamName: `Judges - ${updatedEvent.name}`,
-                        eventId: updatedEvent.id,
-                        isSpecialTeam: true,
-                        specialTeamType: 'judges',
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString()
-                    };
-                    teams.push(judgesTeam);
-                    updatedEvent.judgesTeamId = judgesTeam.id;
-                }
-                
-                await teamsStorage.saveAll(teams);
-            }
+            // Note: Committee/Judge roles are managed via participations (roles[]) — no special teams needed
             
             events[index] = updatedEvent;
             await eventsStorage.saveAll(events);

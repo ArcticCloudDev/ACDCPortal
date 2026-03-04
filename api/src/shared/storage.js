@@ -83,6 +83,18 @@ const Storage = {
         }
     },
 
+    // Events
+    events: {
+        getAll() {
+            return readJsonFile('events.json');
+        },
+
+        getById(id) {
+            const events = this.getAll();
+            return events.find(e => e.id === id) || null;
+        }
+    },
+
     // Users
     users: {
         getAll() {
@@ -203,8 +215,21 @@ const Storage = {
         create(registration) {
             const registrations = this.getAll();
             
-            // Remove any existing registration for this email
-            const filtered = registrations.filter(r => r.email.toLowerCase() !== registration.email.toLowerCase());
+            // Remove any existing record with same id, or same email AND same type/prefix
+            // OTP records have id like "otp_email", registration records have UUID ids
+            const isOtpRecord = registration.id && registration.id.startsWith('otp_');
+            const filtered = registrations.filter(r => {
+                // Always remove exact id match
+                if (r.id === registration.id) return false;
+                // For OTP records, don't remove registration records with same email (and vice versa)
+                if (isOtpRecord) {
+                    // Only remove other OTP records for same email
+                    return !(r.id && r.id.startsWith('otp_') && r.email.toLowerCase() === registration.email.toLowerCase());
+                } else {
+                    // Only remove other registration records for same email (not OTP records)
+                    return !(r.id && !r.id.startsWith('otp_') && r.email.toLowerCase() === registration.email.toLowerCase());
+                }
+            });
             filtered.push(registration);
             
             writeJsonFile('pending-registrations.json', filtered);

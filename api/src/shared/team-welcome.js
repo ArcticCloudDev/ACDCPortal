@@ -128,27 +128,72 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
                     .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
 
                 if (sequenceCampaigns.length > 0) {
-                    // Create digest email
-                    let digestBody = `<h2>Important Information You Should Know</h2>`;
-                    digestBody += `<p>Since you joined the team, we've sent some important updates about ${event.name}. Here's what you need to know:</p>`;
-                    digestBody += `<hr style="margin: 20px 0; border: none; border-top: 2px solid #ddd;">`;
-                    
-                    sequenceCampaigns.forEach((campaign, index) => {
-                        digestBody += `<div style="margin: 30px 0;">`;
-                        digestBody += `<h3>${campaign.subject}</h3>`;
-                        digestBody += campaign.content;
-                        if (index < sequenceCampaigns.length - 1) {
-                            digestBody += `<hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">`;
-                        }
-                        digestBody += `</div>`;
+                    // Build message blocks as HTML table rows (same format as interest.js)
+                    const messageBlocks = sequenceCampaigns.map((campaign, index) => `
+                        <tr>
+                            <td style="padding: 0;">
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td style="background-color: #1e293b; padding: 14px 40px;">
+                                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                                <tr>
+                                                    <td>
+                                                        <span style="color: #94a3b8; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">UPDATE ${index + 1} OF ${sequenceCampaigns.length}</span>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding-top: 4px;">
+                                                        <span style="color: #ffffff; font-size: 18px; font-weight: 700;">${campaign.subject}</span>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 28px 40px 32px 40px; color: #334155; font-size: 15px; line-height: 1.75;">
+                                            ${campaign.content}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    `).join('');
+
+                    // Load digest template
+                    const digestTemplatePath = path.join(__dirname, '../../../data/email-templates/sequence-digest.html');
+                    const digestTemplate = await fs.readFile(digestTemplatePath, 'utf-8');
+                    const digestHtml = processTemplate(digestTemplate, {
+                        eventName: event.name,
+                        firstName: fullName.split(' ')[0] || 'there',
+                        digestCount: sequenceCampaigns.length.toString(),
+                        digestContent: messageBlocks,
+                        year: new Date().getFullYear().toString()
                     });
 
                     // Send digest email
                     await sendEmail({
                         to: memberEmail,
                         subject: `${event.name} - Important Updates`,
-                        htmlContent: digestBody
+                        htmlContent: digestHtml
                     });
+
+                    // Record delivery entries for each campaign in the digest
+                    const { readData, writeData } = require('./storage');
+                    const deliveryData = await readData('email-deliveries.json') || { deliveries: [] };
+                    if (!deliveryData.deliveries) deliveryData.deliveries = [];
+                    for (const campaign of sequenceCampaigns) {
+                        deliveryData.deliveries.push({
+                            id: require('uuid').v4(),
+                            campaignId: campaign.id,
+                            email: memberEmail,
+                            userId: memberUser?.id || null,
+                            status: 'sent',
+                            sentAt: new Date().toISOString(),
+                            sentVia: 'digest',
+                            createdAt: new Date().toISOString()
+                        });
+                    }
+                    await writeData('email-deliveries.json', deliveryData);
 
                     emailsSent++;
                     context.log(`Sent digest of ${sequenceCampaigns.length} sequence emails to ${memberEmail}`);

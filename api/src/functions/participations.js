@@ -1,12 +1,10 @@
-// ACDC Portal - Participations API
-// Links users to events with team memberships and hotel choices
-// Team memberships: { teamId, isAdmin, isParticipant }
-// Rules: 
-//   - Can be admin on N teams
-//   - Can be participant on only 1 team per event
-//   - Max 5 participants per team
+// ACDC Portal - Participations API (v2)
+// Unified participation model: one record per person per event
+// Roles array: ['interest', 'participant', 'judge', 'committee', 'sponsor']
+// Email is the anchor identity (present before userId)
 
 const { app } = require('@azure/functions');
+const { v4: uuidv4 } = require('uuid');
 const { Storage } = require('../shared/storage');
 
 const participationsStorage = new Storage('participations');
@@ -16,23 +14,31 @@ const usersStorage = new Storage('users');
 const interestQueueStorage = new Storage('interest-queue');
 const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
+const invitationsStorage = new Storage('invitations');
+const sequenceProgressStorage = new Storage('sequence-progress');
 const { sendEmail } = require('../shared/mail');
 const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
+const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
 
-// Helper to check if event status means it's active (visible to public)
+// Valid roles
+const VALID_ROLES = ['interest', 'participant', 'judge', 'committee', 'sponsor'];
+
+// Helper to check if event status means it's active
 function isActiveStatus(status) {
     return status === 'pre-registration' || status === 'registration' || status === 'live';
 }
 
 // Helper to generate ID
 function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    return uuidv4();
 }
 
-// Helper to trigger sequence emails when user joins an event
+// ============================================================
+// HELPERS: Sequence emails & interest queue
+// ============================================================
+
 async function triggerSequenceEmails(userId, eventId, context) {
     try {
-        // Get user
         const users = await usersStorage.getAll();
         const user = users.find(u => u.id === userId);
         if (!user || !user.email) {
@@ -40,18 +46,24 @@ async function triggerSequenceEmails(userId, eventId, context) {
             return;
         }
 
-        // Get sequence campaigns for this event
-        const campaignData = await campaignsStorage.getRaw();
-        const sequenceCampaigns = (campaignData?.campaigns || [])
-            .filter(c => c.eventId === eventId && c.type === 'sequence')
-            .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
-
-        if (sequenceCampaigns.length === 0) {
-            context.log(`No sequence campaigns for event ${eventId}`);
+        // Look up event to get its sequenceId
+        const events = await eventsStorage.getAll();
+        const event = events.find(e => e.id === eventId);
+        if (!event || !event.sequenceEnabled || !event.sequenceId) {
+            context.log(`Event ${eventId} not found or sequence not enabled`);
             return;
         }
 
-        // Get existing deliveries for this user
+        const campaignData = await campaignsStorage.getRaw();
+        const sequenceCampaigns = (campaignData?.campaigns || [])
+            .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence' && c.status === 'live')
+            .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
+
+        if (sequenceCampaigns.length === 0) {
+            context.log(`No sequence campaigns for sequence ${event.sequenceId} (event ${eventId})`);
+            return;
+        }
+
         const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
         const userDeliveries = new Set(
             deliveryData.deliveries
@@ -59,83 +71,128 @@ async function triggerSequenceEmails(userId, eventId, context) {
                 .map(d => d.campaignId)
         );
 
-        let sent = 0;
-        for (const campaign of sequenceCampaigns) {
-            // Skip if already sent
-            if (userDeliveries.has(campaign.id)) {
-                continue;
-            }
+        // Filter to only unsent campaigns
+        const campaignsToSend = sequenceCampaigns.filter(c => !userDeliveries.has(c.id));
+        if (campaignsToSend.length === 0) {
+            context.log(`All sequence emails already sent to ${user.email}`);
+            return;
+        }
 
-            const delivery = {
-                id: 'del_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
-                campaignId: campaign.id,
-                email: user.email,
-                userId: user.id,
-                status: 'pending',
-                createdAt: new Date().toISOString()
-            };
+        // Build digest email with all unsent campaigns in one message
+        const fs = require('fs').promises;
+        const path = require('path');
+        const { processTemplate } = require('../shared/mail');
 
-            try {
-                await sendEmail({
-                    to: user.email,
-                    subject: campaign.subject,
-                    htmlContent: campaign.content,
-                    firstName: user.firstName || 'Participant',
-                    ctaUrl: campaign.ctaUrl,
-                    ctaText: campaign.ctaText
+        const messageBlocks = campaignsToSend.map((campaign, index) => `
+            <tr>
+                <td style="padding: 0;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                        <tr>
+                            <td style="background-color: #1e293b; padding: 14px 40px;">
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td>
+                                            <span style="color: #94a3b8; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">UPDATE ${index + 1} OF ${campaignsToSend.length}</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding-top: 4px;">
+                                            <span style="color: #ffffff; font-size: 18px; font-weight: 700;">${campaign.subject}</span>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 28px 40px 32px 40px; color: #334155; font-size: 15px; line-height: 1.75;">
+                                ${campaign.content}
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        `).join('');
+
+        const digestTemplatePath = path.join(__dirname, '../../../data/email-templates/sequence-digest.html');
+        const digestTemplate = await fs.readFile(digestTemplatePath, 'utf-8');
+        const digestHtml = processTemplate(digestTemplate, {
+            eventName: event.name,
+            firstName: user.firstName || 'Participant',
+            digestCount: campaignsToSend.length.toString(),
+            digestContent: messageBlocks,
+            year: new Date().getFullYear().toString()
+        });
+
+        try {
+            await sendEmail({
+                to: user.email,
+                subject: `${event.name} - Important Updates`,
+                htmlContent: digestHtml
+            });
+
+            // Record deliveries for all campaigns included in the digest
+            for (const campaign of campaignsToSend) {
+                deliveryData.deliveries.push({
+                    id: uuidv4(),
+                    campaignId: campaign.id,
+                    email: user.email,
+                    userId: user.id,
+                    status: 'sent',
+                    sentAt: new Date().toISOString(),
+                    sentVia: 'digest',
+                    createdAt: new Date().toISOString()
                 });
-
-                delivery.status = 'sent';
-                delivery.sentAt = new Date().toISOString();
-                sent++;
-            } catch (err) {
-                delivery.status = 'failed';
-                delivery.error = err.message;
-                context.log(`Failed to send sequence email to ${user.email}: ${err.message}`);
             }
-
-            deliveryData.deliveries.push(delivery);
+            context.log(`Sent digest of ${campaignsToSend.length} sequence emails to ${user.email} for event ${eventId}`);
+        } catch (err) {
+            for (const campaign of campaignsToSend) {
+                deliveryData.deliveries.push({
+                    id: uuidv4(),
+                    campaignId: campaign.id,
+                    email: user.email,
+                    userId: user.id,
+                    status: 'failed',
+                    error: err.message,
+                    createdAt: new Date().toISOString()
+                });
+            }
+            context.log(`Failed to send digest to ${user.email}: ${err.message}`);
         }
 
-        if (deliveryData.deliveries.length > 0) {
-            await deliveriesStorage.saveRaw(deliveryData);
-        }
-
-        context.log(`Sent ${sent} sequence emails to ${user.email} for event ${eventId}`);
+        await deliveriesStorage.saveRaw(deliveryData);
     } catch (error) {
-        // Don't fail the main operation if this fails
         context.log(`Warning: Failed to trigger sequence emails: ${error.message}`);
     }
 }
 
-// Helper to remove user from interest queue when they register
 async function removeFromInterestQueue(userId, eventId, context) {
     try {
-        // Get user email
         const users = await usersStorage.getAll();
         const user = users.find(u => u.id === userId);
         if (!user || !user.email) return;
 
-        // Check interest queue
         const data = await interestQueueStorage.getRaw();
         if (!data || !data.entries) return;
 
-        const entryIndex = data.entries.findIndex(e => 
+        const entryIndex = data.entries.findIndex(e =>
             e.email.toLowerCase() === user.email.toLowerCase() && !e.registeredEventId
         );
 
         if (entryIndex >= 0) {
-            // Mark as registered instead of removing
             data.entries[entryIndex].registeredEventId = eventId;
             data.entries[entryIndex].registeredAt = new Date().toISOString();
             await interestQueueStorage.saveRaw(data);
             context.log(`Marked interest queue entry for ${user.email} as registered for event ${eventId}`);
         }
     } catch (error) {
-        // Don't fail the main operation if this fails
         context.log(`Warning: Failed to update interest queue: ${error.message}`);
     }
 }
+
+
+// ============================================================
+// CORE CRUD
+// ============================================================
 
 // GET /api/participations/all - Get all participations (admin)
 app.http('participations-get-all', {
@@ -145,21 +202,19 @@ app.http('participations-get-all', {
     handler: async (request, context) => {
         try {
             const participations = await participationsStorage.getAll();
-            return {
-                status: 200,
-                jsonBody: participations
-            };
+            // Migration: ensure roles array exists on all records
+            participations.forEach(p => {
+                if (!p.roles) p.roles = migrateRoles(p);
+            });
+            return { status: 200, jsonBody: participations };
         } catch (error) {
             context.error('Participations GET ALL error:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Internal server error' }
-            };
+            return { status: 500, jsonBody: { error: 'Internal server error' } };
         }
     }
 });
 
-// GET /api/participations - Get participation for user in event
+// GET /api/participations - Get participation for user/email in event
 app.http('participations-get', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -167,53 +222,41 @@ app.http('participations-get', {
     handler: async (request, context) => {
         try {
             const userId = request.query.get('userId');
+            const email = request.query.get('email');
             const eventId = request.query.get('eventId');
-            
-            if (!userId) {
-                return {
-                    status: 400,
-                    jsonBody: { error: 'userId is required' }
-                };
+
+            if (!userId && !email) {
+                return { status: 400, jsonBody: { error: 'userId or email is required' } };
             }
-            
+
             const participations = await participationsStorage.getAll();
-            
-            // If eventId not provided, get active event
+
+            // Determine target event
             let targetEventId = eventId;
             if (!targetEventId) {
                 const events = await eventsStorage.getAll();
                 const activeEvent = events.find(e => isActiveStatus(e.status));
-                if (activeEvent) {
-                    targetEventId = activeEvent.id;
-                }
+                if (activeEvent) targetEventId = activeEvent.id;
             }
-            
-            const participation = participations.find(p => 
-                p.userId === userId && p.eventId === targetEventId
-            );
-            
+
+            // Find by userId or email
+            const participation = participations.find(p => {
+                const matchesUser = userId ? p.userId === userId : p.email?.toLowerCase() === email.toLowerCase();
+                return matchesUser && p.eventId === targetEventId;
+            });
+
             if (!participation) {
-                return {
-                    status: 404,
-                    jsonBody: { error: 'Participation not found' }
-                };
+                return { status: 404, jsonBody: { error: 'Participation not found' } };
             }
-            
-            // Ensure teamMemberships array exists (migration support)
-            if (!participation.teamMemberships) {
-                participation.teamMemberships = [];
-            }
-            
-            return {
-                status: 200,
-                jsonBody: participation
-            };
+
+            // Migration support
+            if (!participation.roles) participation.roles = migrateRoles(participation);
+            if (!participation.teamMemberships) participation.teamMemberships = buildLegacyTeamMemberships(participation);
+
+            return { status: 200, jsonBody: participation };
         } catch (error) {
             context.error('Error getting participation:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to get participation' }
-            };
+            return { status: 500, jsonBody: { error: 'Failed to get participation' } };
         }
     }
 });
@@ -226,70 +269,387 @@ app.http('participations-upsert', {
     handler: async (request, context) => {
         try {
             const body = await request.json();
-            const { userId, eventId, hotelNights } = body;
-            
-            if (!userId || !eventId) {
-                return {
-                    status: 400,
-                    jsonBody: { error: 'userId and eventId are required' }
-                };
+            const { userId, email, eventId, hotelNights, roles } = body;
+
+            if (!eventId) {
+                return { status: 400, jsonBody: { error: 'eventId is required' } };
             }
-            
+            if (!userId && !email) {
+                return { status: 400, jsonBody: { error: 'userId or email is required' } };
+            }
+
+            // Resolve email from userId if not provided
+            let resolvedEmail = email;
+            if (!resolvedEmail && userId) {
+                const users = await usersStorage.getAll();
+                const user = users.find(u => u.id === userId);
+                resolvedEmail = user?.email;
+            }
+
             const participations = await participationsStorage.getAll();
-            const existingIndex = participations.findIndex(p => 
-                p.userId === userId && p.eventId === eventId
-            );
-            
+
+            // Find existing: match by userId OR email for this event
+            const existingIndex = participations.findIndex(p => {
+                if (userId && p.userId === userId && p.eventId === eventId) return true;
+                if (resolvedEmail && p.email?.toLowerCase() === resolvedEmail.toLowerCase() && p.eventId === eventId) return true;
+                return false;
+            });
+
             const now = new Date().toISOString();
-            
+
             if (existingIndex >= 0) {
                 // Update existing participation
                 const existing = participations[existingIndex];
                 const updated = {
                     ...existing,
+                    userId: userId || existing.userId,
+                    email: resolvedEmail || existing.email,
                     hotelNights: hotelNights !== undefined ? hotelNights : existing.hotelNights,
-                    teamMemberships: existing.teamMemberships || [],
+                    roles: existing.roles || migrateRoles(existing),
                     updatedAt: now
                 };
+                // Ensure legacy support
+                updated.teamMemberships = buildLegacyTeamMemberships(updated);
                 participations[existingIndex] = updated;
                 await participationsStorage.saveAll(participations);
-                
-                context.log(`Participation updated for user ${userId} in event ${eventId}`);
-                return {
-                    status: 200,
-                    jsonBody: updated
-                };
+
+                context.log(`Participation updated for ${resolvedEmail || userId} in event ${eventId}`);
+                return { status: 200, jsonBody: updated };
             } else {
                 // Create new participation
+                // Determine initial hotelPaidBy based on roles
+                const initialRoles = roles || [];
+                const initialHotelPaidBy = initialRoles.includes('committee') || initialRoles.includes('judge')
+                    ? 'committee' : null;
+
                 const newParticipation = {
                     id: generateId(),
-                    userId,
+                    userId: userId || null,
+                    email: resolvedEmail || null,
                     eventId,
-                    teamMemberships: [],
+                    roles: initialRoles,
+                    teamId: null,
+                    isTeamAdmin: false,
                     hotelNights: hotelNights || {},
+                    hotelPaidBy: initialHotelPaidBy,
                     createdAt: now,
                     updatedAt: now
                 };
+                // Legacy support
+                newParticipation.teamMemberships = [];
                 participations.push(newParticipation);
                 await participationsStorage.saveAll(participations);
-                
-                context.log(`Participation created for user ${userId} in event ${eventId}`);
-                return {
-                    status: 201,
-                    jsonBody: newParticipation
-                };
+
+                context.log(`Participation created for ${resolvedEmail || userId} in event ${eventId}`);
+                return { status: 201, jsonBody: newParticipation };
             }
         } catch (error) {
             context.error('Error upserting participation:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to save participation' }
-            };
+            return { status: 500, jsonBody: { error: 'Failed to save participation' } };
         }
     }
 });
 
-// PUT /api/participations/:id/hotel - Update hotel nights only
+// PUT /api/participations/:id - Update participation fields
+app.http('participations-update', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'participations/{id}',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const body = await request.json();
+
+            const participations = await participationsStorage.getAll();
+            const index = participations.findIndex(p => p.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Participation not found' } };
+            }
+
+            const existing = participations[index];
+            const updated = {
+                ...existing,
+                ...(body.hotelNights !== undefined && { hotelNights: body.hotelNights }),
+                ...(body.teamId !== undefined && { teamId: body.teamId }),
+                ...(body.isTeamAdmin !== undefined && { isTeamAdmin: body.isTeamAdmin }),
+                ...(body.userId !== undefined && { userId: body.userId }),
+                ...(body.email !== undefined && { email: body.email }),
+                ...(body.interestSource !== undefined && { interestSource: body.interestSource }),
+                ...(body.interestVerified !== undefined && { interestVerified: body.interestVerified }),
+                updatedAt: new Date().toISOString()
+            };
+
+            // Rebuild legacy support
+            updated.teamMemberships = buildLegacyTeamMemberships(updated);
+            participations[index] = updated;
+            await participationsStorage.saveAll(participations);
+
+            return { status: 200, jsonBody: updated };
+        } catch (error) {
+            context.error('Error updating participation:', error);
+            return { status: 500, jsonBody: { error: 'Failed to update participation' } };
+        }
+    }
+});
+
+// DELETE /api/participations/:id - Delete a participation
+app.http('participations-delete', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'participations/{id}',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const participations = await participationsStorage.getAll();
+            const index = participations.findIndex(p => p.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Participation not found' } };
+            }
+
+            const participation = participations[index];
+            const email = participation.email;
+            const userId = participation.userId;
+            const eventId = participation.eventId;
+
+            // Remove the participation
+            participations.splice(index, 1);
+            await participationsStorage.saveAll(participations);
+
+            // Cascade: clean up related data
+            let cleaned = { invitations: 0, deliveries: 0, sequenceProgress: 0 };
+
+            // 1. Clean up invitations for this email + event
+            try {
+                const invData = await invitationsStorage.getRaw();
+                const invitations = invData?.invitations || [];
+                const before = invitations.length;
+                const filtered = invitations.filter(inv => 
+                    !(inv.email?.toLowerCase() === email?.toLowerCase() && inv.eventId === eventId)
+                );
+                if (filtered.length < before) {
+                    cleaned.invitations = before - filtered.length;
+                    await invitationsStorage.saveRaw({ invitations: filtered });
+                }
+            } catch (e) { context.log(`Warning: invitation cleanup failed: ${e.message}`); }
+
+            // 2. Clean up email deliveries for this user/email
+            try {
+                const delData = await deliveriesStorage.getRaw() || { deliveries: [] };
+                const deliveries = delData.deliveries || [];
+                const before = deliveries.length;
+                const filtered = deliveries.filter(d => {
+                    if (userId && d.userId === userId) return false;
+                    if (email && d.email?.toLowerCase() === email.toLowerCase()) return false;
+                    return true;
+                });
+                if (filtered.length < before) {
+                    cleaned.deliveries = before - filtered.length;
+                    await deliveriesStorage.saveRaw({ deliveries: filtered });
+                }
+            } catch (e) { context.log(`Warning: delivery cleanup failed: ${e.message}`); }
+
+            // 3. Clean up sequence progress
+            try {
+                const progData = await sequenceProgressStorage.getRaw();
+                const progress = progData?.progress || progData || [];
+                if (Array.isArray(progress)) {
+                    const before = progress.length;
+                    const filtered = progress.filter(p => 
+                        !(p.userId === userId && p.eventId === eventId)
+                    );
+                    if (filtered.length < before) {
+                        cleaned.sequenceProgress = before - filtered.length;
+                        await sequenceProgressStorage.saveRaw(progData?.progress ? { progress: filtered } : filtered);
+                    }
+                }
+            } catch (e) { context.log(`Warning: sequence progress cleanup failed: ${e.message}`); }
+
+            context.log(`Deleted participation ${id} (${email}). Cleaned: ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries, ${cleaned.sequenceProgress} sequence progress`);
+
+            return { status: 200, jsonBody: { success: true, cleaned } };
+        } catch (error) {
+            context.error('Error deleting participation:', error);
+            return { status: 500, jsonBody: { error: 'Failed to delete participation' } };
+        }
+    }
+});
+
+
+// ============================================================
+// ROLES MANAGEMENT
+// ============================================================
+
+// PUT /api/participations/:id/roles - Add or remove roles
+app.http('participations-update-roles-v2', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'participations/{id}/roles',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const body = await request.json();
+            const { add, remove, set } = body;
+
+            const participations = await participationsStorage.getAll();
+            const index = participations.findIndex(p => p.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Participation not found' } };
+            }
+
+            const participation = participations[index];
+            let roles = participation.roles || migrateRoles(participation);
+
+            // 'set' replaces the entire roles array
+            if (set && Array.isArray(set)) {
+                const invalid = set.filter(r => !VALID_ROLES.includes(r));
+                if (invalid.length > 0) {
+                    return { status: 400, jsonBody: { error: `Invalid roles: ${invalid.join(', ')}. Valid: ${VALID_ROLES.join(', ')}` } };
+                }
+                roles = [...new Set(set)];
+            } else {
+                // 'add' appends roles
+                if (add && Array.isArray(add)) {
+                    const invalid = add.filter(r => !VALID_ROLES.includes(r));
+                    if (invalid.length > 0) {
+                        return { status: 400, jsonBody: { error: `Invalid roles: ${invalid.join(', ')}` } };
+                    }
+                    roles = [...new Set([...roles, ...add])];
+                }
+                // 'remove' removes roles
+                if (remove && Array.isArray(remove)) {
+                    roles = roles.filter(r => !remove.includes(r));
+                }
+            }
+
+            participation.roles = roles;
+            participation.updatedAt = new Date().toISOString();
+
+            // If participant/judge/committee was just added, handle side effects
+            const addedActionableRole = add?.some(r => ['participant', 'judge', 'committee'].includes(r));
+            if (addedActionableRole && participation.userId) {
+                await removeFromInterestQueue(participation.userId, participation.eventId, context);
+                await triggerSequenceEmails(participation.userId, participation.eventId, context);
+
+                if (participation.email) {
+                    sendInterestAcknowledgmentEmail(participation.email, participation.eventId, context)
+                        .then(result => {
+                            if (result?.success) context.log(`Interest acknowledgment sent to ${participation.email}`);
+                        })
+                        .catch(err => context.error(`Failed interest ack to ${participation.email}:`, err));
+                }
+            }
+
+            // Rebuild legacy support
+            participation.teamMemberships = buildLegacyTeamMemberships(participation);
+            participations[index] = participation;
+            await participationsStorage.saveAll(participations);
+
+            context.log(`Roles updated for participation ${id}: [${roles.join(', ')}]`);
+            return { status: 200, jsonBody: participation };
+        } catch (error) {
+            context.error('Error updating roles:', error);
+            return { status: 500, jsonBody: { error: 'Failed to update roles' } };
+        }
+    }
+});
+
+
+// ============================================================
+// TEAM ASSIGNMENT
+// ============================================================
+
+// PUT /api/participations/:id/team - Assign to a team
+app.http('participations-assign-team', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'participations/{id}/team',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const body = await request.json();
+            const { teamId, isTeamAdmin } = body;
+
+            const participations = await participationsStorage.getAll();
+            const index = participations.findIndex(p => p.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Participation not found' } };
+            }
+
+            const participation = participations[index];
+
+            if (teamId) {
+                // Validate team exists
+                const teams = await teamsStorage.getAll();
+                const team = teams.find(t => t.id === teamId);
+                if (!team) {
+                    return { status: 404, jsonBody: { error: 'Team not found' } };
+                }
+
+                // Check max team size
+                const events = await eventsStorage.getAll();
+                const event = events.find(e => e.id === participation.eventId);
+                const maxSize = event?.maxTeamSize || 5;
+
+                const currentCount = participations.filter(p =>
+                    p.teamId === teamId && p.roles?.includes('participant') && p.id !== id
+                ).length;
+
+                if (currentCount >= maxSize) {
+                    return {
+                        status: 400,
+                        jsonBody: { error: `Team has reached maximum of ${maxSize} participants`, currentCount }
+                    };
+                }
+
+                // Auto-add 'participant' role if not present
+                if (!participation.roles) participation.roles = [];
+                if (!participation.roles.includes('participant')) {
+                    participation.roles.push('participant');
+                }
+            }
+
+            participation.teamId = teamId || null;
+            participation.isTeamAdmin = isTeamAdmin || false;
+            participation.updatedAt = new Date().toISOString();
+
+            // Rebuild legacy
+            participation.teamMemberships = buildLegacyTeamMemberships(participation);
+            participations[index] = participation;
+            await participationsStorage.saveAll(participations);
+
+            // Side effects for joining a team
+            if (teamId && participation.userId) {
+                await removeFromInterestQueue(participation.userId, participation.eventId, context);
+                await triggerSequenceEmails(participation.userId, participation.eventId, context);
+
+                if (participation.email) {
+                    sendInterestAcknowledgmentEmail(participation.email, participation.eventId, context)
+                        .then(result => {
+                            if (result?.success) context.log(`Interest acknowledgment sent to ${participation.email}`);
+                        })
+                        .catch(err => context.error(`Failed interest ack:`, err));
+                }
+            }
+
+            context.log(`Team assignment updated for participation ${id}: team=${teamId}`);
+            return { status: 200, jsonBody: participation };
+        } catch (error) {
+            context.error('Error assigning team:', error);
+            return { status: 500, jsonBody: { error: 'Failed to assign team' } };
+        }
+    }
+});
+
+
+// ============================================================
+// HOTEL
+// ============================================================
+
+// PUT /api/participations/:id/hotel - Update hotel nights
 app.http('participations-update-hotel', {
     methods: ['PUT'],
     authLevel: 'anonymous',
@@ -299,473 +659,37 @@ app.http('participations-update-hotel', {
             const id = request.params.id;
             const body = await request.json();
             const { hotelNights } = body;
-            
+
             const participations = await participationsStorage.getAll();
             const index = participations.findIndex(p => p.id === id);
-            
+
             if (index < 0) {
-                return {
-                    status: 404,
-                    jsonBody: { error: 'Participation not found' }
-                };
+                return { status: 404, jsonBody: { error: 'Participation not found' } };
             }
-            
+
             participations[index] = {
                 ...participations[index],
                 hotelNights,
                 updatedAt: new Date().toISOString()
             };
-            
+
             await participationsStorage.saveAll(participations);
-            
+
             context.log(`Hotel nights updated for participation ${id}`);
-            return {
-                status: 200,
-                jsonBody: participations[index]
-            };
+            return { status: 200, jsonBody: participations[index] };
         } catch (error) {
             context.error('Error updating hotel nights:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to update hotel nights' }
-            };
+            return { status: 500, jsonBody: { error: 'Failed to update hotel nights' } };
         }
     }
 });
 
-// POST /api/participations/:id/team-membership - Add or update team membership
-app.http('participations-add-team-membership', {
-    methods: ['POST'],
-    authLevel: 'anonymous',
-    route: 'participations/{id}/team-membership',
-    handler: async (request, context) => {
-        try {
-            const id = request.params.id;
-            const body = await request.json();
-            const { teamId, isAdmin, isParticipant } = body;
-            
-            if (!teamId) {
-                return {
-                    status: 400,
-                    jsonBody: { error: 'teamId is required' }
-                };
-            }
-            
-            const participations = await participationsStorage.getAll();
-            const index = participations.findIndex(p => p.id === id);
-            
-            if (index < 0) {
-                return {
-                    status: 404,
-                    jsonBody: { error: 'Participation not found' }
-                };
-            }
-            
-            const participation = participations[index];
-            const memberships = participation.teamMemberships || [];
-            
-            // Check if trying to add as participant when already participant on another team
-            if (isParticipant) {
-                const existingParticipantTeam = memberships.find(m => m.isParticipant && m.teamId !== teamId);
-                if (existingParticipantTeam) {
-                    return {
-                        status: 400,
-                        jsonBody: { 
-                            error: 'Already a participant on another team',
-                            existingTeamId: existingParticipantTeam.teamId
-                        }
-                    };
-                }
-                
-                // Check if team would exceed max 5 participants
-                const teams = await teamsStorage.getAll();
-                const team = teams.find(t => t.id === teamId);
-                if (team) {
-                    // Count current participants for this team
-                    let participantCount = 0;
-                    for (const p of participations) {
-                        const tm = (p.teamMemberships || []).find(m => m.teamId === teamId && m.isParticipant);
-                        if (tm && p.id !== id) { // Don't count current user if updating
-                            participantCount++;
-                        }
-                    }
-                    
-                    if (participantCount >= 5) {
-                        return {
-                            status: 400,
-                            jsonBody: { 
-                                error: 'Team has reached maximum of 5 participants',
-                                currentCount: participantCount
-                            }
-                        };
-                    }
-                    
-                    // Warning if would exceed numberOfParticipants
-                    if (participantCount >= team.numberOfParticipants) {
-                        context.log(`Warning: Team ${teamId} exceeding expected ${team.numberOfParticipants} participants`);
-                    }
-                }
-            }
-            
-            // Find existing membership for this team
-            const existingMembershipIndex = memberships.findIndex(m => m.teamId === teamId);
-            
-            if (existingMembershipIndex >= 0) {
-                // Update existing membership
-                memberships[existingMembershipIndex] = {
-                    teamId,
-                    isAdmin: isAdmin !== undefined ? isAdmin : memberships[existingMembershipIndex].isAdmin,
-                    isParticipant: isParticipant !== undefined ? isParticipant : memberships[existingMembershipIndex].isParticipant
-                };
-            } else {
-                // Add new membership
-                memberships.push({
-                    teamId,
-                    isAdmin: isAdmin || false,
-                    isParticipant: isParticipant || false
-                });
-            }
-            
-            participations[index] = {
-                ...participation,
-                teamMemberships: memberships,
-                updatedAt: new Date().toISOString()
-            };
-            
-            await participationsStorage.saveAll(participations);
-            
-            // If user became a participant, check interest queue and trigger sequence emails
-            if (isParticipant) {
-                await removeFromInterestQueue(participation.userId, participation.eventId, context);
-                await triggerSequenceEmails(participation.userId, participation.eventId, context);
 
-                // Send interest acknowledgment email if applicable
-                const users = await usersStorage.getAll();
-                const user = users.find(u => u.id === participation.userId);
-                if (user?.email) {
-                    sendInterestAcknowledgmentEmail(user.email, participation.eventId, context)
-                        .then(result => {
-                            if (result.success) {
-                                context.log(`Interest acknowledgment email sent to ${user.email}`);
-                            }
-                        })
-                        .catch(error => {
-                            context.error(`Failed to send interest acknowledgment email to ${user.email}:`, error);
-                        });
-                }
-            }
-            
-            context.log(`Team membership updated for participation ${id}, team ${teamId}`);
-            return {
-                status: 200,
-                jsonBody: participations[index]
-            };
-        } catch (error) {
-            context.error('Error adding team membership:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to add team membership' }
-            };
-        }
-    }
-});
+// ============================================================
+// QUERY ENDPOINTS
+// ============================================================
 
-// DELETE /api/participations/:id/team-membership/:teamId - Remove team membership
-app.http('participations-remove-team-membership', {
-    methods: ['DELETE'],
-    authLevel: 'anonymous',
-    route: 'participations/{id}/team-membership/{teamId}',
-    handler: async (request, context) => {
-        try {
-            const id = request.params.id;
-            const teamId = request.params.teamId;
-            
-            const participations = await participationsStorage.getAll();
-            const index = participations.findIndex(p => p.id === id);
-            
-            if (index < 0) {
-                return {
-                    status: 404,
-                    jsonBody: { error: 'Participation not found' }
-                };
-            }
-            
-            const participation = participations[index];
-            const memberships = participation.teamMemberships || [];
-            
-            const membershipIndex = memberships.findIndex(m => m.teamId === teamId);
-            if (membershipIndex < 0) {
-                return {
-                    status: 404,
-                    jsonBody: { error: 'Team membership not found' }
-                };
-            }
-            
-            // Check if user is admin - cannot remove if only admin
-            const membership = memberships[membershipIndex];
-            if (membership.isAdmin) {
-                // Check if there are other admins for this team
-                let otherAdminCount = 0;
-                for (const p of participations) {
-                    if (p.id !== id) {
-                        const tm = (p.teamMemberships || []).find(m => m.teamId === teamId && m.isAdmin);
-                        if (tm) otherAdminCount++;
-                    }
-                }
-                
-                if (otherAdminCount === 0) {
-                    return {
-                        status: 400,
-                        jsonBody: { error: 'Cannot remove last admin from team' }
-                    };
-                }
-            }
-            
-            memberships.splice(membershipIndex, 1);
-            
-            participations[index] = {
-                ...participation,
-                teamMemberships: memberships,
-                updatedAt: new Date().toISOString()
-            };
-            
-            await participationsStorage.saveAll(participations);
-            
-            context.log(`Team membership removed for participation ${id}, team ${teamId}`);
-            return {
-                status: 200,
-                jsonBody: participations[index]
-            };
-        } catch (error) {
-            context.error('Error removing team membership:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to remove team membership' }
-            };
-        }
-    }
-});
-
-// PUT /api/participations/:id/team-membership/:teamId/participant - Toggle participant status
-app.http('participations-toggle-participant', {
-    methods: ['PUT'],
-    authLevel: 'anonymous',
-    route: 'participations/{id}/team-membership/{teamId}/participant',
-    handler: async (request, context) => {
-        try {
-            const id = request.params.id;
-            const teamId = request.params.teamId;
-            const body = await request.json();
-            const { isParticipant } = body;
-            
-            const participations = await participationsStorage.getAll();
-            const index = participations.findIndex(p => p.id === id);
-            
-            if (index < 0) {
-                return {
-                    status: 404,
-                    jsonBody: { error: 'Participation not found' }
-                };
-            }
-            
-            const participation = participations[index];
-            const memberships = participation.teamMemberships || [];
-            const membershipIndex = memberships.findIndex(m => m.teamId === teamId);
-            
-            if (membershipIndex < 0) {
-                return {
-                    status: 404,
-                    jsonBody: { error: 'Team membership not found' }
-                };
-            }
-            
-            // If setting isParticipant true, check constraints
-            if (isParticipant) {
-                // Check if already participant on another team
-                const existingParticipantTeam = memberships.find(m => m.isParticipant && m.teamId !== teamId);
-                if (existingParticipantTeam) {
-                    return {
-                        status: 400,
-                        jsonBody: { 
-                            error: 'Already a participant on another team',
-                            existingTeamId: existingParticipantTeam.teamId
-                        }
-                    };
-                }
-                
-                // Check max participants
-                const teams = await teamsStorage.getAll();
-                const team = teams.find(t => t.id === teamId);
-                if (team) {
-                    let participantCount = 0;
-                    for (const p of participations) {
-                        const tm = (p.teamMemberships || []).find(m => m.teamId === teamId && m.isParticipant);
-                        if (tm && p.id !== id) {
-                            participantCount++;
-                        }
-                    }
-                    
-                    if (participantCount >= 5) {
-                        return {
-                            status: 400,
-                            jsonBody: { 
-                                error: 'Team has reached maximum of 5 participants',
-                                currentCount: participantCount
-                            }
-                        };
-                    }
-                }
-            }
-            
-            memberships[membershipIndex].isParticipant = isParticipant;
-            
-            participations[index] = {
-                ...participation,
-                teamMemberships: memberships,
-                updatedAt: new Date().toISOString()
-            };
-            
-            await participationsStorage.saveAll(participations);
-            
-            // If user became a participant, check interest queue
-            if (isParticipant) {
-                await removeFromInterestQueue(participation.userId, participation.eventId, context);
-
-                // Send interest acknowledgment email if applicable
-                const users = await usersStorage.getAll();
-                const user = users.find(u => u.id === participation.userId);
-                if (user?.email) {
-                    sendInterestAcknowledgmentEmail(user.email, participation.eventId, context)
-                        .then(result => {
-                            if (result.success) {
-                                context.log(`Interest acknowledgment email sent to ${user.email}`);
-                            }
-                        })
-                        .catch(error => {
-                            context.error(`Failed to send interest acknowledgment email to ${user.email}:`, error);
-                        });
-                }
-            }
-            
-            context.log(`Participant status toggled for participation ${id}, team ${teamId}: ${isParticipant}`);
-            return {
-                status: 200,
-                jsonBody: participations[index]
-            };
-        } catch (error) {
-            context.error('Error toggling participant status:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to toggle participant status' }
-            };
-        }
-    }
-});
-
-// PUT /api/participations/:id/team-membership/:teamId/roles - Update both isAdmin and isParticipant
-app.http('participations-update-roles', {
-    methods: ['PUT'],
-    authLevel: 'anonymous',
-    route: 'participations/{id}/team-membership/{teamId}/roles',
-    handler: async (request, context) => {
-        try {
-            const id = request.params.id;
-            const teamId = request.params.teamId;
-            const body = await request.json();
-            const { isAdmin, isParticipant } = body;
-            
-            const participations = await participationsStorage.getAll();
-            const index = participations.findIndex(p => p.id === id);
-            
-            if (index < 0) {
-                return {
-                    status: 404,
-                    jsonBody: { error: 'Participation not found' }
-                };
-            }
-            
-            const participation = participations[index];
-            const memberships = participation.teamMemberships || [];
-            const membershipIndex = memberships.findIndex(m => m.teamId === teamId);
-            
-            if (membershipIndex < 0) {
-                return {
-                    status: 404,
-                    jsonBody: { error: 'Team membership not found' }
-                };
-            }
-            
-            // If setting isParticipant true, check constraints
-            if (isParticipant && !memberships[membershipIndex].isParticipant) {
-                // Check if already participant on another team
-                const existingParticipantTeam = memberships.find(m => m.isParticipant && m.teamId !== teamId);
-                if (existingParticipantTeam) {
-                    return {
-                        status: 400,
-                        jsonBody: { 
-                            error: 'Already a participant on another team',
-                            existingTeamId: existingParticipantTeam.teamId
-                        }
-                    };
-                }
-                
-                // Check max participants
-                const teams = await teamsStorage.getAll();
-                const team = teams.find(t => t.id === teamId);
-                if (team) {
-                    let participantCount = 0;
-                    for (const p of participations) {
-                        const tm = (p.teamMemberships || []).find(m => m.teamId === teamId && m.isParticipant);
-                        if (tm && p.id !== id) {
-                            participantCount++;
-                        }
-                    }
-                    
-                    // Get max from event
-                    const events = await require('../shared/storage').getStorage('events').getAll();
-                    const event = events.find(e => e.id === participation.eventId);
-                    const maxParticipants = event?.maxTeamSize || 5;
-                    
-                    if (participantCount >= maxParticipants) {
-                        return {
-                            status: 400,
-                            jsonBody: { 
-                                error: `Team has reached maximum of ${maxParticipants} participants`,
-                                currentCount: participantCount
-                            }
-                        };
-                    }
-                }
-            }
-            
-            // Update both roles
-            memberships[membershipIndex].isAdmin = isAdmin;
-            memberships[membershipIndex].isParticipant = isParticipant;
-            
-            participations[index] = {
-                ...participation,
-                teamMemberships: memberships,
-                updatedAt: new Date().toISOString()
-            };
-            
-            await participationsStorage.saveAll(participations);
-            
-            context.log(`Roles updated for participation ${id}, team ${teamId}: isAdmin=${isAdmin}, isParticipant=${isParticipant}`);
-            return {
-                status: 200,
-                jsonBody: participations[index]
-            };
-        } catch (error) {
-            context.error('Error updating roles:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to update roles' }
-            };
-        }
-    }
-});
-
-// GET /api/participations/event/:eventId - Get all participations for an event
+// GET /api/participations/event/:eventId - All participations for an event (with optional role filter)
 app.http('participations-by-event', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -773,24 +697,71 @@ app.http('participations-by-event', {
     handler: async (request, context) => {
         try {
             const eventId = request.params.eventId;
+            const role = request.query.get('role'); // Optional: filter by role
+
             const participations = await participationsStorage.getAll();
-            const eventParticipations = participations.filter(p => p.eventId === eventId);
-            
-            // Ensure teamMemberships array exists for all
-            eventParticipations.forEach(p => {
-                if (!p.teamMemberships) p.teamMemberships = [];
+            let results = participations.filter(p => p.eventId === eventId);
+
+            // Migration: ensure roles exist
+            results.forEach(p => {
+                if (!p.roles) p.roles = migrateRoles(p);
+                if (!p.teamMemberships) p.teamMemberships = buildLegacyTeamMemberships(p);
             });
-            
-            return {
-                status: 200,
-                jsonBody: eventParticipations
-            };
+
+            // Filter by role if specified
+            if (role) {
+                results = results.filter(p => p.roles.includes(role));
+            }
+
+            return { status: 200, jsonBody: results };
         } catch (error) {
             context.error('Error getting participations by event:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to get participations' }
-            };
+            return { status: 500, jsonBody: { error: 'Failed to get participations' } };
+        }
+    }
+});
+
+// GET /api/participations/person/:email - All participations for a person across events
+app.http('participations-by-person', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'participations/person/{email}',
+    handler: async (request, context) => {
+        try {
+            const email = decodeURIComponent(request.params.email);
+
+            const participations = await participationsStorage.getAll();
+            const personParticipations = participations.filter(p =>
+                p.email?.toLowerCase() === email.toLowerCase()
+            );
+
+            // Also check by userId if we can resolve email -> user
+            const users = await usersStorage.getAll();
+            const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+            if (user) {
+                participations.forEach(p => {
+                    if (p.userId === user.id && !personParticipations.find(pp => pp.id === p.id)) {
+                        personParticipations.push(p);
+                    }
+                });
+            }
+
+            // Migration
+            personParticipations.forEach(p => {
+                if (!p.roles) p.roles = migrateRoles(p);
+            });
+
+            // Enrich with event names
+            const events = await eventsStorage.getAll();
+            const enriched = personParticipations.map(p => ({
+                ...p,
+                eventName: events.find(e => e.id === p.eventId)?.name || 'Unknown Event'
+            }));
+
+            return { status: 200, jsonBody: enriched };
+        } catch (error) {
+            context.error('Error getting participations by person:', error);
+            return { status: 500, jsonBody: { error: 'Failed to get participations' } };
         }
     }
 });
@@ -804,23 +775,27 @@ app.http('participations-by-team', {
         try {
             const teamId = request.params.teamId;
             const participations = await participationsStorage.getAll();
-            
-            // Filter to participations that have membership in this team
-            const teamParticipations = participations.filter(p => {
-                const memberships = p.teamMemberships || [];
-                return memberships.some(m => m.teamId === teamId);
+
+            // New model: flat teamId
+            let teamParticipations = participations.filter(p => p.teamId === teamId);
+
+            // Legacy fallback: also check teamMemberships array
+            if (teamParticipations.length === 0) {
+                teamParticipations = participations.filter(p => {
+                    const memberships = p.teamMemberships || [];
+                    return memberships.some(m => m.teamId === teamId);
+                });
+            }
+
+            // Migration
+            teamParticipations.forEach(p => {
+                if (!p.roles) p.roles = migrateRoles(p);
             });
-            
-            return {
-                status: 200,
-                jsonBody: teamParticipations
-            };
+
+            return { status: 200, jsonBody: teamParticipations };
         } catch (error) {
             context.error('Error getting participations by team:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to get participations' }
-            };
+            return { status: 500, jsonBody: { error: 'Failed to get participations' } };
         }
     }
 });
@@ -834,35 +809,396 @@ app.http('participations-team-count', {
         try {
             const teamId = request.params.teamId;
             const participations = await participationsStorage.getAll();
-            
+
             let adminCount = 0;
             let participantCount = 0;
-            
+
             for (const p of participations) {
+                // New model
+                if (p.teamId === teamId && p.roles?.includes('participant')) {
+                    participantCount++;
+                    if (p.isTeamAdmin) adminCount++;
+                    continue;
+                }
+                // Legacy fallback
                 const membership = (p.teamMemberships || []).find(m => m.teamId === teamId);
                 if (membership) {
                     if (membership.isAdmin) adminCount++;
                     if (membership.isParticipant) participantCount++;
                 }
             }
-            
+
             return {
                 status: 200,
-                jsonBody: {
-                    teamId,
-                    adminCount,
-                    participantCount,
-                    maxParticipants: 5
-                }
+                jsonBody: { teamId, adminCount, participantCount, maxParticipants: 5 }
             };
         } catch (error) {
             context.error('Error getting team count:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to get team count' }
-            };
+            return { status: 500, jsonBody: { error: 'Failed to get team count' } };
         }
     }
 });
 
-console.log('Participations API loaded');
+
+// ============================================================
+// LEGACY COMPATIBILITY ENDPOINTS
+// These keep existing frontend pages working during migration
+// ============================================================
+
+// POST /api/participations/:id/team-membership - Legacy: add team membership
+app.http('participations-add-team-membership', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'participations/{id}/team-membership',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const body = await request.json();
+            const { teamId, isAdmin, isParticipant } = body;
+
+            if (!teamId) {
+                return { status: 400, jsonBody: { error: 'teamId is required' } };
+            }
+
+            const participations = await participationsStorage.getAll();
+            const index = participations.findIndex(p => p.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Participation not found' } };
+            }
+
+            const participation = participations[index];
+
+            // Check participant constraints
+            if (isParticipant) {
+                if (participation.teamId && participation.teamId !== teamId && participation.roles?.includes('participant')) {
+                    return {
+                        status: 400,
+                        jsonBody: { error: 'Already a participant on another team', existingTeamId: participation.teamId }
+                    };
+                }
+
+                const events = await eventsStorage.getAll();
+                const event = events.find(e => e.id === participation.eventId);
+                const maxSize = event?.maxTeamSize || 5;
+
+                const currentCount = participations.filter(p =>
+                    p.teamId === teamId && p.roles?.includes('participant') && p.id !== id
+                ).length;
+
+                if (currentCount >= maxSize) {
+                    return {
+                        status: 400,
+                        jsonBody: { error: `Team has reached maximum of ${maxSize} participants`, currentCount }
+                    };
+                }
+            }
+
+            // Update new model
+            participation.teamId = teamId;
+            participation.isTeamAdmin = isAdmin || false;
+            if (!participation.roles) participation.roles = [];
+            if (isParticipant && !participation.roles.includes('participant')) {
+                participation.roles.push('participant');
+            }
+
+            // Also maintain legacy teamMemberships
+            participation.teamMemberships = participation.teamMemberships || [];
+            const existingIdx = participation.teamMemberships.findIndex(m => m.teamId === teamId);
+            if (existingIdx >= 0) {
+                participation.teamMemberships[existingIdx] = {
+                    teamId, isAdmin: isAdmin || false, isParticipant: isParticipant || false
+                };
+            } else {
+                participation.teamMemberships.push({
+                    teamId, isAdmin: isAdmin || false, isParticipant: isParticipant || false
+                });
+            }
+
+            // When joining a team as participant, team pays for hotel
+            if (isParticipant) {
+                participation.hotelPaidBy = 'team';
+            }
+
+            participation.updatedAt = new Date().toISOString();
+            participations[index] = participation;
+            await participationsStorage.saveAll(participations);
+
+            // Side effects
+            if (isParticipant && participation.userId) {
+                await removeFromInterestQueue(participation.userId, participation.eventId, context);
+                await triggerSequenceEmails(participation.userId, participation.eventId, context);
+
+                if (participation.email) {
+                    // Send team welcome email to new participant
+                    sendTeamWelcomeEmail(participation.email, participation.eventId, context)
+                        .then(result => {
+                            if (result?.success) context.log(`Team welcome email sent to ${participation.email}: ${result.emailsSent} sent, ${result.emailsFailed} failed`);
+                        })
+                        .catch(err => context.error(`Failed team welcome email:`, err));
+
+                    sendInterestAcknowledgmentEmail(participation.email, participation.eventId, context)
+                        .then(result => { if (result?.success) context.log(`Interest ack sent to ${participation.email}`); })
+                        .catch(err => context.error(`Failed interest ack:`, err));
+                }
+            }
+
+            context.log(`Legacy team membership added for participation ${id}, team ${teamId}`);
+            return { status: 200, jsonBody: participation };
+        } catch (error) {
+            context.error('Error adding team membership:', error);
+            return { status: 500, jsonBody: { error: 'Failed to add team membership' } };
+        }
+    }
+});
+
+// DELETE /api/participations/:id/team-membership/:teamId - Legacy: remove team membership
+app.http('participations-remove-team-membership', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'participations/{id}/team-membership/{teamId}',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const teamId = request.params.teamId;
+
+            const participations = await participationsStorage.getAll();
+            const index = participations.findIndex(p => p.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Participation not found' } };
+            }
+
+            const participation = participations[index];
+
+            // Clear from new model
+            if (participation.teamId === teamId) {
+                participation.teamId = null;
+                participation.isTeamAdmin = false;
+                participation.roles = (participation.roles || []).filter(r => r !== 'participant');
+            }
+
+            // Clear from legacy
+            const memberships = participation.teamMemberships || [];
+            const membershipIndex = memberships.findIndex(m => m.teamId === teamId);
+            if (membershipIndex >= 0) {
+                memberships.splice(membershipIndex, 1);
+            }
+
+            participation.teamMemberships = memberships;
+
+            // Update hotelPaidBy: revert to committee if they have that role, otherwise clear
+            const hasOtherTeams = memberships.some(m => m.isParticipant);
+            if (!hasOtherTeams) {
+                const roles = participation.roles || [];
+                if (roles.includes('committee') || roles.includes('judge')) {
+                    participation.hotelPaidBy = 'committee';
+                } else {
+                    participation.hotelPaidBy = null;
+                    participation.hotelNights = {};
+                }
+            }
+
+            participation.updatedAt = new Date().toISOString();
+            participations[index] = participation;
+            await participationsStorage.saveAll(participations);
+
+            context.log(`Legacy team membership removed for participation ${id}, team ${teamId}`);
+            return { status: 200, jsonBody: participation };
+        } catch (error) {
+            context.error('Error removing team membership:', error);
+            return { status: 500, jsonBody: { error: 'Failed to remove team membership' } };
+        }
+    }
+});
+
+// PUT /api/participations/:id/team-membership/:teamId/participant - Legacy: toggle participant
+app.http('participations-toggle-participant', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'participations/{id}/team-membership/{teamId}/participant',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const teamId = request.params.teamId;
+            const body = await request.json();
+            const { isParticipant } = body;
+
+            const participations = await participationsStorage.getAll();
+            const index = participations.findIndex(p => p.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Participation not found' } };
+            }
+
+            const participation = participations[index];
+
+            // Update new model
+            if (!participation.roles) participation.roles = [];
+            if (isParticipant) {
+                if (!participation.roles.includes('participant')) participation.roles.push('participant');
+                participation.teamId = teamId;
+            } else {
+                participation.roles = participation.roles.filter(r => r !== 'participant');
+                if (participation.teamId === teamId) {
+                    participation.teamId = null;
+                }
+            }
+
+            // Update legacy
+            const memberships = participation.teamMemberships || [];
+            const membershipIndex = memberships.findIndex(m => m.teamId === teamId);
+            if (membershipIndex >= 0) {
+                memberships[membershipIndex].isParticipant = isParticipant;
+            }
+            participation.teamMemberships = memberships;
+
+            participation.updatedAt = new Date().toISOString();
+            participations[index] = participation;
+            await participationsStorage.saveAll(participations);
+
+            // Side effects
+            if (isParticipant && participation.userId) {
+                await removeFromInterestQueue(participation.userId, participation.eventId, context);
+
+                if (participation.email) {
+                    sendInterestAcknowledgmentEmail(participation.email, participation.eventId, context)
+                        .then(result => { if (result?.success) context.log(`Interest ack sent to ${participation.email}`); })
+                        .catch(err => context.error(`Failed interest ack:`, err));
+                }
+            }
+
+            context.log(`Legacy participant toggled for participation ${id}, team ${teamId}: ${isParticipant}`);
+            return { status: 200, jsonBody: participation };
+        } catch (error) {
+            context.error('Error toggling participant:', error);
+            return { status: 500, jsonBody: { error: 'Failed to toggle participant' } };
+        }
+    }
+});
+
+// PUT /api/participations/:id/team-membership/:teamId/roles - Legacy: update roles on team membership
+app.http('participations-update-team-roles', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'participations/{id}/team-membership/{teamId}/roles',
+    handler: async (request, context) => {
+        try {
+            const id = request.params.id;
+            const teamId = request.params.teamId;
+            const body = await request.json();
+            const { isAdmin, isParticipant } = body;
+
+            const participations = await participationsStorage.getAll();
+            const index = participations.findIndex(p => p.id === id);
+
+            if (index < 0) {
+                return { status: 404, jsonBody: { error: 'Participation not found' } };
+            }
+
+            const participation = participations[index];
+
+            // Check participant constraints
+            if (isParticipant && !participation.roles?.includes('participant')) {
+                if (participation.teamId && participation.teamId !== teamId) {
+                    return {
+                        status: 400,
+                        jsonBody: { error: 'Already a participant on another team', existingTeamId: participation.teamId }
+                    };
+                }
+
+                const events = await eventsStorage.getAll();
+                const event = events.find(e => e.id === participation.eventId);
+                const maxSize = event?.maxTeamSize || 5;
+
+                const currentCount = participations.filter(p =>
+                    p.teamId === teamId && p.roles?.includes('participant') && p.id !== id
+                ).length;
+
+                if (currentCount >= maxSize) {
+                    return {
+                        status: 400,
+                        jsonBody: { error: `Team has reached maximum of ${maxSize} participants`, currentCount }
+                    };
+                }
+            }
+
+            // Update new model
+            participation.teamId = teamId;
+            participation.isTeamAdmin = isAdmin;
+            if (!participation.roles) participation.roles = [];
+            if (isParticipant && !participation.roles.includes('participant')) {
+                participation.roles.push('participant');
+            } else if (!isParticipant) {
+                participation.roles = participation.roles.filter(r => r !== 'participant');
+            }
+
+            // Update legacy
+            const memberships = participation.teamMemberships || [];
+            const membershipIndex = memberships.findIndex(m => m.teamId === teamId);
+            if (membershipIndex >= 0) {
+                memberships[membershipIndex].isAdmin = isAdmin;
+                memberships[membershipIndex].isParticipant = isParticipant;
+            }
+            participation.teamMemberships = memberships;
+
+            participation.updatedAt = new Date().toISOString();
+            participations[index] = participation;
+            await participationsStorage.saveAll(participations);
+
+            context.log(`Legacy team roles updated for participation ${id}, team ${teamId}`);
+            return { status: 200, jsonBody: participation };
+        } catch (error) {
+            context.error('Error updating team roles:', error);
+            return { status: 500, jsonBody: { error: 'Failed to update roles' } };
+        }
+    }
+});
+
+
+// ============================================================
+// MIGRATION HELPERS
+// ============================================================
+
+// Derive roles from old teamMemberships structure
+function migrateRoles(participation) {
+    const roles = [];
+
+    if (participation.interestDate || participation.interestSource) {
+        roles.push('interest');
+    }
+
+    if (participation.teamMemberships && participation.teamMemberships.length > 0) {
+        for (const tm of participation.teamMemberships) {
+            if (tm.isParticipant && !roles.includes('participant')) {
+                roles.push('participant');
+            }
+        }
+    }
+
+    if (participation.teamId && !roles.includes('participant')) {
+        roles.push('participant');
+    }
+
+    return roles;
+}
+
+// Build legacy teamMemberships from new flat model
+function buildLegacyTeamMemberships(participation) {
+    if (participation.teamMemberships && participation.teamMemberships.length > 0) {
+        return participation.teamMemberships;
+    }
+
+    if (participation.teamId) {
+        return [{
+            teamId: participation.teamId,
+            isAdmin: participation.isTeamAdmin || false,
+            isParticipant: participation.roles?.includes('participant') || false
+        }];
+    }
+
+    return [];
+}
+
+
+console.log('Participations API v2 loaded (with roles[])');

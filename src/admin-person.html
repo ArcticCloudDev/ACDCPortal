@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person Search - ACDC Committee</title>
+    <link rel="stylesheet" href="css/admin-styles.css">
+    <style>
+        .search-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .search-container input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--admin-border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .search-container input:focus {
+            border-color: var(--admin-primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .search-container button {
+            padding: 10px 20px;
+            background: var(--admin-primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .search-container button:hover { background: #2563eb; }
+
+        /* Person card */
+        .person-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--admin-border);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .person-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px 24px;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+        }
+
+        .person-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .person-info h2 {
+            margin: 0;
+            font-size: 1.15rem;
+            font-weight: 600;
+        }
+
+        .person-info .email {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            margin-top: 2px;
+        }
+
+        .person-info .user-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 6px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .person-info .user-status.registered {
+            background: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+        }
+
+        .person-info .user-status.unregistered {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fcd34d;
+        }
+
+        /* Stats strip */
+        .person-stats {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .person-stat {
+            flex: 1;
+            padding: 14px 20px;
+            text-align: center;
+            border-right: 1px solid var(--admin-border);
+        }
+
+        .person-stat:last-child { border-right: none; }
+        .person-stat .value { font-size: 1.4rem; font-weight: 700; color: var(--admin-sidebar); }
+        .person-stat .label { font-size: 0.7rem; color: var(--admin-text-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Timeline */
+        .timeline { padding: 24px; }
+        .timeline-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--admin-text-muted);
+            margin-bottom: 16px;
+        }
+
+        .timeline-event {
+            display: flex;
+            gap: 16px;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .timeline-event:last-child { border-bottom: none; }
+
+        .timeline-dot {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #dbeafe;
+            color: #2563eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .timeline-content { flex: 1; }
+
+        .timeline-content .event-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--admin-sidebar);
+        }
+
+        .timeline-content .event-dates {
+            font-size: 0.8rem;
+            color: var(--admin-text-muted);
+            margin-top: 2px;
+        }
+
+        .timeline-roles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .role-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .role-pill.interest { background: #fef3c7; color: #92400e; }
+        .role-pill.participant { background: #dbeafe; color: #1d4ed8; }
+        .role-pill.judge { background: #ede9fe; color: #6d28d9; }
+        .role-pill.committee { background: #d1fae5; color: #065f46; }
+        .role-pill.sponsor { background: #fce7f3; color: #9d174d; }
+
+        .timeline-meta {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+            font-size: 0.78rem;
+            color: var(--admin-text-muted);
+        }
+
+        .timeline-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Empty / no results */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--admin-text-muted);
+        }
+
+        .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+        .empty-state h3 { color: var(--admin-sidebar); margin: 0 0 6px; font-size: 1rem; }
+        .empty-state p { margin: 0; font-size: 0.85rem; }
+
+        .no-results {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--admin-border);
+            padding: 40px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Person Search</h1>
+            </div>
+
+            <div class="search-container">
+                <input type="email" id="search-email" placeholder="Enter email address..." 
+                       autocomplete="off" spellcheck="false">
+                <button id="search-btn" onclick="searchPerson()">🔍 Search</button>
+            </div>
+
+            <div id="results-container">
+                <div class="empty-state">
+                    <div class="icon">🔍</div>
+                    <h3>Search for a person</h3>
+                    <p>Enter an email address to see their participation history across all events</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/admin-sidebar.js"></script>
+    <script src="js/permissions.js"></script>
+    <script>
+        let allEvents = [];
+        let allUsers = [];
+        let currentPermissions = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Resolve permissions (handles auth check, sidebar render, access denied)
+            currentPermissions = await Permissions.initAdminPage('person');
+
+            if (!currentPermissions) return;
+
+            // Load reference data
+            try {
+                let [events, users] = await Promise.all([
+                    API.events.list(),
+                    API.users.list()
+                ]);
+                // Scope events to permitted events for non-admin users
+                allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
+                allUsers = users;
+            } catch (e) {
+                console.error('Error loading reference data:', e);
+            }
+
+            // Enter key triggers search
+            document.getElementById('search-email').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') searchPerson();
+            });
+
+            // Auto-search if query param present
+            const params = new URLSearchParams(window.location.search);
+            const emailParam = params.get('email');
+            if (emailParam) {
+                document.getElementById('search-email').value = emailParam;
+                searchPerson();
+            }
+        });
+
+        async function searchPerson() {
+            const email = document.getElementById('search-email').value.trim().toLowerCase();
+            const container = document.getElementById('results-container');
+
+            if (!email) {
+                alert('Please enter an email address');
+                return;
+            }
+
+            container.innerHTML = '<div class="empty-state"><p>Searching...</p></div>';
+
+            try {
+                const participations = await API.participations.getByPerson(email);
+
+                if (!participations || participations.length === 0) {
+                    container.innerHTML = `
+                        <div class="no-results">
+                            <div style="font-size: 2rem; margin-bottom: 12px;">🚫</div>
+                            <h3 style="margin: 0 0 6px; color: var(--admin-sidebar);">No results found</h3>
+                            <p style="margin: 0; color: var(--admin-text-muted); font-size: 0.85rem;">
+                                No participations found for <strong>${escapeHtml(email)}</strong>
+                            </p>
+                        </div>`;
+                    return;
+                }
+
+                renderPersonResult(email, participations);
+            } catch (error) {
+                console.error('Error searching:', error);
+                container.innerHTML = `
+                    <div class="no-results">
+                        <div style="font-size: 2rem; margin-bottom: 12px;">⚠️</div>
+                        <h3 style="margin: 0 0 6px; color: var(--admin-sidebar);">Search failed</h3>
+                        <p style="margin: 0; color: var(--admin-text-muted);">${escapeHtml(error.message)}</p>
+                    </div>`;
+            }
+        }
+
+        function renderPersonResult(email, participations) {
+            const container = document.getElementById('results-container');
+
+            // Find user profile if exists
+            const user = allUsers.find(u => u.email?.toLowerCase() === email);
+            const firstName = user?.firstName || participations[0]?.interestFirstName || '';
+            const lastName = user?.lastName || participations[0]?.interestLastName || '';
+            const displayName = [firstName, lastName].filter(Boolean).join(' ') || email;
+            const initials = firstName && lastName
+                ? (firstName[0] + lastName[0]).toUpperCase()
+                : email.substring(0, 2).toUpperCase();
+
+            // Aggregate stats
+            const allRoles = new Set();
+            participations.forEach(p => (p.roles || []).forEach(r => allRoles.add(r)));
+            const eventCount = new Set(participations.map(p => p.eventId)).size;
+            const roleCount = allRoles.size;
+
+            // Sort participations by event date (newest first)
+            const sorted = [...participations].sort((a, b) => {
+                const eventA = allEvents.find(e => e.id === a.eventId);
+                const eventB = allEvents.find(e => e.id === b.eventId);
+                const dateA = eventA?.startDate || a.createdAt;
+                const dateB = eventB?.startDate || b.createdAt;
+                return new Date(dateB) - new Date(dateA);
+            });
+
+            const timelineHTML = sorted.map(p => {
+                const event = allEvents.find(e => e.id === p.eventId);
+                const eventName = event?.name || 'Unknown Event';
+                const eventDates = event
+                    ? formatDateRange(event.startDate, event.endDate)
+                    : '';
+                const roles = p.roles || [];
+
+                const rolePills = roles.map(r => 
+                    `<span class="role-pill ${r}">${getRoleIcon(r)} ${r}</span>`
+                ).join('');
+
+                const metaParts = [];
+                if (p.teamId) {
+                    metaParts.push(`<span>👥 On a team</span>`);
+                }
+                if (p.interestDate) {
+                    metaParts.push(`<span>📋 Interest: ${formatDate(p.interestDate)}</span>`);
+                }
+                if (p.createdAt) {
+                    metaParts.push(`<span>📅 Joined: ${formatDate(p.createdAt)}</span>`);
+                }
+
+                return `
+                    <div class="timeline-event">
+                        <div class="timeline-dot">📅</div>
+                        <div class="timeline-content">
+                            <div class="event-name">${escapeHtml(eventName)}</div>
+                            <div class="event-dates">${eventDates}</div>
+                            <div class="timeline-roles">${rolePills}</div>
+                            <div class="timeline-meta">${metaParts.join('')}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="person-card">
+                    <div class="person-header">
+                        <div class="person-avatar">${initials}</div>
+                        <div class="person-info">
+                            <h2>${escapeHtml(displayName)}</h2>
+                            <div class="email">${escapeHtml(email)}</div>
+                            <span class="user-status ${user ? 'registered' : 'unregistered'}">
+                                ${user ? '✓ Registered user' : '○ No account yet'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="person-stats">
+                        <div class="person-stat">
+                            <div class="value">${eventCount}</div>
+                            <div class="label">Events</div>
+                        </div>
+                        <div class="person-stat">
+                            <div class="value">${roleCount}</div>
+                            <div class="label">Unique Roles</div>
+                        </div>
+                        <div class="person-stat">
+                            <div class="value">${participations.length}</div>
+                            <div class="label">Participations</div>
+                        </div>
+                    </div>
+                    <div class="timeline">
+                        <div class="timeline-title">Participation History</div>
+                        ${timelineHTML}
+                    </div>
+                </div>
+            `;
+        }
+
+        function getRoleIcon(role) {
+            const icons = {
+                interest: '📋',
+                participant: '🏃',
+                judge: '⚖️',
+                committee: '🛡️',
+                sponsor: '💎'
+            };
+            return icons[role] || '●';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            return new Date(dateStr).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric'
+            });
+        }
+
+        function formatDateRange(start, end) {
+            if (!start) return '';
+            const s = new Date(start);
+            const e = end ? new Date(end) : null;
+            const opts = { month: 'short', day: 'numeric', year: 'numeric' };
+            if (e) {
+                return `${s.toLocaleDateString('en-US', opts)} — ${e.toLocaleDateString('en-US', opts)}`;
+            }
+            return s.toLocaleDateString('en-US', opts);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
