@@ -246,7 +246,7 @@ app.http('participations-get', {
             });
 
             if (!participation) {
-                return { status: 404, jsonBody: { error: 'Participation not found' } };
+                return { status: 200, jsonBody: null };
             }
 
             // Migration support

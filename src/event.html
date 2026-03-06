@@ -1423,67 +1423,6 @@
             border-top: 1px solid #e2e8f0;
         }
 
-        /* Create Team Modal */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-        }
-        
-        .modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .modal {
-            background: var(--card-bg);
-            border-radius: var(--border-radius);
-            padding: 30px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-            transform: translateY(-20px);
-            transition: transform 0.3s ease;
-        }
-        
-        .modal-overlay.active .modal {
-            transform: translateY(0);
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        .modal-header h2 {
-            margin: 0;
-        }
-        
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--text-muted);
-        }
-        
-        .modal-close:hover {
-            color: var(--text-color);
-        }
-        
         /* Team details modal */
         .team-members-list {
             margin-top: 20px;
@@ -1586,7 +1525,7 @@
                 <div id="interest-upgrade-actions" class="interest-upgrade hidden">
                     <p class="upgrade-heading">Ready to participate?</p>
                     <div class="upgrade-buttons">
-                        <a href="register.html?intent=team" class="btn btn-primary btn-lg upgrade-btn">
+                        <a href="register.html?intent=team" id="upgrade-register-team-link" class="btn btn-primary btn-lg upgrade-btn">
                             👥 Register a Team
                         </a>
                         <button id="interest-solo-btn" class="btn btn-secondary btn-lg upgrade-btn" onclick="document.getElementById('solo-queue-modal').classList.add('active')">
@@ -1661,58 +1600,6 @@
         </footer>
     </div>
 
-    <!-- Profile Modal -->
-    <div id="profile-modal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>👤 Your Profile</h2>
-                <button class="modal-close" id="close-profile">&times;</button>
-            </div>
-            
-            <form id="profile-form">
-                <div class="form-group">
-                    <label for="firstName">First Name *</label>
-                    <input type="text" id="firstName" name="firstName" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="lastName">Last Name *</label>
-                    <input type="text" id="lastName" name="lastName" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" readonly class="readonly">
-                </div>
-                
-                <div class="form-group">
-                    <label for="phone">Phone *</label>
-                    <input type="tel" id="phone" name="phone" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="gamertag">Gamertag</label>
-                    <input type="text" id="gamertag" name="gamertag" 
-                           placeholder="Your gaming username (optional)">
-                </div>
-                
-                <div class="form-group">
-                    <label for="allergies">Allergies / Dietary Requirements</label>
-                    <textarea id="allergies" name="allergies" rows="3" 
-                              maxlength="500" placeholder="Enter any allergies or dietary requirements..."></textarea>
-                </div>
-
-                <div id="profile-error" class="error-message hidden"></div>
-                <div id="profile-success" class="success-message hidden"></div>
-                
-                <button type="submit" class="btn btn-primary" id="save-profile-btn">
-                    <span class="btn-text">Save Profile</span>
-                    <span class="btn-loading hidden">Saving...</span>
-                </button>
-            </form>
-        </div>
-    </div>
-
     <!-- Create Team Modal -->
     <div id="create-team-modal" class="modal-overlay">
         <div class="modal">
@@ -1778,6 +1665,19 @@
                 <input type="hidden" id="invite-teamId">
                 
                 <p>Invite a new member to <strong id="invite-teamName"></strong></p>
+                
+                <div style="display: flex; gap: 12px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="invite-firstName">First Name *</label>
+                        <input type="text" id="invite-firstName" name="firstName" required 
+                               placeholder="First name">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="invite-lastName">Last Name *</label>
+                        <input type="text" id="invite-lastName" name="lastName" required 
+                               placeholder="Last name">
+                    </div>
+                </div>
                 
                 <div class="form-group">
                     <label for="invite-email">Email Address *</label>

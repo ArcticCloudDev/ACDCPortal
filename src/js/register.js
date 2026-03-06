@@ -163,6 +163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             pendingFormData.teamName = document.getElementById('teamName').value.trim();
             pendingFormData.numberOfParticipants = document.getElementById('numberOfParticipants').value;
             pendingFormData.willParticipate = document.getElementById('willParticipate').checked;
+            pendingFormData.eventId = eventId || null;
 
             if (!pendingFormData.teamName || !pendingFormData.numberOfParticipants) {
                 showError('form-error', 'Team name and number of participants are required.');
@@ -275,11 +276,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // New user + interest: registration done, now record interest
                     await recordInterestAndShow();
                 } else if (flowMode === 'register-team') {
-                    // Team registration: show success page
-                    document.getElementById('success-heading-text').textContent = 'Registration Complete!';
-                    document.getElementById('success-team-line').classList.remove('hidden');
-                    document.getElementById('success-team-name').textContent = pendingFormData.teamName;
-                    showStep('success');
+                    // Team registration: redirect to event page
+                    const targetEventId = completeResult.eventId || eventId;
+                    if (targetEventId) {
+                        window.location.href = `/event.html?id=${targetEventId}`;
+                    } else {
+                        // Fallback: show success page if no eventId
+                        document.getElementById('success-heading-text').textContent = 'Registration Complete!';
+                        document.getElementById('success-team-line').classList.remove('hidden');
+                        document.getElementById('success-team-name').textContent = pendingFormData.teamName;
+                        showStep('success');
+                    }
                 } else {
                     // Profile-only: redirect to events
                     const redirect = urlParams.get('redirect') || '/events.html';

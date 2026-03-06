@@ -50,21 +50,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
             
-            // If profile not complete, check if they have registered interest before redirecting
+            // If profile not complete, check if they have a participation or interest before redirecting
             if (!currentUser.profileComplete) {
-                let hasInterest = false;
+                let hasExistingRelationship = false;
                 try {
-                    const resp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        const leads = Array.isArray(data) ? data : (data.leads || []);
-                        hasInterest = leads.some(l => 
-                            l.email.toLowerCase() === currentUser.email.toLowerCase() && 
-                            l.eventId === eventId
-                        );
+                    // Check for existing participation (team member, judge, committee, etc.)
+                    const participation = await API.participations.getOrNull(currentUser.id, eventId);
+                    if (participation) {
+                        hasExistingRelationship = true;
                     }
                 } catch (e) { /* ignore */ }
-                if (!hasInterest) {
+                if (!hasExistingRelationship) {
+                    try {
+                        const resp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            const leads = Array.isArray(data) ? data : (data.leads || []);
+                            hasExistingRelationship = leads.some(l => 
+                                l.email.toLowerCase() === currentUser.email.toLowerCase() && 
+                                l.eventId === eventId
+                            );
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+                if (!hasExistingRelationship) {
                     window.location.href = 'complete-registration.html';
                     return;
                 }
@@ -123,7 +132,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Populate the page
         populateEventBanner();
-        populateProfileForm();
         await renderTeams();
         
         // Render badges section and show nav tabs only for team participants
@@ -187,8 +195,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         else if (status === 'pre-registration') statusText = '🔔 Pre-Registration';
         else if (status === 'completed') statusText = '✓ Completed';
 
-        // Profile button opens modal on event page (not navigate)
-        const profileModal = document.getElementById('profile-modal');
         SiteHeader.render({
             title: currentEvent.name,
             subtitle: null,
@@ -198,11 +204,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 { text: statusText, id: 'event-status', className: 'status-badge' }
             ],
             showSignIn: false,
-            inactive: false,
-            profileAction: 'modal',
-            onProfileClick: () => profileModal?.classList.add('active')
+            inactive: false
         });
-        SiteHeader.update({ authUser: Auth.getUser(), user: currentUser });
+        
+        // Check if user is admin (committee or judge)
+        const userRoles = currentParticipation?.roles || [];
+        const isAdmin = userRoles.includes('committee') || userRoles.includes('judge');
+        
+        SiteHeader.update({ authUser: Auth.getUser(), user: currentUser, isAdmin });
 
         // Apply status-specific background to the badge
         const statusEl = document.getElementById('event-status');
@@ -216,10 +225,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const banner = SiteHeader.getElements().container;
         
         // Check user's roles for this event
-        const userRoles = currentParticipation?.roles || [];
         const isJudge = userRoles.includes('judge');
         const isCommittee = userRoles.includes('committee');
-        const isInterest = userRoles.includes('interest');
+        // Interest is only a "special role" if the user hasn't been upgraded to a team participant
+        const hasTeam = currentParticipation?.teamId || (currentParticipation?.teamMemberships?.length > 0);
+        const isInterest = userRoles.includes('interest') && !hasTeam;
         const hasSpecialRole = isJudge || isCommittee || isInterest;
         
         // If user is a judge or committee member, show the role confirmation view
@@ -293,9 +303,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     // Show upgrade options if event is open for registration
                     const eventStatus = currentEvent.status || 'draft';
-                    if (eventStatus === 'registration-open' || eventStatus === 'pre-registration') {
+                    if (eventStatus === 'registration-open' || eventStatus === 'pre-registration' || currentEvent.registrationOpen) {
                         const upgradeDiv = document.getElementById('interest-upgrade-actions');
                         if (upgradeDiv) upgradeDiv.classList.remove('hidden');
+                        // Set eventId on the register team link
+                        const upgradeLink = document.getElementById('upgrade-register-team-link');
+                        if (upgradeLink) upgradeLink.href = `register.html?intent=team&eventId=${currentEvent.id}`;
                     }
                 }
 
@@ -347,15 +360,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Portal admins and committee members see all teams
         const isPrivileged = currentUser.isPortalAdmin || 
             (currentParticipation?.roles || []).includes('committee');
-        const userTeamIds = (currentParticipation?.teamMemberships || []).map(m => m.teamId);
-        const myTeams = isPrivileged ? eventTeams : eventTeams.filter(t => userTeamIds.includes(t.id));
+        const userTeamIds = new Set(
+            (currentParticipation?.teamMemberships || []).map(m => m.teamId)
+        );
+        // Also include the direct teamId from participation (set during registration)
+        if (currentParticipation?.teamId) {
+            userTeamIds.add(currentParticipation.teamId);
+        }
+        const myTeams = isPrivileged ? eventTeams : eventTeams.filter(t => userTeamIds.has(t.id));
         
         if (myTeams.length === 0) {
             teamsContainer.classList.add('hidden');
             noTeams.classList.remove('hidden');
+            if (createSection) createSection.classList.remove('hidden');
         } else {
             teamsContainer.classList.remove('hidden');
             noTeams.classList.add('hidden');
+            // Hide "Create New Team / Join Solo Queue" — user already has a team
+            if (createSection) createSection.classList.add('hidden');
             
             // Build team cards with participants
             const teamCardsHtml = await Promise.all(myTeams.map(async team => {
@@ -634,13 +656,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         return `
             <div class="team-card" data-team-id="${team.id}">
-                <div class="team-card-header">
-                    <h3>Team - ${escapeHtml(team.teamName)}</h3>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        ${adminDisplay}
-                        ${deleteButtonHtml}
-                    </div>
-                </div>
                 <div class="team-card-body">
                     <div class="team-stats">
                         <span>👥 ${realParticipantCount}/${committedParticipants} committed</span>
@@ -703,13 +718,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Find user's primary team
-        const userTeamIds = (currentParticipation?.teamMemberships || []).map(m => m.teamId);
-        const myTeam = eventTeams.find(t => userTeamIds.includes(t.id));
+        const badgeTeamIds = new Set(
+            (currentParticipation?.teamMemberships || []).map(m => m.teamId)
+        );
+        if (currentParticipation?.teamId) badgeTeamIds.add(currentParticipation.teamId);
+        const myTeam = eventTeams.find(t => badgeTeamIds.has(t.id));
         const teamId = myTeam?.id || '';
 
         // Check if user is admin on this team
         const myMembership = (currentParticipation?.teamMemberships || []).find(m => m.teamId === teamId);
-        const isAdmin = myMembership?.isAdmin || false;
+        const isAdmin = myMembership?.isAdmin || currentParticipation?.isTeamAdmin || false;
 
         // Get team participants for assign dropdown
         const teamParticipations = allParticipations.filter(p => {
@@ -1461,6 +1479,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         document.getElementById('invite-teamId').value = teamId;
         document.getElementById('invite-teamName').textContent = team.teamName;
+        document.getElementById('invite-firstName').value = '';
+        document.getElementById('invite-lastName').value = '';
         document.getElementById('invite-email').value = '';
         document.getElementById('invite-error').classList.add('hidden');
         document.getElementById('invite-success').classList.add('hidden');
@@ -1475,10 +1495,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const successDiv = document.getElementById('invite-success');
         
         const teamId = document.getElementById('invite-teamId').value;
+        const firstName = document.getElementById('invite-firstName').value.trim();
+        const lastName = document.getElementById('invite-lastName').value.trim();
         const email = document.getElementById('invite-email').value.trim().toLowerCase();
         
-        if (!email) {
-            errorDiv.textContent = 'Please enter an email address.';
+        if (!firstName || !lastName || !email) {
+            errorDiv.textContent = 'Please fill in first name, last name, and email.';
             errorDiv.classList.remove('hidden');
             return;
         }
@@ -1494,14 +1516,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 teamId: teamId,
                 eventId: eventId,
                 email: email,
+                inviteeFirstName: firstName,
+                inviteeLastName: lastName,
                 inviterId: currentUser.id,
                 inviterName: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'Team Admin',
                 inviterEmail: currentUser.email
             });
             
-            successDiv.textContent = `Invitation sent to ${email}`;
+            successDiv.textContent = `Invitation sent to ${firstName} ${lastName} (${email})`;
             successDiv.classList.remove('hidden');
             
+            document.getElementById('invite-firstName').value = '';
+            document.getElementById('invite-lastName').value = '';
             document.getElementById('invite-email').value = '';
             
             // Reload team cards to show pending invitation
@@ -1775,10 +1801,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Setup modals
     function setupModals() {
-        // Profile modal - click handler wired via SiteHeader.render({ onProfileClick })
-        const profileModal = document.getElementById('profile-modal');
-        document.getElementById('close-profile').addEventListener('click', () => profileModal.classList.remove('active'));
-        
         // Helper to check if registration is open
         const isRegistrationOpen = () => {
             return currentEvent.status === 'registration';
@@ -1869,11 +1891,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             await createTeam();
         });
         
-        // Profile form submit
-        document.getElementById('profile-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await saveProfile();
-        });
         
         // Edit participant form submit
         document.getElementById('edit-participant-form').addEventListener('submit', async (e) => {
@@ -2078,59 +2095,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Populate profile form
-    function populateProfileForm() {
-        if (!currentUser) return;
-        
-        document.getElementById('firstName').value = currentUser.firstName || '';
-        document.getElementById('lastName').value = currentUser.lastName || '';
-        document.getElementById('email').value = currentUser.email || '';
-        document.getElementById('phone').value = currentUser.phone || '';
-        document.getElementById('gamertag').value = currentUser.gamertag || '';
-        document.getElementById('allergies').value = currentUser.allergies || '';
-    }
-    
-    // Save profile
-    async function saveProfile() {
-        const saveBtn = document.getElementById('save-profile-btn');
-        const errorDiv = document.getElementById('profile-error');
-        const successDiv = document.getElementById('profile-success');
-        
-        const formData = {
-            firstName: document.getElementById('firstName').value.trim(),
-            lastName: document.getElementById('lastName').value.trim(),
-            phone: document.getElementById('phone').value.trim(),
-            gamertag: document.getElementById('gamertag').value.trim(),
-            allergies: document.getElementById('allergies').value.trim(),
-            profileComplete: true
-        };
-
-        saveBtn.disabled = true;
-        saveBtn.querySelector('.btn-text').classList.add('hidden');
-        saveBtn.querySelector('.btn-loading').classList.remove('hidden');
-        errorDiv.classList.add('hidden');
-        successDiv.classList.add('hidden');
-
-        try {
-            await API.users.update(currentUser.id, formData);
-            currentUser = { ...currentUser, ...formData };
-            
-            successDiv.textContent = 'Profile saved!';
-            successDiv.classList.remove('hidden');
-            
-            setTimeout(() => {
-                document.getElementById('profile-modal').classList.remove('active');
-            }, 1500);
-            
-        } catch (error) {
-            errorDiv.textContent = error.message || 'Could not save profile.';
-            errorDiv.classList.remove('hidden');
-        } finally {
-            saveBtn.disabled = false;
-            saveBtn.querySelector('.btn-text').classList.remove('hidden');
-            saveBtn.querySelector('.btn-loading').classList.add('hidden');
-        }
-    }
-
     // Logout handled by SiteHeader component
 });
 

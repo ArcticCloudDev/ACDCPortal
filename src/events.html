@@ -130,6 +130,11 @@
             color: #166534;
             border: 1px solid #86efac;
         }
+        .my-status-pill.team {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
         .event-status-row {
             display: flex;
             justify-content: flex-start;
@@ -186,6 +191,7 @@
             let currentUser = null;
             let participationByEventId = new Map();
             let interestLeadEventIds = new Set();
+            let isAdmin = false;
             
             // Check for invitation link parameter and store it
             const urlParams = new URLSearchParams(window.location.search);
@@ -202,17 +208,23 @@
 
                 if (authUser?.email) {
                     currentUser = await API.users.getOrNull(authUser.email);
-                    SiteHeader.update({ authUser, user: currentUser });
-
+                    
                     if (currentUser?.id) {
                         try {
-                            const participationData = await API.participations.get(currentUser.id);
-                            const participationList = Array.isArray(participationData) ? participationData : [participationData];
-                            participationList.filter(Boolean).forEach(participation => {
-                                if (participation.eventId) {
-                                    participationByEventId.set(participation.eventId, participation);
-                                }
-                            });
+                            const participationData = await API.participations.getOrNull(currentUser.id);
+                            if (participationData) {
+                                const participationList = Array.isArray(participationData) ? participationData : [participationData];
+                                participationList.filter(Boolean).forEach(participation => {
+                                    if (participation.eventId) {
+                                        participationByEventId.set(participation.eventId, participation);
+                                    }
+                                    // Check if user has admin roles
+                                    const roles = participation?.roles || [];
+                                    if (roles.includes('committee') || roles.includes('judge')) {
+                                        isAdmin = true;
+                                    }
+                                });
+                            }
                         } catch (e) {
                             console.log('Could not load participations for event status badges:', e);
                         }
@@ -230,23 +242,26 @@
                             console.log('Could not load interest leads for badges:', e);
                         }
                     }
+
+                    SiteHeader.update({ authUser, user: currentUser, isAdmin });
                 }
             } catch (error) {
                 console.error('Auth/user context error:', error);
             }
             
-            // If this is a role-based invitation, show the dedicated acceptance page
+            // If this is an invitation link, redirect to the dedicated acceptance page
             if (inviteId) {
                 try {
                     const invitation = await API.invitations.get(inviteId);
-                    if (invitation && invitation.status === 'pending' && !invitation.isExpired 
-                        && invitation.role && invitation.role !== 'participant') {
-                        showRoleInvitationPage(invitation);
-                        return; // Don't load regular page
-                    }
-                    // For team invites or invalid invites, fall through to normal page
                     if (invitation && invitation.status === 'pending' && !invitation.isExpired) {
-                        showTeamInvitationWelcome(invitation);
+                        // Role invites (judge/committee) still show inline page
+                        if (invitation.role && invitation.role !== 'participant') {
+                            showRoleInvitationPage(invitation);
+                            return;
+                        }
+                        // Team invites redirect to dedicated acceptance page
+                        window.location.href = `accept-invitation.html?invite=${inviteId}`;
+                        return;
                     }
                 } catch (err) {
                     console.log('Could not load invitation:', err);
@@ -255,7 +270,7 @@
             
             // Regular page: load events + sign-in section
             await loadEvents();
-            SiteHeader.update({ authUser, user: currentUser });
+            SiteHeader.update({ authUser, user: currentUser, isAdmin });
             
             // ============================================================
             // ROLE-BASED INVITE: Dedicated acceptance page (judge/committee)
@@ -357,26 +372,6 @@
             }
             
             // ============================================================
-            // TEAM INVITE: Banner on top of regular page
-            // ============================================================
-            function showTeamInvitationWelcome(invitation) {
-                const section = document.getElementById('events-section');
-                const welcomeHtml = `
-                    <div style="background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                        <p style="margin: 0 0 8px; color: #1e40af; font-weight: 600;">🎉 You've been invited!</p>
-                        <p style="margin: 0; color: #475569;">
-                            <strong>${invitation.inviterName}</strong> has invited you to join team 
-                            <strong style="color: #1e40af;">${invitation.teamName}</strong>
-                        </p>
-                        <p style="margin: 8px 0 0; color: #64748b; font-size: 14px;">
-                            Sign in below to accept the invitation and join the team.
-                        </p>
-                    </div>
-                `;
-                section.insertAdjacentHTML('beforebegin', welcomeHtml);
-            }
-
-            // ============================================================
             // REGULAR PAGE: Events list + sign-in
             // ============================================================
             
@@ -402,7 +397,7 @@
                                 <p style="margin-top: 8px;">Check back later or sign in to see your profile.</p>
                             </div>
                         `;
-                        return;
+                        return null;
                     }
                     
                     section.innerHTML = '<div class="events-grid">' + activeEvents.map(event => {
@@ -416,63 +411,54 @@
                         const isPreReg = event.status === 'pre-registration';
                         const statusIcon = isPreReg ? '🔔' : '✅';
                         const statusText = isPreReg ? 'Coming Soon' : 'Registration Open';
-                        const statusPill = isInterestRegistered ? '<div class="my-status-pill interest">✓ Interest Registered</div>' : '';
+                        const statusPill = hasTeam
+                            ? '<div class="my-status-pill team">✓ Team Registered</div>'
+                            : isInterestRegistered
+                                ? '<div class="my-status-pill interest">✓ Interest Registered</div>'
+                                : '';
                         
                         const meta = `📅 ${formatDateRange(event.startDate, event.endDate)}${event.location ? ` · 📍 ${event.location}` : ''}`;
                         const desc = event.description ? `<p class="description">${event.description}</p>` : '';
                         
-                        if (isPreReg) {
-                            const preRegActions = isInterestRegistered
-                                ? `<a href="event.html?id=${event.id}" class="btn-event interest-only">View Event</a>`
-                                : `<a href="register.html?intent=interest&eventId=${event.id}" class="btn-event interest-only">Register Interest</a>`;
+                        // Determine if user already has any relationship with this event
+                        const hasRelationship = hasTeam || isJudge || isCommittee || isInterestRegistered;
 
-                            return `
-                                <div class="event-card pre-registration">
-                                    <div class="event-status-row">
-                                        <div class="status-badge">${statusIcon} ${statusText}</div>
-                                        ${statusPill}
-                                    </div>
-                                    <h3>${event.name}</h3>
-                                    ${desc}
-                                    <p class="event-meta">${meta}</p>
-                                    <div class="btn-row">
-                                        ${preRegActions}
-                                    </div>
-                                    <p class="helper-text">Be the first to know when registration opens!</p>
-                                </div>
-                            `;
+                        let actions = '';
+                        let helperText = '';
+
+                        if (hasRelationship) {
+                            // Single "Open" button for anyone with existing involvement
+                            actions = `<a href="event.html?id=${event.id}" class="btn-event primary">Open</a>`;
+                            helperText = '';
+                        } else if (isPreReg) {
+                            actions = `<a href="register.html?intent=interest&eventId=${event.id}" class="btn-event interest-only">Register Interest</a>`;
+                            helperText = '<p class="helper-text">Be the first to know when registration opens!</p>';
                         } else {
-                            let registrationActions = `
-                                <a href="register.html?intent=team" class="btn-event primary">Register Team</a>
+                            actions = `
+                                <a href="register.html?intent=team&eventId=${event.id}" class="btn-event primary">Register Team</a>
                                 <a href="register.html?intent=interest&eventId=${event.id}" class="btn-event secondary">Register Interest</a>
                             `;
-
-                            if (hasTeam || isJudge || isCommittee) {
-                                registrationActions = `<a href="event.html?id=${event.id}" class="btn-event primary">View Event</a>`;
-                            } else if (isInterestRegistered) {
-                                registrationActions = `
-                                    <a href="register.html?intent=team" class="btn-event primary">Register Team</a>
-                                    <a href="event.html?id=${event.id}" class="btn-event secondary">View Event</a>
-                                `;
-                            }
-
-                            return `
-                                <div class="event-card registration">
-                                    <div class="event-status-row">
-                                        <div class="status-badge">${statusIcon} ${statusText}</div>
-                                        ${statusPill}
-                                    </div>
-                                    <h3>${event.name}</h3>
-                                    ${desc}
-                                    <p class="event-meta">${meta}</p>
-                                    <div class="btn-row">
-                                        ${registrationActions}
-                                    </div>
-                                    <p class="helper-text">Register your team or express interest to stay informed</p>
-                                </div>
-                            `;
+                            helperText = '<p class="helper-text">Register your team or express interest to stay informed</p>';
                         }
+
+                        return `
+                            <div class="event-card ${isPreReg ? 'pre-registration' : 'registration'}">
+                                <div class="event-status-row">
+                                    <div class="status-badge">${statusIcon} ${statusText}</div>
+                                    ${statusPill}
+                                </div>
+                                <h3>${event.name}</h3>
+                                ${desc}
+                                <p class="event-meta">${meta}</p>
+                                <div class="btn-row">
+                                    ${actions}
+                                </div>
+                                ${helperText}
+                            </div>
+                        `;
                     }).join('') + '</div>';
+                    
+                    return activeEvents[0]?.id || null;
                     
                 } catch (error) {
                     console.error('Error loading events:', error);
@@ -482,6 +468,7 @@
                             <p>Unable to load events. Please try again later.</p>
                         </div>
                     `;
+                    return null;
                 }
             }
             

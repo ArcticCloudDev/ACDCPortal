@@ -191,19 +191,24 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
 
         const themeImageSrc = extractImageSrc(eventTheme.themeImage || '');
         const portalUrl = process.env.PORTAL_URL || 'https://your-portal.com';
-        const acceptUrl = `${portalUrl}?invite=${invitation.id}`;
+        const acceptUrl = `${portalUrl}/accept-invitation.html?invite=${invitation.id}`;
 
         // Build merge data from invitation object
+        const inviteeName = [invitation.inviteeFirstName, invitation.inviteeLastName].filter(Boolean).join(' ');
         const mergeData = {
             teamName: invitation.teamName || 'the team',
-            fullName: invitation.email.split('@')[0],
+            fullName: inviteeName || invitation.email.split('@')[0],
             eventName: eventName,
             teamAdminName: invitation.inviterName || 'Team Admin',
             themeImage: themeImageSrc,
-            bodyText: eventTheme.body || globalDefaults.body || '',
-            closingText: eventTheme.closing || globalDefaults.closing || '',
             portalUrl: acceptUrl
         };
+
+        // Pre-process the editable body/closing sections so nested {{placeholders}} are resolved
+        const rawBody = eventTheme.body || globalDefaults.body || '';
+        const rawClosing = eventTheme.closing || globalDefaults.closing || '';
+        mergeData.bodyText = processTemplate(rawBody, mergeData);
+        mergeData.closingText = processTemplate(rawClosing, mergeData);
 
         // Load HTML template
         const templatePath = path.join(__dirname, '../../../data/email-templates/team-welcome.html');
@@ -228,7 +233,7 @@ app.http('invitations-create', {
     handler: async (request, context) => {
         try {
             const body = await request.json();
-            const { email, teamId, eventId, role, inviterId, inviterName, inviterEmail, message } = body;
+            const { email, teamId, eventId, role, inviterId, inviterName, inviterEmail, message, inviteeFirstName, inviteeLastName } = body;
             
             // Role-based invites (judge/committee) need eventId; team invites need teamId
             if (!email || !inviterId) {
@@ -287,6 +292,8 @@ app.http('invitations-create', {
             const invitation = {
                 id: uuidv4(),
                 email: email.toLowerCase(),
+                inviteeFirstName: inviteeFirstName || null,
+                inviteeLastName: inviteeLastName || null,
                 teamId: teamId || null,
                 teamName: teamName,
                 eventId: resolvedEventId || null,
@@ -515,8 +522,17 @@ app.http('invitations-accept', {
             if (invitation.teamId && (!invitation.role || invitation.role === 'participant')) {
                 users[userIndex].teamId = invitation.teamId;
                 users[userIndex].updatedAt = new Date().toISOString();
-                await writeData('users.json', users);
             }
+            
+            // Fill in first/last name from invitation if user has blank values
+            if (invitation.inviteeFirstName && !users[userIndex].firstName) {
+                users[userIndex].firstName = invitation.inviteeFirstName;
+            }
+            if (invitation.inviteeLastName && !users[userIndex].lastName) {
+                users[userIndex].lastName = invitation.inviteeLastName;
+            }
+            
+            await writeData('users.json', users);
             
             // Create or update participation for this event
             if (eventId) {
@@ -526,9 +542,9 @@ app.http('invitations-accept', {
                 // Determine roles for this invitation
                 const inviteRole = invitation.role || 'participant';
                 
-                // Check if user already has a participation for this event
+                // Check if user already has a participation for this event (email + eventId is the unique key)
                 let participationIndex = participations.findIndex(
-                    p => (p.userId === userId || p.email?.toLowerCase() === userEmail.toLowerCase()) && p.eventId === eventId
+                    p => p.email?.toLowerCase() === userEmail.toLowerCase() && p.eventId === eventId
                 );
                 
                 if (participationIndex === -1) {
@@ -564,9 +580,31 @@ app.http('invitations-accept', {
                     if (!existing.roles.includes(inviteRole)) {
                         existing.roles.push(inviteRole);
                     }
-                    // If team invite, set the team
+                    // If team invite, set the team and update teamMemberships
                     if (invitation.teamId && inviteRole === 'participant') {
                         existing.teamId = invitation.teamId;
+                        existing.isTeamAdmin = false;
+                        // Remove 'interest' role — user is upgrading to full participant
+                        const interestIdx = existing.roles.indexOf('interest');
+                        if (interestIdx !== -1) {
+                            existing.roles.splice(interestIdx, 1);
+                            // Track the conversion from interest to participant
+                            existing.convertedFrom = 'interest';
+                            existing.convertedAt = new Date().toISOString();
+                            existing.convertedVia = 'invitation';
+                            existing.invitationId = invitation.id;
+                        }
+                        // Add to teamMemberships (UI depends on this array)
+                        if (!existing.teamMemberships) existing.teamMemberships = [];
+                        const alreadyMember = existing.teamMemberships.some(m => m.teamId === invitation.teamId);
+                        if (!alreadyMember) {
+                            existing.teamMemberships.push({
+                                teamId: invitation.teamId,
+                                isAdmin: false,
+                                isParticipant: true,
+                                joinedAt: new Date().toISOString()
+                            });
+                        }
                     }
                     // Populate userId/email if missing
                     existing.userId = existing.userId || userId;

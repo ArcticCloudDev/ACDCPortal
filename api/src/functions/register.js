@@ -5,6 +5,7 @@
 const { app } = require('@azure/functions');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
+const ParticipationsStore = new (Storage.Storage)('participations');
 
 // Phase 1: Start registration - validate captcha, store pending data
 app.http('register-start', {
@@ -16,7 +17,7 @@ app.http('register-start', {
         
         try {
             const body = await request.json();
-            const { email, firstName, lastName, phone, teamName, numberOfParticipants, willParticipate, captchaToken, registrationType } = body;
+            const { email, firstName, lastName, phone, teamName, numberOfParticipants, willParticipate, captchaToken, registrationType, eventId } = body;
             
             // Validate required fields (personal info always required)
             if (!email || !firstName || !lastName) {
@@ -86,6 +87,7 @@ app.http('register-start', {
                 pendingData.teamName = teamName;
                 pendingData.numberOfParticipants = parseInt(numberOfParticipants);
                 pendingData.willParticipate = willParticipate !== false;
+                pendingData.eventId = eventId || null;
             }
             
             Storage.pendingRegistrations.create(pendingData);
@@ -168,7 +170,7 @@ app.http('register-complete', {
                 };
             }
             
-            const { firstName, lastName, phone, teamName, numberOfParticipants, willParticipate, registrationType } = pending;
+            const { firstName, lastName, phone, teamName, numberOfParticipants, willParticipate, registrationType, eventId: pendingEventId } = pending;
             const isTeamRegistration = registrationType === 'team';
             const isParticipant = isTeamRegistration ? (willParticipate !== false) : false;
             
@@ -182,7 +184,7 @@ app.http('register-complete', {
                 firstName,
                 lastName,
                 phone: phone || null,
-                profileComplete: false,
+                profileComplete: !!(firstName && lastName && phone),
                 createdAt: now,
                 updatedAt: now,
                 gamertag: '',
@@ -199,6 +201,7 @@ app.http('register-complete', {
                 const team = {
                     id: teamId,
                     teamName: teamName,
+                    eventId: pendingEventId || null,
                     numberOfParticipants: parseInt(numberOfParticipants),
                     adminUserId: userId,
                     createdAt: now,
@@ -208,6 +211,43 @@ app.http('register-complete', {
                 context.log(`Registration complete: ${email}, team: ${teamName}, isParticipant: ${isParticipant}`);
             } else {
                 context.log(`Profile registration complete: ${email} (no team)`);
+            }
+            
+            // Create participation record linking user to event
+            let resolvedEventId = pendingEventId;
+            if (!resolvedEventId) {
+                // Fallback: find the active event with registration open
+                const events = Storage.events.getAll();
+                const activeEvent = events.find(e => e.registrationOpen || e.status === 'registration');
+                if (activeEvent) resolvedEventId = activeEvent.id;
+            }
+            
+            if (resolvedEventId) {
+                const roles = isParticipant ? ['participant'] : [];
+                const teamMemberships = teamId ? [{
+                    teamId: teamId,
+                    isAdmin: true,
+                    isParticipant: isParticipant,
+                    joinedAt: now
+                }] : [];
+                const participation = {
+                    id: uuidv4(),
+                    userId: userId,
+                    email: email.toLowerCase().trim(),
+                    eventId: resolvedEventId,
+                    roles: roles,
+                    teamId: teamId,
+                    isTeamAdmin: !!teamId,
+                    hotelNights: {},
+                    hotelPaidBy: null,
+                    teamMemberships: teamMemberships,
+                    createdAt: now,
+                    updatedAt: now
+                };
+                const participations = await ParticipationsStore.getAll();
+                participations.push(participation);
+                await ParticipationsStore.saveAll(participations);
+                context.log(`Participation created for ${email} in event ${resolvedEventId}`);
             }
             
             // Clean up pending registration
@@ -223,7 +263,8 @@ app.http('register-complete', {
                         : 'Account created successfully!',
                     userId: userId,
                     teamId: teamId,
-                    isParticipant: isParticipant
+                    isParticipant: isParticipant,
+                    eventId: resolvedEventId || null
                 }
             };
             

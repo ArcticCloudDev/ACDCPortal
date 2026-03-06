@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accept Invitation - ACDC Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        header h1 {
+            font-size: 1.5rem;
+            color: #1e293b;
+            margin: 0;
+        }
+        header .subtitle {
+            color: #64748b;
+            font-size: 0.95rem;
+            margin: 4px 0 0;
+        }
+
+        /* Invitation card */
+        .invite-card {
+            background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+            border: 2px solid #93c5fd;
+            border-radius: 16px;
+            padding: 28px;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .invite-card .invite-icon {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+        }
+        .invite-card h2 {
+            margin: 0 0 12px;
+            color: #1e40af;
+            font-size: 1.3rem;
+        }
+        .invite-card .invite-detail {
+            color: #475569;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .invite-card .invite-detail strong {
+            color: #1e40af;
+        }
+        .invite-card .invite-event {
+            margin-top: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1e40af;
+        }
+        .invite-card .invite-meta {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        .invite-card .invite-expires {
+            margin-top: 12px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        /* Step breadcrumb */
+        .step-breadcrumb {
+            text-align: center;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Success state */
+        .success-card {
+            text-align: center;
+            padding: 32px 20px;
+        }
+        .success-card .success-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+        .success-card h2 {
+            margin: 0 0 12px;
+            color: #166534;
+        }
+        .success-card p {
+            color: #475569;
+            line-height: 1.6;
+        }
+
+        /* Error state for full-page errors */
+        .error-card {
+            text-align: center;
+            padding: 32px 20px;
+        }
+        .error-card .error-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+        .error-card h2 {
+            margin: 0 0 12px;
+            color: #dc2626;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 24px;
+            color: #94a3b8;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏔️ ACDC Portal</h1>
+            <p class="subtitle">Team Invitation</p>
+        </header>
+
+        <main>
+            <!-- Loading state -->
+            <div id="step-loading" class="card" style="text-align: center; padding: 40px;">
+                <p style="color: #64748b;">Loading invitation...</p>
+            </div>
+
+            <!-- Error state (invalid/expired invitation) -->
+            <div id="step-error" class="card hidden">
+                <div class="error-card">
+                    <div class="error-icon">❌</div>
+                    <h2 id="error-title">Invitation Not Found</h2>
+                    <p id="error-message">This invitation link is invalid or has expired.</p>
+                    <a href="events.html" class="btn btn-primary" style="margin-top: 16px; display: inline-block;">Go to Events</a>
+                </div>
+            </div>
+
+            <!-- Screen 1: Invitation Details -->
+            <div id="step-invite" class="hidden">
+                <div class="invite-card">
+                    <div class="invite-icon">🎉</div>
+                    <h2>You've Been Invited!</h2>
+                    <p class="invite-detail">
+                        <strong id="invite-inviter-name"></strong> has invited you to join team
+                    </p>
+                    <p class="invite-event" id="invite-team-name"></p>
+                    <p class="invite-detail" id="invite-event-line"></p>
+                    <p class="invite-meta" id="invite-meta-line"></p>
+                    <p class="invite-expires" id="invite-expires-line"></p>
+                </div>
+
+                <button type="button" class="btn btn-primary btn-full" id="next-to-profile-btn">
+                    Accept Invitation →
+                </button>
+            </div>
+
+            <!-- Screen 2: Profile / Contact Details -->
+            <div id="step-profile" class="hidden">
+                <div class="step-breadcrumb">Step 1 of 2 — Your Details</div>
+                <div class="card">
+                    <h2>👤 Confirm Your Details</h2>
+                    <p>Please verify your contact information.</p>
+
+                    <form id="profile-form">
+                        <div class="form-group">
+                            <label for="profile-firstName">First Name *</label>
+                            <input type="text" id="profile-firstName" name="firstName" required minlength="2" maxlength="50">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="profile-lastName">Last Name *</label>
+                            <input type="text" id="profile-lastName" name="lastName" required minlength="2" maxlength="50">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="profile-phone">Phone *</label>
+                            <input type="tel" id="profile-phone" name="phone" required
+                                   placeholder="+47 xxx xx xxx">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="profile-email">Email</label>
+                            <input type="email" id="profile-email" readonly class="readonly">
+                        </div>
+
+                        <div id="profile-error" class="error-message hidden"></div>
+
+                        <button type="submit" class="btn btn-primary btn-full" id="continue-to-verify-btn">
+                            <span class="btn-text">Continue →</span>
+                            <span class="btn-loading hidden">Please wait...</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Screen 3: OTP Verification -->
+            <div id="step-verify" class="hidden">
+                <div class="step-breadcrumb">Step 2 of 2 — Verify Identity</div>
+
+                <!-- 3a: Send OTP -->
+                <div id="substep-email" class="card">
+                    <h2>📧 Verify Your Identity</h2>
+                    <p>We'll send a one-time code to <strong id="email-display"></strong> to confirm it's you.</p>
+
+                    <div id="email-error" class="error-message hidden"></div>
+
+                    <button type="button" class="btn btn-primary btn-full" id="send-otp-btn">
+                        <span class="btn-text">Send Verification Code →</span>
+                        <span class="btn-loading hidden">Sending...</span>
+                    </button>
+                </div>
+
+                <!-- 3b: Enter OTP Code -->
+                <div id="substep-otp" class="card hidden">
+                    <h2>🔐 Enter Your Code</h2>
+                    <p>We sent a 6-digit code to <strong id="otp-email-display"></strong></p>
+
+                    <form id="otp-form">
+                        <div class="form-group">
+                            <label for="otp-code">Verification Code</label>
+                            <input type="text" id="otp-code" name="otpCode" required
+                                   placeholder="000000" maxlength="6" pattern="[0-9]{6}"
+                                   inputmode="numeric" autocomplete="one-time-code"
+                                   style="font-size: 1.8rem; text-align: center; letter-spacing: 8px; font-family: 'Courier New', monospace;">
+                        </div>
+
+                        <div id="otp-error" class="error-message hidden"></div>
+
+                        <button type="submit" class="btn btn-primary btn-full" id="verify-otp-btn">
+                            <span class="btn-text">Verify & Join Team 🎉</span>
+                            <span class="btn-loading hidden">Verifying & joining...</span>
+                        </button>
+                    </form>
+
+                    <p class="form-footer">
+                        Didn't receive the code? <a href="#" id="resend-otp-link">Resend code</a>
+                    </p>
+                    <p class="form-footer" style="font-size: 0.8rem; color: #94a3b8;">
+                        Code expires in 10 minutes.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Step 3: Success -->
+            <div id="step-success" class="card hidden">
+                <div class="success-card">
+                    <div class="success-icon">🎉</div>
+                    <h2>You're In!</h2>
+                    <p>You've successfully joined team <strong id="success-team-name"></strong>.</p>
+                    <p style="font-size: 0.9rem; color: #64748b; margin-top: 8px;">Redirecting to your event page...</p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 ACDC Portal</p>
+        </footer>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            Auth.init();
+
+            // Get invitation ID from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteId = urlParams.get('invite');
+
+            if (!inviteId) {
+                showError('No Invitation Found', 'This link is missing an invitation ID. Please use the link from your invitation email.');
+                return;
+            }
+
+            // State
+            let invitation = null;
+            let currentUser = null;
+            let alreadyLoggedIn = false;
+            let pendingProfile = {}; // collected in step 1, submitted after OTP
+
+            // Load invitation
+            try {
+                invitation = await API.invitations.get(inviteId);
+
+                if (!invitation) {
+                    showError('Invitation Not Found', 'This invitation could not be found. It may have been deleted.');
+                    return;
+                }
+
+                if (invitation.isExpired) {
+                    showError('Invitation Expired', 'This invitation has expired. Please ask the team admin to send a new one.');
+                    return;
+                }
+
+                if (invitation.status !== 'pending') {
+                    showError('Already Processed', `This invitation has already been ${invitation.status}.`);
+                    return;
+                }
+
+                // Show the invitation details
+                displayInvitation(invitation);
+
+            } catch (err) {
+                console.error('Failed to load invitation:', err);
+                showError('Error Loading Invitation', 'Could not load the invitation. Please try again later.');
+                return;
+            }
+
+            // Check if user is already logged in with matching email
+            if (Auth.isLoggedIn()) {
+                const authUser = Auth.getUser();
+                if (authUser?.email?.toLowerCase() === invitation.email.toLowerCase()) {
+                    alreadyLoggedIn = true;
+                    try {
+                        currentUser = await API.users.getOrNull(authUser.email);
+                    } catch (e) {
+                        console.log('Could not load user:', e);
+                    }
+                }
+            }
+
+            // Pre-fill profile form (step 1 — shown first)
+            initProfileForm();
+
+            // ============================================================
+            // Step 1: Profile — collect name + phone
+            // ============================================================
+            function initProfileForm() {
+                const firstNameField = document.getElementById('profile-firstName');
+                const lastNameField = document.getElementById('profile-lastName');
+                const phoneField = document.getElementById('profile-phone');
+                const emailField = document.getElementById('profile-email');
+
+                emailField.value = invitation.email;
+
+                // Pre-fill from existing user record, else from invitation data
+                if (currentUser) {
+                    firstNameField.value = currentUser.firstName || invitation.inviteeFirstName || '';
+                    lastNameField.value = currentUser.lastName || invitation.inviteeLastName || '';
+                    phoneField.value = currentUser.phone || '';
+                } else {
+                    firstNameField.value = invitation.inviteeFirstName || '';
+                    lastNameField.value = invitation.inviteeLastName || '';
+                }
+
+                firstNameField.focus();
+            }
+
+            // ============================================================
+            // Screen 1: "Accept Invitation" button → go to profile
+            // ============================================================
+            document.getElementById('next-to-profile-btn').addEventListener('click', () => {
+                document.getElementById('step-invite').classList.add('hidden');
+                document.getElementById('step-profile').classList.remove('hidden');
+                initProfileForm();
+            });
+
+            // ============================================================
+            // Screen 2: Profile form → collect data, then verify or submit
+            // ============================================================
+            document.getElementById('profile-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const errorDiv = document.getElementById('profile-error');
+
+                const firstName = document.getElementById('profile-firstName').value.trim();
+                const lastName = document.getElementById('profile-lastName').value.trim();
+                const phone = document.getElementById('profile-phone').value.trim();
+
+                if (!firstName || !lastName || !phone) {
+                    errorDiv.textContent = 'Please fill in all required fields.';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+
+                errorDiv.classList.add('hidden');
+
+                // Store profile data — we'll submit it after OTP verification
+                pendingProfile = { firstName, lastName, phone };
+
+                // If already logged in with matching email, skip OTP entirely
+                if (alreadyLoggedIn) {
+                    await submitAcceptance();
+                    return;
+                }
+
+                // Advance to OTP verification screen
+                document.getElementById('step-profile').classList.add('hidden');
+                document.getElementById('step-verify').classList.remove('hidden');
+                document.getElementById('email-display').textContent = invitation.email;
+            });
+
+            // ============================================================
+            // Screen 3: OTP Verification
+            // ============================================================
+
+            // Send OTP button
+            document.getElementById('send-otp-btn').addEventListener('click', async () => {
+                const btn = document.getElementById('send-otp-btn');
+                const errorDiv = document.getElementById('email-error');
+
+                btn.disabled = true;
+                btn.querySelector('.btn-text').classList.add('hidden');
+                btn.querySelector('.btn-loading').classList.remove('hidden');
+                errorDiv.classList.add('hidden');
+
+                try {
+                    await API.auth.sendOtp(invitation.email);
+
+                    // Move to OTP entry
+                    document.getElementById('substep-email').classList.add('hidden');
+                    document.getElementById('substep-otp').classList.remove('hidden');
+                    document.getElementById('otp-email-display').textContent = invitation.email;
+                    document.getElementById('otp-code').value = '';
+                    document.getElementById('otp-code').focus();
+
+                } catch (err) {
+                    // If cooldown, still show OTP step (code may already be pending)
+                    document.getElementById('substep-email').classList.add('hidden');
+                    document.getElementById('substep-otp').classList.remove('hidden');
+                    document.getElementById('otp-email-display').textContent = invitation.email;
+                    const otpError = document.getElementById('otp-error');
+                    otpError.textContent = (err.message || 'Failed to send code.') + ' You may already have a pending code.';
+                    otpError.classList.remove('hidden');
+                } finally {
+                    btn.disabled = false;
+                    btn.querySelector('.btn-text').classList.remove('hidden');
+                    btn.querySelector('.btn-loading').classList.add('hidden');
+                }
+            });
+
+            // Verify OTP — on success, submit profile + accept invitation
+            document.getElementById('otp-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('verify-otp-btn');
+                const errorDiv = document.getElementById('otp-error');
+                const code = document.getElementById('otp-code').value.trim();
+
+                if (code.length !== 6) {
+                    errorDiv.textContent = 'Please enter the 6-digit code.';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.querySelector('.btn-text').classList.add('hidden');
+                btn.querySelector('.btn-loading').classList.remove('hidden');
+                errorDiv.classList.add('hidden');
+
+                try {
+                    const result = await API.auth.verifyOtp(invitation.email, code);
+
+                    if (!result.success) {
+                        throw new Error(result.message || 'Invalid code.');
+                    }
+
+                    // Store JWT session
+                    Auth.setSession(result.token, result.user);
+
+                    // Load full user record
+                    try {
+                        currentUser = await API.users.getOrNull(invitation.email);
+                    } catch (e) {
+                        console.log('Could not load user:', e);
+                    }
+
+                    // OTP verified — now submit everything
+                    await submitAcceptance();
+
+                } catch (err) {
+                    errorDiv.textContent = err.message || 'Verification failed. Please try again.';
+                    errorDiv.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.querySelector('.btn-text').classList.remove('hidden');
+                    btn.querySelector('.btn-loading').classList.add('hidden');
+                }
+            });
+
+            // Resend OTP
+            document.getElementById('resend-otp-link').addEventListener('click', async (e) => {
+                e.preventDefault();
+                const link = e.target;
+                link.textContent = 'Sending...';
+                link.style.pointerEvents = 'none';
+                try {
+                    await API.auth.sendOtp(invitation.email);
+                    link.textContent = '✓ Code sent!';
+                    setTimeout(() => {
+                        link.textContent = 'Resend code';
+                        link.style.pointerEvents = '';
+                    }, 30000);
+                } catch (err) {
+                    link.textContent = 'Resend code';
+                    link.style.pointerEvents = '';
+                    const otpError = document.getElementById('otp-error');
+                    otpError.textContent = err.message || 'Failed to resend.';
+                    otpError.classList.remove('hidden');
+                }
+            });
+
+            // Strip non-digits from OTP
+            document.getElementById('otp-code').addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+            });
+
+            // ============================================================
+            // Submit: Update profile + Accept invitation
+            // ============================================================
+            async function submitAcceptance() {
+                try {
+                    if (!currentUser) {
+                        throw new Error('User session not found. Please refresh and try again.');
+                    }
+
+                    // Update profile with the data collected in the profile step
+                    await API.users.update(currentUser.id, {
+                        firstName: pendingProfile.firstName,
+                        lastName: pendingProfile.lastName,
+                        phone: pendingProfile.phone,
+                        profileComplete: true
+                    });
+
+                    // Accept the invitation
+                    const result = await API.invitations.accept(inviteId, currentUser.id, invitation.email);
+
+                    if (!result.success) {
+                        throw new Error('Failed to accept invitation.');
+                    }
+
+                    // Show success
+                    document.getElementById('step-invite').classList.add('hidden');
+                    document.getElementById('step-profile').classList.add('hidden');
+                    document.getElementById('step-verify').classList.add('hidden');
+                    document.getElementById('step-success').classList.remove('hidden');
+                    document.getElementById('success-team-name').textContent = invitation.teamName || 'the team';
+
+                    // Redirect after a short delay
+                    const eventId = result.eventId || invitation.eventId;
+                    setTimeout(() => {
+                        if (eventId) {
+                            window.location.href = `event.html?id=${eventId}`;
+                        } else {
+                            window.location.href = 'events.html';
+                        }
+                    }, 2000);
+
+                } catch (err) {
+                    // Show error on whichever step is currently visible
+                    const visibleError = document.querySelector('#substep-otp:not(.hidden) #otp-error') ||
+                                         document.getElementById('profile-error');
+                    if (visibleError) {
+                        visibleError.textContent = err.message || 'Something went wrong. Please try again.';
+                        visibleError.classList.remove('hidden');
+                    } else {
+                        alert(err.message || 'Something went wrong. Please try again.');
+                    }
+
+                    // Re-enable buttons
+                    document.querySelectorAll('.btn').forEach(b => {
+                        b.disabled = false;
+                        const txt = b.querySelector('.btn-text');
+                        const load = b.querySelector('.btn-loading');
+                        if (txt) txt.classList.remove('hidden');
+                        if (load) load.classList.add('hidden');
+                    });
+                }
+            }
+
+            // ============================================================
+            // Helpers
+            // ============================================================
+            function displayInvitation(inv) {
+                document.getElementById('step-loading').classList.add('hidden');
+                document.getElementById('step-invite').classList.remove('hidden');
+
+                document.getElementById('invite-inviter-name').textContent = inv.inviterName || 'A team admin';
+                document.getElementById('invite-team-name').textContent = inv.teamName || 'the team';
+
+                const eventLine = document.getElementById('invite-event-line');
+                if (inv.eventName) {
+                    eventLine.innerHTML = `for <strong>${escapeHtml(inv.eventName)}</strong>`;
+                } else {
+                    eventLine.classList.add('hidden');
+                }
+
+                // Event meta (dates, location)
+                const metaParts = [];
+                if (inv.eventStartDate) {
+                    metaParts.push(`📅 ${formatDate(inv.eventStartDate)}${inv.eventEndDate ? ' – ' + formatDate(inv.eventEndDate) : ''}`);
+                }
+                if (inv.eventLocation) {
+                    metaParts.push(`📍 ${inv.eventLocation}`);
+                }
+                const metaLine = document.getElementById('invite-meta-line');
+                if (metaParts.length > 0) {
+                    metaLine.textContent = metaParts.join(' · ');
+                } else {
+                    metaLine.classList.add('hidden');
+                }
+
+                // Expiry
+                const expiresLine = document.getElementById('invite-expires-line');
+                if (inv.expiresAt) {
+                    const days = Math.ceil((new Date(inv.expiresAt) - new Date()) / (1000 * 60 * 60 * 24));
+                    if (days <= 1) {
+                        expiresLine.textContent = 'This invitation expires soon';
+                    } else {
+                        expiresLine.textContent = `This invitation expires in ${days} days`;
+                    }
+                } else {
+                    expiresLine.classList.add('hidden');
+                }
+            }
+
+            function showError(title, message) {
+                document.getElementById('step-loading').classList.add('hidden');
+                document.getElementById('step-invite').classList.add('hidden');
+                document.getElementById('step-profile').classList.add('hidden');
+                document.getElementById('step-verify').classList.add('hidden');
+                document.getElementById('step-error').classList.remove('hidden');
+                document.getElementById('error-title').textContent = title;
+                document.getElementById('error-message').textContent = message;
+            }
+
+            function formatDate(dateStr) {
+                if (!dateStr) return '';
+                return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            }
+
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+        });
+    </script>
+</body>
+</html>
