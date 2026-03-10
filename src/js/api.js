@@ -115,7 +115,9 @@ const API = {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
-            return response.json();
+            const text = await response.text();
+            if (!text) return null;
+            try { return JSON.parse(text) || null; } catch { return null; }
         },
 
         async create(data) {
@@ -329,8 +331,9 @@ const API = {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
-            const data = await response.json();
-            return data || null;
+            const text = await response.text();
+            if (!text) return null;
+            try { return JSON.parse(text) || null; } catch { return null; }
         },
 
         async upsert(data) {

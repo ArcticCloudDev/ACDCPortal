@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ACDC Portal</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/styles.css">
     <style>
         /* Event grid */
@@ -177,16 +178,35 @@
 
         .wake-note {
             max-width: 520px;
-            font-size: 0.85rem;
-            color: #64748b;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 10px 12px;
+            font-size: 0.92rem;
+            color: #475569;
+            background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-top: 6px;
+            animation: fadeSlideIn 0.5s ease-out;
+            line-height: 1.5;
+        }
+
+        .wake-emoji {
+            font-size: 1.3rem;
+            display: inline-block;
+            animation: snore 2s ease-in-out infinite;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes snore {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.15); }
         }
     </style>
 </head>
@@ -419,10 +439,13 @@
                         <div class="events-loading">
                             <div class="mini-spinner" aria-hidden="true"></div>
                             <div>Loading events...</div>
-                            <div class="wake-note">SQL appears to be asleep and is waking up. Please be patient, this can take around a minute.</div>
+                            <div class="wake-note">
+                                <span class="wake-emoji">😴</span> Our database is hibernating like a polar bear in the Arctic winter.
+                                Give it a moment to wake up, stretch, and fetch your events. This can take up to a minute.
+                            </div>
                         </div>
                     `;
-                }, 1800);
+                }, 1200);
                 
                 try {
                     const response = await fetch(`${CONFIG.api.baseUrl}/events`);
