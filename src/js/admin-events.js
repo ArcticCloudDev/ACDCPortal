@@ -381,6 +381,8 @@ function showForm(event = null) {
         document.getElementById('min-team-size').value = event.minTeamSize || 3;
         document.getElementById('max-team-size').value = event.maxTeamSize || 5;
         document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
+        document.getElementById('event-sharepoint-url').value = event.sharepointUrl || '';
+        document.getElementById('sharepoint-verify-result').innerHTML = '';
         document.getElementById('event-sequence').checked = event.sequenceEnabled || false;
         document.getElementById('event-team-welcome-email').checked = event.sendWelcomeEmail || false;
         document.getElementById('event-interest-acknowledgment').checked = event.sendInterestAcknowledgment || false;
@@ -454,6 +456,62 @@ function hideForm() {
     window.history.replaceState({}, '', 'admin-events.html');
 }
 
+async function verifySharePointUrl() {
+    const url = document.getElementById('event-sharepoint-url').value.trim();
+    const resultDiv = document.getElementById('sharepoint-verify-result');
+    const btn = document.getElementById('verify-sharepoint-btn');
+
+    if (!url) {
+        resultDiv.innerHTML = '<span style="color: var(--admin-warning-color, #e67e22);">⚠️ Please enter a URL first</span>';
+        return;
+    }
+
+    try {
+        const parsed = new URL(url);
+        if (!parsed.hostname.endsWith('.sharepoint.com')) {
+            resultDiv.innerHTML = '<span style="color: var(--admin-danger-color, #e74c3c);">❌ URL must be a SharePoint domain (*.sharepoint.com)</span>';
+            return;
+        }
+    } catch {
+        resultDiv.innerHTML = '<span style="color: var(--admin-danger-color, #e74c3c);">❌ Invalid URL format</span>';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Checking...';
+    resultDiv.innerHTML = '';
+
+    // Open URL for manual verification
+    window.open(url, '_blank', 'noopener,noreferrer');
+
+    // Ensure FileCategory column exists on the document library
+    const categoriesInput = document.getElementById('event-file-categories').value;
+    const categories = categoriesInput.split(',').map(c => c.trim()).filter(c => c.length > 0);
+
+    if (categories.length > 0) {
+        try {
+            const res = await fetch('/api/files/setup-columns', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ categories })
+            });
+            if (res.ok) {
+                resultDiv.innerHTML = '<span style="color: var(--admin-success-color, #27ae60);">✅ URL opened for verification. FileCategory column ensured on SharePoint library.</span>';
+            } else {
+                const err = await res.json().catch(() => ({}));
+                resultDiv.innerHTML = `<span style="color: var(--admin-warning-color, #e67e22);">⚠️ URL opened, but column setup failed: ${err.error || err.details || 'Unknown error'}. Check SharePoint configuration.</span>`;
+            }
+        } catch (err) {
+            resultDiv.innerHTML = `<span style="color: var(--admin-warning-color, #e67e22);">⚠️ URL opened, but could not reach the API to set up columns. Is the API running?</span>`;
+        }
+    } else {
+        resultDiv.innerHTML = '<span style="color: var(--admin-success-color, #27ae60);">✅ URL opened for verification. Add File Upload Categories above and verify again to set up the SharePoint column.</span>';
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🔗 Verify';
+}
+
 function editEvent(eventId) {
     const event = allEvents.find(e => e.id === eventId);
     if (event) {
@@ -490,7 +548,8 @@ async function handleFormSubmit(e) {
             fileCategories: document.getElementById('event-file-categories').value
                 .split(',')
                 .map(c => c.trim())
-                .filter(c => c.length > 0)
+                .filter(c => c.length > 0),
+            sharepointUrl: document.getElementById('event-sharepoint-url').value.trim() || null
         };
         
         // Only include team size if team type

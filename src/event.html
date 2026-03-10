@@ -734,6 +734,78 @@
             font-size: 1rem;
             padding: 2px;
         }
+
+        .uploaded-files-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .uploaded-file-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 10px;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .file-category-badge {
+            background: var(--primary-color);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .file-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .file-link:hover {
+            text-decoration: underline;
+        }
+
+        .file-size {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .upload-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .upload-category-select {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-size: 0.85rem;
+            flex: 1;
+        }
+
+        .upload-progress {
+            margin-top: 8px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            background: #eef6ff;
+            color: var(--primary-color);
+        }
         
         .team-card-footer {
             padding: 15px 20px;
@@ -1212,9 +1284,6 @@
 
         /* Badge row — single-line layout */
         .badge-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
             padding: 8px 12px;
             border-radius: 8px;
             margin-bottom: 4px;
@@ -1233,6 +1302,25 @@
         .badge-row.pending {
             background: #fffbeb;
             border-color: #fde68a;
+        }
+        .badge-row.rejected {
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+        .badge-row-main {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+        .badge-reject-reason {
+            font-size: 0.78rem;
+            color: #991b1b;
+            background: #fee2e2;
+            padding: 4px 10px;
+            border-radius: 4px;
+            margin-top: 6px;
+            line-height: 1.4;
         }
         .badge-row.exclusive {
             border-left: 3px solid #f59e0b;
@@ -1256,9 +1344,31 @@
         }
 
         .badge-claim-status {
-            font-size: 1rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 2px 8px;
+            border-radius: 10px;
             flex-shrink: 0;
-            line-height: 1;
+            line-height: 1.4;
+            white-space: nowrap;
+        }
+        .badge-claim-status.approved {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .badge-claim-status.submitted {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .badge-claim-status.rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .badge-claim-status.exclusive {
+            background: #fef3c7;
+            color: #92400e;
         }
         .badge-name {
             font-size: 0.9rem;

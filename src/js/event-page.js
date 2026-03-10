@@ -457,51 +457,90 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const teamId = btn.dataset.teamId;
-                const fileIndex = parseInt(btn.dataset.fileIndex);
-                if (!isNaN(fileIndex)) {
-                    await handleFileRemove(teamId, fileIndex);
+                const filePath = btn.dataset.filePath;
+                if (filePath) {
+                    await handleFileRemove(teamId, filePath);
                 }
             });
         });
     }
     
-    // Handle file upload
+    // Handle file upload — POST multipart to API which uploads to SharePoint
     async function handleFileUpload(teamId, category, file) {
+        const progressEl = document.getElementById(`upload-progress-${teamId}`);
+        const uploadBtn = document.getElementById(`upload-btn-${teamId}`);
+
+        // Validate file size client-side
+        const maxSize = 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+            alert('File too large. Maximum size is 10 MB.');
+            return;
+        }
+
         try {
-            // Find the team to get current files
-            const team = teams.find(t => t.id === teamId);
-            const files = team?.files || [];
-            
-            // Add the new file entry
-            files.push({ category, fileName: file.name, uploadedAt: new Date().toISOString() });
-            
-            await API.teams.update(teamId, { files });
-            
-            // Reload to show updated state
+            if (progressEl) {
+                progressEl.classList.remove('hidden');
+                progressEl.textContent = `⏳ Uploading "${file.name}"…`;
+            }
+            if (uploadBtn) uploadBtn.disabled = true;
+
+            const url = `${CONFIG.api.baseUrl}/files/upload?eventId=${encodeURIComponent(currentEvent.id)}&teamId=${encodeURIComponent(teamId)}&category=${encodeURIComponent(category)}`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await fetch(url, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Upload failed' }));
+                throw new Error(err.error || `HTTP ${res.status}`);
+            }
+
+            const result = await res.json();
+            if (result.file?.metadataWarning) {
+                console.warn('Metadata warning:', result.file.metadataWarning);
+            }
+
+            if (progressEl) {
+                progressEl.textContent = `✅ "${file.name}" uploaded successfully!`;
+                setTimeout(() => progressEl.classList.add('hidden'), 3000);
+            }
+
+            // Refresh the team cards to show the new file
             await loadEventTeams();
             await renderTeams();
-            
+
         } catch (error) {
             console.error('File upload error:', error);
+            if (progressEl) {
+                progressEl.textContent = `❌ Upload failed: ${error.message}`;
+                progressEl.classList.remove('hidden');
+            }
             alert('Failed to upload file: ' + error.message);
+        } finally {
+            if (uploadBtn) uploadBtn.disabled = false;
         }
     }
-    
-    // Handle file removal
-    async function handleFileRemove(teamId, fileIndex) {
-        if (!confirm('Are you sure you want to remove this file?')) return;
-        
+
+    // Handle file removal — DELETE via API (removes from SharePoint)
+    async function handleFileRemove(teamId, filePath) {
+        if (!confirm('Are you sure you want to remove this file from SharePoint?')) return;
+
         try {
-            const team = teams.find(t => t.id === teamId);
-            const files = team?.files || [];
-            files.splice(fileIndex, 1);
-            
-            await API.teams.update(teamId, { files });
-            
-            // Reload to show updated state
+            const url = `${CONFIG.api.baseUrl}/files/delete?path=${encodeURIComponent(filePath)}`;
+            const res = await fetch(url, { method: 'DELETE' });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Delete failed' }));
+                throw new Error(err.error || `HTTP ${res.status}`);
+            }
+
             await loadEventTeams();
             await renderTeams();
-            
+
         } catch (error) {
             console.error('File remove error:', error);
             alert('Failed to remove file: ' + error.message);
@@ -638,8 +677,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
         }
         
-        // Build uploads section (only for admins)
-        const uploadsHtml = isAdmin ? buildUploadsSection(team) : '';
+        // Build uploads section for all team members (if SharePoint is configured)
+        const uploadsHtml = currentEvent.sharepointUrl ? await buildUploadsSection(team) : '';
         
         // Build admin display for header
         const adminDisplay = adminUser 
@@ -674,38 +713,60 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
     }
     
-    // Build uploads section for team files - uses event.fileCategories for dropdown
-    function buildUploadsSection(team) {
-        const files = team.files || []; // Array of { category, fileName }
+    // Build uploads section — loads files from SharePoint API
+    async function buildUploadsSection(team) {
         const categories = (currentEvent.fileCategories && currentEvent.fileCategories.length > 0)
             ? currentEvent.fileCategories
             : ['General'];
-        
+
+        // Load files from SharePoint
+        let spFiles = [];
+        try {
+            const res = await fetch(`${CONFIG.api.baseUrl}/files/list?eventId=${encodeURIComponent(currentEvent.id)}&teamId=${encodeURIComponent(team.id)}`);
+            if (res.ok) {
+                spFiles = (await res.json()).filter(f => !f.isFolder);
+            }
+        } catch (err) {
+            console.warn('Could not load SharePoint files:', err);
+        }
+
+        const filesHtml = spFiles.length > 0
+            ? `<div class="uploaded-files-list">
+                ${spFiles.map(f => `
+                    <div class="uploaded-file-row">
+                        <span class="file-category-badge">${escapeHtml(f.category || 'General')}</span>
+                        <a href="${escapeHtml(f.webUrl)}" target="_blank" rel="noopener" class="file-name file-link">${escapeHtml(f.name)}</a>
+                        <span class="file-size">${formatFileSize(f.size)}</span>
+                        <button class="btn-remove" data-team-id="${team.id}" data-file-path="Events/${currentEvent.id}/${team.id}/${f.name}" title="Remove">✕</button>
+                    </div>
+                `).join('')}
+              </div>`
+            : '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">No files uploaded yet.</p>';
+
         return `
             <div class="team-uploads">
                 <h4>📁 Team Deliverables</h4>
-                ${files.length > 0 ? `
-                    <div class="uploaded-files-list">
-                        ${files.map((f, i) => `
-                            <div class="uploaded-file-row">
-                                <span class="file-category-badge">${escapeHtml(f.category)}</span>
-                                <span class="file-name">${escapeHtml(f.fileName)}</span>
-                                <button class="btn-remove" data-team-id="${team.id}" data-file-index="${i}" title="Remove">✕</button>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">No files uploaded yet.</p>'}
+                ${filesHtml}
                 <div class="upload-box">
                     <div class="upload-row">
                         <select id="file-cat-${team.id}" class="upload-category-select">
                             ${categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
                         </select>
-                        <input type="file" id="file-${team.id}" style="display:none;">
-                        <button class="btn btn-secondary btn-upload" onclick="document.getElementById('file-${team.id}').click()">📎 Upload File</button>
+                        <input type="file" id="file-${team.id}" style="display:none;" accept="*/*">
+                        <button class="btn btn-secondary btn-upload" id="upload-btn-${team.id}" onclick="document.getElementById('file-${team.id}').click()">📎 Upload File</button>
                     </div>
+                    <div id="upload-progress-${team.id}" class="upload-progress hidden"></div>
                 </div>
+                <small style="color: var(--text-muted); display: block; margin-top: 6px;">Max 10 MB per file.</small>
             </div>
         `;
+    }
+
+    function formatFileSize(bytes) {
+        if (!bytes) return '';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
     // Render badges into the standalone #badges-section container
@@ -817,9 +878,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const isExclusive = claimType === 'exclusive';
 
                 // For exclusive badges, check ALL claims (any team); for common, check user's team only
+                // Show declined claims too so users can see rejection and re-claim
                 const claim = isExclusive
-                    ? badgeClaims.find(c => c.eventBadgeId === eventBadge.id && c.status !== 'declined')
-                    : teamClaims.find(c => c.eventBadgeId === eventBadge.id && c.status !== 'declined');
+                    ? badgeClaims.find(c => c.eventBadgeId === eventBadge.id)
+                    : teamClaims.find(c => c.eventBadgeId === eventBadge.id);
 
                 const assignedUserId = claim?.assignedToUserId || '';
                 const hasActiveClaim = claim && (claim.status === 'pending' || claim.status === 'approved');
@@ -829,14 +891,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let actionHtml = '';
 
                 if (claim && claim.status === 'approved') {
-                    statusHtml = `<span class="badge-claim-status approved" title="Approved">✅</span>`;
+                    statusHtml = `<span class="badge-claim-status approved" title="Approved">Approved</span>`;
                     if (claim.blogUrl) {
                         actionHtml = `<a href="${escapeHtml(claim.blogUrl)}" target="_blank" class="btn-badge-blog" title="View blog post">📝 Blog</a>`;
                     }
                 } else if (claim && claim.status === 'pending') {
-                    statusHtml = `<span class="badge-claim-status pending" title="Pending review">⏳</span>`;
+                    statusHtml = `<span class="badge-claim-status submitted" title="Submitted — awaiting review">Submitted</span>`;
                     if (claim.blogUrl) {
                         actionHtml = `<a href="${escapeHtml(claim.blogUrl)}" target="_blank" class="btn-badge-blog" title="View blog post">📝 Blog</a>`;
+                    }
+                } else if (claim && claim.status === 'declined') {
+                    statusHtml = `<span class="badge-claim-status rejected" title="Rejected">Rejected</span>`;
+                    if (teamId) {
+                        const safeName = badge.name.replace(/'/g, "\\'");
+                        actionHtml = `<button class="btn-badge-claim" onclick="openClaimBadge('${eventBadge.id}', '${teamId}', '${safeName}')">Re-claim</button>`;
                     }
                 } else if (isExclusive) {
                     statusHtml = `<span class="badge-claim-status exclusive" title="Exclusive — awarded by judges">🏆</span>`;
@@ -845,7 +913,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         actionHtml = `<button class="btn-badge-award" onclick="openAwardBadge('${eventBadge.id}', '${safeName}')">Award</button>`;
                     }
                 } else {
-                    if (isAdmin && teamId) {
+                    if (teamId) {
                         const safeName = badge.name.replace(/'/g, "\\'");
                         actionHtml = `<button class="btn-badge-claim" onclick="openClaimBadge('${eventBadge.id}', '${teamId}', '${safeName}')">Claim</button>`;
                     }
@@ -857,7 +925,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // Show which team was awarded
                     const awardedTeam = eventTeams.find(t => t.id === claim.teamId);
                     assignedHtml = `<span class="badge-assigned-name" style="color: #d97706; font-weight: 600;">🏆 ${awardedTeam ? escapeHtml(awardedTeam.teamName) : 'Unknown team'}</span>`;
-                } else if (!isExclusive && isAdmin && teamId) {
+                } else if (!isExclusive && teamId) {
                     assignedHtml = `
                         <select class="badge-assign-select" data-eb-id="${eventBadge.id}" data-team-id="${teamId}"
                                 onchange="assignBadgeMember(this)" title="Assign team member">
@@ -877,20 +945,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ? `<a href="${escapeHtml(badge.imageUrl)}" target="_blank" class="btn-badge-examples" title="${escapeHtml(badge.description)}">Examples</a>`
                     : '';
 
+                // Build rejection reason line (visible to team members)
+                const rejectionHtml = (claim && claim.status === 'declined' && claim.declineReason)
+                    ? `<div class="badge-reject-reason">💬 ${escapeHtml(claim.declineReason)}</div>`
+                    : '';
+
                 panelsHtml += `
-                    <div class="badge-row ${hasActiveClaim ? (claim.status === 'approved' ? 'claimed' : 'pending') : ''} ${isExclusive ? 'exclusive' : ''}">
-                        <div class="badge-row-left">
-                            ${statusHtml}
-                            <span class="badge-name" title="${escapeHtml(badge.description)}">${escapeHtml(badge.name)}</span>
+                    <div class="badge-row ${claim ? (claim.status === 'approved' ? 'claimed' : claim.status === 'pending' ? 'pending' : claim.status === 'declined' ? 'rejected' : '') : ''} ${isExclusive ? 'exclusive' : ''}">
+                        <div class="badge-row-main">
+                            <div class="badge-row-left">
+                                ${statusHtml}
+                                <span class="badge-name" title="${escapeHtml(badge.description)}">${escapeHtml(badge.name)}</span>
+                            </div>
+                            <div class="badge-row-mid">
+                                ${assignedHtml}
+                            </div>
+                            <div class="badge-row-right">
+                                <span class="badge-points">${badge.points > 0 ? '+' : ''}${badge.points}p</span>
+                                ${examplesLink}
+                                ${actionHtml}
+                            </div>
                         </div>
-                        <div class="badge-row-mid">
-                            ${assignedHtml}
-                        </div>
-                        <div class="badge-row-right">
-                            <span class="badge-points">${badge.points > 0 ? '+' : ''}${badge.points}p</span>
-                            ${examplesLink}
-                            ${actionHtml}
-                        </div>
+                        ${rejectionHtml}
                     </div>
                 `;
             }

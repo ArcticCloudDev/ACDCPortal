@@ -61,7 +61,7 @@ app.http('register-start', {
             }
             
             // Check if email already registered in our system
-            const existingUser = Storage.users.getByEmail(email);
+            const existingUser = await Storage.users.getByEmail(email);
             if (existingUser) {
                 return {
                     status: 400,
@@ -90,11 +90,11 @@ app.http('register-start', {
                 pendingData.eventId = eventId || null;
             }
             
-            Storage.pendingRegistrations.create(pendingData);
+            await Storage.pendingRegistrations.create(pendingData);
             
             // Temporarily add email to allowed-emails so auth-send-otp will accept it
-            if (!Storage.allowedEmails.isAllowed(email)) {
-                Storage.allowedEmails.add(email.toLowerCase().trim(), null);
+            if (!(await Storage.allowedEmails.isAllowed(email))) {
+                await Storage.allowedEmails.add(email.toLowerCase().trim(), null);
                 context.log(`Temporarily added ${email} to allowed-emails for OTP`);
             }
             
@@ -139,7 +139,7 @@ app.http('register-complete', {
             }
             
             // Check if already fully registered
-            const existingUser = Storage.users.getByEmail(email);
+            const existingUser = await Storage.users.getByEmail(email);
             if (existingUser) {
                 // Already done — could be a double-submit. Just return success.
                 return {
@@ -153,7 +153,7 @@ app.http('register-complete', {
             }
             
             // Retrieve pending registration data from server storage
-            const pending = Storage.pendingRegistrations.getByEmail(email);
+            const pending = await Storage.pendingRegistrations.getByEmail(email);
             if (!pending) {
                 return {
                     status: 400,
@@ -163,7 +163,7 @@ app.http('register-complete', {
             
             // Check expiry
             if (new Date(pending.expiresAt) < new Date()) {
-                Storage.pendingRegistrations.delete(pending.id);
+                await Storage.pendingRegistrations.delete(pending.id);
                 return {
                     status: 400,
                     jsonBody: { message: 'Registration expired. Please start again.' }
@@ -191,8 +191,8 @@ app.http('register-complete', {
                 allergies: ''
             };
             
-            Storage.users.create(user);
-            Storage.allowedEmails.add(email, null);
+            await Storage.users.create(user);
+            await Storage.allowedEmails.add(email, null);
             
             // Create team only for team registrations
             let teamId = null;
@@ -207,7 +207,7 @@ app.http('register-complete', {
                     createdAt: now,
                     updatedAt: now
                 };
-                Storage.teams.create(team);
+                await Storage.teams.create(team);
                 context.log(`Registration complete: ${email}, team: ${teamName}, isParticipant: ${isParticipant}`);
             } else {
                 context.log(`Profile registration complete: ${email} (no team)`);
@@ -217,7 +217,7 @@ app.http('register-complete', {
             let resolvedEventId = pendingEventId;
             if (!resolvedEventId) {
                 // Fallback: find the active event with registration open
-                const events = Storage.events.getAll();
+                const events = await Storage.events.getAll();
                 const activeEvent = events.find(e => e.registrationOpen || e.status === 'registration');
                 if (activeEvent) resolvedEventId = activeEvent.id;
             }
@@ -251,7 +251,7 @@ app.http('register-complete', {
             }
             
             // Clean up pending registration
-            Storage.pendingRegistrations.delete(pending.id);
+            await Storage.pendingRegistrations.delete(pending.id);
             
             return {
                 status: 200,

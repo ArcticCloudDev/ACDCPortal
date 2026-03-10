@@ -8,6 +8,8 @@ let allClaims = [];
 let judgeUsers = [];
 let selectedEventId = null;
 let currentPermissions = null;
+let allClaimsEventBadges = [];  // event-badges for judge lookup in claims tab
+let allJudgeUsers = [];         // all judge users across events
 
 // Category display config
 const CATEGORIES = {
@@ -43,8 +45,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadingDiv.classList.add('hidden');
         adminContent.classList.remove('hidden');
 
-        // Render initial view
-        renderBadgeLibrary();
+        // Judges only see Claims tab
+        const isJudgeOnly = currentPermissions.highestRole === 'judge';
+        if (isJudgeOnly) {
+            // Hide Library and Event Badges tabs
+            document.querySelectorAll('.tab-btn[data-tab="master"], .tab-btn[data-tab="event-badges"]').forEach(t => t.style.display = 'none');
+            document.getElementById('tab-master')?.classList.remove('active');
+            // Activate claims tab
+            document.querySelector('.tab-btn[data-tab="claims"]').classList.add('active');
+            document.getElementById('tab-claims').classList.add('active');
+            renderClaims();
+        } else {
+            renderBadgeLibrary();
+        }
 
     } catch (error) {
         console.error('Init error:', error);
@@ -68,6 +81,37 @@ async function loadAllData() {
     // Scope events to permitted events for non-admin users
     allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
     allClaims = claims;
+
+    // Load event-badges for all permitted events (for judge lookup in claims tab)
+    try {
+        const ebPromises = allEvents.map(e => API.request(`/events/${e.id}/badges`));
+        const ebResults = await Promise.all(ebPromises);
+        allClaimsEventBadges = ebResults.flat();
+    } catch (e) {
+        console.warn('Could not load event-badges for claims:', e);
+        allClaimsEventBadges = [];
+    }
+
+    // Build judge user lookup from all event-badges
+    await loadJudgeUsersForClaims();
+}
+
+async function loadJudgeUsersForClaims() {
+    const judgeUserIds = [...new Set(allClaimsEventBadges.filter(eb => eb.judgeUserId).map(eb => eb.judgeUserId))];
+    if (judgeUserIds.length === 0) { allJudgeUsers = []; return; }
+    try {
+        const allUsersData = await API.users.list();
+        allJudgeUsers = judgeUserIds.map(id => {
+            const user = allUsersData.find(u => u.id === id);
+            return {
+                id,
+                name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'Unknown'
+            };
+        }).sort((a, b) => a.name.localeCompare(b.name));
+    } catch (e) {
+        console.warn('Could not load judge users:', e);
+        allJudgeUsers = [];
+    }
 }
 
 async function loadEventBadges(eventId) {
@@ -410,7 +454,7 @@ function getJudgesForEvent(eventId) {
 // ============================================================
 
 function renderClaims() {
-    const tbody = document.getElementById('claims-tbody');
+    const container = document.getElementById('claims-grouped-container');
     const emptyState = document.getElementById('claims-empty');
 
     const eventFilter = document.getElementById('claims-event-filter').value;
@@ -431,38 +475,120 @@ function renderClaims() {
     document.getElementById('cl-stat-declined').textContent = statClaims.filter(c => c.status === 'declined').length;
 
     if (claims.length === 0) {
-        tbody.innerHTML = '';
+        container.innerHTML = '';
         emptyState.classList.remove('hidden');
         return;
     }
 
     emptyState.classList.add('hidden');
 
-    tbody.innerHTML = claims.map(claim => {
-        const badgeName = claim.badge ? claim.badge.name : 'Unknown';
-        const badgeCategory = claim.badge ? claim.badge.category : '';
-        const teamName = claim.team ? claim.team.teamName : 'Unknown';
-        const catConfig = CATEGORIES[badgeCategory] || { label: badgeCategory };
-        const claimedDate = claim.claimedAt ? new Date(claim.claimedAt).toLocaleDateString() : '';
+    // Determine if current user can review a given claim
+    const isPortalAdmin = currentPermissions?.isPortalAdmin;
+    const isCommittee = currentPermissions?.highestRole === 'committee' || currentPermissions?.highestRole === 'portalAdmin';
 
-        return `
-            <tr>
-                <td><strong>${escapeHtml(badgeName)}</strong></td>
-                <td><span class="category-pill ${badgeCategory}">${catConfig.label || badgeCategory}</span></td>
-                <td>${escapeHtml(teamName)}</td>
-                <td class="claim-evidence" title="${escapeHtml(claim.evidence || '')}">${escapeHtml(claim.evidence || '—')}</td>
-                <td><span class="status-pill ${claim.status}">${statusIcon(claim.status)} ${capitalize(claim.status)}</span></td>
-                <td style="font-size: 0.8rem; color: var(--admin-text-muted);">${claimedDate}</td>
-                <td>
-                    <div class="claim-actions">
-                        ${claim.status === 'pending' ? `<button class="btn-sm primary" onclick="openReviewModal('${claim.id}')">Review</button>` : ''}
-                        ${claim.status === 'declined' ? `<span style="font-size: 0.75rem; color: var(--admin-text-muted);" title="${escapeHtml(claim.declineReason || '')}">💬 ${escapeHtml(truncate(claim.declineReason || '', 30))}</span>` : ''}
-                        ${claim.status === 'approved' ? `<span style="font-size: 0.75rem; color: var(--admin-success);">✅</span>` : ''}
+    // Group claims by badge owner (judgeUserId from event-badge)
+    const grouped = {};  // judgeUserId -> claims[]
+    for (const claim of claims) {
+        const eb = allClaimsEventBadges.find(e => e.id === claim.eventBadgeId);
+        const judgeId = eb?.judgeUserId || '__unassigned__';
+        if (!grouped[judgeId]) grouped[judgeId] = [];
+        grouped[judgeId].push(claim);
+    }
+
+    // Sort groups: current user's group first, then alphabetical by judge name, unassigned last
+    const currentUserId = currentUser?.id;
+    const groupOrder = Object.keys(grouped).sort((a, b) => {
+        if (a === currentUserId) return -1;
+        if (b === currentUserId) return 1;
+        if (a === '__unassigned__') return 1;
+        if (b === '__unassigned__') return -1;
+        const nameA = allJudgeUsers.find(j => j.id === a)?.name || '';
+        const nameB = allJudgeUsers.find(j => j.id === b)?.name || '';
+        return nameA.localeCompare(nameB);
+    });
+
+    let html = '';
+    for (const judgeId of groupOrder) {
+        const groupClaims = grouped[judgeId];
+        const isMyGroup = judgeId === currentUserId;
+        const canReview = isMyGroup || isPortalAdmin || isCommittee;
+
+        // Judge name
+        let judgeName;
+        if (judgeId === '__unassigned__') {
+            judgeName = 'Unassigned';
+        } else {
+            const judge = allJudgeUsers.find(j => j.id === judgeId);
+            judgeName = judge ? judge.name : 'Unknown Judge';
+        }
+
+        // Group stats
+        const pendingCount = groupClaims.filter(c => c.status === 'pending').length;
+        const approvedCount = groupClaims.filter(c => c.status === 'approved').length;
+        const declinedCount = groupClaims.filter(c => c.status === 'declined').length;
+
+        html += `
+            <div class="judge-group ${isMyGroup ? 'my-group' : ''}">
+                <div class="judge-group-header">
+                    <div class="judge-group-title">
+                        ${isMyGroup ? '👤 ' : ''}${escapeHtml(judgeName)}
+                        ${isMyGroup ? '<span class="my-badge">You</span>' : ''}
                     </div>
-                </td>
-            </tr>
+                    <div class="judge-group-stats">
+                        <span class="jg-stat total">${groupClaims.length} claim${groupClaims.length !== 1 ? 's' : ''}</span>
+                        ${pendingCount ? `<span class="jg-stat pending">⏳ ${pendingCount}</span>` : ''}
+                        ${approvedCount ? `<span class="jg-stat approved">✅ ${approvedCount}</span>` : ''}
+                        ${declinedCount ? `<span class="jg-stat declined">❌ ${declinedCount}</span>` : ''}
+                    </div>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Badge</th>
+                            <th>Category</th>
+                            <th>Team</th>
+                            <th>Evidence</th>
+                            <th>Status</th>
+                            <th>Claimed</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${groupClaims.map(claim => renderClaimRow(claim, canReview)).join('')}
+                    </tbody>
+                </table>
+            </div>
         `;
-    }).join('');
+    }
+
+    container.innerHTML = html;
+}
+
+function renderClaimRow(claim, canReview) {
+    const badgeName = claim.badge ? claim.badge.name : 'Unknown';
+    const badgeCategory = claim.badge ? claim.badge.category : '';
+    const teamName = claim.team ? claim.team.teamName : 'Unknown';
+    const catConfig = CATEGORIES[badgeCategory] || { label: badgeCategory };
+    const claimedDate = claim.claimedAt ? new Date(claim.claimedAt).toLocaleDateString() : '';
+
+    return `
+        <tr>
+            <td><strong>${escapeHtml(badgeName)}</strong></td>
+            <td><span class="category-pill ${badgeCategory}">${catConfig.label || badgeCategory}</span></td>
+            <td>${escapeHtml(teamName)}</td>
+            <td class="claim-evidence" title="${escapeHtml(claim.evidence || '')}">${escapeHtml(claim.evidence || '—')}</td>
+            <td><span class="status-pill ${claim.status}">${statusIcon(claim.status)} ${capitalize(claim.status)}</span></td>
+            <td style="font-size: 0.8rem; color: var(--admin-text-muted);">${claimedDate}</td>
+            <td>
+                <div class="claim-actions">
+                    ${claim.status === 'pending' && canReview ? `<button class="btn-sm primary" onclick="openReviewModal('${claim.id}')">Review</button>` : ''}
+                    ${claim.status === 'pending' && !canReview ? `<span style="font-size: 0.75rem; color: var(--admin-text-muted);">Awaiting review</span>` : ''}
+                    ${claim.status === 'declined' ? `<span style="font-size: 0.75rem; color: var(--admin-text-muted);" title="${escapeHtml(claim.declineReason || '')}">💬 ${escapeHtml(truncate(claim.declineReason || '', 30))}</span>` : ''}
+                    ${claim.status === 'approved' ? `<span style="font-size: 0.75rem; color: var(--admin-success);">✅</span>` : ''}
+                </div>
+            </td>
+        </tr>
+    `;
 }
 
 

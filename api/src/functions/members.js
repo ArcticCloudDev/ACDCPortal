@@ -25,7 +25,7 @@ app.http('members-add', {
             }
             
             // Get team
-            const team = Storage.teams.getById(teamId);
+            const team = await Storage.teams.getById(teamId);
             if (!team) {
                 return {
                     status: 404,
@@ -34,7 +34,7 @@ app.http('members-add', {
             }
             
             // Check team capacity
-            const currentMembers = Storage.users.getByTeamId(teamId);
+            const currentMembers = await Storage.users.getByTeamId(teamId);
             if (currentMembers.length >= team.numberOfParticipants) {
                 return {
                     status: 400,
@@ -43,7 +43,7 @@ app.http('members-add', {
             }
             
             // Check if email already exists
-            const existingUser = Storage.users.getByEmail(email);
+            const existingUser = await Storage.users.getByEmail(email);
             if (existingUser) {
                 return {
                     status: 400,
@@ -68,10 +68,10 @@ app.http('members-add', {
                 updatedAt: now
             };
             
-            Storage.users.create(newUser);
+            await Storage.users.create(newUser);
             
             // Add to allowed emails
-            Storage.allowedEmails.add(email, team.adminUserId);
+            await Storage.allowedEmails.add(email, team.adminUserId);
             
             // Send welcome email to new member (async, don't wait)
             if (team.eventId) {
@@ -133,7 +133,7 @@ app.http('members-remove', {
             }
             
             // Get user
-            const user = Storage.users.getById(memberId);
+            const user = await Storage.users.getById(memberId);
             if (!user) {
                 return {
                     status: 404,
@@ -145,10 +145,10 @@ app.http('members-remove', {
             // For now, allow removal (TODO: add proper team admin check)
             
             // Remove from allowed emails
-            Storage.allowedEmails.remove(user.email);
+            await Storage.allowedEmails.remove(user.email);
             
             // Delete user
-            Storage.users.delete(memberId);
+            await Storage.users.delete(memberId);
             
             context.log(`Member ${memberId} removed`);
             return {

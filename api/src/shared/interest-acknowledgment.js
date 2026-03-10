@@ -10,7 +10,7 @@ const Storage = require('./storage');
 async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
     try {
         // Get event
-        const event = Storage.events.getById(eventId);
+        const event = await Storage.events.getById(eventId);
         if (!event) {
             context.warn(`Event ${eventId} not found for interest acknowledgment email`);
             return { success: false, reason: 'Event not found' };
@@ -23,7 +23,7 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
         }
 
         // Check if member was a verified interest lead
-        const interestLeads = Storage.interestLeads.getAll();
+        const interestLeads = await Storage.interestLeads.getAll();
         const wasInterestLead = interestLeads.some(lead =>
             lead.email.toLowerCase() === memberEmail.toLowerCase() &&
             lead.eventId === eventId &&
@@ -36,7 +36,7 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
         }
 
         // Get member's full name
-        const users = Storage.users.getAll();
+        const users = await Storage.users.getAll();
         const memberUser = users.find(u => u.email?.toLowerCase() === memberEmail.toLowerCase());
         const fullName = memberUser ? `${memberUser.firstName} ${memberUser.lastName}` : memberEmail;
 

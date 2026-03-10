@@ -13,14 +13,14 @@ const Storage = require('./storage');
 async function sendTeamRegistrationEmail(adminEmail, eventId, teamName, committedParticipants, context) {
     try {
         // Get event
-        const event = Storage.events.getById(eventId);
+        const event = await Storage.events.getById(eventId);
         if (!event) {
             context.warn(`Event ${eventId} not found for team registration email`);
             return { success: false, reason: 'Event not found' };
         }
 
         // Get admin's full name
-        const users = Storage.users.getAll();
+        const users = await Storage.users.getAll();
         const adminUser = users.find(u => u.email?.toLowerCase() === adminEmail.toLowerCase());
         const fullName = adminUser ? `${adminUser.firstName} ${adminUser.lastName}` : adminEmail;
 

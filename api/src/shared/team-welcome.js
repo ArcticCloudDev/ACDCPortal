@@ -11,7 +11,7 @@ const Email = require('./email');
 async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
     try {
         // Get event
-        const event = Storage.events.getById(eventId);
+        const event = await Storage.events.getById(eventId);
         if (!event) {
             context.warn(`Event ${eventId} not found for team welcome email`);
             return { success: false, reason: 'Event not found' };
@@ -24,7 +24,7 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
         }
 
         // Get member's team to get team name and admin info
-        const teams = Storage.teams.getAll();
+        const teams = await Storage.teams.getAll();
         const memberTeam = teams.find(t => 
             t.eventId === eventId && 
             (t.adminEmail?.toLowerCase() === memberEmail.toLowerCase() || 
@@ -37,7 +37,7 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
         }
 
         // Get team admin name
-        const users = Storage.users.getAll();
+        const users = await Storage.users.getAll();
         const adminUser = users.find(u => u.email?.toLowerCase() === memberTeam.adminEmail?.toLowerCase());
         const teamAdminName = adminUser ? `${adminUser.firstName} ${adminUser.lastName}` : memberTeam.adminEmail;
 
@@ -107,7 +107,7 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
         context.log(`Team welcome email sent to ${memberEmail}`);
 
         // Check if member was an interest lead (verified)
-        const interestLeads = Storage.interestLeads.getAll();
+        const interestLeads = await Storage.interestLeads.getAll();
         const wasInterestLead = interestLeads.some(lead => 
             lead.email.toLowerCase() === memberEmail.toLowerCase() && 
             lead.eventId === eventId &&
@@ -122,7 +122,7 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
         // 2. If member was NOT an interest lead and sequence is enabled, send digest of sequence emails they missed
         if (!wasInterestLead && event.sequenceEnabled && event.sequenceId) {
             try {
-                const campaigns = Storage.emailCampaigns.getAll();
+                const campaigns = await Storage.emailCampaigns.getAll();
                 const sequenceCampaigns = campaigns
                     .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence' && c.status === 'live')
                     .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));

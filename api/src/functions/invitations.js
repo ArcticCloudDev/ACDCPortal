@@ -175,7 +175,7 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
         }
 
         // Get event for name and theme
-        const event = invitation.eventId ? Storage.events.getById(invitation.eventId) : null;
+        const event = invitation.eventId ? await Storage.events.getById(invitation.eventId) : null;
         const eventName = event ? event.name : 'the event';
 
         // Get event-specific theme or use global defaults
@@ -320,7 +320,7 @@ app.http('invitations-create', {
             // This ensures they can log in when they click the invitation link
             if (role === 'judge' || role === 'committee') {
                 // Add to allowed emails so they pass auth-check-email
-                Storage.allowedEmails.add(email.toLowerCase(), inviterId);
+                await Storage.allowedEmails.add(email.toLowerCase(), inviterId);
                 context.log(`Added ${email} to allowed-emails for ${role} invitation`);
                 
 

@@ -10,7 +10,7 @@ app.http('users-get-all', {
     route: 'users/all',
     handler: async (request, context) => {
         try {
-            const users = Storage.users.getAll();
+            const users = await Storage.users.getAll();
             return {
                 status: 200,
                 jsonBody: users
@@ -35,7 +35,7 @@ app.http('users-get', {
             const email = request.query.get('email');
             
             if (email) {
-                const user = Storage.users.getByEmail(email);
+                const user = await Storage.users.getByEmail(email);
                 if (!user) {
                     return {
                         status: 404,
@@ -72,7 +72,7 @@ app.http('users-get-by-id', {
         try {
             const userId = request.params.id;
             
-            const user = Storage.users.getById(userId);
+            const user = await Storage.users.getById(userId);
             if (!user) {
                 return {
                     status: 404,
@@ -118,7 +118,7 @@ app.http('users-update', {
             delete updates.createdAt;
             
             // Get existing user to check if TBD
-            const existingUser = Storage.users.getById(userId);
+            const existingUser = await Storage.users.getById(userId);
             if (!existingUser) {
                 return {
                     status: 404,
@@ -134,7 +134,7 @@ app.http('users-update', {
             // Note: Team membership and admin status is now tracked in participations.teamMemberships
             // teamId and isTeamAdmin fields are deprecated and should not be used
             
-            const updatedUser = Storage.users.update(userId, updates);
+            const updatedUser = await Storage.users.update(userId, updates);
 
             context.log(`User ${userId} updated`);
             return {
@@ -169,7 +169,7 @@ app.http('users-create', {
             }
             
             // Check if user already exists
-            const existingUser = Storage.users.getByEmail(userData.email);
+            const existingUser = await Storage.users.getByEmail(userData.email);
             if (existingUser) {
                 return {
                     status: 409,
@@ -178,7 +178,7 @@ app.http('users-create', {
             }
             
             // Create user
-            const newUser = Storage.users.create(userData);
+            const newUser = await Storage.users.create(userData);
             
             context.log(`User created: ${userData.email}`);
             return {

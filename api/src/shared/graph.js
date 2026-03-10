@@ -3,16 +3,16 @@ const { ClientSecretCredential } = require('@azure/identity');
 const { Client } = require('@microsoft/microsoft-graph-client');
 const { TokenCredentialAuthenticationProvider } = require('@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials');
 
-// Configuration from environment variables
-const config = {
-    clientId: process.env.AZURE_CLIENT_ID || 'c14c3e9e-a80f-4c83-ab48-52673788cf8f',
-    clientSecret: process.env.AZURE_CLIENT_SECRET,
-    tenantId: process.env.AZURE_TENANT_ID || '6faefb57-2c64-4298-a1c2-28d08a434986',
-    // External ID tenant domain
-    issuerDomain: process.env.ENTRA_ISSUER_DOMAIN || 'acdcregistration.onmicrosoft.com'
-};
-
 let graphClient = null;
+
+function getConfig() {
+    return {
+        clientId: process.env.AZURE_CLIENT_ID || 'c14c3e9e-a80f-4c83-ab48-52673788cf8f',
+        clientSecret: process.env.AZURE_CLIENT_SECRET,
+        tenantId: process.env.AZURE_TENANT_ID || '6faefb57-2c64-4298-a1c2-28d08a434986',
+        issuerDomain: process.env.ENTRA_ISSUER_DOMAIN || 'acdcregistration.onmicrosoft.com'
+    };
+}
 
 /**
  * Initialize the Graph client with client credentials
@@ -20,6 +20,7 @@ let graphClient = null;
 function getGraphClient() {
     if (graphClient) return graphClient;
 
+    const config = getConfig();
     if (!config.clientSecret) {
         throw new Error('AZURE_CLIENT_SECRET environment variable is not set');
     }
@@ -49,6 +50,7 @@ function getGraphClient() {
  */
 async function createEntraUser(email, displayName = null) {
     const client = getGraphClient();
+    const config = getConfig();
     
     // Use email prefix as display name if not provided
     const name = displayName || email.split('@')[0];
@@ -183,6 +185,7 @@ async function createEntraUsers(emails) {
  */
 async function deleteEntraUser(email) {
     const client = getGraphClient();
+    const config = getConfig();
 
     try {
         // Find user by email identity
@@ -214,6 +217,7 @@ async function deleteEntraUser(email) {
  */
 async function findEntraUserByEmail(email) {
     const client = getGraphClient();
+    const config = getConfig();
 
     // Strategy 1: Find by mail property
     try {

@@ -30,7 +30,7 @@ app.http('teams-list', {
         try {
             const eventId = request.query.get('eventId');
             
-            let teams = Storage.teams.getAll();
+            let teams = await Storage.teams.getAll();
             
             // Filter by eventId if provided
             if (eventId) {
@@ -68,7 +68,7 @@ app.http('teams-get', {
                 };
             }
             
-            const team = Storage.teams.getById(teamId);
+            const team = await Storage.teams.getById(teamId);
             
             if (!team) {
                 return {
@@ -132,7 +132,7 @@ app.http('teams-create', {
             };
             
             // Save team
-            const savedTeam = Storage.teams.create(newTeam);
+            const savedTeam = await Storage.teams.create(newTeam);
             
             // Send registration confirmation email to team admin (async, don't wait)
             if (newTeam.adminEmail && newTeam.eventId) {
@@ -191,7 +191,7 @@ app.http('teams-update', {
                 };
             }
             
-            const team = Storage.teams.getById(teamId);
+            const team = await Storage.teams.getById(teamId);
             
             if (!team) {
                 return {
@@ -210,7 +210,7 @@ app.http('teams-update', {
             team.updatedAt = new Date().toISOString();
             
             // Save updated team
-            const updatedTeam = Storage.teams.update(teamId, team);
+            const updatedTeam = await Storage.teams.update(teamId, team);
             
             context.log(`Team updated: ${team.teamName}`);
             return {
@@ -244,7 +244,7 @@ app.http('teams-delete', {
                 };
             }
 
-            const team = Storage.teams.getById(teamId);
+            const team = await Storage.teams.getById(teamId);
 
             if (!team) {
                 return {
@@ -325,7 +325,7 @@ app.http('teams-delete', {
             }
 
             // 4. Delete the team itself
-            const deleted = Storage.teams.delete(teamId);
+            const deleted = await Storage.teams.delete(teamId);
 
             if (!deleted) {
                 return {
@@ -374,7 +374,7 @@ app.http('teams-members', {
                 };
             }
             
-            const team = Storage.teams.getById(teamId);
+            const team = await Storage.teams.getById(teamId);
             
             if (!team) {
                 return {
@@ -383,7 +383,7 @@ app.http('teams-members', {
                 };
             }
             
-            const members = Storage.users.getByTeamId(teamId);
+            const members = await Storage.users.getByTeamId(teamId);
             
             return {
                 status: 200,

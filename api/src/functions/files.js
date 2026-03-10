@@ -21,7 +21,7 @@ app.http('files-upload', {
             // Get metadata from query params
             const eventId = request.query.get('eventId');
             const teamId = request.query.get('teamId');
-            const category = request.query.get('category') || 'general'; // e.g., 'submission', 'presentation', 'general'
+            const category = request.query.get('category') || 'General';
             
             if (!eventId || !teamId) {
                 return { 
@@ -69,13 +69,23 @@ app.http('files-upload', {
                 };
             }
             
-            // Build folder path: Events/{eventId}/{teamId}/{category}
-            const folderPath = `Events/${eventId}/${teamId}/${category}`;
+            // Build folder path: Events/{eventId}/{teamId}
+            const folderPath = `Events/${eventId}/${teamId}`;
             
             // Upload to SharePoint
             const result = await SharePointStorage.uploadFile(file.data, fileName, folderPath);
             
-            context.log(`File uploaded: ${fileName} to ${folderPath}`);
+            // Set FileCategory metadata on the uploaded file (column must already exist via admin setup)
+            try {
+                await SharePointStorage.setFileMetadata(result.id, { FileCategory: category });
+                result.category = category;
+            } catch (metaErr) {
+                context.warn('Could not set file metadata:', metaErr.message);
+                result.category = category;
+                result.metadataWarning = 'File uploaded but category could not be set';
+            }
+            
+            context.log(`File uploaded: ${fileName} to ${folderPath} [${category}]`);
             
             return {
                 status: 200,
@@ -121,10 +131,7 @@ app.http('files-list', {
             }
             
             // Build folder path
-            let folderPath = `Events/${eventId}/${teamId}`;
-            if (category) {
-                folderPath += `/${category}`;
-            }
+            const folderPath = `Events/${eventId}/${teamId}`;
             
             const files = await SharePointStorage.listFiles(folderPath);
             
@@ -226,6 +233,51 @@ app.http('files-delete', {
             return { 
                 status: 500, 
                 jsonBody: { error: 'Failed to delete file' } 
+            };
+        }
+    }
+});
+
+// POST /api/files/setup-columns - Admin: ensure FileCategory choice column exists on the document library
+app.http('files-setup-columns', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'files/setup-columns',
+    handler: async (request, context) => {
+        try {
+            if (!SharePointStorage.isConfigured()) {
+                return {
+                    status: 503,
+                    jsonBody: { error: 'SharePoint not configured' }
+                };
+            }
+
+            const body = await request.json();
+            const categories = body.categories; // array of strings
+
+            if (!Array.isArray(categories) || categories.length === 0) {
+                return {
+                    status: 400,
+                    jsonBody: { error: 'categories array is required' }
+                };
+            }
+
+            const column = await SharePointStorage.ensureChoiceColumn('FileCategory', categories);
+            context.log(`FileCategory column ensured with choices: ${categories.join(', ')}`);
+
+            return {
+                status: 200,
+                jsonBody: {
+                    message: 'FileCategory column ready',
+                    column: column?.displayName || 'FileCategory'
+                }
+            };
+
+        } catch (error) {
+            context.error('Setup columns error:', error);
+            return {
+                status: 500,
+                jsonBody: { error: 'Failed to set up columns', details: error.message }
             };
         }
     }

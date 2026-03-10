@@ -572,7 +572,7 @@ app.http('interest-record', {
             // Mirror into participations with roles:['interest']
             try {
                 // Look up user to set userId on participation
-                const user = Storage.users.getByEmail(normalizedEmail);
+                const user = await Storage.users.getByEmail(normalizedEmail);
                 const userId = user ? user.id : null;
 
                 const partData = await participationsStorage.getRaw();

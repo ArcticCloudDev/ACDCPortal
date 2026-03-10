@@ -767,6 +767,22 @@
                                             <label>Location</label>
                                             <input type="text" id="event-location" placeholder="Soria Moria, Oslo">
                                         </div>
+
+                                        <div class="form-group" style="margin-top: 16px;">
+                                            <label>📁 File Upload Categories</label>
+                                            <input type="text" id="event-file-categories" placeholder="e.g. Presentation, Source Code, Architecture Diagram, Demo Video">
+                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Comma-separated list. Teams will pick from these when uploading files.</small>
+                                        </div>
+
+                                        <div class="form-group" style="margin-top: 16px;">
+                                            <label>📂 SharePoint Document Folder URL</label>
+                                            <div style="display: flex; gap: 8px; align-items: flex-start;">
+                                                <input type="url" id="event-sharepoint-url" placeholder="https://yourtenant.sharepoint.com/:f:/s/site/..." style="flex: 1;">
+                                                <button type="button" class="btn-sm" id="verify-sharepoint-btn" onclick="verifySharePointUrl()" style="white-space: nowrap;">🔗 Verify</button>
+                                            </div>
+                                            <div id="sharepoint-verify-result" style="margin-top: 6px;"></div>
+                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Paste the SharePoint folder URL where teams should upload documents. Use the Verify button to confirm the link works.</small>
+                                        </div>
                                     </div>
 
                                     <!-- Right Column: Registration Settings -->
@@ -861,12 +877,6 @@
                                                 <strong>Custom invitation email for committee members.</strong> When enabled, committee members will receive a role-specific invitation email with customizable content.
                                                 Customize the email in <strong>Email Templates</strong> under Committee Invite.
                                             </small>
-                                        </div>
-
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label>📁 File Upload Categories</label>
-                                            <input type="text" id="event-file-categories" placeholder="e.g. Presentation, Source Code, Architecture Diagram, Demo Video">
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Comma-separated list. Teams will pick from these when uploading files.</small>
                                         </div>
                                     </div>
                                 </div>

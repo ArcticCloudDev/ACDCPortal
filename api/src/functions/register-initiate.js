@@ -43,7 +43,7 @@ app.http('register-initiate', {
             }
             
             // Check if team name already exists
-            const existingTeam = Storage.teams.getByName(teamName);
+            const existingTeam = await Storage.teams.getByName(teamName);
             if (existingTeam) {
                 return {
                     status: 400,
@@ -52,7 +52,7 @@ app.http('register-initiate', {
             }
             
             // Check if email is already registered
-            const existingUser = Storage.users.getByEmail(email);
+            const existingUser = await Storage.users.getByEmail(email);
             if (existingUser) {
                 return {
                     status: 400,
@@ -80,7 +80,7 @@ app.http('register-initiate', {
                 createdAt: now.toISOString()
             };
             
-            Storage.pendingRegistrations.create(registration);
+            await Storage.pendingRegistrations.create(registration);
             
             // Send verification code
             await Email.sendVerificationCode(email, verificationCode);

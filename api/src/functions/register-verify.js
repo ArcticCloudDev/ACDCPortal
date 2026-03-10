@@ -24,7 +24,7 @@ app.http('register-verify', {
             }
             
             // Get pending registration
-            const registration = Storage.pendingRegistrations.getById(registrationId);
+            const registration = await Storage.pendingRegistrations.getById(registrationId);
             
             if (!registration) {
                 return {
@@ -35,7 +35,7 @@ app.http('register-verify', {
             
             // Check if expired
             if (new Date(registration.expiresAt) < new Date()) {
-                Storage.pendingRegistrations.delete(registrationId);
+                await Storage.pendingRegistrations.delete(registrationId);
                 return {
                     status: 400,
                     jsonBody: { message: 'Verification code has expired. Please register again.' }
@@ -90,14 +90,14 @@ app.http('register-verify', {
             };
             
             // Save to storage
-            Storage.users.create(user);
-            Storage.teams.create(team);
+            await Storage.users.create(user);
+            await Storage.teams.create(team);
             
             // Add email to allowed list
-            Storage.allowedEmails.add(registration.email, null);
+            await Storage.allowedEmails.add(registration.email, null);
             
             // Delete pending registration
-            Storage.pendingRegistrations.delete(registrationId);
+            await Storage.pendingRegistrations.delete(registrationId);
             
             context.log(`Registration complete for ${registration.email}, team: ${team.teamName}`);
             

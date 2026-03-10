@@ -53,7 +53,7 @@ app.http('auth-verify-otp', {
             }
             
             // Get the stored OTP record
-            const otpRecord = Storage.pendingRegistrations.getById(`otp_${normalizedEmail}`);
+            const otpRecord = await Storage.pendingRegistrations.getById(`otp_${normalizedEmail}`);
             
             if (!otpRecord) {
                 return {
@@ -67,7 +67,7 @@ app.http('auth-verify-otp', {
             
             // Check if expired
             if (new Date(otpRecord.expiresAt) < new Date()) {
-                Storage.pendingRegistrations.delete(otpRecord.id);
+                await Storage.pendingRegistrations.delete(otpRecord.id);
                 return {
                     status: 400,
                     jsonBody: { 
@@ -79,7 +79,7 @@ app.http('auth-verify-otp', {
             
             // Check attempt limit (5 wrong tries invalidates the code)
             if (otpRecord.attempts >= (otpRecord.maxAttempts || 5)) {
-                Storage.pendingRegistrations.delete(otpRecord.id);
+                await Storage.pendingRegistrations.delete(otpRecord.id);
                 return {
                     status: 400,
                     jsonBody: { 
@@ -95,7 +95,7 @@ app.http('auth-verify-otp', {
             if (!isValid) {
                 // Increment attempt counter
                 otpRecord.attempts = (otpRecord.attempts || 0) + 1;
-                Storage.pendingRegistrations.create(otpRecord); // Update in place
+                await Storage.pendingRegistrations.create(otpRecord); // Update in place
                 
                 const remaining = (otpRecord.maxAttempts || 5) - otpRecord.attempts;
                 return {
@@ -108,10 +108,10 @@ app.http('auth-verify-otp', {
             }
             
             // Code is valid! Single-use: delete immediately
-            Storage.pendingRegistrations.delete(otpRecord.id);
+            await Storage.pendingRegistrations.delete(otpRecord.id);
             
             // Get user data (may not exist yet if this is registration OTP)
-            const user = Storage.users.getByEmail(normalizedEmail);
+            const user = await Storage.users.getByEmail(normalizedEmail);
             
             // Build JWT payload
             const tokenPayload = {

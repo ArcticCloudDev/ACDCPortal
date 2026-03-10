@@ -3,23 +3,17 @@
 
 const { ConfidentialClientApplication } = require('@azure/msal-node');
 
-// Configuration for the M365 tenant (not External ID tenant)
-// These need to be set in environment variables or local.settings.json
-const config = {
-    auth: {
-        clientId: process.env.MAIL_CLIENT_ID,
-        clientSecret: process.env.MAIL_CLIENT_SECRET,
-        authority: `https://login.microsoftonline.com/${process.env.MAIL_TENANT_ID}`
-    }
-};
-
-const SENDER_EMAIL = process.env.MAIL_SENDER || 'no-reply@acdc.blog';
-
 let msalClient = null;
 
 function getMsalClient() {
-    if (!msalClient && config.auth.clientId) {
-        msalClient = new ConfidentialClientApplication(config);
+    if (!msalClient && process.env.MAIL_CLIENT_ID) {
+        msalClient = new ConfidentialClientApplication({
+            auth: {
+                clientId: process.env.MAIL_CLIENT_ID,
+                clientSecret: process.env.MAIL_CLIENT_SECRET,
+                authority: `https://login.microsoftonline.com/${process.env.MAIL_TENANT_ID}`
+            }
+        });
     }
     return msalClient;
 }
@@ -135,7 +129,7 @@ async function sendEmail({ to, subject, htmlContent, textContent }) {
     }
     
     const response = await fetch(
-        `https://graph.microsoft.com/v1.0/users/${SENDER_EMAIL}/sendMail`,
+        `https://graph.microsoft.com/v1.0/users/${process.env.MAIL_SENDER || 'no-reply@acdc.blog'}/sendMail`,
         {
             method: 'POST',
             headers: {
@@ -224,5 +218,5 @@ module.exports = {
     sendEmail,
     sendBulkEmail,
     processTemplate,
-    SENDER_EMAIL
+    get SENDER_EMAIL() { return process.env.MAIL_SENDER || 'no-reply@acdc.blog'; }
 };

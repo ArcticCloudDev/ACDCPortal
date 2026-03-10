@@ -5,32 +5,31 @@
 const { ConfidentialClientApplication } = require('@azure/msal-node');
 const fetch = require('node-fetch');
 
-// Reuse MAIL credentials - same app registration, same tenant
-const config = {
-    tenantId: process.env.MAIL_TENANT_ID,
-    clientId: process.env.MAIL_CLIENT_ID,
-    clientSecret: process.env.MAIL_CLIENT_SECRET,
-    siteUrl: process.env.SHAREPOINT_SITE_URL,  // e.g., "acdc.sharepoint.com:/sites/ACDC"
-    documentLibrary: process.env.SHAREPOINT_DOC_LIBRARY || 'Team Files'
-};
-
-// MSAL configuration for app-only auth
-const msalConfig = {
-    auth: {
-        clientId: config.clientId,
-        clientSecret: config.clientSecret,
-        authority: `https://login.microsoftonline.com/${config.tenantId}`
-    }
-};
-
 let msalClient = null;
+
+function getConfig() {
+    return {
+        tenantId: process.env.MAIL_TENANT_ID,
+        clientId: process.env.MAIL_CLIENT_ID,
+        clientSecret: process.env.MAIL_CLIENT_SECRET,
+        siteUrl: process.env.SHAREPOINT_SITE_URL,
+        documentLibrary: process.env.SHAREPOINT_DOC_LIBRARY || 'Team Files'
+    };
+}
 let siteId = null;
 let driveId = null;
 
 // Initialize MSAL client
 function getMsalClient() {
+    const config = getConfig();
     if (!msalClient && config.clientId && config.clientSecret) {
-        msalClient = new ConfidentialClientApplication(msalConfig);
+        msalClient = new ConfidentialClientApplication({
+            auth: {
+                clientId: config.clientId,
+                clientSecret: config.clientSecret,
+                authority: `https://login.microsoftonline.com/${config.tenantId}`
+            }
+        });
     }
     return msalClient;
 }
@@ -90,7 +89,7 @@ async function getSiteId() {
     
     // Parse site URL to get hostname and site path
     // Expected format: "yourtenant.sharepoint.com:/sites/ACDC" or full URL
-    let siteRef = config.siteUrl;
+    let siteRef = getConfig().siteUrl;
     
     if (siteRef.startsWith('https://')) {
         const url = new URL(siteRef);
@@ -112,10 +111,10 @@ async function getDriveId() {
     const drives = await graphRequest(`/sites/${siteIdValue}/drives`);
     
     // Find the specified document library or default to first one
-    const drive = drives.value.find(d => d.name === config.documentLibrary) || drives.value[0];
+    const drive = drives.value.find(d => d.name === getConfig().documentLibrary) || drives.value[0];
     
     if (!drive) {
-        throw new Error(`Document library "${config.documentLibrary}" not found`);
+        throw new Error(`Document library "${getConfig().documentLibrary}" not found`);
     }
     
     driveId = drive.id;
@@ -162,6 +161,7 @@ const SharePointStorage = {
      * Check if SharePoint is configured
      */
     isConfigured() {
+        const config = getConfig();
         return !!(config.clientId && config.clientSecret && config.siteUrl && config.tenantId);
     },
     
@@ -229,9 +229,12 @@ const SharePointStorage = {
         const drive = await getDriveId();
         const site = await getSiteId();
         
-        const endpoint = folderPath 
+        const base = folderPath 
             ? `/sites/${site}/drives/${drive}/root:/${folderPath}:/children`
             : `/sites/${site}/drives/${drive}/root/children`;
+        
+        // Expand listItem.fields to get custom column values (e.g. FileCategory)
+        const endpoint = `${base}?$expand=listItem($expand=fields)`;
         
         const result = await graphRequest(endpoint);
         
@@ -244,7 +247,8 @@ const SharePointStorage = {
             createdDateTime: item.createdDateTime,
             lastModifiedDateTime: item.lastModifiedDateTime,
             createdBy: item.createdBy?.user?.displayName,
-            downloadUrl: item['@microsoft.graph.downloadUrl']
+            downloadUrl: item['@microsoft.graph.downloadUrl'],
+            category: item.listItem?.fields?.FileCategory || null
         }));
     },
     
@@ -334,6 +338,81 @@ const SharePointStorage = {
             type: result.link.type,
             scope: result.link.scope
         };
+    },
+
+    /**
+     * Ensure a choice column exists on the document library.
+     * Creates the column if it doesn't exist; merges new choices if it does.
+     * @param {string} columnName - Internal/display name for the column
+     * @param {string[]} choices - Array of choice values
+     */
+    async ensureChoiceColumn(columnName, choices) {
+        const site = await getSiteId();
+        const drive = await getDriveId();
+
+        // Get the list ID associated with this drive (document library)
+        const list = await graphRequest(`/sites/${site}/drives/${drive}/list`);
+        const listId = list.id;
+
+        try {
+            // Get existing columns on the list
+            const cols = await graphRequest(`/sites/${site}/lists/${listId}/columns`);
+            const existing = cols.value.find(
+                c => c.name === columnName || c.displayName === columnName
+            );
+
+            if (existing) {
+                // Column exists — merge any new choices
+                const currentChoices = existing.choice?.choices || [];
+                const merged = [...new Set([...currentChoices, ...choices])];
+                if (merged.length > currentChoices.length) {
+                    await graphRequest(
+                        `/sites/${site}/lists/${listId}/columns/${existing.id}`,
+                        {
+                            method: 'PATCH',
+                            body: JSON.stringify({ choice: { choices: merged } })
+                        }
+                    );
+                }
+                return existing;
+            }
+        } catch (err) {
+            // If listing columns fails, log and try to create
+            console.warn('Could not list columns, attempting to create:', err.message);
+        }
+
+        // Column doesn't exist — create it
+        const columnDef = {
+            name: columnName,
+            displayName: columnName,
+            choice: {
+                allowTextEntry: false,
+                choices: choices
+            }
+        };
+
+        return await graphRequest(`/sites/${site}/lists/${listId}/columns`, {
+            method: 'POST',
+            body: JSON.stringify(columnDef)
+        });
+    },
+
+    /**
+     * Update metadata fields on a file's list item
+     * @param {string} itemId - The drive item ID returned from upload
+     * @param {object} fields - Key/value pairs to set (e.g. { FileCategory: 'Presentation' })
+     */
+    async setFileMetadata(itemId, fields) {
+        const site = await getSiteId();
+        const drive = await getDriveId();
+
+        return await graphRequest(
+            `/sites/${site}/drives/${drive}/items/${itemId}/listItem/fields`,
+            {
+                method: 'PATCH',
+                body: JSON.stringify(fields)
+            }
+        );
     }
 };
 

@@ -113,8 +113,8 @@ app.http('auth-send-otp', {
             
             // Anti-enumeration: always return success even if email doesn't exist
             // But only actually send if user exists
-            const user = Storage.users.getByEmail(normalizedEmail);
-            const isAllowed = Storage.allowedEmails.isAllowed(normalizedEmail);
+            const user = await Storage.users.getByEmail(normalizedEmail);
+            const isAllowed = await Storage.allowedEmails.isAllowed(normalizedEmail);
             
             if (!user && !isAllowed) {
                 // Email not in system — fake success (anti-enumeration)
@@ -146,7 +146,7 @@ app.http('auth-send-otp', {
             };
             
             // This replaces any existing OTP for this email
-            Storage.pendingRegistrations.create(otpRecord);
+            await Storage.pendingRegistrations.create(otpRecord);
             
             // Send the code
             await Email.sendVerificationCode(normalizedEmail, otpCode);

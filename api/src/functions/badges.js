@@ -500,7 +500,7 @@ app.http('badge-claims-list', {
 
             // Enrich with badge details
             const badges = await badgesStorage.getAll();
-            const teams = Storage.teams.getAll();
+            const teams = await Storage.teams.getAll();
 
             const enriched = claims.map(c => ({
                 ...c,
@@ -852,7 +852,7 @@ app.http('event-badge-summary', {
 
             const claims = await badgeClaimsStorage.getAll();
             const badges = await badgesStorage.getAll();
-            const teams = Storage.teams.getAll();
+            const teams = await Storage.teams.getAll();
 
             // Get approved claims for this event
             const eventClaims = claims.filter(c => c.eventId === eventId && c.status === 'approved');

@@ -22,10 +22,10 @@ app.http('auth-check-email', {
             }
             
             // Check if user already exists in our system (users.json)
-            const existingUser = Storage.users.getByEmail(email);
+            const existingUser = await Storage.users.getByEmail(email);
             
             // Also check the allowed-emails list
-            const isAllowed = Storage.allowedEmails.isAllowed(email);
+            const isAllowed = await Storage.allowedEmails.isAllowed(email);
             
             if (existingUser) {
                 // User exists → they should sign in, not register
