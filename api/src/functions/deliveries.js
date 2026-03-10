@@ -72,11 +72,17 @@ app.http('deliveries-event', {
                 .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence')
                 .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
 
-            const campaignIds = new Set(sequenceCampaigns.map(c => c.id));
+            const campaignIds = new Set(
+                sequenceCampaigns
+                    .map(c => (c.id || '').toString().toLowerCase())
+                    .filter(Boolean)
+            );
 
             // Get all deliveries for these campaigns
             const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
-            const eventDeliveries = deliveryData.deliveries.filter(d => campaignIds.has(d.campaignId));
+            const eventDeliveries = deliveryData.deliveries.filter(d =>
+                campaignIds.has((d.campaignId || '').toString().toLowerCase())
+            );
 
             // Get all verified leads for this event
             const leadsData = await leadsStorage.getRaw();

@@ -10,6 +10,10 @@ let currentEventSequence = null;
 let emailEditor = null;
 let currentPermissions = null;
 
+function normalizeId(value) {
+    return (value || '').toString().toLowerCase();
+}
+
 // Status workflow - defines valid transitions
 const STATUS_ORDER = ['draft', 'pre-registration', 'registration', 'live', 'completed'];
 const STATUS_LABELS = {
@@ -1153,13 +1157,15 @@ function renderTeamsTable() {
         const adminName = adminUser
             ? `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || adminUser.email || 'N/A'
             : (adminMembership?.email || 'N/A');
+        const teamDisplayName = team.teamName || team.name || 'Unnamed Team';
+        const maxMembers = team.numberOfParticipants || team.maxSize || 5;
         const createdDate = new Date(team.createdAt).toLocaleDateString();
         
         return `
             <tr>
-                <td><strong>${escapeHtml(team.name)}</strong></td>
+                <td><strong>${escapeHtml(teamDisplayName)}</strong></td>
                 <td>${escapeHtml(adminName)}</td>
-                <td>${memberCount} / ${team.maxSize || 5}</td>
+                <td>${memberCount} / ${maxMembers}</td>
                 <td>${createdDate}</td>
                 <td>
                     <a href="admin-teams.html?team=${team.id}" class="btn-sm" style="text-decoration: none;">View →</a>
@@ -1296,7 +1302,8 @@ async function loadEmailDeliveryStats(emails) {
         // Calculate stats for each email
         const stats = {};
         emails.forEach(email => {
-            const emailDeliveries = deliveries.filter(d => d.campaignId === email.id);
+            const emailId = normalizeId(email.id);
+            const emailDeliveries = deliveries.filter(d => normalizeId(d.campaignId) === emailId);
             const sentCount = emailDeliveries.filter(d => d.status === 'sent').length;
             stats[email.id] = {
                 sent: sentCount,
@@ -1384,7 +1391,8 @@ async function loadRecipientDeliveryOverview() {
             
             // Check each campaign
             const emailStatuses = sortedCampaigns.map(campaign => {
-                const delivery = recipientDeliveries.find(d => d.campaignId === campaign.id);
+                const campaignId = normalizeId(campaign.id);
+                const delivery = recipientDeliveries.find(d => normalizeId(d.campaignId) === campaignId);
                 if (!delivery) return { sent: false, symbol: '-', style: 'color: var(--admin-text-muted);' };
                 if (delivery.status === 'sent') return { sent: true, symbol: '✓', style: 'color: #10b981;' };
                 if (delivery.status === 'failed') return { sent: false, symbol: '✗', style: 'color: #ef4444;' };
