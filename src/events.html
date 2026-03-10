@@ -247,6 +247,23 @@
             let interestLeadEventIds = new Set();
             let isAdmin = false;
             
+            // Start the SQL wake-up timer immediately so it shows even while auth/user calls are pending
+            const eventsSection = document.getElementById('events-section');
+            let pageLoadDone = false;
+            const wakeupTimer = setTimeout(() => {
+                if (pageLoadDone) return;
+                eventsSection.innerHTML = `
+                    <div class="events-loading">
+                        <div class="mini-spinner" aria-hidden="true"></div>
+                        <div>Loading events...</div>
+                        <div class="wake-note">
+                            <span class="wake-emoji">\ud83d\ude34</span> Our database is hibernating like a polar bear in the Arctic winter.
+                            Give it a moment to wake up, stretch, and fetch your events. This can take up to a minute.
+                        </div>
+                    </div>
+                `;
+            }, 1200);
+
             // Check for invitation link parameter and store it
             const urlParams = new URLSearchParams(window.location.search);
             const inviteId = urlParams.get('invite');
@@ -431,28 +448,13 @@
             
             async function loadEvents() {
                 const section = document.getElementById('events-section');
-                let isDone = false;
 
-                const wakeupTimer = setTimeout(() => {
-                    if (isDone) return;
-                    section.innerHTML = `
-                        <div class="events-loading">
-                            <div class="mini-spinner" aria-hidden="true"></div>
-                            <div>Loading events...</div>
-                            <div class="wake-note">
-                                <span class="wake-emoji">😴</span> Our database is hibernating like a polar bear in the Arctic winter.
-                                Give it a moment to wake up, stretch, and fetch your events. This can take up to a minute.
-                            </div>
-                        </div>
-                    `;
-                }, 1200);
-                
                 try {
                     const response = await fetch(`${CONFIG.api.baseUrl}/events`);
                     if (!response.ok) throw new Error('Failed to load events');
                     
                     const events = await response.json();
-                    isDone = true;
+                    pageLoadDone = true;
                     clearTimeout(wakeupTimer);
                     
                     // Get events that are in pre-registration or registration status
@@ -532,7 +534,7 @@
                     return activeEvents[0]?.id || null;
                     
                 } catch (error) {
-                    isDone = true;
+                    pageLoadDone = true;
                     clearTimeout(wakeupTimer);
                     console.error('Error loading events:', error);
                     section.innerHTML = `
