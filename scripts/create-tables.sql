@@ -150,6 +150,10 @@ BEGIN
         TeamName            NVARCHAR(200)    NULL,
         NumberOfParticipants INT             NULL,
         VerificationCode    NVARCHAR(10)     NULL,
+        CodeHash            NVARCHAR(200)    NULL,
+        Attempts            INT              NULL DEFAULT 0,
+        MaxAttempts         INT              NULL DEFAULT 5,
+        Type                NVARCHAR(50)     NULL,
         ExpiresAt           DATETIME2        NULL,
         CreatedAt           DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME()
     );
