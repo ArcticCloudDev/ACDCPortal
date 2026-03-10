@@ -2,7 +2,7 @@
 node_modules/
 
 # Local data (persists locally, not in repo)
-data/
+/data/
 
 # Local settings
 local.settings.json

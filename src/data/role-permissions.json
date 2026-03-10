@@ -1,0 +1,62 @@
+{
+  "_description": "Permission matrix mapping participation roles to admin page access. This is the SINGLE SOURCE OF TRUTH — permissions.js loads this file at runtime.",
+  "roles": {
+    "portalAdmin": {
+      "label": "Portal Admin",
+      "description": "Full access to all pages and all events (god mode)",
+      "pages": [
+        "dashboard",
+        "events",
+        "teams",
+        "users",
+        "interest",
+        "person",
+        "badges",
+        "email",
+        "campaigns",
+        "email-templates",
+        "event-participants"
+      ],
+      "eventScoped": false
+    },
+    "committee": {
+      "label": "Committee Member",
+      "description": "Admin access scoped to events where they have the committee role",
+      "pages": [
+        "dashboard",
+        "events",
+        "teams",
+        "interest",
+        "person",
+        "badges",
+        "email",
+        "campaigns",
+        "event-participants"
+      ],
+      "eventScoped": true
+    },
+    "judge": {
+      "label": "Judge",
+      "description": "Limited admin access scoped to events where they have the judge role",
+      "pages": [
+        "dashboard",
+        "badges",
+        "event-participants"
+      ],
+      "eventScoped": true
+    }
+  },
+  "pageLabels": {
+    "dashboard": "Dashboard",
+    "events": "Events",
+    "teams": "Teams",
+    "users": "Users",
+    "interest": "Interest Queue",
+    "person": "Person Search",
+    "badges": "Badges",
+    "email": "Quick Email",
+    "campaigns": "Sequences",
+    "email-templates": "Email Templates",
+    "event-participants": "Event Participants"
+  }
+}
