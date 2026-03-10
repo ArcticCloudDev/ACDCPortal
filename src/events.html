@@ -155,6 +155,39 @@
             padding: 20px;
             color: var(--text-muted);
         }
+
+        .events-loading {
+            padding: 24px;
+            text-align: center;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .mini-spinner {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 3px solid #e2e8f0;
+            border-top-color: #1d4ed8;
+            animation: spin 0.9s linear infinite;
+        }
+
+        .wake-note {
+            max-width: 520px;
+            font-size: 0.85rem;
+            color: #64748b;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -164,8 +197,9 @@
         <main class="landing">
                 <!-- Event section - dynamically populated -->
                 <div id="events-section">
-                    <div class="loading" style="padding: 20px; text-align: center; color: var(--text-muted);">
-                        Loading events...
+                    <div class="events-loading">
+                        <div class="mini-spinner" aria-hidden="true"></div>
+                        <div>Loading events...</div>
                     </div>
                 </div>
         </main>
@@ -377,12 +411,26 @@
             
             async function loadEvents() {
                 const section = document.getElementById('events-section');
+                let isDone = false;
+
+                const wakeupTimer = setTimeout(() => {
+                    if (isDone) return;
+                    section.innerHTML = `
+                        <div class="events-loading">
+                            <div class="mini-spinner" aria-hidden="true"></div>
+                            <div>Loading events...</div>
+                            <div class="wake-note">SQL appears to be asleep and is waking up. Please be patient, this can take around a minute.</div>
+                        </div>
+                    `;
+                }, 1800);
                 
                 try {
                     const response = await fetch(`${CONFIG.api.baseUrl}/events`);
                     if (!response.ok) throw new Error('Failed to load events');
                     
                     const events = await response.json();
+                    isDone = true;
+                    clearTimeout(wakeupTimer);
                     
                     // Get events that are in pre-registration or registration status
                     const activeEvents = events.filter(e => 
@@ -461,6 +509,8 @@
                     return activeEvents[0]?.id || null;
                     
                 } catch (error) {
+                    isDone = true;
+                    clearTimeout(wakeupTimer);
                     console.error('Error loading events:', error);
                     section.innerHTML = `
                         <div class="no-events-message">
