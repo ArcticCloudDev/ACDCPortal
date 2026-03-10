@@ -21,7 +21,7 @@ app.http('auth-check-email', {
                 };
             }
             
-            // Check if user already exists in our system (users.json)
+            // Check if user already exists in our system (SQL Users table)
             const existingUser = await Storage.users.getByEmail(email);
             
             // Also check the allowed-emails list

@@ -1,6 +1,5 @@
 // Storage Module — SQL-backed (Azure SQL via Entra ID)
 // Drop-in replacement for the JSON file storage module.
-// Falls back to JSON storage if SQL_CONNECTION_STRING is not configured.
 //
 // Exports:
 //   module.exports = Storage          (named stores: .users, .teams, .events, etc.)
@@ -875,7 +874,7 @@ const Storage = {
 };
 
 // ============================================================
-// readData / writeData — Generic file-like read/write
+// readData / writeData — legacy file-shaped compatibility wrappers on top of SQL
 // ============================================================
 
 async function readData(filename) {

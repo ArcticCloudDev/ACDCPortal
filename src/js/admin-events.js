@@ -1113,6 +1113,13 @@ async function loadEventTeams() {
         if (partResponse.ok) {
             allParticipations = await partResponse.json();
         }
+
+        // Load users so we can resolve admin names from participation.userId
+        try {
+            allUsers = await API.users.list();
+        } catch (e) {
+            allUsers = [];
+        }
         
         renderTeamsTable();
     } catch (error) {
@@ -1141,8 +1148,11 @@ function renderTeamsTable() {
         const adminMembership = allParticipations.find(p =>
             (p.teamMemberships || []).some(m => m.teamId === team.id && m.isAdmin)
         );
-        
-        const adminName = adminMembership ? `${adminMembership.firstName} ${adminMembership.lastName}` : 'N/A';
+
+        const adminUser = adminMembership ? allUsers.find(u => u.id === adminMembership.userId) : null;
+        const adminName = adminUser
+            ? `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || adminUser.email || 'N/A'
+            : (adminMembership?.email || 'N/A');
         const createdDate = new Date(team.createdAt).toLocaleDateString();
         
         return `
