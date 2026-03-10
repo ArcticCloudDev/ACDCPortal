@@ -1351,6 +1351,7 @@ async function loadRecipientDeliveryOverview() {
                 <th style="text-align: left;">Recipient</th>
                 ${sortedCampaigns.map((c, i) => `<th style="text-align: center;">#${i+1}</th>`).join('')}
                 <th style="text-align: center;">Total</th>
+                <th style="text-align: center;">Action</th>
             </tr>
         `;
         
@@ -1364,6 +1365,7 @@ async function loadRecipientDeliveryOverview() {
                 name: lead.firstName && lead.lastName ? `${lead.firstName} ${lead.lastName}` : lead.email,
                 email: lead.email,
                 type: 'interest',
+                leadId: lead.id,
                 matchField: 'leadId'
             })),
             ...recipients.map(r => ({
@@ -1371,12 +1373,13 @@ async function loadRecipientDeliveryOverview() {
                 name: r.firstName && r.lastName ? `${r.firstName} ${r.lastName}` : r.email,
                 email: r.email,
                 type: r.type,
+                leadId: null,
                 matchField: 'userId'
             }))
         ];
         
         if (allRecipients.length === 0) {
-            bodyEl.innerHTML = '<tr><td colspan="' + (campaigns.length + 2) + '" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">No recipients yet</td></tr>';
+            bodyEl.innerHTML = '<tr><td colspan="' + (campaigns.length + 3) + '" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">No recipients yet</td></tr>';
             return;
         }
         
@@ -1415,6 +1418,8 @@ async function loadRecipientDeliveryOverview() {
                 name: recipient.name,
                 email: recipient.email,
                 typeLabel,
+                canRestart: recipient.type === 'interest' && !!recipient.leadId,
+                leadId: recipient.leadId,
                 statuses: emailStatuses,
                 sentCount,
                 totalCount,
@@ -1433,6 +1438,9 @@ async function loadRecipientDeliveryOverview() {
                 </td>
                 ${row.statuses.map(s => `<td style="text-align: center; ${s.style}">${s.symbol}</td>`).join('')}
                 <td style="text-align: center; font-weight: 600;">${row.sentCount}/${row.totalCount}</td>
+                <td style="text-align: center;">
+                    ${row.canRestart ? `<button class="btn-sm" onclick="restartSequence('${row.leadId}')">🔄 Restart</button>` : '<span style="color: var(--admin-text-muted);">-</span>'}
+                </td>
             </tr>
         `).join('');
         
