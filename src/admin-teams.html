@@ -117,6 +117,56 @@
         .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
         .btn-sm.primary:hover { background: #2563eb; }
 
+        .team-main-row.expanded { background: #f8fafc; }
+        .team-main-row.expanded:hover { background: #f8fafc; }
+
+        .member-details-row td {
+            background: #f8fafc;
+            padding: 0;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .member-details-wrap {
+            padding: 14px 18px;
+        }
+
+        .member-title {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--admin-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 10px;
+        }
+
+        .member-list {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border: 1px solid var(--admin-border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .member-list td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--admin-border);
+            font-size: 0.82rem;
+        }
+
+        .member-list tr:last-child td { border-bottom: none; }
+
+        .expand-btn {
+            min-width: 74px;
+            text-align: center;
+        }
+
+        .member-empty {
+            color: var(--admin-text-muted);
+            font-size: 0.82rem;
+            padding: 8px 0;
+        }
+
         .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
 
         .access-denied {

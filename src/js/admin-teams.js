@@ -4,6 +4,9 @@ let currentUser = null;
 let allEvents = [];
 let allTeams = [];
 let teamCounts = {};
+let allParticipations = [];
+let allUsers = [];
+const expandedTeams = new Set();
 let currentPermissions = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -40,24 +43,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadData() {
     try {
-        // Load events for filter (scoped by permissions)
-        let events = await API.events.list();
+        const [events, teams, participations, users] = await Promise.all([
+            API.events.list(),
+            API.teams.list(),
+            API.participations.list(),
+            API.users.list()
+        ]);
+
+        // Scope event-bearing entities by permissions
         allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
+        allTeams = Permissions.filterByEvent(currentPermissions, teams);
+        allParticipations = Permissions.filterByEvent(currentPermissions, participations);
+        allUsers = users || [];
+
         populateEventFilter();
 
-        // Load all teams (scoped by permissions)
-        let teams = await API.teams.list();
-        allTeams = Permissions.filterByEvent(currentPermissions, teams);
-
-        // Load participant counts for each team
-        for (const team of allTeams) {
-            try {
-                const count = await API.participations.getTeamCount(team.id);
-                teamCounts[team.id] = count.participantCount || 0;
-            } catch (e) {
-                teamCounts[team.id] = 0;
-            }
-        }
+        // Compute team counts from loaded participations
+        teamCounts = {};
+        allTeams.forEach(team => {
+            teamCounts[team.id] = getTeamMembers(team.id).length;
+        });
 
         // Render
         renderTeamsTable();
@@ -111,10 +116,12 @@ function renderTeamsTable() {
     }
 
     if (searchQuery) {
-        filteredTeams = filteredTeams.filter(t => 
-            t.teamName.toLowerCase().includes(searchQuery) ||
-            (t.adminEmail && t.adminEmail.toLowerCase().includes(searchQuery))
-        );
+        filteredTeams = filteredTeams.filter(t => {
+            const adminInfo = getTeamAdminInfo(t.id);
+            return t.teamName.toLowerCase().includes(searchQuery) ||
+                adminInfo.name.toLowerCase().includes(searchQuery) ||
+                adminInfo.email.toLowerCase().includes(searchQuery);
+        });
     }
 
     // Sort by creation date (newest first)
@@ -144,21 +151,132 @@ function renderTeamsTable() {
         }
 
         const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
+        const members = getTeamMembers(team.id);
+        const isExpanded = expandedTeams.has(team.id);
+        const eventUrl = `admin-events.html?event=${team.eventId}&tab=teams`;
+        const adminInfo = getTeamAdminInfo(team.id);
+
+        const memberRows = members.map(member => {
+            const displayName = (member.user?.firstName || member.user?.lastName)
+                ? `${member.user?.firstName || ''} ${member.user?.lastName || ''}`.trim()
+                : (member.user?.email || member.participation?.email || 'Unknown');
+            const displayEmail = member.user?.email || member.participation?.email || '';
+            const roleBadge = member.participation?.isTeamAdmin
+                ? '<span class="badge full" style="margin-left:6px;">Admin</span>'
+                : '';
+
+            const removeBtn = canDelete
+                ? `<button class="btn-sm" style="color:#dc2626;border-color:#fca5a5;" onclick="removeTeamMember('${member.participation.id}', '${escapeHtml(displayName).replace(/'/g, "\\'")}', '${team.id}')">Remove</button>`
+                : '';
+
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(displayName)}</strong>${roleBadge}</td>
+                    <td style="color:#64748b;">${escapeHtml(displayEmail)}</td>
+                    <td style="text-align:right;">${removeBtn}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const detailsHtml = isExpanded ? `
+            <tr class="member-details-row">
+                <td colspan="6">
+                    <div class="member-details-wrap">
+                        <div class="member-title">Team Members (${members.length})</div>
+                        ${members.length === 0
+                            ? '<div class="member-empty">No members in this team.</div>'
+                            : `<table class="member-list"><tbody>${memberRows}</tbody></table>`}
+                    </div>
+                </td>
+            </tr>
+        ` : '';
 
         return `
-            <tr>
+            <tr class="team-main-row ${isExpanded ? 'expanded' : ''}">
                 <td><strong>${escapeHtml(team.teamName)}</strong></td>
                 <td>${event ? escapeHtml(event.name) : '<em style="color:#94a3b8">Unknown</em>'}</td>
-                <td style="color: #64748b;">${escapeHtml(team.adminEmail || 'Unknown')}</td>
+                <td style="color: #64748b;">${escapeHtml(adminInfo.name || adminInfo.email || 'Unknown')}</td>
                 <td><span class="badge ${countClass}">${memberCount}/${committed}</span></td>
                 <td style="color: #64748b;">${createdDate}</td>
                 <td style="display: flex; gap: 6px; align-items: center;">
-                    <a href="event.html?id=${team.eventId}" class="btn-sm">View Event</a>
+                    <button class="btn-sm expand-btn" onclick="toggleTeamMembers('${team.id}')">${isExpanded ? 'Hide' : 'Members'}</button>
+                    <a href="${eventUrl}" class="btn-sm">View Event</a>
                     ${canDelete ? `<button class="btn-sm" style="color: #dc2626; border-color: #fca5a5;" onclick="deleteTeam('${team.id}', '${escapeHtml(team.teamName).replace(/'/g, "\\'")}')">🗑️</button>` : ''}
                 </td>
             </tr>
+            ${detailsHtml}
         `;
     }).join('');
+}
+
+function getTeamAdminInfo(teamId) {
+    // Prefer explicit team-admin participation
+    const adminParticipation = allParticipations.find(p =>
+        (p.teamMemberships || []).some(m => m.teamId === teamId && m.isAdmin)
+    ) || allParticipations.find(p => p.teamId === teamId && p.isTeamAdmin);
+
+    if (!adminParticipation) {
+        return { name: '', email: '' };
+    }
+
+    const user = allUsers.find(u => u.id === adminParticipation.userId);
+    if (user) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+        return { name, email: user.email || adminParticipation.email || '' };
+    }
+
+    return {
+        name: '',
+        email: adminParticipation.email || ''
+    };
+}
+
+function getTeamMembers(teamId) {
+    return allParticipations
+        .filter(p => {
+            if ((p.teamMemberships || []).some(m => m.teamId === teamId && m.isParticipant)) return true;
+            return p.teamId === teamId && (p.roles || []).includes('participant');
+        })
+        .map(participation => {
+            const user = allUsers.find(u => u.id === participation.userId) || null;
+            return { participation, user };
+        });
+}
+
+function toggleTeamMembers(teamId) {
+    if (expandedTeams.has(teamId)) {
+        expandedTeams.delete(teamId);
+    } else {
+        expandedTeams.add(teamId);
+    }
+    renderTeamsTable();
+}
+
+async function removeTeamMember(participationId, memberName, teamId) {
+    if (!confirm(`Remove "${memberName}" from this team?\n\nThis only removes their team assignment.`)) {
+        return;
+    }
+
+    try {
+        await API.participations.assignTeam(participationId, null, false);
+
+        const idx = allParticipations.findIndex(p => p.id === participationId);
+        if (idx >= 0) {
+            allParticipations[idx] = {
+                ...allParticipations[idx],
+                teamId: null,
+                isTeamAdmin: false,
+                teamMemberships: []
+            };
+        }
+
+        teamCounts[teamId] = getTeamMembers(teamId).length;
+        renderTeamsTable();
+        updateStats();
+    } catch (error) {
+        console.error('Error removing team member:', error);
+        alert('Failed to remove team member: ' + error.message);
+    }
 }
 
 function updateStats() {
