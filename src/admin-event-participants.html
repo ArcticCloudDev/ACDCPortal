@@ -471,7 +471,7 @@
                         isTeamAdmin: teamMembership?.isAdmin || false,
                         hotelNights: p.hotelNights || {},
                         hotelPaidBy: p.hotelPaidBy || null,
-                        roles: p.roles || []
+                        roles: normalizeRoles(p.roles)
                     };
                 });
 
@@ -649,7 +649,16 @@
             tbody.innerHTML = sorted.map(p => renderParticipantRow(p, false)).join('');
         }
 
+        function normalizeRoles(roles) {
+            if (Array.isArray(roles)) return roles;
+            if (typeof roles === 'string') {
+                return roles.split(',').map(r => r.trim()).filter(Boolean);
+            }
+            return [];
+        }
+
         function renderParticipantRow(p, isGrouped) {
+            const roles = normalizeRoles(p.roles);
             const nights = p.hotelNights || {};
             const nightCells = NIGHT_KEYS.map(key => {
                 const checked = nights[key];
@@ -677,9 +686,9 @@
             }
 
             const adminBadge = p.isTeamAdmin ? '<span class="badge admin" style="margin-left: 6px;">Admin</span>' : '';
-            const roleBadge = p.roles.includes('judge')
+            const roleBadge = roles.includes('judge')
                 ? '<span class="badge judge" style="margin-left: 6px;">Judge</span>'
-                : p.roles.includes('committee')
+                : roles.includes('committee')
                     ? '<span class="badge committee" style="margin-left: 6px;">Committee</span>'
                     : '';
 
@@ -687,7 +696,7 @@
             const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
             const isTeamMember = !!p.teamId;
             const deleteBtn = canDelete && !isTeamMember
-                ? `<button class="btn-sm btn-delete-participant" data-id="${p.id}" data-name="${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}" data-role="${p.roles.join(', ')}" title="Remove participation" style="color:#dc2626;border-color:#fca5a5;padding:2px 6px;font-size:0.75rem;">🗑️</button>`
+                ? `<button class="btn-sm btn-delete-participant" data-id="${p.id}" data-name="${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}" data-role="${roles.join(', ')}" title="Remove participation" style="color:#dc2626;border-color:#fca5a5;padding:2px 6px;font-size:0.75rem;">🗑️</button>`
                 : '';
 
             return `
