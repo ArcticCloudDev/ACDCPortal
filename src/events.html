@@ -206,8 +206,11 @@
                         <div class="loader-spinner"></div>
                         <div class="loader-text">Loading events...</div>
                         <div class="loader-wake">
-                            <span class="wake-emoji">\ud83d\ude34</span> Our database is hibernating like a polar bear in the Arctic winter.
+                            <span class="wake-scene"><span class="wake-bear">\ud83d\udc3b\u200d❄️</span> <span class="wake-zzz">\ud83d\udca4</span></span>
+                            <div class="wake-title">Waking up the Arctic Database<span class="wake-dots"></span></div>
+                            Our polar bear database keeper is hibernating!
                             Give it a moment to wake up, stretch, and fetch your events. This can take up to a minute.
+                            <div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up...</div>
                         </div>
                     </div>
                 `;
@@ -395,12 +398,20 @@
             // REGULAR PAGE: Events list + sign-in
             // ============================================================
             
-            async function loadEvents() {
+            async function loadEvents(attempt = 1) {
+                const maxRetries = 3;
                 const section = document.getElementById('events-section');
 
                 try {
                     const response = await fetch(`${CONFIG.api.baseUrl}/events`);
-                    if (!response.ok) throw new Error('Failed to load events');
+                    if (!response.ok) {
+                        if (response.status >= 500 && attempt < maxRetries) {
+                            console.warn(`Events API returned ${response.status}, retrying (${attempt}/${maxRetries})...`);
+                            await new Promise(r => setTimeout(r, attempt * 2000));
+                            return loadEvents(attempt + 1);
+                        }
+                        throw new Error('Failed to load events');
+                    }
                     
                     const events = await response.json();
                     pageLoadDone = true;

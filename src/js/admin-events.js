@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const wakeTimer = setTimeout(() => {
         if (loadingDiv.classList.contains('hidden')) return;
         if (!loadingDiv.querySelector('.loader-wake')) {
-            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-emoji">\ud83d\ude34</span> Our database is hibernating like a polar bear in the Arctic winter. Give it a moment to wake up and stretch. This can take up to a minute.</div>');
+            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span><div class="wake-title">Waking up the Arctic Database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up...</div></div>');
         }
     }, 1200);
     const notCommitteeDiv = document.getElementById('not-committee');
