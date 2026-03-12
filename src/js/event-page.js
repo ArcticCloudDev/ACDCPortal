@@ -884,7 +884,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             panelsHtml += `<div class="badge-panel ${ci === 0 ? 'active' : ''}" data-cat="${cat}">`;
 
-            for (const { eventBadge, badge } of badges) {
+            // Sort badges: rejected first, then unclaimed, then draft, then pending, then approved last
+            const statusOrder = { 'declined': 0, undefined: 1, 'draft': 2, 'pending': 3, 'approved': 4 };
+            const sortedBadges = [...badges].sort((a, b) => {
+                const claimA = (a.badge.claimType === 'exclusive')
+                    ? badgeClaims.find(c => c.eventBadgeId === a.eventBadge.id)
+                    : teamClaims.find(c => c.eventBadgeId === a.eventBadge.id);
+                const claimB = (b.badge.claimType === 'exclusive')
+                    ? badgeClaims.find(c => c.eventBadgeId === b.eventBadge.id)
+                    : teamClaims.find(c => c.eventBadgeId === b.eventBadge.id);
+                const orderA = statusOrder[claimA?.status] ?? 1;
+                const orderB = statusOrder[claimB?.status] ?? 1;
+                return orderA - orderB;
+            });
+
+            for (const { eventBadge, badge } of sortedBadges) {
                 const claimType = badge.claimType || 'common';
                 const isExclusive = claimType === 'exclusive';
 
