@@ -55,11 +55,16 @@ async function loadDashboardData() {
         document.getElementById('stat-events').textContent = allEvents.length;
         renderEventsList();
 
-        // Load teams (scoped by permissions)
+        // Load teams and users (for admin name resolution)
         let teams = await API.teams.list();
         allTeams = Permissions.filterByEvent(currentPermissions, teams);
         document.getElementById('stat-teams').textContent = allTeams.length;
-        renderTeamsTable();
+
+        let allUsers = [];
+        try { allUsers = await API.users.list(); } catch (e) { /* non-critical */ }
+        const userMap = {};
+        for (const u of allUsers) { userMap[u.id] = u; }
+        renderTeamsTable(userMap);
 
         // Calculate total participants across all teams
         let totalParticipants = 0;
@@ -144,7 +149,7 @@ function renderEventsList() {
     }).join('');
 }
 
-function renderTeamsTable() {
+function renderTeamsTable(userMap = {}) {
     const tbody = document.getElementById('teams-table-body');
     
     if (allTeams.length === 0) {
@@ -170,7 +175,7 @@ function renderTeamsTable() {
         return `
             <tr>
                 <td>${escapeHtml(team.teamName)}</td>
-                <td style="color: var(--admin-text-muted); font-size: 0.8rem;">${escapeHtml(team.adminEmail || '—')}</td>
+                <td style="color: var(--admin-text-muted); font-size: 0.8rem;">${escapeHtml((() => { const u = userMap[team.adminUserId]; return u ? (u.firstName && u.lastName ? u.firstName + ' ' + u.lastName : u.email) : team.adminEmail || '—'; })())}</td>
                 <td><span class="badge count">${team.committedParticipants || 0}</span></td>
                 <td>${event ? escapeHtml(event.name) : '—'}</td>
                 <td style="color: var(--admin-text-muted);">${createdDate}</td>
