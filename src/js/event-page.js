@@ -379,7 +379,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (myTeams.length === 0) {
             teamsContainer.classList.add('hidden');
             noTeams.classList.remove('hidden');
-            if (createSection) createSection.classList.remove('hidden');
+            // Don't show create/solo buttons for judges, committee, or interest-only users
+            const roles = currentParticipation?.roles || [];
+            const isSpecialRole = roles.includes('judge') || roles.includes('committee') ||
+                (roles.includes('interest') && !currentParticipation?.teamId);
+            if (createSection && !isSpecialRole) createSection.classList.remove('hidden');
         } else {
             teamsContainer.classList.remove('hidden');
             noTeams.classList.add('hidden');
