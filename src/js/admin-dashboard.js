@@ -64,19 +64,22 @@ async function loadDashboardData() {
         try { allUsers = await API.users.list(); } catch (e) { /* non-critical */ }
         const userMap = {};
         for (const u of allUsers) { userMap[u.id] = u; }
-        renderTeamsTable(userMap);
 
-        // Calculate total participants across all teams
+        // Collect member counts per team
+        const memberCounts = {};
         let totalParticipants = 0;
         for (const team of allTeams) {
             try {
                 const count = await API.participations.getTeamCount(team.id);
-                totalParticipants += count.participantCount || 0;
+                memberCounts[team.id] = count.participantCount || 0;
+                totalParticipants += memberCounts[team.id];
             } catch (e) {
-                // Skip if error
+                memberCounts[team.id] = 0;
             }
         }
         document.getElementById('stat-participants').textContent = totalParticipants;
+
+        renderTeamsTable(userMap, memberCounts);
 
         // Load pending invitations
         try {
@@ -149,7 +152,7 @@ function renderEventsList() {
     }).join('');
 }
 
-function renderTeamsTable(userMap = {}) {
+function renderTeamsTable(userMap = {}, memberCounts = {}) {
     const tbody = document.getElementById('teams-table-body');
     
     if (allTeams.length === 0) {
@@ -176,7 +179,7 @@ function renderTeamsTable(userMap = {}) {
             <tr>
                 <td>${escapeHtml(team.teamName)}</td>
                 <td style="color: var(--admin-text-muted); font-size: 0.8rem;">${escapeHtml((() => { const u = userMap[team.adminUserId]; return u ? (u.firstName && u.lastName ? u.firstName + ' ' + u.lastName : u.email) : team.adminEmail || '—'; })())}</td>
-                <td><span class="badge count">${team.committedParticipants || 0}</span></td>
+                <td><span class="badge count">${memberCounts[team.id] ?? team.committedParticipants ?? 0}</span></td>
                 <td>${event ? escapeHtml(event.name) : '—'}</td>
                 <td style="color: var(--admin-text-muted);">${createdDate}</td>
                 <td><a href="event.html?id=${team.eventId}" class="btn-sm">View</a></td>
