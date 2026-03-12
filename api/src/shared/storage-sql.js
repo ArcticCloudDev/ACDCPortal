@@ -153,6 +153,12 @@ function participationRowToJs(row) {
             obj[jsKey] = value;
         }
     }
+    // Split Roles CSV string back into an array
+    if (typeof obj.roles === 'string') {
+        obj.roles = obj.roles.split(',').map(r => r.trim()).filter(Boolean);
+    } else if (!obj.roles) {
+        obj.roles = [];
+    }
     // Assemble hotelNights object from BIT columns
     obj.hotelNights = {
         'mon-tue': !!row.HotelNight_MonTue,

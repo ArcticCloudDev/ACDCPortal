@@ -15,8 +15,9 @@
         </header>
 
         <main>
-            <div id="loading" class="card">
-                <p>Loading...</p>
+            <div id="loading" class="card acdc-loader">
+                <div class="loader-spinner"></div>
+                <div class="loader-text">Loading registration...</div>
             </div>
 
             <div id="registration-card" class="card hidden">
@@ -77,6 +78,12 @@
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             const loadingDiv = document.getElementById('loading');
+            const wakeTimer = setTimeout(() => {
+                if (loadingDiv.classList.contains('hidden')) return;
+                if (!loadingDiv.querySelector('.loader-wake')) {
+                    loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-emoji">\ud83d\ude34</span> Our database is hibernating like a polar bear in the Arctic winter. Give it a moment to wake up and stretch. This can take up to a minute.</div>');
+                }
+            }, 1200);
             const registrationCard = document.getElementById('registration-card');
             const form = document.getElementById('complete-registration-form');
             
@@ -171,6 +178,7 @@
                 
                 // Show form
                 loadingDiv.classList.add('hidden');
+                clearTimeout(wakeTimer);
                 registrationCard.classList.remove('hidden');
                 
             } catch (error) {

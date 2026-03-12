@@ -2,6 +2,12 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loadingDiv = document.getElementById('loading');
+    const wakeTimer = setTimeout(() => {
+        if (loadingDiv.classList.contains('hidden')) return;
+        if (!loadingDiv.querySelector('.loader-wake')) {
+            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-emoji">\ud83d\ude34</span> Our database is hibernating like a polar bear in the Arctic winter. Give it a moment to wake up and stretch. This can take up to a minute.</div>');
+        }
+    }, 1200);
     const content = document.getElementById('content');
     
     let currentUser = null;
@@ -152,6 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Show content
         loadingDiv.classList.add('hidden');
+        clearTimeout(wakeTimer);
         content.classList.remove('hidden');
         
     } catch (error) {

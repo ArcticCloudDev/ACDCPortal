@@ -2,6 +2,12 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loadingDiv = document.getElementById('loading');
+    const wakeTimer = setTimeout(() => {
+        if (loadingDiv.classList.contains('hidden')) return;
+        if (!loadingDiv.querySelector('.loader-wake')) {
+            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-emoji">\ud83d\ude34</span> Our database is hibernating like a polar bear in the Arctic winter. Give it a moment to wake up and stretch. This can take up to a minute.</div>');
+        }
+    }, 1200);
     const notAdminDiv = document.getElementById('not-admin');
     const adminContent = document.getElementById('admin-content');
     const inviteMemberForm = document.getElementById('invite-member-form');
@@ -31,6 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Check if user is team admin
         if (!currentUser.isTeamAdmin) {
             loadingDiv.classList.add('hidden');
+            clearTimeout(wakeTimer);
             notAdminDiv.classList.remove('hidden');
             return;
         }
@@ -48,6 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Show admin content
         loadingDiv.classList.add('hidden');
+        clearTimeout(wakeTimer);
         adminContent.classList.remove('hidden');
         
     } catch (error) {

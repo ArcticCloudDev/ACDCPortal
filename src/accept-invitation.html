@@ -135,8 +135,9 @@
 
         <main>
             <!-- Loading state -->
-            <div id="step-loading" class="card" style="text-align: center; padding: 40px;">
-                <p style="color: #64748b;">Loading invitation...</p>
+            <div id="step-loading" class="card acdc-loader">
+                <div class="loader-spinner"></div>
+                <div class="loader-text">Loading invitation...</div>
             </div>
 
             <!-- Error state (invalid/expired invitation) -->
@@ -277,6 +278,14 @@
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             Auth.init();
+
+            const stepLoading = document.getElementById('step-loading');
+            const wakeTimer = setTimeout(() => {
+                if (stepLoading.classList.contains('hidden')) return;
+                if (!stepLoading.querySelector('.loader-wake')) {
+                    stepLoading.insertAdjacentHTML('beforeend', '<div class=\"loader-wake\"><span class=\"wake-emoji\">\ud83d\ude34</span> Our database is hibernating like a polar bear in the Arctic winter. Give it a moment to wake up and stretch. This can take up to a minute.</div>');
+                }
+            }, 1200);
 
             // Get invitation ID from URL
             const urlParams = new URLSearchParams(window.location.search);
@@ -585,6 +594,7 @@
             // ============================================================
             function displayInvitation(inv) {
                 document.getElementById('step-loading').classList.add('hidden');
+                clearTimeout(wakeTimer);
                 document.getElementById('step-invite').classList.remove('hidden');
 
                 document.getElementById('invite-inviter-name').textContent = inv.inviterName || 'A team admin';

@@ -119,7 +119,10 @@
         <div id="sidebar-container"></div>
 
         <main class="main-content">
-            <div id="loading" style="text-align: center; padding: 60px;">Loading users...</div>
+            <div id="loading" class="acdc-loader">
+                <div class="loader-spinner"></div>
+                <div class="loader-text">Loading users...</div>
+            </div>
 
             <div id="admin-content" class="hidden">
                 <div class="page-header">
@@ -204,6 +207,12 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             const loadingDiv = document.getElementById('loading');
+            const wakeTimer = setTimeout(() => {
+                if (loadingDiv.classList.contains('hidden')) return;
+                if (!loadingDiv.querySelector('.loader-wake')) {
+                    loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-emoji">\ud83d\ude34</span> Our database is hibernating like a polar bear in the Arctic winter. Give it a moment to wake up and stretch. This can take up to a minute.</div>');
+                }
+            }, 1200);
             const notCommitteeDiv = document.getElementById('not-committee');
             const adminContent = document.getElementById('admin-content');
 
@@ -223,6 +232,7 @@
                 setupFilters();
 
                 loadingDiv.classList.add('hidden');
+                clearTimeout(wakeTimer);
                 adminContent.classList.remove('hidden');
 
             } catch (error) {

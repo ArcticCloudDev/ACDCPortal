@@ -35,6 +35,12 @@ function canTransitionTo(currentStatus, targetStatus) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loadingDiv = document.getElementById('loading');
+    const wakeTimer = setTimeout(() => {
+        if (loadingDiv.classList.contains('hidden')) return;
+        if (!loadingDiv.querySelector('.loader-wake')) {
+            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-emoji">\ud83d\ude34</span> Our database is hibernating like a polar bear in the Arctic winter. Give it a moment to wake up and stretch. This can take up to a minute.</div>');
+        }
+    }, 1200);
     const notCommitteeDiv = document.getElementById('not-committee');
     const adminContent = document.getElementById('admin-content');
 
@@ -80,6 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         loadingDiv.classList.add('hidden');
+        clearTimeout(wakeTimer);
         adminContent.classList.remove('hidden');
 
     } catch (error) {
