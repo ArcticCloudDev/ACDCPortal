@@ -661,8 +661,7 @@ app.http('badge-claims-update', {
                 blogUrl: body.blogUrl !== undefined ? body.blogUrl : (claim.blogUrl || ''),
                 assignedToUserId: body.assignedToUserId !== undefined ? body.assignedToUserId : claim.assignedToUserId,
                 // If re-claiming after decline, reset to pending
-                status: claim.status === 'declined' && body.reclaim ? 'pending' : claim.status,
-                updatedAt: new Date().toISOString()
+                status: claim.status === 'declined' && body.reclaim ? 'pending' : claim.status
             });
 
             context.log(`Badge claim ${id} updated`);
@@ -796,8 +795,7 @@ app.http('badge-claims-assign', {
             if (existing) {
                 // Update assignment on existing claim
                 const updated = await badgeClaimsStorage.update(existing.id, {
-                    assignedToUserId: body.assignedToUserId || null,
-                    updatedAt: new Date().toISOString()
+                    assignedToUserId: body.assignedToUserId || null
                 });
                 return { status: 200, jsonBody: updated };
             } else {
