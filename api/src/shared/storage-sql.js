@@ -566,18 +566,15 @@ class GenericStorage {
         if (!this.config || !this.config.table) return null;
         const pool = await getPool();
 
-        // Read current item
+        // Verify the row exists
         const current = await this.getById(id);
         if (!current) return null;
 
-        const merged = { ...current, ...updates };
+        // Use atomic UPDATE instead of DELETE+INSERT to avoid data loss on failure
+        await updateGeneric(pool, this.config.table, this.config.idCol, id, updates);
 
-        // Delete and re-insert (simpler than building dynamic UPDATE for each table)
-        await pool.request()
-            .input('id', id)
-            .query(`DELETE FROM [${this.config.table}] WHERE [${this.config.idCol}] = @id`);
-        await this._insertItem(pool, merged);
-        return merged;
+        // Return the merged view
+        return { ...current, ...updates };
     }
 
     async delete(id) {

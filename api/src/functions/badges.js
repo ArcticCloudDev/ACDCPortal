@@ -550,6 +550,28 @@ app.http('badge-claims-create', {
                 return { status: 409, jsonBody: { error: 'Team has already claimed this badge', existingClaim } };
             }
 
+            // Check if there's a declined claim — re-claim by upgrading it back to pending
+            const declinedClaim = claims.find(c =>
+                c.eventBadgeId === body.eventBadgeId &&
+                c.teamId === body.teamId &&
+                c.status === 'declined'
+            );
+
+            if (declinedClaim) {
+                const upgraded = await badgeClaimsStorage.update(declinedClaim.id, {
+                    status: 'pending',
+                    blogUrl: body.blogUrl || body.evidence || '',
+                    evidence: body.evidence || body.blogUrl || '',
+                    claimedBy: body.claimedBy || null,
+                    claimedAt: new Date().toISOString(),
+                    declineReason: null,
+                    reviewedBy: null,
+                    reviewedAt: null
+                });
+                context.log(`Badge re-claimed: team ${body.teamId} re-claims badge ${eventBadge.badgeId}`);
+                return { status: 201, jsonBody: upgraded };
+            }
+
             // Check if there's a draft claim (from assigning) - upgrade it
             const draftClaim = claims.find(c =>
                 c.eventBadgeId === body.eventBadgeId &&
