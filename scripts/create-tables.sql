@@ -305,7 +305,7 @@ BEGIN
         CONSTRAINT FK_BadgeClaims_EventBadges FOREIGN KEY (EventBadgeId) REFERENCES EventBadges(Id),
         CONSTRAINT FK_BadgeClaims_Events FOREIGN KEY (EventId) REFERENCES Events(Id),
         CONSTRAINT FK_BadgeClaims_Badges FOREIGN KEY (BadgeId) REFERENCES Badges(Id),
-        CONSTRAINT CK_BadgeClaims_Status CHECK (Status IN ('pending','approved','declined'))
+        CONSTRAINT CK_BadgeClaims_Status CHECK (Status IN ('draft','pending','approved','declined'))
     );
     CREATE INDEX IX_BadgeClaims_EventId ON BadgeClaims(EventId);
     CREATE INDEX IX_BadgeClaims_TeamId ON BadgeClaims(TeamId);

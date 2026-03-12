@@ -539,7 +539,6 @@ app.http('badge-claims-create', {
                 return { status: 404, jsonBody: { error: 'Event-badge assignment not found or inactive' } };
             }
 
-            // Check if this team already claimed this badge for this event
             const claims = await badgeClaimsStorage.getAll();
             const existingClaim = claims.find(c =>
                 c.eventBadgeId === body.eventBadgeId &&
@@ -552,25 +551,23 @@ app.http('badge-claims-create', {
             }
 
             // Check if there's a draft claim (from assigning) - upgrade it
-            const draftIndex = claims.findIndex(c =>
+            const draftClaim = claims.find(c =>
                 c.eventBadgeId === body.eventBadgeId &&
                 c.teamId === body.teamId &&
                 c.status === 'draft'
             );
 
-            if (draftIndex >= 0) {
+            if (draftClaim) {
                 // Upgrade draft to pending claim
-                claims[draftIndex] = {
-                    ...claims[draftIndex],
+                const upgraded = await badgeClaimsStorage.update(draftClaim.id, {
                     status: 'pending',
                     blogUrl: body.blogUrl || body.evidence || '',
                     evidence: body.evidence || body.blogUrl || '',
                     claimedBy: body.claimedBy || null,
                     claimedAt: new Date().toISOString()
-                };
-                await badgeClaimsStorage.saveAll(claims);
+                });
                 context.log(`Badge draft upgraded to claim: team ${body.teamId} claims badge ${eventBadge.badgeId}`);
-                return { status: 201, jsonBody: claims[draftIndex] };
+                return { status: 201, jsonBody: upgraded };
             }
 
             const newClaim = {
@@ -587,8 +584,7 @@ app.http('badge-claims-create', {
                 claimedAt: new Date().toISOString()
             };
 
-            claims.push(newClaim);
-            await badgeClaimsStorage.saveAll(claims);
+            await badgeClaimsStorage.create(newClaim);
 
             context.log(`Badge claim created: team ${body.teamId} claims badge ${eventBadge.badgeId}`);
             return { status: 201, jsonBody: newClaim };
@@ -617,25 +613,21 @@ app.http('badge-claims-review', {
                 return { status: 400, jsonBody: { error: 'declineReason is required when declining' } };
             }
 
-            const claims = await badgeClaimsStorage.getAll();
-            const index = claims.findIndex(c => c.id === id);
+            const claim = await badgeClaimsStorage.getById(id);
 
-            if (index < 0) {
+            if (!claim) {
                 return { status: 404, jsonBody: { error: 'Badge claim not found' } };
             }
 
-            claims[index] = {
-                ...claims[index],
+            const updated = await badgeClaimsStorage.update(id, {
                 status: body.status,
                 declineReason: body.status === 'declined' ? body.declineReason : null,
                 reviewedBy: body.reviewedBy || null,
                 reviewedAt: new Date().toISOString()
-            };
-
-            await badgeClaimsStorage.saveAll(claims);
+            });
 
             context.log(`Badge claim ${id} ${body.status} by ${body.reviewedBy || 'unknown'}`);
-            return { status: 200, jsonBody: claims[index] };
+            return { status: 200, jsonBody: updated };
         } catch (error) {
             context.error('Badge claims REVIEW error:', error);
             return { status: 500, jsonBody: { error: 'Failed to review badge claim' } };
@@ -653,32 +645,28 @@ app.http('badge-claims-update', {
             const id = request.params.id;
             const body = await request.json();
 
-            const claims = await badgeClaimsStorage.getAll();
-            const index = claims.findIndex(c => c.id === id);
+            const claim = await badgeClaimsStorage.getById(id);
 
-            if (index < 0) {
+            if (!claim) {
                 return { status: 404, jsonBody: { error: 'Badge claim not found' } };
             }
 
             // Only allow updating evidence/blogUrl and re-claiming if declined
-            if (claims[index].status === 'approved') {
+            if (claim.status === 'approved') {
                 return { status: 400, jsonBody: { error: 'Cannot modify an approved claim' } };
             }
 
-            claims[index] = {
-                ...claims[index],
-                evidence: body.evidence !== undefined ? body.evidence : claims[index].evidence,
-                blogUrl: body.blogUrl !== undefined ? body.blogUrl : (claims[index].blogUrl || ''),
-                assignedToUserId: body.assignedToUserId !== undefined ? body.assignedToUserId : claims[index].assignedToUserId,
+            const updated = await badgeClaimsStorage.update(id, {
+                evidence: body.evidence !== undefined ? body.evidence : claim.evidence,
+                blogUrl: body.blogUrl !== undefined ? body.blogUrl : (claim.blogUrl || ''),
+                assignedToUserId: body.assignedToUserId !== undefined ? body.assignedToUserId : claim.assignedToUserId,
                 // If re-claiming after decline, reset to pending
-                status: claims[index].status === 'declined' && body.reclaim ? 'pending' : claims[index].status,
+                status: claim.status === 'declined' && body.reclaim ? 'pending' : claim.status,
                 updatedAt: new Date().toISOString()
-            };
-
-            await badgeClaimsStorage.saveAll(claims);
+            });
 
             context.log(`Badge claim ${id} updated`);
-            return { status: 200, jsonBody: claims[index] };
+            return { status: 200, jsonBody: updated };
         } catch (error) {
             context.error('Badge claims UPDATE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update badge claim' } };
@@ -695,15 +683,13 @@ app.http('badge-claims-delete', {
         try {
             const id = request.params.id;
 
-            const claims = await badgeClaimsStorage.getAll();
-            const index = claims.findIndex(c => c.id === id);
+            const claim = await badgeClaimsStorage.getById(id);
 
-            if (index < 0) {
+            if (!claim) {
                 return { status: 404, jsonBody: { error: 'Badge claim not found' } };
             }
 
-            claims.splice(index, 1);
-            await badgeClaimsStorage.saveAll(claims);
+            await badgeClaimsStorage.delete(id);
 
             context.log(`Badge claim ${id} deleted`);
             return { status: 200, jsonBody: { message: 'Badge claim deleted' } };
@@ -769,8 +755,7 @@ app.http('badge-claims-award', {
                 reviewedAt: new Date().toISOString()
             };
 
-            claims.push(newClaim);
-            await badgeClaimsStorage.saveAll(claims);
+            await badgeClaimsStorage.create(newClaim);
 
             context.log(`Exclusive badge awarded: ${badge.name} to team ${body.teamId} by ${body.awardedBy || 'unknown'}`);
             return { status: 201, jsonBody: newClaim };
@@ -801,20 +786,20 @@ app.http('badge-claims-assign', {
                 return { status: 404, jsonBody: { error: 'Event-badge assignment not found' } };
             }
 
-            const claims = await badgeClaimsStorage.getAll();
-
             // Find existing claim for this team + event-badge
-            const existingIndex = claims.findIndex(c =>
+            const allClaims = await badgeClaimsStorage.getAll();
+            const existing = allClaims.find(c =>
                 c.eventBadgeId === body.eventBadgeId &&
                 c.teamId === body.teamId
             );
 
-            if (existingIndex >= 0) {
+            if (existing) {
                 // Update assignment on existing claim
-                claims[existingIndex].assignedToUserId = body.assignedToUserId || null;
-                claims[existingIndex].updatedAt = new Date().toISOString();
-                await badgeClaimsStorage.saveAll(claims);
-                return { status: 200, jsonBody: claims[existingIndex] };
+                const updated = await badgeClaimsStorage.update(existing.id, {
+                    assignedToUserId: body.assignedToUserId || null,
+                    updatedAt: new Date().toISOString()
+                });
+                return { status: 200, jsonBody: updated };
             } else {
                 // Create a draft claim with just assignment
                 const draft = {
@@ -830,8 +815,7 @@ app.http('badge-claims-assign', {
                     claimedBy: null,
                     claimedAt: new Date().toISOString()
                 };
-                claims.push(draft);
-                await badgeClaimsStorage.saveAll(claims);
+                await badgeClaimsStorage.create(draft);
                 return { status: 201, jsonBody: draft };
             }
         } catch (error) {
