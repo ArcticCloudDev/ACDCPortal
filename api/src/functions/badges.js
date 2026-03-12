@@ -564,7 +564,6 @@ app.http('badge-claims-create', {
                     evidence: body.evidence || body.blogUrl || '',
                     claimedBy: body.claimedBy || null,
                     claimedAt: new Date().toISOString(),
-                    declineReason: null,
                     reviewedBy: null,
                     reviewedAt: null
                 });

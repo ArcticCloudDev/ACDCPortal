@@ -590,7 +590,7 @@ function renderClaimRow(claim, canReview) {
                 <div class="claim-actions">
                     ${claim.status === 'pending' && canReview ? `<button class="btn-sm primary" onclick="openReviewModal('${claim.id}')">Review</button>` : ''}
                     ${claim.status === 'pending' && !canReview ? `<span style="font-size: 0.75rem; color: var(--admin-text-muted);">Awaiting review</span>` : ''}
-                    ${claim.status === 'declined' ? `<span style="font-size: 0.75rem; color: var(--admin-text-muted);" title="${escapeHtml(claim.declineReason || '')}">💬 ${escapeHtml(truncate(claim.declineReason || '', 30))}</span>` : ''}
+                    ${claim.status === 'declined' && claim.declineReason ? `<button class="btn-sm" style="font-size: 0.7rem; padding: 2px 8px;" onclick="viewDeclineComments('${claim.id}')">💬 Comments</button>` : ''}
                     ${claim.status === 'approved' ? `<span style="font-size: 0.75rem; color: var(--admin-success);">✅</span>` : ''}
                 </div>
             </td>
@@ -703,6 +703,16 @@ function openReviewModal(claimId) {
     document.getElementById('review-evidence').innerHTML = claim.evidence
         ? `<strong>Evidence:</strong><br>${escapeHtml(claim.evidence)}`
         : '<em>No evidence provided</em>';
+
+    // Show previous decline reason as reviewer comments
+    const commentsEl = document.getElementById('review-previous-comments');
+    if (claim.declineReason) {
+        commentsEl.innerHTML = `<strong>Previous reviewer comments:</strong><br>${escapeHtml(claim.declineReason)}`;
+        commentsEl.style.display = 'block';
+    } else {
+        commentsEl.style.display = 'none';
+    }
+
     document.getElementById('review-decision').value = '';
     document.getElementById('review-decline-reason').value = '';
     document.getElementById('decline-reason-group').style.display = 'none';
@@ -710,8 +720,34 @@ function openReviewModal(claimId) {
     document.getElementById('review-modal').classList.add('visible');
 }
 
+function viewDeclineComments(claimId) {
+    const claim = allClaims.find(c => c.id === claimId);
+    if (!claim || !claim.declineReason) return;
+
+    document.getElementById('review-claim-id').value = claimId;
+    document.getElementById('review-badge-name').textContent = `🏅 ${claim.badge ? claim.badge.name : 'Unknown Badge'}`;
+    document.getElementById('review-team-name').textContent = `Team: ${claim.team ? claim.team.teamName : 'Unknown'}`;
+    document.getElementById('review-evidence').innerHTML = claim.evidence
+        ? `<strong>Evidence:</strong><br>${escapeHtml(claim.evidence)}`
+        : '<em>No evidence provided</em>';
+
+    const commentsEl = document.getElementById('review-previous-comments');
+    commentsEl.innerHTML = `<strong>Reviewer comments:</strong><br>${escapeHtml(claim.declineReason)}`;
+    commentsEl.style.display = 'block';
+
+    // Hide decision controls — this is just a read-only view
+    document.getElementById('review-decision').parentElement.style.display = 'none';
+    document.getElementById('decline-reason-group').style.display = 'none';
+    document.querySelector('#review-modal .modal-footer .primary').style.display = 'none';
+
+    document.getElementById('review-modal').classList.add('visible');
+}
+
 function closeReviewModal() {
     document.getElementById('review-modal').classList.remove('visible');
+    // Restore decision controls for next openReviewModal call
+    document.getElementById('review-decision').parentElement.style.display = '';
+    document.querySelector('#review-modal .modal-footer .primary').style.display = '';
 }
 
 async function submitReview() {
