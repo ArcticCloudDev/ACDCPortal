@@ -937,9 +937,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const awardedTeam = eventTeams.find(t => t.id === claim.teamId);
                     assignedHtml = `<span class="badge-assigned-name" style="color: #d97706; font-weight: 600;">🏆 ${awardedTeam ? escapeHtml(awardedTeam.teamName) : 'Unknown team'}</span>`;
                 } else if (!isExclusive && teamId) {
+                    const isApproved = claim && claim.status === 'approved';
                     assignedHtml = `
                         <select class="badge-assign-select" data-eb-id="${eventBadge.id}" data-team-id="${teamId}"
-                                onchange="assignBadgeMember(this)" title="Assign team member">
+                                onchange="assignBadgeMember(this)" title="Assign team member"${isApproved ? ' disabled' : ''}>
                             <option value="">— assign —</option>
                             ${memberOptions.map(m =>
                                 `<option value="${m.userId}" ${m.userId === assignedUserId ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
