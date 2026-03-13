@@ -1296,11 +1296,19 @@
             border-radius: 8px;
             margin-left: 4px;
         }
+        .badge-tab[data-cat="exclusive"].active {
+            color: #d97706;
+            border-bottom-color: #f59e0b;
+        }
+        .badge-tab[data-cat="exclusive"] .badge-tab-count {
+            color: #d97706;
+            background: #fef3c7;
+        }
 
         /* Panels */
         .badge-panels {
-            background: #f1f5f9;
-            border: 1px solid #e2e8f0;
+            background: #e2e8f0;
+            border: 1px solid #cbd5e1;
             border-radius: 8px;
             padding: 10px;
         }
@@ -1316,13 +1324,13 @@
             padding: 12px 16px;
             border-radius: 8px;
             margin-bottom: 6px;
-            background: #f8fafc;
+            background: #ffffff;
             border: 1px solid #cbd5e1;
             transition: background 0.15s, box-shadow 0.15s;
             min-height: 44px;
         }
         .badge-row:hover {
-            background: #f1f5f9;
+            background: #f8fafc;
             box-shadow: 0 2px 4px rgba(0,0,0,0.06);
         }
         .badge-row.claimed {
@@ -1357,6 +1365,15 @@
         }
         .badge-row.exclusive {
             border-left: 3px solid #f59e0b;
+            background: #fffbeb;
+        }
+        .badge-row.exclusive:hover {
+            background: #fef3c7;
+        }
+        .badge-row.exclusive.claimed {
+            background: #fef3c7;
+            border-color: #f59e0b;
+            border-left: 4px solid #d97706;
         }
 
         .badge-row-left {

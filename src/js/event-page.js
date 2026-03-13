@@ -822,8 +822,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }));
 
         // Group badges by category
-        const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3 };
-        const categoryLabels = { 'soft': '🤝 Soft Skills', 'low-code': '⚡ Low-Code', 'pro-code': '💻 Pro-Code', 'sponsor': '🏢 Sponsor' };
+        const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3, 'exclusive': 4 };
+        const categoryLabels = { 'soft': '🤝 Soft Skills', 'low-code': '⚡ Low-Code', 'pro-code': '💻 Pro-Code', 'sponsor': '🏢 Sponsor', 'exclusive': '🏆 Exclusive' };
 
         // Get claims for this team
         const teamClaims = teamId ? badgeClaims.filter(c => c.teamId === teamId) : [];
@@ -834,12 +834,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isCommittee = userRoles.includes('committee');
         const canAward = isJudge || isCommittee;
 
-        // Collect badges grouped
+        // Collect badges grouped — exclusive badges go into their own 'exclusive' category
         const grouped = {};
         for (const eb of eventBadges) {
             const badge = eb.badge;
             if (!badge || !eb.isActive) continue;
-            const cat = badge.category || 'other';
+            const claimType = badge.claimType || 'common';
+            const cat = claimType === 'exclusive' ? 'exclusive' : (badge.category || 'other');
             if (!grouped[cat]) grouped[cat] = [];
             grouped[cat].push({ eventBadge: eb, badge });
         }
@@ -849,20 +850,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             (categoryOrder[a] ?? 99) - (categoryOrder[b] ?? 99)
         );
 
-        // Count stats
-        const claimedCount = teamClaims.filter(c => c.status === 'pending' || c.status === 'approved').length;
-        const approvedCount = teamClaims.filter(c => c.status === 'approved').length;
-        const totalBadges = eventBadges.filter(eb => eb.isActive).length;
+        // Count stats (exclude exclusive from team counts since they're event-wide awards)
+        const commonEventBadges = eventBadges.filter(eb => eb.isActive && (eb.badge?.claimType || 'common') !== 'exclusive');
+        const claimedCount = teamClaims.filter(c => {
+            const eb = eventBadges.find(e => e.id === c.eventBadgeId);
+            return (eb?.badge?.claimType || 'common') !== 'exclusive' && (c.status === 'pending' || c.status === 'approved');
+        }).length;
+        const totalBadges = commonEventBadges.length;
 
-        // Calculate total points
+        // Calculate total points (exclude exclusive)
         const earnedPoints = teamClaims
-            .filter(c => c.status === 'approved')
+            .filter(c => {
+                const eb = eventBadges.find(e => e.id === c.eventBadgeId);
+                return c.status === 'approved' && (eb?.badge?.claimType || 'common') !== 'exclusive';
+            })
             .reduce((sum, c) => {
                 const eb = eventBadges.find(e => e.id === c.eventBadgeId);
                 return sum + (eb?.badge?.points || 0);
             }, 0);
-        const totalPoints = eventBadges
-            .filter(eb => eb.isActive && eb.badge)
+        const totalPoints = commonEventBadges
+            .filter(eb => eb.badge)
             .reduce((sum, eb) => sum + (eb.badge.points || 0), 0);
 
         // Update the nav count badge
@@ -873,6 +880,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         const tabsHtml = sortedCategories.map((cat, i) => {
             const label = categoryLabels[cat] || cat;
             const catBadges = grouped[cat];
+            if (cat === 'exclusive') {
+                // For exclusive: show awarded count out of total
+                const awardedCount = catBadges.filter(({ eventBadge }) => {
+                    return badgeClaims.some(c => c.eventBadgeId === eventBadge.id && c.status === 'approved');
+                }).length;
+                return `<button class="badge-tab ${i === 0 ? 'active' : ''}" data-cat="${cat}" onclick="switchBadgeTab(this)">
+                    ${label} <span class="badge-tab-count">${awardedCount}/${catBadges.length}</span>
+                </button>`;
+            }
             const catClaimed = catBadges.filter(({ eventBadge }) => {
                 return teamClaims.some(c => c.eventBadgeId === eventBadge.id && (c.status === 'pending' || c.status === 'approved'));
             }).length;
@@ -955,6 +971,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // Show which team was awarded
                     const awardedTeam = eventTeams.find(t => t.id === claim.teamId);
                     assignedHtml = `<span class="badge-assigned-name" style="color: #d97706; font-weight: 600;">🏆 ${awardedTeam ? escapeHtml(awardedTeam.teamName) : 'Unknown team'}</span>`;
+                } else if (isExclusive) {
+                    assignedHtml = `<span class="badge-assigned-name" style="color: #94a3b8; font-style: italic;">Awaiting award...</span>`;
                 } else if (!isExclusive && teamId) {
                     const isApproved = claim && claim.status === 'approved';
                     assignedHtml = `
