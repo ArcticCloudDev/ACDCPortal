@@ -149,11 +149,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (isTeamParticipant && eventBadges && eventBadges.length > 0) {
             document.getElementById('event-nav')?.classList.remove('hidden');
-            // Restore tab from URL hash
-            const hash = location.hash.replace('#', '');
-            if (hash === 'badges' || hash === 'team') {
-                switchEventTab(hash, false);
-            }
         } else {
             document.getElementById('event-nav')?.classList.add('hidden');
         }
@@ -1254,6 +1249,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // Restore tab from URL hash on load and handle back/forward
+    const initHash = location.hash.replace('#', '');
+    if (initHash === 'badges' || initHash === 'team') {
+        switchEventTab(initHash, false);
+    }
+
     window.addEventListener('hashchange', () => {
         const tab = location.hash.replace('#', '');
         if (tab === 'team' || tab === 'badges') {
