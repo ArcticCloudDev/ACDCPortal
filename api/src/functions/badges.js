@@ -759,8 +759,7 @@ app.http('badge-claims-award', {
                 blogUrl: body.blogUrl || '',
                 evidence: '',
                 assignedToUserId: null,
-                claimedBy: null,
-                awardedBy: body.awardedBy || null,
+                claimedBy: body.awardedBy || null,
                 claimedAt: new Date().toISOString(),
                 reviewedBy: body.awardedBy || null,
                 reviewedAt: new Date().toISOString()
