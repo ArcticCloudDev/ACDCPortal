@@ -447,15 +447,6 @@ function updateURL() {
     }
 }
 
-function updateURL() {
-    if (currentEventId) {
-        const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab || 'general';
-        window.history.replaceState({}, '', `admin-events.html?event=${currentEventId}&tab=${activeTab}`);
-    } else {
-        window.history.replaceState({}, '', 'admin-events.html');
-    }
-}
-
 function hideForm() {
     document.getElementById('events-list-view').classList.remove('hidden');
     document.getElementById('event-form-view').classList.add('hidden');
@@ -1184,11 +1175,21 @@ function renderTeamsTable() {
 }
 
 // ===== Sequence Management =====
+function setNoSequenceStateMessage(message, isError = false) {
+    const stateEl = document.getElementById('no-sequence-state');
+    const descriptionEl = stateEl?.querySelector('p');
+    if (!descriptionEl) return;
+
+    descriptionEl.textContent = message;
+    descriptionEl.style.color = isError ? '#dc2626' : 'var(--admin-text-muted)';
+}
+
 async function loadEventSequence() {
     // Show sequence if it exists, regardless of whether it's currently enabled
     if (!currentEvent || !currentEvent.sequenceId) {
         document.getElementById('no-sequence-state').style.display = 'block';
         document.getElementById('sequence-exists-state').style.display = 'none';
+        setNoSequenceStateMessage('Create an email sequence to send automated emails to interest leads for this event.');
         currentEventSequence = null;
         return;
     }
@@ -1200,12 +1201,21 @@ async function loadEventSequence() {
         
         document.getElementById('no-sequence-state').style.display = 'none';
         document.getElementById('sequence-exists-state').style.display = 'block';
+        setNoSequenceStateMessage('Create an email sequence to send automated emails to interest leads for this event.');
         
         renderSequenceEmails();
     } catch (error) {
         console.error('Failed to load sequence:', error);
         document.getElementById('no-sequence-state').style.display = 'block';
         document.getElementById('sequence-exists-state').style.display = 'none';
+        currentEventSequence = null;
+
+        if (error.status === 404) {
+            setNoSequenceStateMessage('This event is linked to a sequence that no longer exists. Create a new sequence for this event.', true);
+            return;
+        }
+
+        setNoSequenceStateMessage(`Failed to load sequence: ${error.message || 'Unknown error'}. Please refresh and try again.`, true);
     }
 }
 
