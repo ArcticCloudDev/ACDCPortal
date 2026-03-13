@@ -11,11 +11,16 @@ const eventsStorage = new Storage('events');
 const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
 const participationsStorage = new Storage('participations');
+const usersStorage = new Storage('users');
 
-// Helper to trigger sequence emails for interest leads
+// Helper to trigger sequence emails for a recipient (lead or user)
+// recipient: { id, email, firstName, userId? } — if userId is set, deliveries are stored with userId instead of leadId
 async function triggerSequenceEmailsForLead(lead, event, context) {
     try {
         context.log(`[SEQUENCE] Starting sequence emails for ${lead.email}, event: ${event.name}`);
+
+        // Determine recipient identifier for delivery records
+        const recipientIdField = lead.userId ? { userId: lead.userId } : { leadId: lead.id };
         
         // Check if event has sequence enabled
         if (!event.sequenceEnabled) {
@@ -117,7 +122,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 id: generateGuid(),
                 campaignId: campaignsToSend.map(c => c.id).join(','), // Track all campaigns in digest
                 email: lead.email,
-                leadId: lead.id,
+                ...recipientIdField,
                 status: 'pending',
                 createdAt: new Date().toISOString(),
                 isDigest: true,
@@ -144,7 +149,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                         id: generateGuid(),
                         campaignId: campaign.id,
                         email: lead.email,
-                        leadId: lead.id,
+                        ...recipientIdField,
                         status: 'sent',
                         sentAt: delivery.sentAt,
                         createdAt: delivery.createdAt,
@@ -168,7 +173,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 id: generateGuid(),
                 campaignId: campaign.id,
                 email: lead.email,
-                leadId: lead.id,
+                ...recipientIdField,
                 status: 'pending',
                 createdAt: new Date().toISOString()
             };
@@ -758,7 +763,7 @@ app.http('interest-delete', {
     }
 });
 
-// POST /api/interest/restart-sequence - Manually trigger sequence for a lead
+// POST /api/interest/restart-sequence - Manually trigger sequence for a recipient (lead or user)
 app.http('interest-restart-sequence', {
     methods: ['POST'],
     authLevel: 'anonymous',
@@ -766,64 +771,87 @@ app.http('interest-restart-sequence', {
     handler: async (request, context) => {
         try {
             const body = await request.json();
-            const { leadId } = body;
+            const { leadId, userId, eventId } = body;
 
-            if (!leadId) {
-                return { status: 400, jsonBody: { error: 'leadId is required' } };
+            if (!leadId && !userId) {
+                return { status: 400, jsonBody: { error: 'leadId or userId is required' } };
             }
 
-            // Get lead
-            const data = await leadsStorage.getRaw();
-            const lead = (data.leads || []).find(l => l.id === leadId);
+            let recipient;
+            let recipientEventId;
 
-            if (!lead) {
-                return { status: 404, jsonBody: { error: 'Lead not found' } };
+            if (leadId) {
+                // Lead-based restart
+                const data = await leadsStorage.getRaw();
+                const lead = (data.leads || []).find(l => l.id === leadId);
+                if (!lead) {
+                    return { status: 404, jsonBody: { error: 'Lead not found' } };
+                }
+                if (!lead.verified) {
+                    return { status: 400, jsonBody: { error: 'Lead is not verified' } };
+                }
+                recipient = lead;
+                recipientEventId = lead.eventId;
+            } else {
+                // User-based restart (participants, judges, committee)
+                const users = await usersStorage.getAll();
+                const user = users.find(u => u.id === userId);
+                if (!user) {
+                    return { status: 404, jsonBody: { error: 'User not found' } };
+                }
+                if (!eventId) {
+                    return { status: 400, jsonBody: { error: 'eventId is required for user-based restart' } };
+                }
+                recipient = { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, userId: user.id };
+                recipientEventId = eventId;
             }
 
-            if (!lead.verified) {
-                return { status: 400, jsonBody: { error: 'Lead is not verified' } };
-            }
+            context.log(`[RESTART] Manually restarting sequence for ${recipient.email}`);
 
-            context.log(`[RESTART] Manually restarting sequence for ${lead.email}`);
-
-            // Delete existing delivery records for this lead to allow resend
+            // Delete existing delivery records for this recipient to allow resend
             const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
             const beforeCount = deliveryData.deliveries.length;
-            deliveryData.deliveries = deliveryData.deliveries.filter(d => d.leadId !== leadId);
+            if (leadId) {
+                deliveryData.deliveries = deliveryData.deliveries.filter(d => d.leadId !== leadId);
+            } else {
+                deliveryData.deliveries = deliveryData.deliveries.filter(d => d.userId !== userId);
+            }
             const removedCount = beforeCount - deliveryData.deliveries.length;
             
             if (removedCount > 0) {
                 await deliveriesStorage.saveRaw(deliveryData);
-                context.log(`[RESTART] Deleted ${removedCount} existing delivery records for lead ${leadId}`);
+                context.log(`[RESTART] Deleted ${removedCount} existing delivery records for ${leadId || userId}`);
             }
 
             // Fetch event to get sequenceId
             const events = await eventsStorage.getAll();
-            context.log(`[RESTART] Loaded ${events.length} events`);
-            const event = events.find(e => e.id === lead.eventId);
+            const event = events.find(e => e.id === recipientEventId);
             context.log(`[RESTART] Event found:`, event ? { id: event.id, name: event.name, sequenceId: event.sequenceId } : 'NOT FOUND');
 
             if (!event) {
-                return { status: 404, jsonBody: { error: 'Event not found for this lead' } };
+                return { status: 404, jsonBody: { error: 'Event not found' } };
             }
 
             // Trigger sequence emails
-            await triggerSequenceEmailsForLead(lead, event, context);
+            await triggerSequenceEmailsForLead(recipient, event, context);
 
             // Get delivery count after sending
             const updatedDeliveryData = await deliveriesStorage.getRaw();
-            const leadDeliveries = (updatedDeliveryData?.deliveries || [])
-                .filter(d => d.leadId === leadId && d.status === 'sent');
+            const sentDeliveries = (updatedDeliveryData?.deliveries || [])
+                .filter(d => {
+                    if (leadId) return d.leadId === leadId && d.status === 'sent';
+                    return d.userId === userId && d.status === 'sent';
+                });
 
             return {
                 status: 200,
                 jsonBody: {
                     message: 'Sequence restarted',
-                    sent: leadDeliveries.length,
-                    lead: {
-                        email: lead.email,
-                        firstName: lead.firstName,
-                        lastName: lead.lastName
+                    sent: sentDeliveries.length,
+                    recipient: {
+                        email: recipient.email,
+                        firstName: recipient.firstName,
+                        lastName: recipient.lastName
                     }
                 }
             };

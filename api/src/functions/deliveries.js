@@ -95,14 +95,11 @@ app.http('deliveries-event', {
                 .filter(p => p.eventId === eventId);
 
             // Build recipients from participations (with their roles)
-            const leadEmails = new Set(eventLeads.map(l => l.email.toLowerCase()));
             const users = await usersStorage.getAll();
             const recipients = eventParticipations
                 .map(p => {
                     const user = users.find(u => u.id === p.userId);
                     if (!user) return null;
-                    // Skip if already an interest lead (they appear in leads)
-                    if (leadEmails.has(user.email.toLowerCase())) return null;
                     // Determine primary role
                     const roles = p.roles || [];
                     let type = 'participant';
@@ -118,11 +115,15 @@ app.http('deliveries-event', {
                 })
                 .filter(Boolean);
 
+            // Exclude leads who have been converted to participations (they show under their current role)
+            const recipientEmails = new Set(recipients.map(r => r.email.toLowerCase()));
+            const filteredLeads = eventLeads.filter(l => !recipientEmails.has(l.email.toLowerCase()));
+
             return {
                 status: 200,
                 jsonBody: {
                     deliveries: eventDeliveries,
-                    leads: eventLeads,
+                    leads: filteredLeads,
                     recipients: recipients,
                     campaigns: sequenceCampaigns,
                     totalSequenceEmails: sequenceCampaigns.length

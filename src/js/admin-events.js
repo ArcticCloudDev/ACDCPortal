@@ -1076,15 +1076,16 @@ async function deleteLead(leadId) {
     }
 }
 
-async function restartSequence(leadId) {
-    if (!confirm('Restart sequence emails for this lead?\n\nThis will send all unsent sequence emails. Check the browser console for detailed logs.')) return;
+async function restartSequence(leadId, userId) {
+    if (!confirm('Restart sequence emails for this recipient?\n\nThis will send all unsent sequence emails. Check the browser console for detailed logs.')) return;
 
     try {
-        console.log('🔄 Restarting sequence for lead:', leadId);
+        const payload = leadId ? { leadId } : { userId, eventId: currentEventId };
+        console.log('🔄 Restarting sequence for:', payload);
         const response = await fetch(`${CONFIG.api.baseUrl}/interest/restart-sequence`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ leadId })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
@@ -1303,8 +1304,9 @@ async function loadEmailDeliveryStats(emails) {
         if (!response.ok) return {};
         
         const data = await response.json();
-        const { deliveries, leads } = data;
+        const { deliveries, leads, recipients = [] } = data;
         const verifiedLeads = leads.filter(l => l.verified);
+        const totalRecipients = verifiedLeads.length + recipients.length;
         
         // Calculate stats for each email
         const stats = {};
@@ -1314,7 +1316,7 @@ async function loadEmailDeliveryStats(emails) {
             const sentCount = emailDeliveries.filter(d => d.status === 'sent').length;
             stats[email.id] = {
                 sent: sentCount,
-                total: verifiedLeads.length
+                total: totalRecipients
             };
         });
         
@@ -1425,8 +1427,8 @@ async function loadRecipientDeliveryOverview() {
                 name: recipient.name,
                 email: recipient.email,
                 typeLabel,
-                canRestart: recipient.type === 'interest' && !!recipient.leadId,
                 leadId: recipient.leadId,
+                userId: recipient.leadId ? null : recipient.id,
                 statuses: emailStatuses,
                 sentCount,
                 totalCount,
@@ -1446,7 +1448,9 @@ async function loadRecipientDeliveryOverview() {
                 ${row.statuses.map(s => `<td style="text-align: center; ${s.style}">${s.symbol}</td>`).join('')}
                 <td style="text-align: center; font-weight: 600;">${row.sentCount}/${row.totalCount}</td>
                 <td style="text-align: center;">
-                    ${row.canRestart ? `<button class="btn-sm" onclick="restartSequence('${row.leadId}')">🔄 Restart</button>` : '<span style="color: var(--admin-text-muted);">-</span>'}
+                    ${row.leadId 
+                        ? `<button class="btn-sm" onclick="restartSequence('${row.leadId}')">🔄 Restart</button>` 
+                        : `<button class="btn-sm" onclick="restartSequence(null, '${row.userId}')">🔄 Restart</button>`}
                 </td>
             </tr>
         `).join('');
