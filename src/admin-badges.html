@@ -69,6 +69,16 @@
             border-color: #818cf8;
             box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15);
         }
+        .judge-group.exclusive-group {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.15);
+        }
+        .judge-group.exclusive-group .judge-group-header {
+            background: #fffbeb;
+        }
+        .judge-group.exclusive-group .judge-group-title {
+            color: #92400e;
+        }
         .judge-group-header {
             display: flex;
             justify-content: space-between;
@@ -328,7 +338,6 @@
                             <option value="pro-code">Pro Code</option>
                             <option value="sponsor">Sponsor</option>
                         </select>
-                        <button class="btn-sm primary" id="award-badge-btn" style="margin-left: auto;" onclick="openAwardModal()">🏆 Award Badge</button>
                     </div>
 
                     <div class="stat-row">
@@ -440,39 +449,6 @@
             <div class="modal-footer">
                 <button class="btn-sm" onclick="closeReviewModal()">Cancel</button>
                 <button class="btn-sm primary" onclick="submitReview()">Submit Review</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Award Badge Modal -->
-    <div class="modal-overlay" id="award-modal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>🏆 Award Exclusive Badge</h2>
-                <button class="modal-close" onclick="closeAwardModal()">✕</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Event *</label>
-                    <select id="award-event"></select>
-                </div>
-                <div class="form-group">
-                    <label>Badge *</label>
-                    <select id="award-badge" disabled>
-                        <option value="">Select an event first</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Team *</label>
-                    <select id="award-team" disabled>
-                        <option value="">Select an event first</option>
-                    </select>
-                </div>
-                <div id="award-error" class="form-error" style="display: none; color: var(--admin-danger); margin-top: 8px;"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-sm" onclick="closeAwardModal()">Cancel</button>
-                <button class="btn-sm primary" id="award-submit-btn" onclick="submitAward()">🏆 Award Badge</button>
             </div>
         </div>
     </div>

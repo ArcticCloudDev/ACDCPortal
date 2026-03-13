@@ -199,9 +199,6 @@ function setupEventListeners() {
             e.target.value === 'declined' ? 'block' : 'none';
     });
 
-    // Award modal event change
-    document.getElementById('award-event').addEventListener('change', onAwardEventChange);
-
     // Populate event selectors
     populateEventSelectors();
 }
@@ -484,17 +481,53 @@ function renderClaims() {
     document.getElementById('cl-stat-approved').textContent = statClaims.filter(c => c.status === 'approved').length;
     document.getElementById('cl-stat-declined').textContent = statClaims.filter(c => c.status === 'declined').length;
 
-    if (claims.length === 0) {
+    // Determine if current user can review a given claim
+    const isPortalAdmin = currentPermissions?.isPortalAdmin;
+    const isCommittee = currentPermissions?.highestRole === 'committee' || currentPermissions?.highestRole === 'portalAdmin';
+
+    let html = '';
+
+    // ── Exclusive Badges Group (above judge groups) ──
+    if (!statusFilter || statusFilter === 'approved') {
+        const exclusiveBadges = getExclusiveBadgesForUser(eventFilter);
+        if (exclusiveBadges.length > 0) {
+            const awardedCount = exclusiveBadges.filter(b => b.awardedTeamId).length;
+            html += `
+                <div class="judge-group exclusive-group">
+                    <div class="judge-group-header">
+                        <div class="judge-group-title">🏆 Exclusive Badges</div>
+                        <div class="judge-group-stats">
+                            <span class="jg-stat total">${exclusiveBadges.length} badge${exclusiveBadges.length !== 1 ? 's' : ''}</span>
+                            ${awardedCount ? `<span class="jg-stat approved">✅ ${awardedCount} awarded</span>` : ''}
+                        </div>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Badge</th>
+                                <th>Category</th>
+                                <th>Points</th>
+                                <th>Awarded To</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${exclusiveBadges.map(b => renderExclusiveRow(b)).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+    }
+
+    // ── Judge Groups (claims) ──
+    if (claims.length === 0 && !html) {
         container.innerHTML = '';
         emptyState.classList.remove('hidden');
         return;
     }
 
     emptyState.classList.add('hidden');
-
-    // Determine if current user can review a given claim
-    const isPortalAdmin = currentPermissions?.isPortalAdmin;
-    const isCommittee = currentPermissions?.highestRole === 'committee' || currentPermissions?.highestRole === 'portalAdmin';
 
     // Group claims by badge owner (judgeUserId from event-badge)
     const grouped = {};  // judgeUserId -> claims[]
@@ -517,7 +550,6 @@ function renderClaims() {
         return nameA.localeCompare(nameB);
     });
 
-    let html = '';
     for (const judgeId of groupOrder) {
         const groupClaims = grouped[judgeId];
         const isMyGroup = judgeId === currentUserId;
@@ -572,6 +604,7 @@ function renderClaims() {
     }
 
     container.innerHTML = html;
+    loadTeamsForExclusiveDropdowns();
 }
 
 function renderClaimRow(claim, canReview) {
@@ -781,116 +814,129 @@ async function submitReview() {
 
 
 // ============================================================
-// AWARD BADGE MODAL
+// EXCLUSIVE BADGE AWARDING (inline in claims list)
 // ============================================================
 
 let awardTeamsCache = {};  // eventId -> teams[]
 
-async function openAwardModal() {
-    const modal = document.getElementById('award-modal');
-    const eventSelect = document.getElementById('award-event');
-    const badgeSelect = document.getElementById('award-badge');
-    const teamSelect = document.getElementById('award-team');
-    const errorEl = document.getElementById('award-error');
-
-    // Reset
-    errorEl.style.display = 'none';
-    badgeSelect.disabled = true;
-    badgeSelect.innerHTML = '<option value="">Select an event first</option>';
-    teamSelect.disabled = true;
-    teamSelect.innerHTML = '<option value="">Select an event first</option>';
-
-    // Populate events
-    eventSelect.innerHTML = '<option value="">Select event...</option>';
-    allEvents.forEach(e => {
-        eventSelect.appendChild(new Option(e.name, e.id));
-    });
-
-    // If only one event, auto-select it
-    if (allEvents.length === 1) {
-        eventSelect.value = allEvents[0].id;
-        await onAwardEventChange();
-    }
-
-    modal.classList.add('visible');
-}
-
-function closeAwardModal() {
-    document.getElementById('award-modal').classList.remove('visible');
-}
-
-async function onAwardEventChange() {
-    const eventId = document.getElementById('award-event').value;
-    const badgeSelect = document.getElementById('award-badge');
-    const teamSelect = document.getElementById('award-team');
-
-    if (!eventId) {
-        badgeSelect.disabled = true;
-        badgeSelect.innerHTML = '<option value="">Select an event first</option>';
-        teamSelect.disabled = true;
-        teamSelect.innerHTML = '<option value="">Select an event first</option>';
-        return;
-    }
-
-    // Load event-badges for this event (exclusive ones assigned to this judge)
-    const eventBadges = allClaimsEventBadges.filter(eb => eb.eventId === eventId && eb.isActive);
+function getExclusiveBadgesForUser(eventFilter) {
     const isPortalAdmin = currentPermissions?.isPortalAdmin;
     const isCommittee = currentPermissions?.highestRole === 'committee' || currentPermissions?.highestRole === 'portalAdmin';
 
-    // Filter to exclusive badges — judges see only their assigned ones, admins see all
-    const exclusiveBadges = eventBadges.filter(eb => {
+    let eventBadges = [...allClaimsEventBadges].filter(eb => eb.isActive);
+    if (eventFilter) eventBadges = eventBadges.filter(eb => eb.eventId === eventFilter);
+
+    // Filter to exclusive badges the user can award
+    const exclusiveEBs = eventBadges.filter(eb => {
         const badge = allBadges.find(b => b.id === eb.badgeId);
         if (!badge || (badge.claimType || 'common') !== 'exclusive') return false;
         if (isPortalAdmin || isCommittee) return true;
         return eb.judgeUserId === currentUser?.id;
     });
 
-    badgeSelect.innerHTML = '<option value="">Select badge...</option>';
-    exclusiveBadges.forEach(eb => {
-        const badge = allBadges.find(b => b.id === eb.badgeId);
-        if (badge) {
-            const opt = new Option(`${badge.name} (${badge.points}p)`, eb.id);
-            badgeSelect.appendChild(opt);
-        }
+    // Enrich with badge info and existing award
+    return exclusiveEBs.map(eb => {
+        const badge = allBadges.find(b => b.id === eb.badgeId) || {};
+        const existingClaim = allClaims.find(c =>
+            c.eventBadgeId === eb.id && c.status === 'approved'
+        );
+        const event = allEvents.find(e => e.id === eb.eventId);
+        return {
+            eventBadgeId: eb.id,
+            eventId: eb.eventId,
+            eventName: event?.name || '',
+            badgeName: badge.name || 'Unknown',
+            category: badge.category || '',
+            points: badge.points || 0,
+            awardedTeamId: existingClaim?.teamId || null,
+            awardedTeamName: existingClaim?.team?.teamName || null
+        };
     });
-    badgeSelect.disabled = exclusiveBadges.length === 0;
-    if (exclusiveBadges.length === 0) {
-        badgeSelect.innerHTML = '<option value="">No exclusive badges assigned to you</option>';
-    }
-
-    // Load teams for this event
-    if (!awardTeamsCache[eventId]) {
-        try {
-            const allTeams = await API.teams.list();
-            awardTeamsCache[eventId] = allTeams.filter(t => t.eventId === eventId);
-        } catch (e) {
-            console.error('Failed to load teams:', e);
-            awardTeamsCache[eventId] = [];
-        }
-    }
-
-    const teams = awardTeamsCache[eventId];
-    teamSelect.innerHTML = '<option value="">Select team...</option>';
-    teams.forEach(t => {
-        teamSelect.appendChild(new Option(t.teamName, t.id));
-    });
-    teamSelect.disabled = teams.length === 0;
 }
 
-async function submitAward() {
-    const eventBadgeId = document.getElementById('award-badge').value;
-    const teamId = document.getElementById('award-team').value;
-    const errorEl = document.getElementById('award-error');
+function renderExclusiveRow(badge) {
+    const catConfig = CATEGORIES[badge.category] || { label: badge.category };
 
-    errorEl.style.display = 'none';
+    if (badge.awardedTeamId) {
+        // Already awarded
+        return `
+            <tr>
+                <td><strong>${escapeHtml(badge.badgeName)}</strong></td>
+                <td><span class="category-pill ${badge.category}">${catConfig.label || badge.category}</span></td>
+                <td>${badge.points}p</td>
+                <td><span style="color: #d97706; font-weight: 600;">🏆 ${escapeHtml(badge.awardedTeamName || 'Unknown')}</span></td>
+                <td><span style="font-size: 0.75rem; color: var(--admin-success);">✅ Awarded</span></td>
+            </tr>
+        `;
+    }
 
-    if (!eventBadgeId || !teamId) {
-        errorEl.textContent = 'Please select both a badge and a team.';
-        errorEl.style.display = 'block';
+    // Not yet awarded — show team dropdown + award button
+    return `
+        <tr>
+            <td><strong>${escapeHtml(badge.badgeName)}</strong></td>
+            <td><span class="category-pill ${badge.category}">${catConfig.label || badge.category}</span></td>
+            <td>${badge.points}p</td>
+            <td>
+                <select class="award-team-select" id="award-team-${badge.eventBadgeId}" style="font-size: 0.8rem; padding: 4px 8px; border: 1px solid var(--admin-border); border-radius: 4px;">
+                    <option value="">Select team...</option>
+                </select>
+            </td>
+            <td>
+                <button class="btn-sm primary" style="font-size: 0.75rem;" onclick="awardBadgeInline('${badge.eventBadgeId}')">🏆 Award</button>
+            </td>
+        </tr>
+    `;
+}
+
+async function loadTeamsForExclusiveDropdowns() {
+    // Find all unique event IDs from the exclusive badges currently rendered
+    const selects = document.querySelectorAll('.award-team-select');
+    if (selects.length === 0) return;
+
+    // Collect event IDs from exclusive badges
+    const eventIds = [...new Set(
+        getExclusiveBadgesForUser(document.getElementById('claims-event-filter').value)
+            .filter(b => !b.awardedTeamId)
+            .map(b => b.eventId)
+    )];
+
+    // Load teams for each event
+    for (const eventId of eventIds) {
+        if (!awardTeamsCache[eventId]) {
+            try {
+                const allTeams = await API.teams.list();
+                awardTeamsCache[eventId] = allTeams.filter(t => t.eventId === eventId);
+            } catch (e) {
+                console.error('Failed to load teams:', e);
+                awardTeamsCache[eventId] = [];
+            }
+        }
+    }
+
+    // Populate each dropdown
+    const exclusiveBadges = getExclusiveBadgesForUser(document.getElementById('claims-event-filter').value);
+    for (const badge of exclusiveBadges) {
+        if (badge.awardedTeamId) continue;
+        const select = document.getElementById(`award-team-${badge.eventBadgeId}`);
+        if (!select) continue;
+        const teams = awardTeamsCache[badge.eventId] || [];
+        teams.forEach(t => {
+            select.appendChild(new Option(t.teamName, t.id));
+        });
+    }
+}
+
+async function awardBadgeInline(eventBadgeId) {
+    const teamSelect = document.getElementById(`award-team-${eventBadgeId}`);
+    if (!teamSelect) return;
+    const teamId = teamSelect.value;
+
+    if (!teamId) {
+        alert('Please select a team to award');
         return;
     }
 
-    const btn = document.getElementById('award-submit-btn');
+    const btn = teamSelect.closest('tr').querySelector('.btn-sm.primary');
     btn.disabled = true;
     btn.textContent = 'Awarding...';
 
@@ -906,13 +952,10 @@ async function submitAward() {
 
         await loadAllData();
         renderClaims();
-        closeAwardModal();
     } catch (error) {
-        errorEl.textContent = error.message || 'Failed to award badge';
-        errorEl.style.display = 'block';
-    } finally {
+        alert('Failed to award badge: ' + (error.message || 'Unknown error'));
         btn.disabled = false;
-        btn.textContent = '🏆 Award Badge';
+        btn.textContent = '🏆 Award';
     }
 }
 
