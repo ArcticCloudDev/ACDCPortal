@@ -352,7 +352,11 @@ async function updateParticipation(pool, id, updates) {
         if (key === 'roles') {
             const p = `u${pi++}`;
             const rolesStr = Array.isArray(val) ? val.join(',') : (val || null);
-            request.input(p, rolesStr === null ? sql.NVarChar : undefined, rolesStr ?? null);
+            if (rolesStr === null) {
+                request.input(p, sql.NVarChar, null);
+            } else {
+                request.input(p, rolesStr);
+            }
             setClauses.push(`[Roles] = @${p}`);
             continue;
         }
