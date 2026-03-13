@@ -116,9 +116,7 @@ app.http('badges-create', {
                 createdAt: new Date().toISOString()
             };
 
-            const badges = await badgesStorage.getAll();
-            badges.push(newBadge);
-            await badgesStorage.saveAll(badges);
+            await badgesStorage.create(newBadge);
 
             context.log(`Badge created: ${newBadge.name}`);
             return { status: 201, jsonBody: newBadge };
@@ -189,22 +187,21 @@ app.http('badges-delete', {
         try {
             const id = request.params.id;
 
-            const badges = await badgesStorage.getAll();
-            const index = badges.findIndex(b => b.id === id);
+            const badge = await badgesStorage.getById(id);
 
-            if (index < 0) {
+            if (!badge) {
                 return { status: 404, jsonBody: { error: 'Badge not found' } };
             }
 
-            const badgeName = badges[index].name;
-            badges.splice(index, 1);
-            await badgesStorage.saveAll(badges);
+            const badgeName = badge.name;
+            await badgesStorage.delete(id);
 
             // Also clean up event-badge assignments
             const eventBadges = await eventBadgesStorage.getAll();
-            const cleaned = eventBadges.filter(eb => eb.badgeId !== id);
-            if (cleaned.length !== eventBadges.length) {
-                await eventBadgesStorage.saveAll(cleaned);
+            for (const eb of eventBadges) {
+                if (eb.badgeId === id) {
+                    await eventBadgesStorage.delete(eb.id);
+                }
             }
 
             context.log(`Badge deleted: ${badgeName}`);
@@ -314,12 +311,8 @@ app.http('event-badges-add', {
                     createdAt: new Date().toISOString()
                 };
 
-                eventBadges.push(assignment);
-                added.push(assignment);
-            }
-
-            if (added.length > 0) {
-                await eventBadgesStorage.saveAll(eventBadges);
+                const created = await eventBadgesStorage.create(assignment);
+                added.push(created);
             }
 
             context.log(`Added ${added.length} badges to event ${eventId}, skipped ${skipped.length}`);
@@ -344,24 +337,20 @@ app.http('event-badges-update', {
             const { eventId, id } = request.params;
             const body = await request.json();
 
-            const eventBadges = await eventBadgesStorage.getAll();
-            const index = eventBadges.findIndex(eb => eb.id === id && eb.eventId === eventId);
+            const eventBadge = await eventBadgesStorage.getById(id);
 
-            if (index < 0) {
+            if (!eventBadge || eventBadge.eventId !== eventId) {
                 return { status: 404, jsonBody: { error: 'Event-badge assignment not found' } };
             }
 
-            eventBadges[index] = {
-                ...eventBadges[index],
-                judgeUserId: body.judgeUserId !== undefined ? body.judgeUserId : eventBadges[index].judgeUserId,
-                isActive: body.isActive !== undefined ? body.isActive : eventBadges[index].isActive,
+            const updated = await eventBadgesStorage.update(id, {
+                judgeUserId: body.judgeUserId !== undefined ? body.judgeUserId : eventBadge.judgeUserId,
+                isActive: body.isActive !== undefined ? body.isActive : eventBadge.isActive,
                 updatedAt: new Date().toISOString()
-            };
-
-            await eventBadgesStorage.saveAll(eventBadges);
+            });
 
             context.log(`Event-badge ${id} updated for event ${eventId}`);
-            return { status: 200, jsonBody: eventBadges[index] };
+            return { status: 200, jsonBody: updated };
         } catch (error) {
             context.error('Event badges UPDATE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update event badge' } };
@@ -378,21 +367,20 @@ app.http('event-badges-remove', {
         try {
             const { eventId, id } = request.params;
 
-            const eventBadges = await eventBadgesStorage.getAll();
-            const index = eventBadges.findIndex(eb => eb.id === id && eb.eventId === eventId);
+            const eventBadge = await eventBadgesStorage.getById(id);
 
-            if (index < 0) {
+            if (!eventBadge || eventBadge.eventId !== eventId) {
                 return { status: 404, jsonBody: { error: 'Event-badge assignment not found' } };
             }
 
-            eventBadges.splice(index, 1);
-            await eventBadgesStorage.saveAll(eventBadges);
+            await eventBadgesStorage.delete(id);
 
             // Also clean up claims for this event-badge
             const claims = await badgeClaimsStorage.getAll();
-            const cleaned = claims.filter(c => c.eventBadgeId !== id);
-            if (cleaned.length !== claims.length) {
-                await badgeClaimsStorage.saveAll(cleaned);
+            for (const c of claims) {
+                if (c.eventBadgeId === id) {
+                    await badgeClaimsStorage.delete(c.id);
+                }
             }
 
             context.log(`Badge removed from event ${eventId}`);
@@ -430,12 +418,14 @@ app.http('event-badges-bulk', {
             const toRemove = currentAssignments.filter(eb => !selectedBadgeIds.includes(eb.badgeId));
 
             // Remove
-            const removeIds = new Set(toRemove.map(eb => eb.id));
-            const remaining = eventBadges.filter(eb => !removeIds.has(eb.id));
+            for (const eb of toRemove) {
+                await eventBadgesStorage.delete(eb.id);
+            }
 
             // Add
+            const added = [];
             for (const badgeId of toAdd) {
-                remaining.push({
+                const newEb = await eventBadgesStorage.create({
                     id: generateGuid(),
                     eventId: eventId,
                     badgeId: badgeId,
@@ -443,18 +433,21 @@ app.http('event-badges-bulk', {
                     isActive: true,
                     createdAt: new Date().toISOString()
                 });
+                added.push(newEb);
             }
-
-            await eventBadgesStorage.saveAll(remaining);
 
             // Clean up claims for removed badges
             if (toRemove.length > 0) {
+                const removeIds = new Set(toRemove.map(eb => eb.id));
                 const claims = await badgeClaimsStorage.getAll();
-                const cleaned = claims.filter(c => !removeIds.has(c.eventBadgeId));
-                if (cleaned.length !== claims.length) {
-                    await badgeClaimsStorage.saveAll(cleaned);
+                for (const c of claims) {
+                    if (removeIds.has(c.eventBadgeId)) {
+                        await badgeClaimsStorage.delete(c.id);
+                    }
                 }
             }
+
+            const totalForEvent = currentAssignments.length - toRemove.length + toAdd.length;
 
             context.log(`Bulk update for event ${eventId}: added ${toAdd.length}, removed ${toRemove.length}`);
             return {
@@ -462,7 +455,7 @@ app.http('event-badges-bulk', {
                 jsonBody: {
                     added: toAdd.length,
                     removed: toRemove.length,
-                    total: remaining.filter(eb => eb.eventId === eventId).length
+                    total: totalForEvent
                 }
             };
         } catch (error) {
