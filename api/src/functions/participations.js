@@ -310,8 +310,13 @@ app.http('participations-upsert', {
                 };
                 // Ensure legacy support
                 updated.teamMemberships = buildLegacyTeamMemberships(updated);
-                participations[existingIndex] = updated;
-                await participationsStorage.saveAll(participations);
+                await participationsStorage.update(existing.id, {
+                    userId: updated.userId,
+                    email: updated.email,
+                    hotelNights: updated.hotelNights,
+                    roles: updated.roles,
+                    updatedAt: now
+                });
 
                 context.log(`Participation updated for ${resolvedEmail || userId} in event ${eventId}`);
                 return { status: 200, jsonBody: updated };
@@ -337,8 +342,7 @@ app.http('participations-upsert', {
                 };
                 // Legacy support
                 newParticipation.teamMemberships = [];
-                participations.push(newParticipation);
-                await participationsStorage.saveAll(participations);
+                await participationsStorage.create(newParticipation);
 
                 context.log(`Participation created for ${resolvedEmail || userId} in event ${eventId}`);
                 return { status: 201, jsonBody: newParticipation };
@@ -382,8 +386,16 @@ app.http('participations-update', {
 
             // Rebuild legacy support
             updated.teamMemberships = buildLegacyTeamMemberships(updated);
-            participations[index] = updated;
-            await participationsStorage.saveAll(participations);
+            await participationsStorage.update(id, {
+                ...(body.hotelNights !== undefined && { hotelNights: body.hotelNights }),
+                ...(body.teamId !== undefined && { teamId: body.teamId }),
+                ...(body.isTeamAdmin !== undefined && { isTeamAdmin: body.isTeamAdmin }),
+                ...(body.userId !== undefined && { userId: body.userId }),
+                ...(body.email !== undefined && { email: body.email }),
+                ...(body.interestSource !== undefined && { interestSource: body.interestSource }),
+                ...(body.interestVerified !== undefined && { interestVerified: body.interestVerified }),
+                updatedAt: updated.updatedAt
+            });
 
             return { status: 200, jsonBody: updated };
         } catch (error) {
@@ -414,8 +426,7 @@ app.http('participations-delete', {
             const eventId = participation.eventId;
 
             // Remove the participation
-            participations.splice(index, 1);
-            await participationsStorage.saveAll(participations);
+            await participationsStorage.delete(id);
 
             // Cascade: clean up related data
             let cleaned = { invitations: 0, deliveries: 0, sequenceProgress: 0 };
@@ -544,8 +555,10 @@ app.http('participations-update-roles-v2', {
 
             // Rebuild legacy support
             participation.teamMemberships = buildLegacyTeamMemberships(participation);
-            participations[index] = participation;
-            await participationsStorage.saveAll(participations);
+            await participationsStorage.update(id, {
+                roles: participation.roles,
+                updatedAt: participation.updatedAt
+            });
 
             context.log(`Roles updated for participation ${id}: [${roles.join(', ')}]`);
             return { status: 200, jsonBody: participation };
@@ -618,8 +631,12 @@ app.http('participations-assign-team', {
 
             // Rebuild legacy
             participation.teamMemberships = buildLegacyTeamMemberships(participation);
-            participations[index] = participation;
-            await participationsStorage.saveAll(participations);
+            await participationsStorage.update(id, {
+                teamId: participation.teamId,
+                isTeamAdmin: participation.isTeamAdmin,
+                roles: participation.roles,
+                updatedAt: participation.updatedAt
+            });
 
             // Side effects for joining a team
             if (teamId && participation.userId) {
@@ -667,16 +684,17 @@ app.http('participations-update-hotel', {
                 return { status: 404, jsonBody: { error: 'Participation not found' } };
             }
 
-            participations[index] = {
+            const updatedAt = new Date().toISOString();
+            const updated = {
                 ...participations[index],
                 hotelNights,
-                updatedAt: new Date().toISOString()
+                updatedAt
             };
 
-            await participationsStorage.saveAll(participations);
+            await participationsStorage.update(id, { hotelNights, updatedAt });
 
             context.log(`Hotel nights updated for participation ${id}`);
-            return { status: 200, jsonBody: participations[index] };
+            return { status: 200, jsonBody: updated };
         } catch (error) {
             context.error('Error updating hotel nights:', error);
             return { status: 500, jsonBody: { error: 'Failed to update hotel nights' } };
@@ -921,8 +939,13 @@ app.http('participations-add-team-membership', {
             }
 
             participation.updatedAt = new Date().toISOString();
-            participations[index] = participation;
-            await participationsStorage.saveAll(participations);
+            await participationsStorage.update(id, {
+                teamId: participation.teamId,
+                isTeamAdmin: participation.isTeamAdmin,
+                roles: participation.roles,
+                hotelPaidBy: participation.hotelPaidBy || null,
+                updatedAt: participation.updatedAt
+            });
 
             // Side effects
             if (isParticipant && participation.userId) {
@@ -1000,8 +1023,14 @@ app.http('participations-remove-team-membership', {
             }
 
             participation.updatedAt = new Date().toISOString();
-            participations[index] = participation;
-            await participationsStorage.saveAll(participations);
+            await participationsStorage.update(id, {
+                teamId: participation.teamId,
+                isTeamAdmin: participation.isTeamAdmin,
+                roles: participation.roles,
+                hotelPaidBy: participation.hotelPaidBy,
+                hotelNights: participation.hotelNights,
+                updatedAt: participation.updatedAt
+            });
 
             context.log(`Legacy team membership removed for participation ${id}, team ${teamId}`);
             return { status: 200, jsonBody: participation };
@@ -1054,8 +1083,11 @@ app.http('participations-toggle-participant', {
             participation.teamMemberships = memberships;
 
             participation.updatedAt = new Date().toISOString();
-            participations[index] = participation;
-            await participationsStorage.saveAll(participations);
+            await participationsStorage.update(id, {
+                teamId: participation.teamId,
+                roles: participation.roles,
+                updatedAt: participation.updatedAt
+            });
 
             // Side effects
             if (isParticipant && participation.userId) {
@@ -1143,8 +1175,12 @@ app.http('participations-update-team-roles', {
             participation.teamMemberships = memberships;
 
             participation.updatedAt = new Date().toISOString();
-            participations[index] = participation;
-            await participationsStorage.saveAll(participations);
+            await participationsStorage.update(id, {
+                teamId: participation.teamId,
+                isTeamAdmin: participation.isTeamAdmin,
+                roles: participation.roles,
+                updatedAt: participation.updatedAt
+            });
 
             context.log(`Legacy team roles updated for participation ${id}, team ${teamId}`);
             return { status: 200, jsonBody: participation };

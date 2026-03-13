@@ -319,6 +319,58 @@ async function insertParticipation(pool, item) {
     `);
 }
 
+// Atomic UPDATE for a single participation row — handles hotel nights + roles serialization
+async function updateParticipation(pool, id, updates) {
+    const request = pool.request();
+    request.input('_id', id);
+    const setClauses = [];
+    let pi = 0;
+
+    for (const [key, val] of Object.entries(updates)) {
+        if (key === 'id' || key === 'teamMemberships') continue;
+        if (val === undefined) continue;
+
+        if (key === 'hotelNights') {
+            const hn = val || {};
+            const nights = {
+                'HotelNight_MonTue': !!hn['mon-tue'],
+                'HotelNight_TueWed': !!hn['tue-wed'],
+                'HotelNight_WedThu': !!hn['wed-thu'],
+                'HotelNight_ThuFri': !!hn['thu-fri'],
+                'HotelNight_FriSat': !!hn['fri-sat'],
+                'HotelNight_SatSun': !!hn['sat-sun'],
+                'HotelNight_SunMon': !!hn['sun-mon']
+            };
+            for (const [col, boolVal] of Object.entries(nights)) {
+                const p = `u${pi++}`;
+                request.input(p, boolVal);
+                setClauses.push(`[${col}] = @${p}`);
+            }
+            continue;
+        }
+
+        if (key === 'roles') {
+            const p = `u${pi++}`;
+            const rolesStr = Array.isArray(val) ? val.join(',') : (val || null);
+            request.input(p, rolesStr === null ? sql.NVarChar : undefined, rolesStr ?? null);
+            setClauses.push(`[Roles] = @${p}`);
+            continue;
+        }
+
+        const sqlCol = camelToSql(key);
+        const p = `u${pi++}`;
+        if (val === null) {
+            request.input(p, sql.NVarChar, null);
+        } else {
+            request.input(p, val);
+        }
+        setClauses.push(`[${sqlCol}] = @${p}`);
+    }
+
+    if (setClauses.length === 0) return;
+    await request.query(`UPDATE [Participations] SET ${setClauses.join(', ')} WHERE [Id] = @_id`);
+}
+
 // ============================================================
 // EMAIL LOG — with results object
 // ============================================================
@@ -570,8 +622,13 @@ class GenericStorage {
         const current = await this.getById(id);
         if (!current) return null;
 
-        // Use atomic UPDATE instead of DELETE+INSERT to avoid data loss on failure
-        await updateGeneric(pool, this.config.table, this.config.idCol, id, updates);
+        // Participations have special column mappings (hotel nights, roles array)
+        if (this.config.table === 'Participations') {
+            await updateParticipation(pool, id, updates);
+        } else {
+            // Use atomic UPDATE instead of DELETE+INSERT to avoid data loss on failure
+            await updateGeneric(pool, this.config.table, this.config.idCol, id, updates);
+        }
 
         // Return the merged view
         return { ...current, ...updates };
