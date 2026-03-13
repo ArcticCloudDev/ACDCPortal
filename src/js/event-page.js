@@ -149,6 +149,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (isTeamParticipant && eventBadges && eventBadges.length > 0) {
             document.getElementById('event-nav')?.classList.remove('hidden');
+            // Restore tab from URL hash
+            const hash = location.hash.replace('#', '');
+            if (hash === 'badges' || hash === 'team') {
+                switchEventTab(hash, false);
+            }
         } else {
             document.getElementById('event-nav')?.classList.add('hidden');
         }
@@ -1215,7 +1220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ============================================================
 
     // Switch between My Team / Badges top-level tabs
-    window.switchEventTab = function(tabName) {
+    window.switchEventTab = function(tabName, updateHash = true) {
         // Toggle nav tab active states
         document.querySelectorAll('.event-nav-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.tab === tabName);
@@ -1224,7 +1229,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.event-tab-content').forEach(c => {
             c.classList.toggle('active', c.id === `tab-content-${tabName}`);
         });
+        // Persist tab in URL hash
+        if (updateHash) {
+            history.replaceState(null, '', `#${tabName}`);
+        }
     };
+
+    // Restore tab from URL hash on load and handle back/forward
+    window.addEventListener('hashchange', () => {
+        const tab = location.hash.replace('#', '');
+        if (tab === 'team' || tab === 'badges') {
+            switchEventTab(tab, false);
+        }
+    });
 
     // Switch category tab within the badges section
     window.switchBadgeTab = function(tabBtn) {

@@ -139,10 +139,9 @@ app.http('badges-update', {
             const id = request.params.id;
             const body = await request.json();
 
-            const badges = await badgesStorage.getAll();
-            const index = badges.findIndex(b => b.id === id);
+            const badge = await badgesStorage.getById(id);
 
-            if (index < 0) {
+            if (!badge) {
                 return { status: 404, jsonBody: { error: 'Badge not found' } };
             }
 
@@ -160,21 +159,20 @@ app.http('badges-update', {
                 }
             }
 
-            badges[index] = {
-                ...badges[index],
-                name: body.name !== undefined ? body.name : badges[index].name,
-                description: body.description !== undefined ? body.description : badges[index].description,
-                category: body.category !== undefined ? body.category : badges[index].category,
-                claimType: body.claimType !== undefined ? body.claimType : (badges[index].claimType || 'common'),
-                imageUrl: body.imageUrl !== undefined ? body.imageUrl : badges[index].imageUrl,
-                points: body.points !== undefined ? parseInt(body.points) : badges[index].points,
+            const updates = {
+                name: body.name !== undefined ? body.name : badge.name,
+                description: body.description !== undefined ? body.description : badge.description,
+                category: body.category !== undefined ? body.category : badge.category,
+                claimType: body.claimType !== undefined ? body.claimType : (badge.claimType || 'common'),
+                imageUrl: body.imageUrl !== undefined ? body.imageUrl : badge.imageUrl,
+                points: body.points !== undefined ? parseInt(body.points) : badge.points,
                 updatedAt: new Date().toISOString()
             };
 
-            await badgesStorage.saveAll(badges);
+            const updated = await badgesStorage.update(id, updates);
 
-            context.log(`Badge updated: ${badges[index].name}`);
-            return { status: 200, jsonBody: badges[index] };
+            context.log(`Badge updated: ${updates.name}`);
+            return { status: 200, jsonBody: updated };
         } catch (error) {
             context.error('Badges UPDATE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update badge' } };
