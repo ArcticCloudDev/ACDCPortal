@@ -105,10 +105,25 @@ async function triggerSequenceEmails(userId, eventId, context) {
                             </td>
                         </tr>
                         <tr>
-                            <td style="padding: 28px 40px 32px 40px; color: #334155; font-size: 15px; line-height: 1.75;">
+                            <td style="padding: 28px 40px 8px 40px; color: #334155; font-size: 15px; line-height: 1.75;">
                                 ${campaign.content}
                             </td>
                         </tr>
+                        ${campaign.ctaUrl ? `
+                        <tr>
+                            <td style="padding: 0 40px 32px 40px; text-align: center;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
+                                    <tr>
+                                        <td align="center" bgcolor="#1d4ed8" style="background-color: #1d4ed8; border-radius: 8px; padding: 14px 36px;">
+                                            <a href="${campaign.ctaUrl}" style="display: block; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; line-height: 1.2;">
+                                                ${campaign.ctaText || 'Learn More'}
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        ` : `<tr><td style="padding-bottom: 32px;"></td></tr>`}
                     </table>
                 </td>
             </tr>

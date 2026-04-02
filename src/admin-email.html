@@ -489,7 +489,7 @@
                         const email = await response.json();
                         
                         document.getElementById('subject').value = email.subject;
-                        quill.root.innerHTML = email.content || '';
+                        quill.clipboard.dangerouslyPasteHTML(email.content || '');
                         
                         // Set template - use template field if exists, or handle old campaigns with type="sequence"
                         selectedTemplate = email.template || email.type || 'announcement';
@@ -961,6 +961,26 @@
             document.getElementById('scheduled-send-time').disabled = lock;
             quill.enable(!lock);
             
+            // Apply visual locked state to editor
+            const editorContainer = document.getElementById('editor-container');
+            if (lock) {
+                editorContainer.style.opacity = '1';
+                editorContainer.style.background = '';
+                // Overlay to visually block editing
+                let overlay = document.getElementById('editor-lock-overlay');
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.id = 'editor-lock-overlay';
+                    overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;z-index:10;cursor:not-allowed;';
+                    editorContainer.style.position = 'relative';
+                    editorContainer.appendChild(overlay);
+                }
+                overlay.style.display = 'block';
+            } else {
+                const overlay = document.getElementById('editor-lock-overlay');
+                if (overlay) overlay.style.display = 'none';
+            }
+            
             // Lock/unlock template cards
             document.querySelectorAll('.template-card').forEach(card => {
                 card.style.pointerEvents = lock ? 'none' : 'auto';
@@ -969,7 +989,7 @@
             
             // Show/hide message
             if (lock) {
-                showStatus('Email is live - switch to draft to make changes', 'info');
+                showStatus('Email is live — switch to Draft to make changes', 'warning');
             }
         }
 
