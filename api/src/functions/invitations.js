@@ -94,7 +94,7 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
             </tr>
         `).join('');
 
-        const digestTemplatePath = path.join(__dirname, '../../../data/email-templates/sequence-digest.html');
+        const digestTemplatePath = path.join(__dirname, '../../data/email-templates/sequence-digest.html');
         const digestTemplate = await fs.readFile(digestTemplatePath, 'utf-8');
         const digestHtml = processTemplate(digestTemplate, {
             eventName: event.name,
@@ -165,7 +165,7 @@ function getTeamsArray(data) {
 async function buildTeamWelcomeEmailForInvitation(invitation, context) {
     try {
         // Load system email config
-        const configPath = path.join(__dirname, '../../../data/system-email-config.json');
+        const configPath = path.join(__dirname, '../../data/system-email-config.json');
         const configData = await fs.readFile(configPath, 'utf-8');
         const config = JSON.parse(configData);
         const template = config.templates['team-welcome'];
@@ -211,7 +211,7 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
         mergeData.closingText = processTemplate(rawClosing, mergeData);
 
         // Load HTML template
-        const templatePath = path.join(__dirname, '../../../data/email-templates/team-welcome.html');
+        const templatePath = path.join(__dirname, '../../data/email-templates/team-welcome.html');
         const templateHtml = await fs.readFile(templatePath, 'utf-8');
 
         // Process template with merge data
@@ -563,12 +563,6 @@ app.http('invitations-accept', {
                         isTeamAdmin: false,
                         hotelNights: {},
                         hotelPaidBy: initialHotelPaidBy,
-                        // Legacy compatibility
-                        teamMemberships: invitation.teamId ? [{
-                            teamId: invitation.teamId,
-                            isAdmin: false,
-                            isParticipant: inviteRole === 'participant'
-                        }] : [],
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
                     };
@@ -593,17 +587,6 @@ app.http('invitations-accept', {
                             existing.convertedAt = new Date().toISOString();
                             existing.convertedVia = 'invitation';
                             existing.invitationId = invitation.id;
-                        }
-                        // Add to teamMemberships (UI depends on this array)
-                        if (!existing.teamMemberships) existing.teamMemberships = [];
-                        const alreadyMember = existing.teamMemberships.some(m => m.teamId === invitation.teamId);
-                        if (!alreadyMember) {
-                            existing.teamMemberships.push({
-                                teamId: invitation.teamId,
-                                isAdmin: false,
-                                isParticipant: true,
-                                joinedAt: new Date().toISOString()
-                            });
                         }
                     }
                     // Populate userId/email if missing

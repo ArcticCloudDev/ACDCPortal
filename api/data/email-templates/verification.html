@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f3f4f6;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f3f4f6;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="500" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1a365d 0%, #2d4a6f 50%, #3b82f6 100%); padding: 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700;">Verify Your Interest</h1>
+                            <p style="color: #93c5fd; margin: 8px 0 0; font-size: 14px;">{{eventName}}</p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 30px; text-align: center;">
+                            <p style="color: #334155; font-size: 16px; margin: 0 0 20px; line-height: 1.6;">
+                                Hi {{firstName}},<br>
+                                Use this code to verify your interest registration:
+                            </p>
+                            <div style="background: #f1f5f9; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                                <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1a365d;">{{code}}</span>
+                            </div>
+                            <p style="color: #64748b; font-size: 14px; margin: 20px 0 0;">
+                                This code expires in 15 minutes.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="color: #94a3b8; font-size: 12px; margin: 0;">Arctic Cloud Developer Challenge</p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

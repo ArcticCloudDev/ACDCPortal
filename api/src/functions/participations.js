@@ -113,7 +113,7 @@ async function triggerSequenceEmails(userId, eventId, context) {
             </tr>
         `).join('');
 
-        const digestTemplatePath = path.join(__dirname, '../../../data/email-templates/sequence-digest.html');
+        const digestTemplatePath = path.join(__dirname, '../../data/email-templates/sequence-digest.html');
         const digestTemplate = await fs.readFile(digestTemplatePath, 'utf-8');
         const digestHtml = processTemplate(digestTemplate, {
             eventName: event.name,

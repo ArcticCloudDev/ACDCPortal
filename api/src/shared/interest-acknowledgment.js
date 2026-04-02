@@ -45,7 +45,7 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
         const path = require('path');
         const { processTemplate } = require('./mail');
 
-        const configPath = path.join(__dirname, '../../../data/system-email-config.json');
+        const configPath = path.join(__dirname, '../../data/system-email-config.json');
         const configData = await fs.readFile(configPath, 'utf-8');
         const config = JSON.parse(configData);
         const template = config.templates['interest-acknowledgment'];
@@ -79,7 +79,7 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
         };
 
         // Load HTML template file
-        const templatePath = path.join(__dirname, '../../../data/email-templates/interest-acknowledgment.html');
+        const templatePath = path.join(__dirname, '../../data/email-templates/interest-acknowledgment.html');
         const templateHtml = await fs.readFile(templatePath, 'utf-8');
 
         // Process template with merge data

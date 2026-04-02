@@ -7,7 +7,7 @@ const path = require('path');
 
 // Helper to get template
 async function getTemplate(templateName) {
-    const templatePath = path.join(__dirname, `../../../data/email-templates/${templateName}.html`);
+    const templatePath = path.join(__dirname, `../../data/email-templates/${templateName}.html`);
     try {
         return await fs.readFile(templatePath, 'utf8');
     } catch (error) {
@@ -22,7 +22,7 @@ app.http('email-templates', {
     route: 'email/templates',
     handler: async (request, context) => {
         try {
-            const templatesDir = path.join(__dirname, '../../../data/email-templates');
+            const templatesDir = path.join(__dirname, '../../data/email-templates');
             const files = await fs.readdir(templatesDir);
             const templates = files
                 .filter(f => f.endsWith('.html'))

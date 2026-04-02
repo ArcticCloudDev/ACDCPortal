@@ -51,7 +51,7 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
         const { processTemplate } = require('./mail');
 
         // Load system email config
-        const configPath = path.join(__dirname, '../../../data/system-email-config.json');
+        const configPath = path.join(__dirname, '../../data/system-email-config.json');
         const configData = await fs.readFile(configPath, 'utf-8');
         const config = JSON.parse(configData);
         const template = config.templates['team-welcome'];
@@ -87,7 +87,7 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
         };
 
         // Load HTML template file
-        const templatePath = path.join(__dirname, '../../../data/email-templates/team-welcome.html');
+        const templatePath = path.join(__dirname, '../../data/email-templates/team-welcome.html');
         const templateHtml = await fs.readFile(templatePath, 'utf-8');
 
         // Process template with merge data
@@ -160,7 +160,7 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
                     `).join('');
 
                     // Load digest template
-                    const digestTemplatePath = path.join(__dirname, '../../../data/email-templates/sequence-digest.html');
+                    const digestTemplatePath = path.join(__dirname, '../../data/email-templates/sequence-digest.html');
                     const digestTemplate = await fs.readFile(digestTemplatePath, 'utf-8');
                     const digestHtml = processTemplate(digestTemplate, {
                         eventName: event.name,

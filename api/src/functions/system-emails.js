@@ -56,7 +56,7 @@ app.http('system-emails-upload-theme', {
 
             // Save file to data/email-themes/
             const fs = require('fs').promises;
-            const themesDir = path.join(__dirname, '../../../data/email-themes');
+            const themesDir = path.join(__dirname, '../../data/email-themes');
             
             // Create directory if it doesn't exist
             await fs.mkdir(themesDir, { recursive: true });
@@ -190,7 +190,7 @@ app.http('system-emails-test', {
                 };
 
                 // Load HTML template file
-                const templatePath = path.join(__dirname, '../../../data/email-templates', `${templateType}.html`);
+                const templatePath = path.join(__dirname, '../../data/email-templates', `${templateType}.html`);
                 const templateHtml = await fs.readFile(templatePath, 'utf-8');
                 
                 // Process template with merge data
@@ -257,7 +257,7 @@ app.http('system-emails-send', {
             };
 
             // Load HTML template file
-            const templatePath = path.join(__dirname, '../../../data/email-templates', `${templateType}.html`);
+            const templatePath = path.join(__dirname, '../../data/email-templates', `${templateType}.html`);
             const templateHtml = await fs.readFile(templatePath, 'utf-8');
             
             // Process template with merge data

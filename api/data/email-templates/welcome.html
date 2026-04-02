@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to ACDC!</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          
+          <!-- Header with celebration style -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #1a365d 0%, #2d4a6f 50%, #3b82f6 100%); padding: 50px 40px; text-align: center;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center">
+                    <div style="margin: 0 auto 20px;">
+                      <span style="font-size: 48px;">🏔️</span>
+                    </div>
+                    <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 600;">Welcome to ACDC!</h1>
+                    <p style="color: #93c5fd; margin: 15px 0 0; font-size: 18px;">Arctic Cloud Developer Challenge</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Welcome message -->
+          <tr>
+            <td style="padding: 40px;">
+              <p style="color: #334155; font-size: 18px; line-height: 1.6; margin: 0 0 25px;">
+                Hi {{firstName}}! 🎉
+              </p>
+              <p style="color: #334155; font-size: 16px; line-height: 1.7; margin: 0 0 25px;">
+                Welcome aboard! You're now registered for the Arctic Cloud Developer Challenge. We're thrilled to have you join our community of cloud innovators.
+              </p>
+              
+              <!-- What's next box -->
+              <div style="background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%); border: 1px solid #bfdbfe; padding: 25px; margin: 30px 0; border-radius: 12px;">
+                <p style="color: #1e40af; font-size: 16px; margin: 0 0 15px; font-weight: 600;">🚀 What's Next?</p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="padding: 8px 0;">
+                      <span style="color: #3b82f6; font-size: 18px; margin-right: 10px;">1.</span>
+                      <span style="color: #334155; font-size: 15px;"><strong>Complete your profile</strong> - Add your details</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0;">
+                      <span style="color: #3b82f6; font-size: 18px; margin-right: 10px;">2.</span>
+                      <span style="color: #334155; font-size: 15px;"><strong>Join or create a team</strong> - Collaborate with others</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0;">
+                      <span style="color: #3b82f6; font-size: 18px; margin-right: 10px;">3.</span>
+                      <span style="color: #334155; font-size: 15px;"><strong>Start building</strong> - Let your creativity shine</span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              
+              <!-- CTA Button (bulletproof for Outlook + Gmail) -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="padding: 20px 0;">
+                    <table role="presentation" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td align="center" bgcolor="#1d4ed8" style="background-color: #1d4ed8; border-radius: 8px; padding: 18px 50px;">
+                          <a href="{{portalUrl}}" style="display: block; color: #ffffff; text-decoration: none; font-size: 18px; font-weight: 600; line-height: 1.2;">
+                            Go to My Dashboard
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Resources section -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 30px 40px; border-top: 1px solid #e2e8f0;">
+              <p style="color: #475569; font-size: 14px; font-weight: 600; margin: 0 0 15px;">📚 Helpful Resources</p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="padding: 5px 0;">
+                    <a href="{{rulesUrl}}" style="color: #3b82f6; font-size: 14px; text-decoration: none;">📋 Challenge Rules & Guidelines</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 5px 0;">
+                    <a href="{{faqUrl}}" style="color: #3b82f6; font-size: 14px; text-decoration: none;">❓ Frequently Asked Questions</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 5px 0;">
+                    <a href="{{contactUrl}}" style="color: #3b82f6; font-size: 14px; text-decoration: none;">💬 Contact Support</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #1a365d; padding: 25px 40px; text-align: center;">
+              <p style="color: #93c5fd; font-size: 13px; margin: 0;">
+                Arctic Cloud Developer Challenge • {{year}}
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

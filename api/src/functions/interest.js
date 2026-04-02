@@ -123,7 +123,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
             `).join('');
 
             // Load digest template
-            const digestTemplatePath = path.join(__dirname, '../../../data/email-templates/sequence-digest.html');
+            const digestTemplatePath = path.join(__dirname, '../../data/email-templates/sequence-digest.html');
             let digestTemplate = await fs.readFile(digestTemplatePath, 'utf-8');
             const digestContent = processTemplate(digestTemplate, {
                 eventName: event.name,
@@ -260,7 +260,7 @@ function generateGuid() {
 
 // Helper to get verification email HTML from template
 async function getVerificationEmailHtml(code, eventName, firstName) {
-    const templatePath = path.join(__dirname, '../../../data/email-templates/verification.html');
+    const templatePath = path.join(__dirname, '../../data/email-templates/verification.html');
     const template = await fs.readFile(templatePath, 'utf-8');
     return processTemplate(template, {
         code: code,

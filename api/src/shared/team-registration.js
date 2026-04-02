@@ -30,7 +30,7 @@ async function sendTeamRegistrationEmail(adminEmail, eventId, teamName, committe
         const { processTemplate, sendEmail } = require('./mail');
 
         // Load system email config
-        const configPath = path.join(__dirname, '../../../data/system-email-config.json');
+        const configPath = path.join(__dirname, '../../data/system-email-config.json');
         const configData = await fs.readFile(configPath, 'utf-8');
         const config = JSON.parse(configData);
         const template = config.templates['team-registration'];
@@ -66,7 +66,7 @@ async function sendTeamRegistrationEmail(adminEmail, eventId, teamName, committe
         };
 
         // Load HTML template file
-        const templatePath = path.join(__dirname, '../../../data/email-templates/team-registration.html');
+        const templatePath = path.join(__dirname, '../../data/email-templates/team-registration.html');
         const templateHtml = await fs.readFile(templatePath, 'utf-8');
 
         // Process template with merge data

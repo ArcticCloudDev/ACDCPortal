@@ -99,7 +99,7 @@ async function sendEmail({ to, subject, htmlContent, textContent }) {
     try {
         const debugFs = require('fs');
         const debugPath = require('path');
-        const debugFile = debugPath.join(__dirname, '../../../data/debug-last-email.html');
+        const debugFile = debugPath.join(__dirname, '../../data/debug-last-email.html');
         debugFs.writeFileSync(debugFile, processedHtml, 'utf-8');
         console.log(`[DEBUG] Email HTML saved to ${debugFile}`);
         console.log(`[DEBUG] Subject: ${subject}`);
