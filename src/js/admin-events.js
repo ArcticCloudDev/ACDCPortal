@@ -1276,8 +1276,8 @@ function renderSequenceEmails() {
                             </div>
                         </div>
                         <div class="email-card-actions">
-                            ${!isLive && order > 1 ? `<button class="btn-sm" onclick="moveEmailUp('${email.id}')">↑</button>` : ''}
-                            ${!isLive && order < emails.length ? `<button class="btn-sm" onclick="moveEmailDown('${email.id}')">↓</button>` : ''}
+                            ${order > 1 ? `<button class="btn-sm" onclick="moveEmailUp('${email.id}')">↑</button>` : ''}
+                            ${order < emails.length ? `<button class="btn-sm" onclick="moveEmailDown('${email.id}')">↓</button>` : ''}
                             <button class="btn-sm" onclick="editSequenceEmailInline('${email.id}')">${editButtonText}</button>
                         </div>
                     </div>
@@ -1653,20 +1653,22 @@ async function reorderEmail(emailId, direction) {
     const email = currentEventSequence.emails.find(e => e.id === emailId);
     if (!email) return;
     
-    const newOrder = email.order + direction;
+    const currentOrder = email.sequenceOrder;
+    const newOrder = currentOrder + direction;
     const emails = [...currentEventSequence.emails];
-    const otherEmail = emails.find(e => e.order === newOrder);
+    const otherEmail = emails.find(e => e.sequenceOrder === newOrder);
     
     if (!otherEmail) return;
     
     try {
-        // Swap orders
-        await API.sequences.updateEmail(currentEventSequence.id, email.id, { order: newOrder });
-        await API.sequences.updateEmail(currentEventSequence.id, otherEmail.id, { order: email.order });
+        // Swap sequenceOrder values between the two emails
+        await API.campaigns.update(email.id, { sequenceOrder: newOrder });
+        await API.campaigns.update(otherEmail.id, { sequenceOrder: currentOrder });
         
         // Reload sequence
         const response = await API.sequences.get(currentEventSequence.id);
         currentEventSequence = response.sequence;
+        currentEventSequence.emails = response.emails || [];
         renderSequenceEmails();
         
     } catch (error) {
