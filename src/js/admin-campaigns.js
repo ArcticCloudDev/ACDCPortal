@@ -298,7 +298,7 @@ function renderEmails() {
         return;
     }
     
-    tbody.innerHTML = currentEmails.map(email => {
+    tbody.innerHTML = currentEmails.map((email, index) => {
         const createdDate = new Date(email.createdAt).toLocaleDateString();
         const status = email.status || 'draft';
         
@@ -333,7 +333,7 @@ function renderEmails() {
         
         return `
             <tr>
-                <td><span class="badge sequence">#${email.sequenceOrder || 1}</span></td>
+                <td><span class="badge sequence">#${email.sequenceOrder ?? (index + 1)}</span></td>
                 <td>
                     <strong>${escapeHtml(email.subject)}</strong>
                     ${scheduleBadge}
@@ -443,6 +443,7 @@ function showCreateEmailForm() {
     
     document.getElementById('email-id').value = '';
     document.getElementById('email-sequence-id').value = currentSequenceId;
+    document.getElementById('email-sequence-order').value = '';
     document.getElementById('email-form-title').textContent = 'Create Email';
     document.getElementById('email-subject').value = '';
     quill.setContents([]);
@@ -467,6 +468,7 @@ async function editEmail(emailId) {
         
         document.getElementById('email-id').value = email.id;
         document.getElementById('email-sequence-id').value = email.sequenceId;
+        document.getElementById('email-sequence-order').value = email.sequenceOrder ?? '';
         document.getElementById('email-form-title').textContent = 'Edit Email';
         document.getElementById('email-subject').value = email.subject;
         quill.root.innerHTML = email.content;
@@ -500,7 +502,7 @@ async function editEmail(emailId) {
         
         document.getElementById('delete-email-btn').classList.remove('hidden');
         
-        document.getElementById('email-order-info').innerHTML = `This is email #<span id="email-number">${email.sequenceOrder || 1}</span> of ${currentEmails.length} in the sequence.`;
+        document.getElementById('email-order-info').innerHTML = `This is email #<span id="email-number">${email.sequenceOrder ?? currentEmails.length}</span> of ${currentEmails.length} in the sequence.`;
         
         setupStatusHandlers();
         showView('email-form');
@@ -513,6 +515,7 @@ async function editEmail(emailId) {
 async function saveEmail() {
     const emailId = document.getElementById('email-id').value;
     const sequenceId = document.getElementById('email-sequence-id').value;
+    const sequenceOrderRaw = document.getElementById('email-sequence-order').value;
     const subject = document.getElementById('email-subject').value.trim();
     const content = quill.root.innerHTML;
     const ctaUrl = document.getElementById('email-cta-url').value.trim();
@@ -533,6 +536,11 @@ async function saveEmail() {
         ctaText,
         status
     };
+    
+    // Preserve sequenceOrder when editing an existing email
+    if (emailId && sequenceOrderRaw !== '') {
+        data.sequenceOrder = parseInt(sequenceOrderRaw, 10);
+    }
     
     // Only include schedule if a value is set
     if (scheduleValue) {
