@@ -1,6 +1,7 @@
 // Auth Check Email - Check if email exists in the system (for register/login routing)
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
 
 app.http('auth-check-email', {
@@ -65,6 +66,7 @@ app.http('auth-check-email', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Auth check email error:', error);
             return {
                 status: 500,

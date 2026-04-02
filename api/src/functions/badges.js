@@ -1,6 +1,7 @@
 // Badges API - Master badges, event-badge assignments, and badge claims
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 
@@ -49,6 +50,7 @@ app.http('badges-list', {
                 jsonBody: badges
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Badges LIST error:', error);
             return { status: 500, jsonBody: { error: 'Failed to list badges' } };
         }
@@ -72,6 +74,7 @@ app.http('badges-get', {
 
             return { status: 200, jsonBody: badge };
         } catch (error) {
+            await logError(context, error);
             context.error('Badges GET error:', error);
             return { status: 500, jsonBody: { error: 'Failed to get badge' } };
         }
@@ -121,6 +124,7 @@ app.http('badges-create', {
             context.log(`Badge created: ${newBadge.name}`);
             return { status: 201, jsonBody: newBadge };
         } catch (error) {
+            await logError(context, error);
             context.error('Badges CREATE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to create badge' } };
         }
@@ -172,6 +176,7 @@ app.http('badges-update', {
             context.log(`Badge updated: ${updates.name}`);
             return { status: 200, jsonBody: updated };
         } catch (error) {
+            await logError(context, error);
             context.error('Badges UPDATE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update badge' } };
         }
@@ -207,6 +212,7 @@ app.http('badges-delete', {
             context.log(`Badge deleted: ${badgeName}`);
             return { status: 200, jsonBody: { message: 'Badge deleted' } };
         } catch (error) {
+            await logError(context, error);
             context.error('Badges DELETE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to delete badge' } };
         }
@@ -252,6 +258,7 @@ app.http('event-badges-list', {
 
             return { status: 200, jsonBody: enriched };
         } catch (error) {
+            await logError(context, error);
             context.error('Event badges LIST error:', error);
             return { status: 500, jsonBody: { error: 'Failed to list event badges' } };
         }
@@ -321,6 +328,7 @@ app.http('event-badges-add', {
                 jsonBody: { added, skipped }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Event badges ADD error:', error);
             return { status: 500, jsonBody: { error: 'Failed to add badges to event' } };
         }
@@ -352,6 +360,7 @@ app.http('event-badges-update', {
             context.log(`Event-badge ${id} updated for event ${eventId}`);
             return { status: 200, jsonBody: updated };
         } catch (error) {
+            await logError(context, error);
             context.error('Event badges UPDATE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update event badge' } };
         }
@@ -386,6 +395,7 @@ app.http('event-badges-remove', {
             context.log(`Badge removed from event ${eventId}`);
             return { status: 200, jsonBody: { message: 'Badge removed from event' } };
         } catch (error) {
+            await logError(context, error);
             context.error('Event badges REMOVE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to remove badge from event' } };
         }
@@ -459,6 +469,7 @@ app.http('event-badges-bulk', {
                 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Event badges BULK error:', error);
             return { status: 500, jsonBody: { error: 'Failed to bulk update event badges' } };
         }
@@ -504,6 +515,7 @@ app.http('badge-claims-list', {
 
             return { status: 200, jsonBody: enriched };
         } catch (error) {
+            await logError(context, error);
             context.error('Badge claims LIST error:', error);
             return { status: 500, jsonBody: { error: 'Failed to list badge claims' } };
         }
@@ -601,6 +613,7 @@ app.http('badge-claims-create', {
             context.log(`Badge claim created: team ${body.teamId} claims badge ${eventBadge.badgeId}`);
             return { status: 201, jsonBody: newClaim };
         } catch (error) {
+            await logError(context, error);
             context.error('Badge claims CREATE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to create badge claim' } };
         }
@@ -641,6 +654,7 @@ app.http('badge-claims-review', {
             context.log(`Badge claim ${id} ${body.status} by ${body.reviewedBy || 'unknown'}`);
             return { status: 200, jsonBody: updated };
         } catch (error) {
+            await logError(context, error);
             context.error('Badge claims REVIEW error:', error);
             return { status: 500, jsonBody: { error: 'Failed to review badge claim' } };
         }
@@ -679,6 +693,7 @@ app.http('badge-claims-update', {
             context.log(`Badge claim ${id} updated`);
             return { status: 200, jsonBody: updated };
         } catch (error) {
+            await logError(context, error);
             context.error('Badge claims UPDATE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update badge claim' } };
         }
@@ -705,6 +720,7 @@ app.http('badge-claims-delete', {
             context.log(`Badge claim ${id} deleted`);
             return { status: 200, jsonBody: { message: 'Badge claim deleted' } };
         } catch (error) {
+            await logError(context, error);
             context.error('Badge claims DELETE error:', error);
             return { status: 500, jsonBody: { error: 'Failed to delete badge claim' } };
         }
@@ -770,6 +786,7 @@ app.http('badge-claims-award', {
             context.log(`Exclusive badge awarded: ${badge.name} to team ${body.teamId} by ${body.awardedBy || 'unknown'}`);
             return { status: 201, jsonBody: newClaim };
         } catch (error) {
+            await logError(context, error);
             context.error('Badge claims AWARD error:', error);
             return { status: 500, jsonBody: { error: 'Failed to award badge' } };
         }
@@ -828,6 +845,7 @@ app.http('badge-claims-assign', {
                 return { status: 201, jsonBody: draft };
             }
         } catch (error) {
+            await logError(context, error);
             context.error('Badge claims ASSIGN error:', error);
             return { status: 500, jsonBody: { error: 'Failed to assign badge' } };
         }
@@ -889,6 +907,7 @@ app.http('event-badge-summary', {
                 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Badge summary error:', error);
             return { status: 500, jsonBody: { error: 'Failed to get badge summary' } };
         }

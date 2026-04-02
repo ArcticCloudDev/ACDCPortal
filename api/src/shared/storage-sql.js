@@ -127,6 +127,7 @@ const TABLE_MAP = {
     'solo-queue':       { table: 'SoloQueue',        wrapperKey: null,             idCol: 'Id' },
     'sequence-progress':{ table: null },  // dead code
     'system-email-config': { table: 'SystemEmailConfig', wrapperKey: 'templates',  idCol: 'TemplateKey' },
+    'errors':           { table: 'Errors',           wrapperKey: 'errors',         idCol: 'Id' },
 };
 
 // ============================================================

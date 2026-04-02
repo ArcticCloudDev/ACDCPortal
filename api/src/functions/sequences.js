@@ -1,5 +1,6 @@
 // Sequences API - Manage email sequences (one per event)
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { v4: uuidv4 } = require('uuid');
 
@@ -40,6 +41,7 @@ app.http('sequences-list', {
             
             return { status: 200, jsonBody: { sequences } };
         } catch (error) {
+            await logError(context, error);
             context.error('Sequences list error:', error);
             return { status: 500, jsonBody: { error: 'Failed to list sequences' } };
         }
@@ -92,6 +94,7 @@ app.http('sequences-get', {
                 } 
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Sequence get error:', error);
             return { status: 500, jsonBody: { error: 'Failed to get sequence' } };
         }
@@ -127,6 +130,7 @@ app.http('sequences-create', {
             
             return { status: 201, jsonBody: { sequence } };
         } catch (error) {
+            await logError(context, error);
             context.error('Sequence create error:', error);
             return { status: 500, jsonBody: { error: 'Failed to create sequence' } };
         }
@@ -162,6 +166,7 @@ app.http('sequences-update', {
             
             return { status: 200, jsonBody: { sequence: data.sequences[index] } };
         } catch (error) {
+            await logError(context, error);
             context.error('Sequence update error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update sequence' } };
         }
@@ -191,6 +196,7 @@ app.http('sequences-delete', {
             
             return { status: 200, jsonBody: { message: 'Sequence deleted' } };
         } catch (error) {
+            await logError(context, error);
             context.error('Sequence delete error:', error);
             return { status: 500, jsonBody: { error: 'Failed to delete sequence' } };
         }
@@ -253,6 +259,7 @@ app.http('sequences-copy', {
                 } 
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Sequence copy error:', error);
             return { status: 500, jsonBody: { error: 'Failed to copy sequence' } };
         }

@@ -1,5 +1,6 @@
 // Judge Invitation Email - Send invitation email when someone is invited as a judge
 const { readData } = require('./storage');
+const { logError } = require('./error-log');
 
 /**
  * Send judge invitation email
@@ -100,6 +101,7 @@ async function buildJudgeInvitationEmail(invitation, context) {
         };
 
     } catch (error) {
+        await logError(context, error);
         context.error('Error in buildJudgeInvitationEmail:', error);
         return {
             success: false,

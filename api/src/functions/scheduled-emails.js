@@ -2,6 +2,7 @@
 // HTTP endpoint for manual/automated triggering
 // When deployed to Azure, can be called by Azure Logic Apps, Power Automate, or an external timer
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
 
@@ -126,6 +127,7 @@ async function processScheduledEmails(context) {
                     emailsSent++;
                     context.log(`[SCHEDULED] Sent to ${lead.email}`);
                 } catch (err) {
+                    await logError(context, err);
                     delivery.status = 'failed';
                     delivery.error = err.message;
                     emailsFailed++;
@@ -186,6 +188,7 @@ async function processScheduledEmails(context) {
         return result;
 
     } catch (error) {
+        await logError(context, error);
         context.error('[SCHEDULED] ERROR:', error);
         const result = await recordRun(startTime, 0, 0, [], context, error.message);
         return result;
@@ -220,6 +223,7 @@ async function recordRun(startTime, sent, failed, campaigns, context, error = nu
 
         return run;
     } catch (err) {
+        await logError(context, err);
         context.error('[SCHEDULED] Failed to record run:', err);
         return null;
     }

@@ -1,6 +1,7 @@
 // Send OTP API - Generate and send verification code
 // Security: rate limiting, hashed storage, reCAPTCHA, anti-enumeration
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
 const Email = require('../shared/email');
 
@@ -164,6 +165,7 @@ app.http('auth-send-otp', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Auth send OTP error:', error);
             return {
                 status: 500,
@@ -197,6 +199,7 @@ async function verifyCaptcha(token, context) {
         const data = await response.json();
         return data.success && (data.score || 1) >= 0.5;
     } catch (error) {
+        await logError(context, error);
         context.error('reCAPTCHA verification error:', error);
         return false;
     }

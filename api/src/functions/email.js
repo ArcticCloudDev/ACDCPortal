@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { readData, writeData } = require('../shared/storage');
 const { sendEmail, sendBulkEmail, processTemplate, SENDER_EMAIL } = require('../shared/mail');
 const { v4: uuidv4 } = require('uuid');
@@ -11,6 +12,7 @@ async function getTemplate(templateName) {
     try {
         return await fs.readFile(templatePath, 'utf8');
     } catch (error) {
+        await logError(context, error);
         throw new Error(`Template '${templateName}' not found`);
     }
 }
@@ -33,6 +35,7 @@ app.http('email-templates', {
             
             return { status: 200, jsonBody: templates };
         } catch (error) {
+            await logError(context, error);
             context.error('Error listing templates:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -50,6 +53,7 @@ app.http('email-template-get', {
             const template = await getTemplate(id);
             return { status: 200, jsonBody: { id, content: template } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting template:', error);
             return { status: 404, jsonBody: { error: error.message } };
         }
@@ -85,6 +89,7 @@ app.http('email-preview', {
             
             return { status: 200, jsonBody: { html: preview } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error previewing email:', error);
             return { status: 500, jsonBody: { error: error.message, stack: error.stack } };
         }
@@ -186,6 +191,7 @@ app.http('email-recipients', {
             
             return { status: 200, jsonBody: formattedRecipients };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting recipients:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -249,6 +255,7 @@ app.http('email-send', {
                     });
                     emailLog.results.sent++;
                 } catch (error) {
+                    await logError(context, error);
                     emailLog.results.failed++;
                     emailLog.results.errors.push({
                         email: recipient.email,
@@ -266,6 +273,7 @@ app.http('email-send', {
             
             return { status: 200, jsonBody: emailLog };
         } catch (error) {
+            await logError(context, error);
             context.error('Error sending email:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -286,6 +294,7 @@ app.http('email-history', {
             );
             return { status: 200, jsonBody: emails };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting email history:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }

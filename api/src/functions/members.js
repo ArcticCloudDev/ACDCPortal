@@ -1,6 +1,7 @@
 // Members API - Add and remove team members
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
@@ -108,6 +109,7 @@ app.http('members-add', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Members POST error:', error);
             return {
                 status: 500,
@@ -243,6 +245,7 @@ app.http('members-remove', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Members DELETE error:', error);
             return {
                 status: 500,

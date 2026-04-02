@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { readData, writeData } = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
 const { buildInvitationEmail } = require('../shared/invitation-email');
@@ -126,6 +127,7 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
             }
             context.log(`Sent digest of ${campaignsToSend.length} sequence emails to ${email} for event ${eventId}`);
         } catch (err) {
+            await logError(context, err);
             for (const campaign of campaignsToSend) {
                 deliveries.push({
                     id: uuidv4(),
@@ -142,6 +144,7 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
 
         await writeData('email-deliveries.json', { deliveries });
     } catch (error) {
+        await logError(context, error);
         context.log(`Warning: Failed to trigger sequence emails: ${error.message}`);
     }
 }
@@ -220,6 +223,7 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
 
         return { success: true, htmlContent, subject };
     } catch (error) {
+        await logError(context, error);
         context.error('Error building team welcome email for invitation:', error);
         return { success: false, reason: error.message };
     }
@@ -365,6 +369,7 @@ app.http('invitations-create', {
             
             return { status: 201, jsonBody: invitation };
         } catch (error) {
+            await logError(context, error);
             context.error('Error creating invitation:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -405,6 +410,7 @@ app.http('invitations-list', {
             
             return { status: 200, jsonBody: invitations };
         } catch (error) {
+            await logError(context, error);
             context.error('Error listing invitations:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -445,6 +451,7 @@ app.http('invitations-get', {
                         eventLocation = event.location || null;
                     }
                 } catch (err) {
+                    await logError(context, err);
                     // Non-critical, continue without event details
                 }
             }
@@ -454,6 +461,7 @@ app.http('invitations-get', {
                 jsonBody: { ...invitation, isExpired, eventName, eventStartDate, eventEndDate, eventLocation } 
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting invitation:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -620,6 +628,7 @@ app.http('invitations-accept', {
                 } 
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error accepting invitation:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -648,6 +657,7 @@ app.http('invitations-cancel', {
             
             return { status: 200, jsonBody: { success: true } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error cancelling invitation:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -708,6 +718,7 @@ app.http('invitations-resend', {
             
             return { status: 200, jsonBody: { success: true } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error resending invitation:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }

@@ -1,5 +1,6 @@
 // ACDC Portal - File Upload API (SharePoint)
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const SharePointStorage = require('../shared/sharepoint');
 const multipart = require('parse-multipart-data');
 
@@ -96,6 +97,7 @@ app.http('files-upload', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('File upload error:', error);
             return { 
                 status: 500, 
@@ -138,6 +140,7 @@ app.http('files-list', {
             return { status: 200, jsonBody: files };
             
         } catch (error) {
+            await logError(context, error);
             // If folder doesn't exist, return empty list
             if (error.message.includes('404')) {
                 return { status: 200, jsonBody: [] };
@@ -187,6 +190,7 @@ app.http('files-download', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('File download error:', error);
             return { 
                 status: 500, 
@@ -229,6 +233,7 @@ app.http('files-delete', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('File delete error:', error);
             return { 
                 status: 500, 
@@ -274,6 +279,7 @@ app.http('files-setup-columns', {
             };
 
         } catch (error) {
+            await logError(context, error);
             context.error('Setup columns error:', error);
             return {
                 status: 500,

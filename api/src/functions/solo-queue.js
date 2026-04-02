@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const { Storage: GenericStorage } = require('../shared/storage');
 
@@ -29,6 +30,7 @@ async function markRegisteredInInterestQueue(userId, eventId, context) {
             context.log(`Marked interest queue entry for ${user.email} as registered (solo queue)`);
         }
     } catch (error) {
+        await logError(context, error);
         context.log(`Warning: Failed to update interest queue: ${error.message}`);
     }
 }
@@ -60,6 +62,7 @@ app.http('solo-queue-get', {
                 jsonBody: queue
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting solo queue:', error);
             return {
                 status: 500,
@@ -123,6 +126,7 @@ app.http('solo-queue-join', {
                 jsonBody: { ...entry, position }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error joining solo queue:', error);
             return {
                 status: 500,
@@ -160,6 +164,7 @@ app.http('solo-queue-leave', {
                 jsonBody: { success: true }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error leaving solo queue:', error);
             return {
                 status: 500,
@@ -203,6 +208,7 @@ app.http('solo-queue-position', {
                 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting queue position:', error);
             return {
                 status: 500,

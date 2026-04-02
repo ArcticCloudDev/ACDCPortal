@@ -1,6 +1,7 @@
 // Register Initiate - Start registration, send verification code
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const Email = require('../shared/email');
@@ -97,6 +98,7 @@ app.http('register-initiate', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Register initiate error:', error);
             return {
                 status: 500,

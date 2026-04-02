@@ -426,5 +426,19 @@ CREATE TABLE SoloQueue (
 );
 GO
 
-PRINT '=== All 23 tables created successfully ===';
+-- 24. Errors (centralised error log)
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Errors')
+CREATE TABLE [Errors] (
+    [Id]           UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID(),
+    [OccurredAt]   DATETIME2        NOT NULL DEFAULT GETUTCDATE(),
+    [FunctionName] NVARCHAR(100)    NOT NULL,
+    [ErrorMessage] NVARCHAR(MAX)    NOT NULL,
+    [StackTrace]   NVARCHAR(MAX)    NULL,
+    [Details]      NVARCHAR(MAX)    NULL,
+    [Severity]     NVARCHAR(20)     NOT NULL DEFAULT 'error',
+    CONSTRAINT [PK_Errors] PRIMARY KEY ([Id])
+);
+GO
+
+PRINT '=== All 24 tables created successfully ===';
 SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME;

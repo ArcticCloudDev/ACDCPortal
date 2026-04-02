@@ -1,6 +1,7 @@
 // Invitation Email Builder - Unified builder for judge & committee invitation emails
 // Uses the invitation's role to select the correct template and config.
 const { readData } = require('./storage');
+const { logError } = require('./error-log');
 
 /**
  * Build an invitation email for any role (judge, committee, etc.)
@@ -111,6 +112,7 @@ async function buildInvitationEmail(invitation, context) {
         };
 
     } catch (error) {
+        await logError(context, error);
         context.error(`Error in buildInvitationEmail (${role}):`, error);
         return {
             success: false,

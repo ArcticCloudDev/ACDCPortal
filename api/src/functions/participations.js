@@ -4,6 +4,7 @@
 // Email is the anchor identity (present before userId)
 
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const { Storage } = require('../shared/storage');
 
@@ -145,6 +146,7 @@ async function triggerSequenceEmails(userId, eventId, context) {
             }
             context.log(`Sent digest of ${campaignsToSend.length} sequence emails to ${user.email} for event ${eventId}`);
         } catch (err) {
+            await logError(context, err);
             for (const campaign of campaignsToSend) {
                 deliveryData.deliveries.push({
                     id: uuidv4(),
@@ -161,6 +163,7 @@ async function triggerSequenceEmails(userId, eventId, context) {
 
         await deliveriesStorage.saveRaw(deliveryData);
     } catch (error) {
+        await logError(context, error);
         context.log(`Warning: Failed to trigger sequence emails: ${error.message}`);
     }
 }
@@ -185,6 +188,7 @@ async function removeFromInterestQueue(userId, eventId, context) {
             context.log(`Marked interest queue entry for ${user.email} as registered for event ${eventId}`);
         }
     } catch (error) {
+        await logError(context, error);
         context.log(`Warning: Failed to update interest queue: ${error.message}`);
     }
 }
@@ -208,6 +212,7 @@ app.http('participations-get-all', {
             });
             return { status: 200, jsonBody: participations };
         } catch (error) {
+            await logError(context, error);
             context.error('Participations GET ALL error:', error);
             return { status: 500, jsonBody: { error: 'Internal server error' } };
         }
@@ -255,6 +260,7 @@ app.http('participations-get', {
 
             return { status: 200, jsonBody: participation };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting participation:', error);
             return { status: 500, jsonBody: { error: 'Failed to get participation' } };
         }
@@ -348,6 +354,7 @@ app.http('participations-upsert', {
                 return { status: 201, jsonBody: newParticipation };
             }
         } catch (error) {
+            await logError(context, error);
             context.error('Error upserting participation:', error);
             return { status: 500, jsonBody: { error: 'Failed to save participation' } };
         }
@@ -399,6 +406,7 @@ app.http('participations-update', {
 
             return { status: 200, jsonBody: updated };
         } catch (error) {
+            await logError(context, error);
             context.error('Error updating participation:', error);
             return { status: 500, jsonBody: { error: 'Failed to update participation' } };
         }
@@ -481,6 +489,7 @@ app.http('participations-delete', {
 
             return { status: 200, jsonBody: { success: true, cleaned } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error deleting participation:', error);
             return { status: 500, jsonBody: { error: 'Failed to delete participation' } };
         }
@@ -563,6 +572,7 @@ app.http('participations-update-roles-v2', {
             context.log(`Roles updated for participation ${id}: [${roles.join(', ')}]`);
             return { status: 200, jsonBody: participation };
         } catch (error) {
+            await logError(context, error);
             context.error('Error updating roles:', error);
             return { status: 500, jsonBody: { error: 'Failed to update roles' } };
         }
@@ -655,6 +665,7 @@ app.http('participations-assign-team', {
             context.log(`Team assignment updated for participation ${id}: team=${teamId}`);
             return { status: 200, jsonBody: participation };
         } catch (error) {
+            await logError(context, error);
             context.error('Error assigning team:', error);
             return { status: 500, jsonBody: { error: 'Failed to assign team' } };
         }
@@ -696,6 +707,7 @@ app.http('participations-update-hotel', {
             context.log(`Hotel nights updated for participation ${id}`);
             return { status: 200, jsonBody: updated };
         } catch (error) {
+            await logError(context, error);
             context.error('Error updating hotel nights:', error);
             return { status: 500, jsonBody: { error: 'Failed to update hotel nights' } };
         }
@@ -733,6 +745,7 @@ app.http('participations-by-event', {
 
             return { status: 200, jsonBody: results };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting participations by event:', error);
             return { status: 500, jsonBody: { error: 'Failed to get participations' } };
         }
@@ -778,6 +791,7 @@ app.http('participations-by-person', {
 
             return { status: 200, jsonBody: enriched };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting participations by person:', error);
             return { status: 500, jsonBody: { error: 'Failed to get participations' } };
         }
@@ -812,6 +826,7 @@ app.http('participations-by-team', {
 
             return { status: 200, jsonBody: teamParticipations };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting participations by team:', error);
             return { status: 500, jsonBody: { error: 'Failed to get participations' } };
         }
@@ -851,6 +866,7 @@ app.http('participations-team-count', {
                 jsonBody: { teamId, adminCount, participantCount, maxParticipants: 5 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting team count:', error);
             return { status: 500, jsonBody: { error: 'Failed to get team count' } };
         }
@@ -969,6 +985,7 @@ app.http('participations-add-team-membership', {
             context.log(`Legacy team membership added for participation ${id}, team ${teamId}`);
             return { status: 200, jsonBody: participation };
         } catch (error) {
+            await logError(context, error);
             context.error('Error adding team membership:', error);
             return { status: 500, jsonBody: { error: 'Failed to add team membership' } };
         }
@@ -1035,6 +1052,7 @@ app.http('participations-remove-team-membership', {
             context.log(`Legacy team membership removed for participation ${id}, team ${teamId}`);
             return { status: 200, jsonBody: participation };
         } catch (error) {
+            await logError(context, error);
             context.error('Error removing team membership:', error);
             return { status: 500, jsonBody: { error: 'Failed to remove team membership' } };
         }
@@ -1103,6 +1121,7 @@ app.http('participations-toggle-participant', {
             context.log(`Legacy participant toggled for participation ${id}, team ${teamId}: ${isParticipant}`);
             return { status: 200, jsonBody: participation };
         } catch (error) {
+            await logError(context, error);
             context.error('Error toggling participant:', error);
             return { status: 500, jsonBody: { error: 'Failed to toggle participant' } };
         }
@@ -1185,6 +1204,7 @@ app.http('participations-update-team-roles', {
             context.log(`Legacy team roles updated for participation ${id}, team ${teamId}`);
             return { status: 200, jsonBody: participation };
         } catch (error) {
+            await logError(context, error);
             context.error('Error updating team roles:', error);
             return { status: 500, jsonBody: { error: 'Failed to update roles' } };
         }

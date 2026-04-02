@@ -1,6 +1,7 @@
 // Users API - Get and Update user profiles
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
 
 // Get all users (for admin dashboard)
@@ -16,6 +17,7 @@ app.http('users-get-all', {
                 jsonBody: users
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Users GET ALL error:', error);
             return {
                 status: 500,
@@ -54,6 +56,7 @@ app.http('users-get', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Users GET error:', error);
             return {
                 status: 500,
@@ -86,6 +89,7 @@ app.http('users-get-by-id', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Users GET by ID error:', error);
             return {
                 status: 500,
@@ -143,6 +147,7 @@ app.http('users-update', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Users PUT error:', error);
             return {
                 status: 500,
@@ -187,6 +192,7 @@ app.http('users-create', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Users POST error:', error);
             return {
                 status: 500,

@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { readData, writeData } = require('../shared/storage');
 const { v4: uuidv4 } = require('uuid');
 
@@ -17,6 +18,7 @@ app.http('interest-queue-list', {
             
             return { status: 200, jsonBody: entries };
         } catch (error) {
+            await logError(context, error);
             context.error('Error listing interest queue:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -69,6 +71,7 @@ app.http('interest-queue-add', {
 
             return { status: 201, jsonBody: newEntry };
         } catch (error) {
+            await logError(context, error);
             context.error('Error adding to interest queue:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -97,6 +100,7 @@ app.http('interest-queue-check', {
                 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error checking interest queue:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -126,6 +130,7 @@ app.http('interest-queue-remove', {
 
             return { status: 200, jsonBody: { removed } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error removing from interest queue:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -170,6 +175,7 @@ app.http('interest-queue-mark-registered', {
                 updated: entries.length
             }};
         } catch (error) {
+            await logError(context, error);
             context.error('Error marking as registered:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -196,6 +202,7 @@ app.http('interest-queue-stats', {
             
             return { status: 200, jsonBody: stats };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting interest queue stats:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -232,6 +239,7 @@ app.http('interest-queue-mark-notified', {
                 updated: count
             }};
         } catch (error) {
+            await logError(context, error);
             context.error('Error marking as notified:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }

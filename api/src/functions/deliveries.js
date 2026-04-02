@@ -1,5 +1,6 @@
 // ACDC Portal - Email Deliveries API
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
 
@@ -28,6 +29,7 @@ app.http('deliveries-scheduled-runs', {
                 jsonBody: { runs: recentRuns }
             };
         } catch (err) {
+            await logError(context, err);
             context.error('Failed to get scheduled runs:', err);
             return {
                 status: 500,
@@ -130,6 +132,7 @@ app.http('deliveries-event', {
                 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting deliveries:', error);
             return { status: 500, jsonBody: { error: 'Failed to get deliveries' } };
         }
@@ -210,6 +213,7 @@ app.http('deliveries-retry', {
                     }
                 };
             } catch (err) {
+                await logError(context, err);
                 context.log(`[RETRY] ERROR sending email: ${err.message}`);
                 context.error(err);
                 
@@ -233,6 +237,7 @@ app.http('deliveries-retry', {
                 };
             }
         } catch (error) {
+            await logError(context, error);
             context.error('Error retrying delivery:', error);
             return { status: 500, jsonBody: { error: 'Failed to retry delivery' } };
         }

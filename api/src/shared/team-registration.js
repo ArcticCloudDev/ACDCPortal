@@ -1,5 +1,6 @@
 // Team Registration Email - Send confirmation when a team is registered
 const Storage = require('./storage');
+const { logError } = require('./error-log');
 
 /**
  * Send registration confirmation email to the team admin
@@ -86,6 +87,7 @@ async function sendTeamRegistrationEmail(adminEmail, eventId, teamName, committe
         return { success: true };
 
     } catch (error) {
+        await logError(context, error);
         context.error('Error in sendTeamRegistrationEmail:', error);
         return {
             success: false,

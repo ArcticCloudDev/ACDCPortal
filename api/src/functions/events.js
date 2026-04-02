@@ -1,5 +1,6 @@
 // ACDC Portal - Events API
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 
 const eventsStorage = new Storage('events');
@@ -99,6 +100,7 @@ app.http('events-list', {
                 jsonBody: events
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error listing events:', error);
             return {
                 status: 500,
@@ -131,6 +133,7 @@ app.http('events-active', {
                 jsonBody: activeEvent
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting active event:', error);
             return {
                 status: 500,
@@ -163,6 +166,7 @@ app.http('events-get', {
                 jsonBody: event
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error getting event:', error);
             return {
                 status: 500,
@@ -239,6 +243,7 @@ app.http('events-create', {
                 jsonBody: newEvent
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error creating event:', error);
             return {
                 status: 500,
@@ -321,6 +326,7 @@ app.http('events-update', {
                 jsonBody: updatedEvent
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error updating event:', error);
             return {
                 status: 500,
@@ -360,6 +366,7 @@ app.http('events-delete', {
                 jsonBody: { message: 'Event deleted', event: deletedEvent }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error deleting event:', error);
             return {
                 status: 500,

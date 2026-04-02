@@ -1,5 +1,6 @@
 // Team Welcome Email - Send welcome email when team member joins
 const Storage = require('./storage');
+const { logError } = require('./error-log');
 const Email = require('./email');
 
 /**
@@ -199,6 +200,7 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
                     context.log(`Sent digest of ${sequenceCampaigns.length} sequence emails to ${memberEmail}`);
                 }
             } catch (error) {
+                await logError(context, error);
                 context.error(`Failed to send sequence digest to ${memberEmail}:`, error);
                 emailsFailed++;
             }
@@ -212,6 +214,7 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
         };
 
     } catch (error) {
+        await logError(context, error);
         context.error('Error in sendTeamWelcomeEmail:', error);
         return {
             success: false,

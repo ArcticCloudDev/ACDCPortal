@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { readData, writeData } = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
 const { uploadFile } = require('../shared/storage');
@@ -75,6 +76,7 @@ app.http('system-emails-upload-theme', {
                 } 
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error uploading theme:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -91,6 +93,7 @@ app.http('system-emails-config-get', {
             const config = await readData('system-email-config.json');
             return { status: 200, jsonBody: config };
         } catch (error) {
+            await logError(context, error);
             context.error('Error loading config:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -108,6 +111,7 @@ app.http('system-emails-config-put', {
             await writeData('system-email-config.json', config);
             return { status: 200, jsonBody: { message: 'Config saved' } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error saving config:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -209,6 +213,7 @@ app.http('system-emails-test', {
 
             return { status: 200, jsonBody: { message: 'Test email sent' } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error sending test email:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }
@@ -275,6 +280,7 @@ app.http('system-emails-send', {
 
             return { status: 200, jsonBody: { message: 'Email sent' } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error sending email:', error);
             return { status: 500, jsonBody: { error: error.message } };
         }

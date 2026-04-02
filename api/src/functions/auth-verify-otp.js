@@ -1,6 +1,7 @@
 // Verify OTP API - Verify code and issue JWT session token
 // Security: timing-safe comparison, attempt limiting, hashed codes, single-use
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const jwt = require('jsonwebtoken');
 const Storage = require('../shared/storage');
 const Email = require('../shared/email');
@@ -146,6 +147,7 @@ app.http('auth-verify-otp', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Auth verify OTP error:', error);
             return {
                 status: 500,

@@ -1,6 +1,7 @@
 // Teams API - Get team info and members
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
@@ -43,6 +44,7 @@ app.http('teams-list', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Teams LIST error:', error);
             return {
                 status: 500,
@@ -83,6 +85,7 @@ app.http('teams-get', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Teams GET error:', error);
             return {
                 status: 500,
@@ -165,6 +168,7 @@ app.http('teams-create', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Teams POST error:', error);
             return {
                 status: 500,
@@ -219,6 +223,7 @@ app.http('teams-update', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Teams UPDATE error:', error);
             return {
                 status: 500,
@@ -349,6 +354,7 @@ app.http('teams-delete', {
             };
 
         } catch (error) {
+            await logError(context, error);
             context.error('Teams DELETE error:', error);
             return {
                 status: 500,
@@ -391,6 +397,7 @@ app.http('teams-members', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Teams members GET error:', error);
             return {
                 status: 500,

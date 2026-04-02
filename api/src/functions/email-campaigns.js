@@ -1,6 +1,7 @@
 // Email Campaigns API
 // Stores email templates once, tracks deliveries per recipient
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
 const { v4: uuidv4 } = require('uuid');
@@ -54,6 +55,7 @@ app.http('email-campaigns-list', {
 
             return { status: 200, jsonBody: { campaigns } };
         } catch (error) {
+            await logError(context, error);
             context.error('Campaigns list error:', error);
             return { status: 500, jsonBody: { error: 'Failed to list campaigns' } };
         }
@@ -77,6 +79,7 @@ app.http('campaigns-get', {
 
             return { status: 200, jsonBody: campaign };
         } catch (error) {
+            await logError(context, error);
             context.error('Campaign get error:', error);
             return { status: 500, jsonBody: { error: 'Failed to get campaign' } };
         }
@@ -127,6 +130,7 @@ app.http('email-campaigns-get', {
                 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Campaign get error:', error);
             return { status: 500, jsonBody: { error: 'Failed to get campaign' } };
         }
@@ -168,6 +172,7 @@ app.http('campaigns-create', {
 
             return { status: 201, jsonBody: campaign };
         } catch (error) {
+            await logError(context, error);
             context.error('Campaign create error:', error);
             return { status: 500, jsonBody: { error: 'Failed to create campaign' } };
         }
@@ -214,6 +219,7 @@ app.http('email-campaigns-create', {
 
             return { status: 201, jsonBody: campaign };
         } catch (error) {
+            await logError(context, error);
             context.error('Campaign create error:', error);
             return { status: 500, jsonBody: { error: 'Failed to create campaign' } };
         }
@@ -252,6 +258,7 @@ app.http('campaigns-update', {
 
             return { status: 200, jsonBody: campaign };
         } catch (error) {
+            await logError(context, error);
             context.error('Campaign update error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update campaign' } };
         }
@@ -290,6 +297,7 @@ app.http('email-campaigns-update', {
 
             return { status: 200, jsonBody: campaign };
         } catch (error) {
+            await logError(context, error);
             context.error('Campaign update error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update campaign' } };
         }
@@ -321,6 +329,7 @@ app.http('campaigns-delete', {
 
             return { status: 200, jsonBody: { message: 'Campaign deleted' } };
         } catch (error) {
+            await logError(context, error);
             context.error('Campaign delete error:', error);
             return { status: 500, jsonBody: { error: 'Failed to delete campaign' } };
         }
@@ -354,6 +363,7 @@ app.http('email-campaigns-delete', {
 
             return { status: 200, jsonBody: { message: 'Campaign deleted' } };
         } catch (error) {
+            await logError(context, error);
             context.error('Campaign delete error:', error);
             return { status: 500, jsonBody: { error: 'Failed to delete campaign' } };
         }
@@ -423,6 +433,7 @@ app.http('email-campaigns-send', {
                     delivery.sentAt = new Date().toISOString();
                     results.sent++;
                 } catch (err) {
+                    await logError(context, err);
                     delivery.status = 'failed';
                     delivery.error = err.message;
                     results.failed++;
@@ -436,6 +447,7 @@ app.http('email-campaigns-send', {
 
             return { status: 200, jsonBody: results };
         } catch (error) {
+            await logError(context, error);
             context.error('Campaign send error:', error);
             return { status: 500, jsonBody: { error: 'Failed to send campaign' } };
         }
@@ -514,6 +526,7 @@ app.http('email-trigger-sequence', {
                     delivery.sentAt = new Date().toISOString();
                     results.sent++;
                 } catch (err) {
+                    await logError(context, err);
                     delivery.status = 'failed';
                     delivery.error = err.message;
                     results.failed++;
@@ -527,6 +540,7 @@ app.http('email-trigger-sequence', {
             context.log(`Sequence emails for user ${user.email} on event ${eventId}: sent=${results.sent}, skipped=${results.skipped}`);
             return { status: 200, jsonBody: results };
         } catch (error) {
+            await logError(context, error);
             context.error('Trigger sequence error:', error);
             return { status: 500, jsonBody: { error: 'Failed to trigger sequence emails' } };
         }
@@ -558,6 +572,7 @@ app.http('email-campaigns-deliveries', {
 
             return { status: 200, jsonBody: { deliveries: enriched } };
         } catch (error) {
+            await logError(context, error);
             context.error('Get deliveries error:', error);
             return { status: 500, jsonBody: { error: 'Failed to get deliveries' } };
         }

@@ -1,5 +1,6 @@
 // ACDC Portal - Interest Registration API
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
 const { v4: uuidv4 } = require('uuid');
@@ -173,6 +174,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                     });
                 }
             } catch (err) {
+                await logError(context, err);
                 context.log(`[SEQUENCE] ERROR sending digest email: ${err.message}`);
                 context.error(err);
                 delivery.status = 'failed';
@@ -212,6 +214,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 sent++;
                 result.sent = sent;
             } catch (err) {
+                await logError(context, err);
                 context.log(`[SEQUENCE] ERROR sending email: ${err.message}`);
                 context.error(err);
                 delivery.status = 'failed';
@@ -233,6 +236,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
         }
         return result;
     } catch (error) {
+        await logError(context, error);
         // Don't fail the main operation if this fails
         context.log(`[SEQUENCE] WARNING: Failed to trigger sequence emails: ${error.message}`);
         context.error(error);
@@ -352,6 +356,7 @@ app.http('interest-register', {
                 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error registering interest:', error);
             return { status: 500, jsonBody: { error: 'Failed to register interest' } };
         }
@@ -529,6 +534,7 @@ app.http('interest-verify', {
                 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error verifying interest:', error);
             return { status: 500, jsonBody: { error: 'Failed to verify' } };
         }
@@ -678,6 +684,7 @@ app.http('interest-record', {
                 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error recording interest:', error);
             return { status: 500, jsonBody: { error: 'Failed to record interest' } };
         }
@@ -721,6 +728,7 @@ app.http('interest-list', {
 
             return { status: 200, jsonBody: { leads: sanitizedLeads } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error listing leads:', error);
             return { status: 500, jsonBody: { error: 'Failed to list leads' } };
         }
@@ -788,6 +796,7 @@ app.http('interest-delete', {
 
             return { status: 200, jsonBody: { message: 'Lead deleted', cleaned } };
         } catch (error) {
+            await logError(context, error);
             context.error('Error deleting lead:', error);
             return { status: 500, jsonBody: { error: 'Failed to delete lead' } };
         }
@@ -897,6 +906,7 @@ app.http('interest-restart-sequence', {
                 }
             };
         } catch (error) {
+            await logError(context, error);
             context.error('Error restarting sequence:', error);
             return { status: 500, jsonBody: { error: 'Failed to restart sequence: ' + error.message } };
         }

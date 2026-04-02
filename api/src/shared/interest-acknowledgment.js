@@ -1,5 +1,6 @@
 // Interest Acknowledgment Email - Send acknowledgment when an interest lead joins a team
 const Storage = require('./storage');
+const { logError } = require('./error-log');
 
 /**
  * Send interest acknowledgment email to a member who was a verified interest lead
@@ -104,6 +105,7 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
         };
 
     } catch (error) {
+        await logError(context, error);
         context.error('Error in sendInterestAcknowledgmentEmail:', error);
         return {
             success: false,

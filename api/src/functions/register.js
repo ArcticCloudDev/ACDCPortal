@@ -3,6 +3,7 @@
 // Phase 2: After OTP verification, complete registration (save team/user to JSON)
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
+const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const ParticipationsStore = new (Storage.Storage)('participations');
@@ -109,6 +110,7 @@ app.http('register-start', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Register start error:', error);
             return {
                 status: 500,
@@ -269,6 +271,7 @@ app.http('register-complete', {
             };
             
         } catch (error) {
+            await logError(context, error);
             context.error('Register complete error:', error);
             return {
                 status: 500,
@@ -307,6 +310,7 @@ async function verifyCaptcha(token, context) {
         // v3 returns a score (0.0-1.0), we require at least 0.5
         return data.success && (data.score === undefined || data.score >= 0.5);
     } catch (error) {
+        await logError(context, error);
         context.error('reCAPTCHA verification error:', error);
         return false;
     }

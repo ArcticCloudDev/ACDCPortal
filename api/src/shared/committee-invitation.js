@@ -1,5 +1,6 @@
 // Committee Invitation Email - Send invitation email when someone is invited to the committee
 const { readData } = require('./storage');
+const { logError } = require('./error-log');
 
 /**
  * Send committee invitation email
@@ -100,6 +101,7 @@ async function buildCommitteeInvitationEmail(invitation, context) {
         };
 
     } catch (error) {
+        await logError(context, error);
         context.error('Error in buildCommitteeInvitationEmail:', error);
         return {
             success: false,
