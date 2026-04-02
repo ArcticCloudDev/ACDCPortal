@@ -327,7 +327,7 @@ async function updateParticipation(pool, id, updates) {
     let pi = 0;
 
     for (const [key, val] of Object.entries(updates)) {
-        if (key === 'id' || key === 'teamMemberships') continue;
+        if (key === 'id') continue;
         if (val === undefined) continue;
 
         if (key === 'hotelNights') {

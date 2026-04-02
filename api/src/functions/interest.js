@@ -19,19 +19,29 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
     try {
         context.log(`[SEQUENCE] Starting sequence emails for ${lead.email}, event: ${event.name}`);
 
+        const result = {
+            sent: 0,
+            failed: 0,
+            eligible: 0,
+            totalCampaigns: 0,
+            reason: null
+        };
+
         // Determine recipient identifier for delivery records
         const recipientIdField = lead.userId ? { userId: lead.userId } : { leadId: lead.id };
         
         // Check if event has sequence enabled
         if (!event.sequenceEnabled) {
             context.log(`[SEQUENCE] Sequence not enabled for event ${event.id}`);
-            return;
+            result.reason = 'sequence-disabled';
+            return result;
         }
         
         // Check if event has a sequence assigned (backward compatibility)
         if (!event.sequenceId) {
             context.log(`[SEQUENCE] No sequence assigned to event ${event.id}`);
-            return;
+            result.reason = 'no-sequence-assigned';
+            return result;
         }
         
         // Get sequence campaigns for this sequence
@@ -42,11 +52,14 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
             .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence')
             .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
 
+        result.totalCampaigns = sequenceCampaigns.length;
+
         context.log(`[SEQUENCE] Found ${sequenceCampaigns.length} sequence campaigns for sequence ${event.sequenceId}`);
         
         if (sequenceCampaigns.length === 0) {
             context.log(`[SEQUENCE] No sequence campaigns for event ${event.id}`);
-            return;
+            result.reason = 'no-sequence-campaigns';
+            return result;
         }
 
         // Get existing deliveries for this email
@@ -59,10 +72,12 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
 
         // Filter campaigns that haven't been sent yet
         const campaignsToSend = sequenceCampaigns.filter(campaign => !userDeliveries.has(campaign.id));
+        result.eligible = campaignsToSend.length;
         
         if (campaignsToSend.length === 0) {
             context.log(`[SEQUENCE] All emails already sent to ${lead.email}`);
-            return;
+            result.reason = 'already-sent';
+            return result;
         }
 
         context.log(`[SEQUENCE] ${campaignsToSend.length} email(s) to send to ${lead.email}`);
@@ -142,6 +157,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 delivery.status = 'sent';
                 delivery.sentAt = new Date().toISOString();
                 sent = campaignsToSend.length; // Count as all campaigns sent
+                result.sent = sent;
                 
                 // Create individual delivery records for each campaign (for tracking)
                 for (const campaign of campaignsToSend) {
@@ -161,6 +177,8 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 context.error(err);
                 delivery.status = 'failed';
                 delivery.error = err.message;
+                result.failed = campaignsToSend.length;
+                result.reason = 'send-failed';
             }
 
             deliveryData.deliveries.push(delivery);
@@ -192,11 +210,14 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 delivery.status = 'sent';
                 delivery.sentAt = new Date().toISOString();
                 sent++;
+                result.sent = sent;
             } catch (err) {
                 context.log(`[SEQUENCE] ERROR sending email: ${err.message}`);
                 context.error(err);
                 delivery.status = 'failed';
                 delivery.error = err.message;
+                result.failed = 1;
+                result.reason = 'send-failed';
             }
 
             deliveryData.deliveries.push(delivery);
@@ -207,10 +228,22 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
         }
 
         context.log(`[SEQUENCE] COMPLETE: Sent ${sent}/${campaignsToSend.length} sequence emails to ${lead.email} for event ${event.id}`);
+        if (result.sent > 0 && !result.reason) {
+            result.reason = 'sent';
+        }
+        return result;
     } catch (error) {
         // Don't fail the main operation if this fails
         context.log(`[SEQUENCE] WARNING: Failed to trigger sequence emails: ${error.message}`);
         context.error(error);
+        return {
+            sent: 0,
+            failed: 1,
+            eligible: 0,
+            totalCampaigns: 0,
+            reason: 'trigger-error',
+            error: error.message
+        };
     }
 }
 
@@ -448,7 +481,6 @@ app.http('interest-verify', {
                         interestSource: 'interest-form',
                         interestFirstName: verifiedLead.firstName,
                         interestLastName: verifiedLead.lastName,
-                        teamMemberships: [],
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
                     });
@@ -615,7 +647,6 @@ app.http('interest-record', {
                         interestSource: 'unified-register',
                         interestFirstName: leadFirstName,
                         interestLastName: leadLastName,
-                        teamMemberships: [],
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
                     });
@@ -811,10 +842,19 @@ app.http('interest-restart-sequence', {
             // Delete existing delivery records for this recipient to allow resend
             const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
             const beforeCount = deliveryData.deliveries.length;
+            const normalizedEmail = (recipient.email || '').toLowerCase();
             if (leadId) {
-                deliveryData.deliveries = deliveryData.deliveries.filter(d => d.leadId !== leadId);
+                deliveryData.deliveries = deliveryData.deliveries.filter(d => {
+                    if (d.leadId === leadId) return false;
+                    if (normalizedEmail && (d.email || '').toLowerCase() === normalizedEmail) return false;
+                    return true;
+                });
             } else {
-                deliveryData.deliveries = deliveryData.deliveries.filter(d => d.userId !== userId);
+                deliveryData.deliveries = deliveryData.deliveries.filter(d => {
+                    if (d.userId === userId) return false;
+                    if (normalizedEmail && (d.email || '').toLowerCase() === normalizedEmail) return false;
+                    return true;
+                });
             }
             const removedCount = beforeCount - deliveryData.deliveries.length;
             
@@ -833,7 +873,7 @@ app.http('interest-restart-sequence', {
             }
 
             // Trigger sequence emails
-            await triggerSequenceEmailsForLead(recipient, event, context);
+            const triggerResult = await triggerSequenceEmailsForLead(recipient, event, context);
 
             // Get delivery count after sending
             const updatedDeliveryData = await deliveriesStorage.getRaw();
@@ -848,6 +888,7 @@ app.http('interest-restart-sequence', {
                 jsonBody: {
                     message: 'Sequence restarted',
                     sent: sentDeliveries.length,
+                    details: triggerResult,
                     recipient: {
                         email: recipient.email,
                         firstName: recipient.firstName,

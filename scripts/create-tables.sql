@@ -196,24 +196,7 @@ BEGIN
 END
 GO
 
--- 11. TeamMemberships
-IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'TeamMemberships')
-BEGIN
-    CREATE TABLE TeamMemberships (
-        Id              INT              IDENTITY(1,1) NOT NULL PRIMARY KEY,
-        ParticipationId UNIQUEIDENTIFIER NOT NULL,
-        TeamId          UNIQUEIDENTIFIER NOT NULL,
-        IsAdmin         BIT              NOT NULL DEFAULT 0,
-        IsParticipant   BIT              NOT NULL DEFAULT 1,
-        JoinedAt        DATETIME2        NULL,
-        CONSTRAINT FK_TeamMemberships_Participations FOREIGN KEY (ParticipationId) REFERENCES Participations(Id) ON DELETE CASCADE,
-        CONSTRAINT FK_TeamMemberships_Teams FOREIGN KEY (TeamId) REFERENCES Teams(Id),
-        CONSTRAINT UQ_TeamMemberships UNIQUE (ParticipationId, TeamId)
-    );
-END
-GO
-
--- 12. Invitations
+-- 11. Invitations
 IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Invitations')
 BEGIN
     CREATE TABLE Invitations (

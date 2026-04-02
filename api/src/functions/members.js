@@ -3,6 +3,7 @@
 const { app } = require('@azure/functions');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
+const { Storage: GenericStorage } = require('../shared/storage');
 const Email = require('../shared/email');
 const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
 const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
@@ -124,6 +125,14 @@ app.http('members-remove', {
     handler: async (request, context) => {
         try {
             const memberId = request.params.id;
+            let teamId = null;
+
+            try {
+                const body = await request.json();
+                teamId = body?.teamId || null;
+            } catch {
+                // DELETE bodies may be omitted by some clients; teamId remains null.
+            }
             
             if (!memberId) {
                 return {
@@ -143,6 +152,80 @@ app.http('members-remove', {
             
             // Note: Team admin status should be checked via participations.teamMemberships[].isAdmin
             // For now, allow removal (TODO: add proper team admin check)
+
+            // Resolve team/event context for cleanup.
+            let team = null;
+            if (teamId) {
+                team = await Storage.teams.getById(teamId);
+            } else if (user.teamId) {
+                team = await Storage.teams.getById(user.teamId);
+                teamId = user.teamId;
+            }
+
+            const eventId = team?.eventId || null;
+
+            // Remove related participation(s) for this user in the same team/event context.
+            const participationsStorage = new GenericStorage('participations');
+            const invitationsStorage = new GenericStorage('invitations');
+            const deliveriesStorage = new GenericStorage('email-deliveries');
+            const sequenceProgressStorage = new GenericStorage('sequence-progress');
+
+            const allParticipations = await participationsStorage.getAll();
+            const matchedParticipations = allParticipations.filter(p => {
+                if (p.userId !== memberId) return false;
+                if (teamId && p.teamId === teamId) return true;
+                if (eventId && p.eventId === eventId) return true;
+                return !teamId && !eventId;
+            });
+
+            const cleaned = {
+                participations: 0,
+                invitations: 0,
+                deliveries: 0,
+                sequenceProgress: 0
+            };
+
+            for (const participation of matchedParticipations) {
+                await participationsStorage.delete(participation.id);
+                cleaned.participations += 1;
+
+                const pEmail = participation.email;
+                const pUserId = participation.userId;
+                const pEventId = participation.eventId;
+
+                // Clean invitations for this person/event.
+                const invitations = await invitationsStorage.getAll();
+                const filteredInvitations = invitations.filter(inv => {
+                    const emailMatch = pEmail && inv.email && inv.email.toLowerCase() === pEmail.toLowerCase();
+                    return !(emailMatch && inv.eventId === pEventId);
+                });
+                if (filteredInvitations.length < invitations.length) {
+                    cleaned.invitations += invitations.length - filteredInvitations.length;
+                    await invitationsStorage.saveAll(filteredInvitations);
+                }
+
+                // Clean deliveries tied to this user/email.
+                const deliveries = await deliveriesStorage.getAll();
+                const filteredDeliveries = deliveries.filter(d => {
+                    if (pUserId && d.userId === pUserId) return false;
+                    if (pEmail && d.email && d.email.toLowerCase() === pEmail.toLowerCase()) return false;
+                    return true;
+                });
+                if (filteredDeliveries.length < deliveries.length) {
+                    cleaned.deliveries += deliveries.length - filteredDeliveries.length;
+                    await deliveriesStorage.saveAll(filteredDeliveries);
+                }
+
+                // Clean sequence progress if present (legacy JSON-backed dataset).
+                const progressRows = await sequenceProgressStorage.getAll();
+                if (Array.isArray(progressRows) && progressRows.length > 0) {
+                    const filteredProgress = progressRows.filter(p => !(p.userId === pUserId && p.eventId === pEventId));
+                    if (filteredProgress.length < progressRows.length) {
+                        cleaned.sequenceProgress += progressRows.length - filteredProgress.length;
+                        await sequenceProgressStorage.saveAll(filteredProgress);
+                    }
+                }
+            }
             
             // Remove from allowed emails
             await Storage.allowedEmails.remove(user.email);
@@ -150,10 +233,13 @@ app.http('members-remove', {
             // Delete user
             await Storage.users.delete(memberId);
             
-            context.log(`Member ${memberId} removed`);
+            context.log(`Member ${memberId} removed. Cleaned ${cleaned.participations} participations, ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries, ${cleaned.sequenceProgress} sequence progress rows.`);
             return {
                 status: 200,
-                jsonBody: { message: 'Member removed successfully' }
+                jsonBody: {
+                    message: 'Member removed successfully',
+                    cleaned
+                }
             };
             
         } catch (error) {

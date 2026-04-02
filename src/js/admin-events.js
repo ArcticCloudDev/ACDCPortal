@@ -1086,7 +1086,25 @@ async function restartSequence(leadId, userId) {
 
         const result = await response.json();
         console.log('✅ Sequence restart result:', result);
-        alert(`Sequence restarted successfully!\n${result.sent || 0} email(s) sent.\n\nCheck the browser console and server terminal for detailed logs.`);
+
+        const sentCount = result.sent || 0;
+        if (sentCount > 0) {
+            alert(`Sequence restarted successfully!\n${sentCount} email(s) sent.\n\nCheck the browser console and server terminal for detailed logs.`);
+            return;
+        }
+
+        const reasonMap = {
+            'sequence-disabled': 'Sequence is disabled for this event.',
+            'no-sequence-assigned': 'No sequence is assigned to this event.',
+            'no-sequence-campaigns': 'No sequence emails exist for the assigned sequence.',
+            'already-sent': 'All sequence emails are already marked as sent for this recipient.',
+            'send-failed': 'Send attempt failed. Check API logs for mail provider errors.',
+            'trigger-error': 'Sequence trigger failed unexpectedly. Check API logs.'
+        };
+
+        const reasonKey = result.details?.reason;
+        const reason = reasonMap[reasonKey] || 'No eligible sequence emails were sent.';
+        alert(`Sequence restart completed with 0 emails sent.\n\nReason: ${reason}`);
     } catch (error) {
         console.error('❌ Error restarting sequence:', error);
         alert('Failed to restart sequence: ' + error.message);

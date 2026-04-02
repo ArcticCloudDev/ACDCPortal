@@ -455,9 +455,8 @@
                 allParticipants = eventParticipations.map(p => {
                     const user = allUsers.find(u => u.id === p.userId) || {};
                     
-                    // Find team membership
-                    const teamMembership = (p.teamMemberships || []).find(tm => tm.isParticipant);
-                    const team = teamMembership ? allTeams.find(t => t.id === teamMembership.teamId) : null;
+                    // Find team using teamId directly on the participation
+                    const team = p.teamId ? allTeams.find(t => t.id === p.teamId) : null;
 
                     return {
                         id: p.id,
@@ -469,7 +468,7 @@
                         allergies: user.allergies || '',
                         teamId: team?.id || null,
                         teamName: team?.teamName || null,
-                        isTeamAdmin: teamMembership?.isAdmin || false,
+                        isTeamAdmin: p.isTeamAdmin || false,
                         hotelNights: p.hotelNights || {},
                         hotelPaidBy: p.hotelPaidBy || null,
                         roles: normalizeRoles(p.roles)
