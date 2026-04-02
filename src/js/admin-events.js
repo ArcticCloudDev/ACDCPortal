@@ -1650,27 +1650,33 @@ async function moveEmailDown(emailId) {
 }
 
 async function reorderEmail(emailId, direction) {
-    const email = currentEventSequence.emails.find(e => e.id === emailId);
-    if (!email) return;
-    
-    const currentOrder = email.sequenceOrder;
-    const newOrder = currentOrder + direction;
-    const emails = [...currentEventSequence.emails];
-    const otherEmail = emails.find(e => e.sequenceOrder === newOrder);
-    
-    if (!otherEmail) return;
-    
+    // Sort by current display order (handles null sequenceOrder gracefully)
+    const sorted = [...currentEventSequence.emails].sort(
+        (a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0)
+    );
+
+    const idx = sorted.findIndex(e => e.id === emailId);
+    if (idx === -1) return;
+
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+
+    // Swap the two elements
+    [sorted[idx], sorted[swapIdx]] = [sorted[swapIdx], sorted[idx]];
+
     try {
-        // Swap sequenceOrder values between the two emails
-        await API.campaigns.update(email.id, { sequenceOrder: newOrder });
-        await API.campaigns.update(otherEmail.id, { sequenceOrder: currentOrder });
-        
-        // Reload sequence
-        const response = await API.sequences.get(currentEventSequence.id);
-        currentEventSequence = response.sequence;
-        currentEventSequence.emails = response.emails || [];
+        // Update both in parallel with their new 1-based positions
+        await Promise.all([
+            API.campaigns.update(sorted[idx].id,    { sequenceOrder: idx + 1 }),
+            API.campaigns.update(sorted[swapIdx].id, { sequenceOrder: swapIdx + 1 })
+        ]);
+
+        // Apply new order locally and re-render immediately (no server round-trip needed)
+        sorted[idx].sequenceOrder    = idx + 1;
+        sorted[swapIdx].sequenceOrder = swapIdx + 1;
+        currentEventSequence.emails = sorted;
         renderSequenceEmails();
-        
+
     } catch (error) {
         console.error('Failed to reorder emails:', error);
         alert('Failed to reorder emails. Please try again.');
