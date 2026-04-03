@@ -14,9 +14,7 @@ const SIDEBAR_NAV_ITEMS = [
 
     { section: 'Participants' },
     { page: 'teams',    href: 'admin-teams.html',    icon: '👥', label: 'Teams' },
-    { page: 'users',    href: 'admin-users.html',    icon: '👤', label: 'Users' },
-    { page: 'interest', href: 'admin-interest.html', icon: '📋', label: 'Interest Queue' },
-    { page: 'person',   href: 'admin-person.html',   icon: '🔍', label: 'Person Search' },
+    { page: 'users',    href: 'admin-users.html',    icon: '👤', label: 'People' },
 
     { section: 'Competition' },
     { page: 'badges', href: 'admin-badges.html', icon: '🏅', label: 'Badges' },

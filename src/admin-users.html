@@ -1,56 +1,145 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Users - ACDC Committee</title>
+    <title>People - ACDC Committee</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/admin-styles.css">
     <style>
-        /* Page-specific styles */
+        /* ── Toolbar ────────────────────────────────────────────── */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+            background: white;
+            border: 1px solid var(--admin-border);
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
 
-        .filters { display: flex; gap: 10px; align-items: center; }
-        .filters select, .filters input {
-            padding: 6px 12px;
+        .toolbar select, .toolbar input[type="search"] {
+            padding: 6px 10px;
             border: 1px solid var(--admin-border);
             border-radius: 6px;
             font-size: 0.85rem;
+            background: var(--admin-bg);
         }
-        .filters input[type="search"] { width: 200px; }
 
-        .stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
+        .toolbar input[type="search"] { width: 220px; }
+
+        .toolbar-separator {
+            width: 1px;
+            height: 24px;
+            background: var(--admin-border);
+        }
+
+        .view-toggle {
+            display: flex;
+            border: 1px solid var(--admin-border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .view-toggle button {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            border: none;
+            background: white;
+            cursor: pointer;
+            color: var(--admin-text-muted);
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+
+        .view-toggle button.active {
+            background: var(--admin-primary);
+            color: white;
+        }
+
+        .toolbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+        /* ── Stats ─────────────────────────────────────────────── */
+        .stats-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
 
         .stat-card {
             background: white;
             border: 1px solid var(--admin-border);
             border-radius: 8px;
-            padding: 14px 20px;
+            padding: 12px 18px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            min-width: 150px;
+            gap: 10px;
+            min-width: 120px;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s;
         }
 
-        .stat-card .icon {
-            width: 40px; height: 40px;
+        .stat-card:hover { border-color: var(--admin-primary); }
+        .stat-card.active { border-color: var(--admin-primary); box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+
+        .stat-icon {
+            width: 36px; height: 36px;
             border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 1.1rem;
+            font-size: 1rem;
         }
 
-        .stat-card .icon.blue { background: #dbeafe; color: #2563eb; }
-        .stat-card .icon.green { background: #d1fae5; color: #059669; }
-        .stat-card .icon.purple { background: #ede9fe; color: #7c3aed; }
+        .stat-icon.blue   { background: #dbeafe; color: #2563eb; }
+        .stat-icon.green  { background: #d1fae5; color: #059669; }
+        .stat-icon.purple { background: #ede9fe; color: #7c3aed; }
+        .stat-icon.amber  { background: #fef3c7; color: #d97706; }
+        .stat-icon.rose   { background: #fce7f3; color: #be185d; }
+        .stat-icon.slate  { background: #f1f5f9; color: #475569; }
 
-        .stat-card .info .value { font-size: 1.5rem; font-weight: 700; color: var(--admin-sidebar); line-height: 1; }
-        .stat-card .info .label { font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 2px; }
+        .stat-info .value { font-size: 1.4rem; font-weight: 700; color: var(--admin-sidebar); line-height: 1; }
+        .stat-info .label { font-size: 0.72rem; color: var(--admin-text-muted); margin-top: 2px; }
 
+        /* ── Panel ─────────────────────────────────────────────── */
         .panel {
             background: white;
             border-radius: 8px;
             border: 1px solid var(--admin-border);
+            overflow: hidden;
         }
 
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--admin-border);
+            background: var(--admin-bg);
+        }
+
+        .panel-title { font-size: 0.85rem; font-weight: 600; color: var(--admin-sidebar); }
+        .panel-count { font-size: 0.78rem; color: var(--admin-text-muted); }
+
+        /* ── Group header rows ─────────────────────────────────── */
+        .group-header-row td {
+            padding: 8px 16px;
+            background: #f1f5f9;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--admin-text-muted);
+            border-bottom: 1px solid var(--admin-border);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .group-header-row:hover td { background: #e8edf5; }
+        .group-toggle { float: right; font-size: 0.9rem; }
+
+        /* ── Data table ────────────────────────────────────────── */
         .data-table { width: 100%; border-collapse: collapse; }
 
         .data-table th {
@@ -63,55 +152,197 @@
             color: var(--admin-text-muted);
             background: var(--admin-bg);
             border-bottom: 1px solid var(--admin-border);
+            white-space: nowrap;
         }
 
         .data-table td {
-            padding: 12px 16px;
+            padding: 11px 16px;
             border-bottom: 1px solid var(--admin-border);
             font-size: 0.85rem;
+            vertical-align: middle;
         }
 
-        .data-table tbody tr:hover { background: var(--admin-bg); }
+        .data-table tbody tr:hover { background: #f8fafc; cursor: pointer; }
         .data-table tbody tr:last-child td { border-bottom: none; }
+        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
 
-        .badge {
-            display: inline-flex;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 500;
+        /* ── Person cell ───────────────────────────────────────── */
+        .person-cell { display: flex; align-items: center; gap: 10px; }
+
+        .avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: #dbeafe; color: #1d4ed8;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.75rem; font-weight: 700;
+            flex-shrink: 0;
         }
 
-        .badge.committee { background: #ede9fe; color: #7c3aed; }
-        .badge.user { background: #dbeafe; color: #1d4ed8; }
+        .avatar.committee { background: #d1fae5; color: #065f46; }
+        .avatar.judge     { background: #ede9fe; color: #6d28d9; }
+        .avatar.interest  { background: #fef3c7; color: #92400e; }
+        .avatar.invited   { background: #f1f5f9; color: #475569; }
 
+        .person-name  { font-weight: 500; }
+        .person-email { font-size: 0.78rem; color: var(--admin-text-muted); }
+
+        /* ── Role pills ─────────────────────────────────────────── */
+        .role-pill {
+            display: inline-flex; align-items: center; gap: 3px;
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-size: 0.7rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.2px;
+            margin-right: 3px;
+        }
+
+        .role-pill.participant { background: #dbeafe; color: #1d4ed8; }
+        .role-pill.judge       { background: #ede9fe; color: #6d28d9; }
+        .role-pill.committee   { background: #d1fae5; color: #065f46; }
+        .role-pill.interest    { background: #fef3c7; color: #92400e; }
+        .role-pill.sponsor     { background: #fce7f3; color: #9d174d; }
+        .role-pill.invited     { background: #f1f5f9; color: #475569; border: 1px dashed #cbd5e1; }
+
+        /* ── Badges ─────────────────────────────────────────────── */
+        .badge {
+            display: inline-flex; padding: 2px 8px;
+            border-radius: 4px; font-size: 0.7rem; font-weight: 500;
+        }
+
+        .badge.pending  { background: #fef3c7; color: #92400e; }
+        .badge.accepted { background: #d1fae5; color: #065f46; }
+        .badge.declined { background: #fee2e2; color: #991b1b; }
+
+        /* ── Buttons ────────────────────────────────────────────── */
         .btn-sm {
-            padding: 5px 10px;
-            font-size: 0.75rem;
-            border-radius: 4px;
+            padding: 4px 10px; font-size: 0.75rem; border-radius: 4px;
             border: 1px solid var(--admin-border);
-            background: white;
-            color: var(--admin-text);
-            cursor: pointer;
-            text-decoration: none;
+            background: white; color: var(--admin-text);
+            cursor: pointer; text-decoration: none;
+            transition: background 0.1s;
         }
 
         .btn-sm:hover { background: var(--admin-bg); }
         .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
-        .btn-sm.primary:hover { background: #2563eb; }
 
-        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
-
-        .access-denied {
-            max-width: 400px;
-            margin: 100px auto;
-            margin-left: calc(220px + 100px);
-            text-align: center;
-            padding: 40px;
-            background: white;
-            border-radius: 8px;
+        /* ── Interest share bar ─────────────────────────────────── */
+        .share-bar {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--admin-bg);
             border: 1px solid var(--admin-border);
+            border-radius: 6px; padding: 6px 10px;
+            font-size: 0.82rem; margin-bottom: 16px;
         }
+
+        .share-bar input {
+            border: none; background: transparent; flex: 1;
+            font-size: 0.82rem; color: var(--admin-text-muted); min-width: 0;
+        }
+
+        .share-bar button {
+            padding: 3px 8px; border: 1px solid var(--admin-border);
+            background: white; border-radius: 4px; cursor: pointer;
+            font-size: 0.75rem; white-space: nowrap;
+        }
+
+        /* ── Drawer ─────────────────────────────────────────────── */
+        .drawer-backdrop {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.25); z-index: 200;
+        }
+
+        .drawer-backdrop.open { display: block; }
+
+        .drawer {
+            position: fixed; top: 0; right: -520px;
+            width: 520px; height: 100vh;
+            background: white;
+            box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+            z-index: 201;
+            display: flex; flex-direction: column;
+            transition: right 0.25s ease;
+            overflow: hidden;
+        }
+
+        .drawer.open { right: 0; }
+
+        .drawer-header {
+            display: flex; align-items: center; gap: 16px;
+            padding: 20px 24px;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white; flex-shrink: 0;
+        }
+
+        .drawer-avatar {
+            width: 52px; height: 52px; border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; font-weight: 700; flex-shrink: 0;
+        }
+
+        .drawer-info h2 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+        .drawer-info .d-email { color: #94a3b8; font-size: 0.83rem; margin-top: 2px; }
+
+        .drawer-status-pill {
+            display: inline-flex; align-items: center; gap: 4px;
+            margin-top: 6px; padding: 2px 8px; border-radius: 4px;
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+        }
+
+        .drawer-status-pill.registered { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+        .drawer-status-pill.no-account { background: rgba(245,158,11,0.2);  color: #fcd34d; }
+
+        .drawer-close {
+            margin-left: auto; background: transparent; border: none;
+            color: rgba(255,255,255,0.6); font-size: 1.5rem;
+            cursor: pointer; line-height: 1; padding: 0 4px;
+        }
+
+        .drawer-close:hover { color: white; }
+
+        .drawer-stats { display: flex; border-bottom: 1px solid var(--admin-border); flex-shrink: 0; }
+
+        .drawer-stat {
+            flex: 1; padding: 12px 16px; text-align: center;
+            border-right: 1px solid var(--admin-border);
+        }
+
+        .drawer-stat:last-child { border-right: none; }
+        .drawer-stat .value { font-size: 1.3rem; font-weight: 700; color: var(--admin-sidebar); }
+        .drawer-stat .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--admin-text-muted); margin-top: 2px; }
+
+        .drawer-body { flex: 1; overflow-y: auto; padding: 0 24px 24px; }
+
+        .drawer-section-title {
+            font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--admin-text-muted);
+            margin: 20px 0 10px; padding-bottom: 6px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .timeline-entry {
+            display: flex; gap: 14px; padding: 14px 0;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .timeline-entry:last-child { border-bottom: none; }
+
+        .tl-dot {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #dbeafe; color: #2563eb;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; flex-shrink: 0; margin-top: 2px;
+        }
+
+        .tl-event-name { font-weight: 600; font-size: 0.9rem; color: var(--admin-sidebar); }
+        .tl-event-date { font-size: 0.78rem; color: var(--admin-text-muted); margin-top: 1px; }
+        .tl-roles { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+        .tl-meta  { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; font-size: 0.78rem; color: var(--admin-text-muted); }
+
+        .drawer-loading { padding: 40px; text-align: center; color: var(--admin-text-muted); }
+
+        /* ── Collapsed group rows ───────────────────────────────── */
+        tr.group-collapsed { display: none; }
     </style>
 </head>
 <body>
@@ -121,59 +352,70 @@
         <main class="main-content">
             <div id="loading" class="acdc-loader">
                 <div class="loader-spinner"></div>
-                <div class="loader-text">Loading users...</div>
+                <div class="loader-text">Loading people...</div>
             </div>
 
             <div id="admin-content" class="hidden">
+
                 <div class="page-header">
-                    <h1 class="page-title">Users</h1>
-                    <div class="filters">
-                        <select id="role-filter">
-                            <option value="">All Users</option>
-                            <option value="committee">Committee Members</option>
-                            <option value="regular">Regular Users</option>
-                        </select>
-                        <input type="search" id="search-users" placeholder="Search users...">
+                    <h1 class="page-title">People</h1>
+                </div>
+
+                <!-- Toolbar -->
+                <div class="toolbar">
+                    <select id="filter-event">
+                        <option value="">All Events</option>
+                    </select>
+
+                    <div class="toolbar-separator"></div>
+
+                    <select id="filter-group">
+                        <option value="">All roles</option>
+                        <option value="participant">Participants</option>
+                        <option value="judge">Judges</option>
+                        <option value="committee">Committee</option>
+                        <option value="interest">Interest only</option>
+                        <option value="invited">Invited (pending)</option>
+                        <option value="no-account">No account yet</option>
+                    </select>
+
+                    <select id="filter-team">
+                        <option value="">All teams</option>
+                    </select>
+
+                    <div class="toolbar-separator"></div>
+
+                    <input type="search" id="filter-search" placeholder="Search name or email…">
+
+                    <div class="toolbar-right">
+                        <div class="view-toggle">
+                            <button id="view-flat"  class="active" onclick="setView('flat')">☰ List</button>
+                            <button id="view-event" onclick="setView('event')">📅 By Event</button>
+                        </div>
+                        <button class="btn-sm" onclick="exportCSV()">⬇ Export</button>
                     </div>
                 </div>
 
-                <div class="stats-row">
-                    <div class="stat-card">
-                        <div class="icon blue">👤</div>
-                        <div class="info">
-                            <div class="value" id="total-users">0</div>
-                            <div class="label">Total Users</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="icon purple">⭐</div>
-                        <div class="info">
-                            <div class="value" id="committee-users">0</div>
-                            <div class="label">Committee</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="icon green">✅</div>
-                        <div class="info">
-                            <div class="value" id="active-users">0</div>
-                            <div class="label">Active</div>
-                        </div>
-                    </div>
+                <!-- Stat cards -->
+                <div class="stats-row" id="stats-row"></div>
+
+                <!-- Interest share link (shown only when interest filter active) -->
+                <div id="interest-share-bar" class="share-bar" style="display:none;">
+                    <span>Interest sign-up link:</span>
+                    <input type="text" id="share-link" readonly>
+                    <button onclick="copyShareLink()">Copy</button>
                 </div>
 
+                <!-- Main table -->
                 <div class="panel">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Teams</th>
-                                <th>Registered</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-table-body">
-                            <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+                    <div class="panel-header">
+                        <span class="panel-title" id="panel-title">All People</span>
+                        <span class="panel-count" id="panel-count"></span>
+                    </div>
+                    <table class="data-table" id="main-table">
+                        <thead id="main-thead"></thead>
+                        <tbody id="main-tbody">
+                            <tr><td colspan="6" class="empty-state">Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -181,10 +423,20 @@
         </main>
     </div>
 
-    <div id="not-committee" class="access-denied hidden">
-        <h2>⛔ Access Denied</h2>
-        <p style="color: var(--admin-text-muted);">You do not have committee access.</p>
-        <a href="events.html" class="btn-sm primary">Go to Events</a>
+    <!-- Person detail drawer -->
+    <div class="drawer-backdrop" id="drawer-backdrop" onclick="closeDrawer()"></div>
+    <div class="drawer" id="person-drawer">
+        <div class="drawer-header">
+            <div class="drawer-avatar" id="drawer-avatar"></div>
+            <div class="drawer-info">
+                <h2 id="drawer-name"></h2>
+                <div class="d-email" id="drawer-email"></div>
+                <span class="drawer-status-pill" id="drawer-status-pill"></span>
+            </div>
+            <button class="drawer-close" onclick="closeDrawer()">✕</button>
+        </div>
+        <div class="drawer-stats" id="drawer-stats"></div>
+        <div class="drawer-body"  id="drawer-body"></div>
     </div>
 
     <script src="js/config.js"></script>
@@ -193,148 +445,610 @@
     <script src="js/admin-sidebar.js"></script>
     <script src="js/permissions.js"></script>
     <script>
-        let currentUser = null;
-        let allUsers = [];
-        let allParticipations = [];
+        // ─── State ────────────────────────────────────────────────
         let currentPermissions = null;
+        let allUsers           = [];
+        let allParticipations  = [];
+        let allEvents          = [];
+        let allTeams           = [];
+        let allInvitations     = [];
+        let currentView        = 'flat';
+        let activeStatFilter   = null;
+        let displayRows        = [];   // current visible rows (indexed for drawer)
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
+        // ─── Boot ─────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', async () => {
             const loadingDiv = document.getElementById('loading');
+            const contentDiv = document.getElementById('admin-content');
+
             const wakeTimer = setTimeout(() => {
                 if (loadingDiv.classList.contains('hidden')) return;
                 if (!loadingDiv.querySelector('.loader-wake')) {
-                    loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span><div class="wake-title">Waking up the Arctic Database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up...</div></div>');
+                    loadingDiv.insertAdjacentHTML('beforeend',
+                        '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span><div class="wake-title">Waking up the Arctic Database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch.<div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up...</div></div>'
+                    );
                 }
             }, 1200);
-            const notCommitteeDiv = document.getElementById('not-committee');
-            const adminContent = document.getElementById('admin-content');
 
-            // Resolve permissions (handles auth check, sidebar render, access denied)
             currentPermissions = await Permissions.initAdminPage('users', {
                 loadingEl: loadingDiv,
-                accessDeniedEl: notCommitteeDiv,
-                contentEl: adminContent
+                contentEl: contentDiv
             });
-
             if (!currentPermissions) return;
 
-            currentUser = currentPermissions.user;
-
             try {
-                await loadData();
+                await loadAllData();
+                document.getElementById('share-link').value = window.location.origin + '/register.html?intent=interest';
                 setupFilters();
-
+                render();
                 loadingDiv.classList.add('hidden');
                 clearTimeout(wakeTimer);
-                adminContent.classList.remove('hidden');
-
-            } catch (error) {
-                console.error('Error:', error);
-                loadingDiv.innerHTML = `<p class="error-message">Error: ${error.message}</p>`;
+                contentDiv.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                loadingDiv.innerHTML = `<p style="color:var(--admin-danger);padding:40px;">Error loading data: ${escapeHtml(err.message)}</p>`;
             }
         });
 
-        async function loadData() {
-            try {
-                const [usersResponse, participationsResponse] = await Promise.all([
-                    API.users.list(),
-                    API.participations.list()
-                ]);
+        async function loadAllData() {
+            const [users, participations, events, teams, invitations] = await Promise.all([
+                API.users.list(),
+                API.participations.list(),
+                API.events.list(),
+                API.teams.list(),
+                API.invitations.list()
+            ]);
 
-                allUsers = usersResponse || [];
-                allParticipations = participationsResponse || [];
+            allUsers          = users          || [];
+            allParticipations = participations || [];
+            allEvents         = Permissions.filterByEvent(currentPermissions, events || [], 'id');
+            allTeams          = teams          || [];
+            allInvitations    = invitations    || [];
 
-                updateStats();
-                renderUsers();
+            // Populate event filter
+            const evtSel = document.getElementById('filter-event');
+            allEvents
+                .sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0) || new Date(b.startDate) - new Date(a.startDate))
+                .forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e.id;
+                    opt.textContent = e.name + (e.isActive ? ' (Active)' : '');
+                    evtSel.appendChild(opt);
+                });
 
-            } catch (err) {
-                console.error('Failed to load data:', err);
-            }
+            // Populate team filter
+            const tmSel = document.getElementById('filter-team');
+            allTeams
+                .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                .forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t.id;
+                    opt.textContent = t.name;
+                    tmSel.appendChild(opt);
+                });
         }
 
-        function updateStats() {
-            document.getElementById('total-users').textContent = allUsers.length;
-            document.getElementById('committee-users').textContent = 
-                allUsers.filter(u => u.isPortalAdmin).length;
-            document.getElementById('active-users').textContent = 
-                allUsers.filter(u => hasParticipation(u.id)).length;
-        }
-
-        function hasParticipation(userId) {
-            return allParticipations.some(p => p.userId === userId);
-        }
-
-        function getUserTeamCount(userId) {
-            return allParticipations.filter(p => 
-                p.userId === userId && p.teamMemberships?.length > 0
-            ).reduce((count, p) => count + p.teamMemberships.length, 0);
-        }
-
-        function renderUsers() {
-            const roleFilter = document.getElementById('role-filter')?.value || '';
-            const searchText = document.getElementById('search-users')?.value.toLowerCase() || '';
-
-            let filtered = allUsers.filter(user => {
-                const matchesRole = !roleFilter || 
-                    (roleFilter === 'committee' && user.isPortalAdmin) ||
-                    (roleFilter === 'regular' && !user.isPortalAdmin);
-                
-                const matchesSearch = !searchText || 
-                    user.firstName?.toLowerCase().includes(searchText) ||
-                    user.lastName?.toLowerCase().includes(searchText) ||
-                    user.email?.toLowerCase().includes(searchText);
-
-                return matchesRole && matchesSearch;
+        // ─── Filters ──────────────────────────────────────────────
+        function setupFilters() {
+            ['filter-event', 'filter-group', 'filter-team'].forEach(id => {
+                document.getElementById(id).addEventListener('change', () => { activeStatFilter = null; render(); });
             });
+            document.getElementById('filter-search').addEventListener('input', render);
+        }
 
-            const tbody = document.getElementById('users-table-body');
+        function setView(v) {
+            currentView = v;
+            document.getElementById('view-flat') .classList.toggle('active', v === 'flat');
+            document.getElementById('view-event').classList.toggle('active', v === 'event');
+            render();
+        }
 
-            if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No users found</td></tr>';
+        // ─── Build unified person-event rows ──────────────────────
+        // One row = one person's relationship to one event.
+        function buildRows() {
+            const eventId  = document.getElementById('filter-event').value;
+            const groupKey = document.getElementById('filter-group').value || activeStatFilter || '';
+            const teamId   = document.getElementById('filter-team').value;
+            const search   = document.getElementById('filter-search').value.toLowerCase().trim();
+
+            const userByEmail = {};
+            for (const u of allUsers) {
+                if (u.email) userByEmail[u.email.toLowerCase()] = u;
+            }
+
+            const rows = [];
+
+            // ── From participations ──────────────────────────────
+            let parts = allParticipations;
+            if (eventId) parts = parts.filter(p => p.eventId === eventId);
+            if (teamId)  parts = parts.filter(p => p.teamId  === teamId);
+
+            for (const p of parts) {
+                const event = allEvents.find(e => e.id === p.eventId);
+                const team  = p.teamId ? allTeams.find(t => t.id === p.teamId) : null;
+                const user  = userByEmail[p.email?.toLowerCase()];
+                const roles = p.roles || [];
+                const firstName = user?.firstName || p.interestFirstName || '';
+                const lastName  = user?.lastName  || p.interestLastName  || '';
+
+                let primaryGroup;
+                if (roles.includes('committee'))       primaryGroup = 'committee';
+                else if (roles.includes('judge'))       primaryGroup = 'judge';
+                else if (roles.includes('participant')) primaryGroup = 'participant';
+                else if (roles.includes('interest'))    primaryGroup = 'interest';
+                else                                    primaryGroup = 'participant';
+
+                rows.push({
+                    type: 'participation',
+                    id: p.id,
+                    email: p.email?.toLowerCase() || '',
+                    firstName, lastName,
+                    displayName: [firstName, lastName].filter(Boolean).join(' ') || p.email,
+                    roles, primaryGroup,
+                    eventId: p.eventId,
+                    eventName: event?.name || '—',
+                    eventActive: !!event?.isActive,
+                    teamId: p.teamId || null,
+                    teamName: team?.name || null,
+                    hasAccount: !!user,
+                    isPortalAdmin: !!user?.isPortalAdmin,
+                    createdAt: p.createdAt,
+                    user,
+                });
+            }
+
+            // ── Portal admins with no participation ──────────────
+            if (!teamId) {
+                for (const u of allUsers.filter(u2 => u2.isPortalAdmin)) {
+                    const email = u.email?.toLowerCase();
+                    if (!email) continue;
+                    const inParts = parts.some(p => p.email?.toLowerCase() === email);
+                    if (!inParts) {
+                        rows.push({
+                            type: 'portal-admin',
+                            id: u.id,
+                            email,
+                            firstName: u.firstName || '', lastName: u.lastName || '',
+                            displayName: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email,
+                            roles: ['committee'], primaryGroup: 'committee',
+                            eventId: null, eventName: '—', eventActive: false,
+                            teamId: null, teamName: null,
+                            hasAccount: true, isPortalAdmin: true,
+                            createdAt: u.createdAt,
+                            user: u,
+                        });
+                    }
+                }
+            }
+
+            // ── Pending invitations not yet in participations ─────
+            let invs = allInvitations.filter(inv => inv.status === 'pending');
+            if (eventId) invs = invs.filter(inv => inv.eventId === eventId);
+            if (teamId)  invs = invs.filter(inv => inv.teamId  === teamId);
+
+            for (const inv of invs) {
+                const email = inv.email?.toLowerCase();
+                const already = rows.some(r => r.email === email && r.eventId === inv.eventId);
+                if (already) continue;
+                const event = allEvents.find(e => e.id === inv.eventId);
+                const team  = inv.teamId ? allTeams.find(t => t.id === inv.teamId) : null;
+                rows.push({
+                    type: 'invitation',
+                    id: inv.id,
+                    email: email || '',
+                    firstName: inv.firstName || '', lastName: inv.lastName || '',
+                    displayName: [inv.firstName, inv.lastName].filter(Boolean).join(' ') || inv.email,
+                    roles: ['invited'], primaryGroup: 'invited',
+                    eventId: inv.eventId || null,
+                    eventName: event?.name || '—', eventActive: !!event?.isActive,
+                    teamId: inv.teamId || null,
+                    teamName: team?.name || null,
+                    hasAccount: !!userByEmail[email],
+                    isPortalAdmin: false,
+                    createdAt: inv.createdAt,
+                    user: userByEmail[email] || null,
+                });
+            }
+
+            // ── Role/group filter ──────────────────────────────────
+            let filtered = rows;
+            if      (groupKey === 'participant')  filtered = rows.filter(r => r.primaryGroup === 'participant');
+            else if (groupKey === 'judge')        filtered = rows.filter(r => r.primaryGroup === 'judge');
+            else if (groupKey === 'committee')    filtered = rows.filter(r => r.primaryGroup === 'committee');
+            else if (groupKey === 'interest')     filtered = rows.filter(r => r.primaryGroup === 'interest');
+            else if (groupKey === 'invited')      filtered = rows.filter(r => r.primaryGroup === 'invited');
+            else if (groupKey === 'no-account')   filtered = rows.filter(r => !r.hasAccount);
+
+            // ── Search ────────────────────────────────────────────
+            if (search) {
+                filtered = filtered.filter(r =>
+                    r.displayName.toLowerCase().includes(search) ||
+                    r.email.includes(search) ||
+                    (r.teamName  || '').toLowerCase().includes(search) ||
+                    (r.eventName || '').toLowerCase().includes(search)
+                );
+            }
+
+            return filtered;
+        }
+
+        // ─── Render ───────────────────────────────────────────────
+        function render() {
+            displayRows = buildRows();
+            renderStats(displayRows);
+            renderShareBar();
+            if (currentView === 'event') renderByEvent(displayRows);
+            else                         renderFlat(displayRows);
+        }
+
+        function renderStats(rows) {
+            const c = {
+                all:         rows.length,
+                participant: rows.filter(r => r.primaryGroup === 'participant').length,
+                judge:       rows.filter(r => r.primaryGroup === 'judge').length,
+                committee:   rows.filter(r => r.primaryGroup === 'committee').length,
+                interest:    rows.filter(r => r.primaryGroup === 'interest').length,
+                invited:     rows.filter(r => r.primaryGroup === 'invited').length,
+            };
+
+            const defs = [
+                { key: 'all',         icon: '👤', color: 'blue',   label: 'Total',        value: c.all },
+                { key: 'participant', icon: '🏃', color: 'green',  label: 'Participants',  value: c.participant },
+                { key: 'judge',       icon: '⚖️', color: 'purple', label: 'Judges',        value: c.judge },
+                { key: 'committee',   icon: '🛡️', color: 'slate',  label: 'Committee',     value: c.committee },
+                { key: 'interest',    icon: '📋', color: 'amber',  label: 'Interest',      value: c.interest },
+                { key: 'invited',     icon: '✉️', color: 'rose',   label: 'Invited',       value: c.invited },
+            ];
+
+            document.getElementById('stats-row').innerHTML = defs.map(s => `
+                <div class="stat-card ${activeStatFilter === s.key ? 'active' : ''}" onclick="toggleStatFilter('${s.key}')">
+                    <div class="stat-icon ${s.color}">${s.icon}</div>
+                    <div class="stat-info">
+                        <div class="value">${s.value}</div>
+                        <div class="label">${s.label}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleStatFilter(key) {
+            activeStatFilter = (activeStatFilter === key || key === 'all') ? null : key;
+            document.getElementById('filter-group').value = '';
+            render();
+        }
+
+        function renderShareBar() {
+            const gk = document.getElementById('filter-group').value || activeStatFilter || '';
+            document.getElementById('interest-share-bar').style.display = gk === 'interest' ? 'flex' : 'none';
+        }
+
+        // ─── Flat list ────────────────────────────────────────────
+        function renderFlat(rows) {
+            const noEventFilter = !document.getElementById('filter-event').value;
+            document.getElementById('panel-title').textContent = buildPanelTitle();
+            document.getElementById('panel-count').textContent = `${rows.length} people`;
+
+            document.getElementById('main-thead').innerHTML = `<tr>
+                <th>Person</th>
+                ${noEventFilter ? '<th>Event</th>' : ''}
+                <th>Roles</th>
+                <th>Team</th>
+                <th>Since</th>
+                <th></th>
+            </tr>`;
+
+            const span = noEventFilter ? 6 : 5;
+
+            if (!rows.length) {
+                document.getElementById('main-tbody').innerHTML =
+                    `<tr><td colspan="${span}" class="empty-state">No people match the current filters</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = filtered.map(user => {
-                const teamCount = getUserTeamCount(user.id);
-                const registeredDate = new Date(user.registeredAt || user.createdAt).toLocaleDateString();
-
-                return `
-                    <tr>
-                        <td><strong>${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</strong></td>
-                        <td>${escapeHtml(user.email)}</td>
-                        <td>${teamCount} team${teamCount !== 1 ? 's' : ''}</td>
-                        <td>${registeredDate}</td>
-                        <td>
-                            <button class="btn-sm" onclick="viewUser('${user.id}')">👁️ View</button>
-                        </td>
-                    </tr>
-                `;
+            document.getElementById('main-tbody').innerHTML = rows.map((r, idx) => {
+                const initials  = getInitials(r.displayName, r.email);
+                const avatarCls = r.primaryGroup === 'committee' ? 'committee'
+                                : r.primaryGroup === 'judge'     ? 'judge'
+                                : r.primaryGroup === 'interest'  ? 'interest'
+                                : r.primaryGroup === 'invited'   ? 'invited' : '';
+                return `<tr onclick="openDrawer(${idx})">
+                    <td><div class="person-cell">
+                        <div class="avatar ${avatarCls}">${initials}</div>
+                        <div>
+                            <div class="person-name">${escapeHtml(r.displayName)}</div>
+                            <div class="person-email">${escapeHtml(r.email)}</div>
+                        </div>
+                    </div></td>
+                    ${noEventFilter ? `<td style="font-size:0.82rem;color:var(--admin-text-muted);">${escapeHtml(r.eventName)}</td>` : ''}
+                    <td>${r.roles.map(rolePill).join('')}</td>
+                    <td style="font-size:0.82rem;color:var(--admin-text-muted);">${escapeHtml(r.teamName || '—')}</td>
+                    <td style="font-size:0.8rem;color:var(--admin-text-muted);">${formatDate(r.createdAt)}</td>
+                    <td><button class="btn-sm" onclick="event.stopPropagation();openDrawer(${idx})">👤 View</button></td>
+                </tr>`;
             }).join('');
         }
 
-        function setupFilters() {
-            document.getElementById('role-filter').addEventListener('change', renderUsers);
-            document.getElementById('search-users').addEventListener('input', renderUsers);
+        // ─── By-Event grouped view ────────────────────────────────
+        function renderByEvent(rows) {
+            document.getElementById('panel-title').textContent = buildPanelTitle();
+            document.getElementById('panel-count').textContent = `${rows.length} people`;
+
+            document.getElementById('main-thead').innerHTML = `<tr>
+                <th>Person</th><th>Roles</th><th>Team</th><th>Since</th><th></th>
+            </tr>`;
+
+            if (!rows.length) {
+                document.getElementById('main-tbody').innerHTML =
+                    `<tr><td colspan="5" class="empty-state">No people match the current filters</td></tr>`;
+                return;
+            }
+
+            const GROUP_ORDER = ['committee','judge','participant','interest','invited'];
+            const GROUP_LABEL = {
+                committee:   '🛡️ Committee',
+                judge:       '⚖️ Judges',
+                participant: '🏃 Participants',
+                interest:    '📋 Interest',
+                invited:     '✉️ Invited (pending)',
+            };
+
+            // Sorted event keys: active first, newest first
+            const eventOrder = allEvents
+                .sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0) || new Date(b.startDate) - new Date(a.startDate))
+                .map(e => e.id);
+
+            const byEvent = {};
+            for (const r of rows) {
+                const eid = r.eventId || '__none__';
+                (byEvent[eid] = byEvent[eid] || []).push(r);
+            }
+
+            // Preserve index into displayRows for drawer lookup
+            // displayRows is already set to `rows` before this function is called
+            const rowIndexMap = new Map(rows.map((r, i) => [r, i]));
+
+            let html = '';
+            const keys = [...eventOrder.filter(k => byEvent[k]),
+                          ...Object.keys(byEvent).filter(k => !eventOrder.includes(k))];
+
+            for (const eid of keys) {
+                const eventRows = byEvent[eid];
+                if (!eventRows) continue;
+                const evtNode = `evt-${eid}`;
+                const eventName = eventRows[0].eventName;
+
+                html += `<tr class="group-header-row" onclick="toggleGroup('${evtNode}')">
+                    <td colspan="5">📅 ${escapeHtml(eventName)}<span class="group-toggle" id="arrow-${evtNode}">▾</span></td>
+                </tr>`;
+
+                const byGroup = {};
+                for (const r of eventRows) (byGroup[r.primaryGroup] = byGroup[r.primaryGroup] || []).push(r);
+
+                for (const gk of GROUP_ORDER) {
+                    const gRows = byGroup[gk];
+                    if (!gRows?.length) continue;
+                    const grpNode = `${evtNode}-${gk}`;
+
+                    html += `<tr class="group-header-row group-member-${evtNode}" style="background:#f8fafc;" onclick="toggleGroup('${grpNode}')">
+                        <td colspan="5" style="padding-left:32px;">
+                            ${GROUP_LABEL[gk]} <span style="font-weight:400;opacity:.7;">(${gRows.length})</span>
+                            <span class="group-toggle" id="arrow-${grpNode}">▾</span>
+                        </td>
+                    </tr>`;
+
+                    for (const r of gRows) {
+                        const idx = rowIndexMap.get(r);
+                        const initials  = getInitials(r.displayName, r.email);
+                        const avatarCls = r.primaryGroup === 'committee' ? 'committee'
+                                        : r.primaryGroup === 'judge'     ? 'judge'
+                                        : r.primaryGroup === 'interest'  ? 'interest'
+                                        : r.primaryGroup === 'invited'   ? 'invited' : '';
+
+                        html += `<tr class="group-member-${evtNode} group-member-${grpNode}" onclick="openDrawer(${idx})">
+                            <td style="padding-left:48px;"><div class="person-cell">
+                                <div class="avatar ${avatarCls}">${initials}</div>
+                                <div>
+                                    <div class="person-name">${escapeHtml(r.displayName)}</div>
+                                    <div class="person-email">${escapeHtml(r.email)}</div>
+                                </div>
+                            </div></td>
+                            <td>${r.roles.map(rolePill).join('')}</td>
+                            <td style="font-size:0.82rem;color:var(--admin-text-muted);">${escapeHtml(r.teamName || '—')}</td>
+                            <td style="font-size:0.8rem;color:var(--admin-text-muted);">${formatDate(r.createdAt)}</td>
+                            <td><button class="btn-sm" onclick="event.stopPropagation();openDrawer(${idx})">👤 View</button></td>
+                        </tr>`;
+                    }
+                }
+            }
+
+            document.getElementById('main-tbody').innerHTML = html;
         }
 
-        function viewUser(userId) {
-            const user = allUsers.find(u => u.id === userId);
-            if (!user) return;
+        function toggleGroup(groupId) {
+            const members = document.querySelectorAll(`.group-member-${groupId}`);
+            const arrow   = document.getElementById(`arrow-${groupId}`);
+            if (!members.length) return;
+            const isCollapsed = members[0].classList.contains('group-collapsed');
+            members.forEach(el => el.classList.toggle('group-collapsed', !isCollapsed));
+            if (arrow) arrow.textContent = isCollapsed ? '▾' : '▸';
+        }
 
-            const userParticipations = allParticipations.filter(p => p.userId === userId);
-            const details = userParticipations.map(p => {
-                const teams = (p.teamMemberships || []).map(tm => tm.teamName).join(', ');
-                return `Event: ${p.eventName || p.eventId}, Teams: ${teams || 'None'}`;
-            }).join('\n');
+        // ─── Person drawer ────────────────────────────────────────
+        async function openDrawer(idx) {
+            const row = displayRows[idx];
+            if (!row) return;
 
-            alert(`User: ${user.firstName} ${user.lastName}\nEmail: ${user.email}\nPortal Admin: ${user.isPortalAdmin ? 'Yes' : 'No'}\n\n${details || 'No participations yet'}`);
+            document.getElementById('drawer-backdrop').classList.add('open');
+            document.getElementById('person-drawer').classList.add('open');
+
+            document.getElementById('drawer-avatar').textContent = getInitials(row.displayName, row.email);
+            document.getElementById('drawer-name').textContent   = row.displayName || row.email;
+            document.getElementById('drawer-email').textContent  = row.email;
+
+            const pill = document.getElementById('drawer-status-pill');
+            pill.className = 'drawer-status-pill ' + (row.hasAccount ? 'registered' : 'no-account');
+            pill.textContent = row.hasAccount ? '✓ Registered user' : '○ No account yet';
+
+            document.getElementById('drawer-stats').innerHTML = '';
+            document.getElementById('drawer-body').innerHTML  = '<div class="drawer-loading">Loading history…</div>';
+
+            try {
+                const [participations] = await Promise.all([
+                    API.participations.getByPerson(row.email)
+                ]);
+                const invitations = allInvitations.filter(inv => inv.email?.toLowerCase() === row.email);
+
+                const uniqueEvents = new Set(participations.map(p => p.eventId)).size;
+                const allRoles     = new Set(participations.flatMap(p => p.roles || []));
+
+                document.getElementById('drawer-stats').innerHTML = `
+                    <div class="drawer-stat"><div class="value">${uniqueEvents}</div><div class="label">Events</div></div>
+                    <div class="drawer-stat"><div class="value">${allRoles.size}</div><div class="label">Roles</div></div>
+                    <div class="drawer-stat"><div class="value">${participations.length}</div><div class="label">Participations</div></div>
+                    <div class="drawer-stat"><div class="value">${invitations.length}</div><div class="label">Invitations</div></div>
+                `;
+
+                const sorted = [...participations].sort((a, b) => {
+                    const ea = allEvents.find(e => e.id === a.eventId);
+                    const eb = allEvents.find(e => e.id === b.eventId);
+                    return new Date(eb?.startDate || b.createdAt) - new Date(ea?.startDate || a.createdAt);
+                });
+
+                let body = '';
+
+                if (sorted.length) {
+                    body += '<div class="drawer-section-title">Participation History</div>';
+                    body += sorted.map(p => {
+                        const ev   = allEvents.find(e => e.id === p.eventId);
+                        const tm   = p.teamId ? allTeams.find(t => t.id === p.teamId) : null;
+                        const meta = [];
+                        if (tm)            meta.push(`👥 ${escapeHtml(tm.name)}`);
+                        if (p.isTeamAdmin) meta.push('⭐ Team Admin');
+                        if (p.createdAt)   meta.push(`📅 Joined ${formatDate(p.createdAt)}`);
+                        return `<div class="timeline-entry">
+                            <div class="tl-dot">📅</div>
+                            <div>
+                                <div class="tl-event-name">${escapeHtml(ev?.name || '—')}</div>
+                                <div class="tl-event-date">${ev ? formatDateRange(ev.startDate, ev.endDate) : ''}</div>
+                                <div class="tl-roles">${(p.roles || []).map(rolePill).join('')}</div>
+                                <div class="tl-meta">${meta.join(' · ')}</div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+
+                if (invitations.length) {
+                    body += '<div class="drawer-section-title">Invitations</div>';
+                    body += invitations.map(inv => {
+                        const ev = allEvents.find(e => e.id === inv.eventId);
+                        const tm = inv.teamId ? allTeams.find(t => t.id === inv.teamId) : null;
+                        const statusBadge = { pending: 'pending', accepted: 'accepted', declined: 'declined' }[inv.status] || '';
+                        return `<div class="timeline-entry">
+                            <div class="tl-dot">✉️</div>
+                            <div>
+                                <div class="tl-event-name">${escapeHtml(ev?.name || '—')} <span class="badge ${statusBadge}">${inv.status}</span></div>
+                                ${tm ? `<div class="tl-event-date">Team: ${escapeHtml(tm.name)}</div>` : ''}
+                                <div class="tl-meta">Invited ${formatDate(inv.createdAt)}</div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+
+                if (!body) {
+                    body = '<div style="padding:40px 0;text-align:center;color:var(--admin-text-muted);">No history found</div>';
+                }
+
+                document.getElementById('drawer-body').innerHTML = body;
+
+            } catch (err) {
+                document.getElementById('drawer-body').innerHTML =
+                    `<div style="padding:20px;color:var(--admin-danger);">Error loading: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        function closeDrawer() {
+            document.getElementById('drawer-backdrop').classList.remove('open');
+            document.getElementById('person-drawer').classList.remove('open');
+        }
+
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+        // ─── Export ───────────────────────────────────────────────
+        function exportCSV() {
+            if (!displayRows.length) return;
+            const q = s => `"${(s || '').replace(/"/g, '""')}"`;
+            const lines = [
+                'Name,Email,Event,Roles,Team,Account,Since',
+                ...displayRows.map(r => [
+                    q(r.displayName), q(r.email), q(r.eventName),
+                    q(r.roles.join(';')), q(r.teamName || ''),
+                    r.hasAccount ? 'Yes' : 'No',
+                    (r.createdAt || '').split('T')[0]
+                ].join(','))
+            ];
+            const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+            const a = Object.assign(document.createElement('a'), {
+                href: URL.createObjectURL(blob),
+                download: `people-${new Date().toISOString().split('T')[0]}.csv`
+            });
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        // ─── Helpers ──────────────────────────────────────────────
+        function buildPanelTitle() {
+            const gk = document.getElementById('filter-group').value || activeStatFilter || '';
+            const eid = document.getElementById('filter-event').value;
+            const labels = {
+                participant: 'Participants', judge: 'Judges', committee: 'Committee',
+                interest: 'Interest Leads', invited: 'Invited (Pending)', 'no-account': 'No Account',
+            };
+            const parts = [];
+            if (labels[gk]) parts.push(labels[gk]);
+            if (eid) {
+                const ev = allEvents.find(e => e.id === eid);
+                if (ev) parts.push(ev.name);
+            }
+            return parts.length ? parts.join(' — ') : 'All People';
+        }
+
+        function rolePill(role) {
+            const label = { participant: '🏃 Participant', judge: '⚖️ Judge', committee: '🛡️ Committee', interest: '📋 Interest', sponsor: '💎 Sponsor', invited: '✉️ Invited' };
+            return `<span class="role-pill ${role}">${label[role] || role}</span>`;
+        }
+
+        function getInitials(name, email) {
+            const parts = (name || email || '').trim().split(/\s+/);
+            if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+            return (parts[0] || '?').substring(0, 2).toUpperCase();
+        }
+
+        function formatDate(str) {
+            if (!str) return '—';
+            return new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function formatDateRange(start, end) {
+            if (!start) return '';
+            const opts = { month: 'short', day: 'numeric', year: 'numeric' };
+            const s = new Date(start).toLocaleDateString('en-US', opts);
+            return end ? `${s} — ${new Date(end).toLocaleDateString('en-US', opts)}` : s;
+        }
+
+        function copyShareLink() {
+            const inp = document.getElementById('share-link');
+            inp.select();
+            document.execCommand('copy');
+            const btn = inp.nextElementSibling;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy', 2000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
         }
     </script>
 </body>
