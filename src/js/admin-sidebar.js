@@ -13,8 +13,8 @@ const SIDEBAR_NAV_ITEMS = [
     { page: 'events',    href: 'admin-events.html',    icon: '📅', label: 'Events' },
 
     { section: 'Participants' },
-    { page: 'teams',    href: 'admin-teams.html',    icon: '👥', label: 'Teams' },
-    { page: 'users',    href: 'admin-users.html',    icon: '👤', label: 'People' },
+    { page: 'teams',    href: 'admin-teams.html',    icon: '👥', label: 'Teams',  darkIcon: true },
+    { page: 'users',    href: 'admin-users.html',    icon: '👤', label: 'People', darkIcon: true },
 
     { section: 'Competition' },
     { page: 'badges', href: 'admin-badges.html', icon: '🏅', label: 'Badges' },
@@ -53,8 +53,9 @@ function renderAdminSidebar(activePage = '', permissions = null) {
             lastSectionHadItems = true;
 
             const activeClass = activePage === item.page ? 'active' : '';
+            const iconClass = item.darkIcon ? 'icon icon-invert' : 'icon';
             navHTML += `<a href="${item.href}" class="nav-item ${activeClass}">
-                    <span class="icon">${item.icon}</span><span>${item.label}</span>
+                    <span class="${iconClass}">${item.icon}</span><span>${item.label}</span>
                 </a>`;
         }
     }

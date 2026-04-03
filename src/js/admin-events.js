@@ -1375,7 +1375,7 @@ async function loadEmailDeliveryStats(emails) {
         const verifiedLeads = leads.filter(l => l.verified);
         const totalRecipients = verifiedLeads.length + recipients.length;
         
-        // Calculate stats for each email
+        // Calculate stats for each email — match by email address
         const stats = {};
         emails.forEach(email => {
             const emailId = normalizeId(email.id);
@@ -1461,12 +1461,10 @@ async function loadRecipientDeliveryOverview() {
         
         // Build rows for each recipient
         const rows = allRecipients.map(recipient => {
-            // Match deliveries by leadId for leads, userId for participants, fallback to email
-            const recipientDeliveries = deliveries.filter(d => {
-                if (recipient.matchField === 'leadId') return d.leadId === recipient.id;
-                if (recipient.matchField === 'userId') return d.userId === recipient.id;
-                return d.email?.toLowerCase() === recipient.email.toLowerCase();
-            });
+            // Match deliveries by email (reliable across all recipient types)
+            const recipientDeliveries = deliveries.filter(d =>
+                d.email?.toLowerCase() === recipient.email.toLowerCase()
+            );
             
             // Check each campaign
             const emailStatuses = sortedCampaigns.map(campaign => {
