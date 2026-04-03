@@ -978,11 +978,23 @@ async function loadInterestLeads() {
         
         const data = await response.json();
         allLeads = data.leads || [];
+
+        // Ensure participations, users, and teams are loaded so we can show conversion status
+        const loaders = [];
+        if (allParticipations.length === 0) loaders.push(API.participations.list().then(r => { allParticipations = r; }));
+        if (allUsers.length === 0) loaders.push(API.users.list().then(r => { allUsers = r; }));
+        if (allTeams.length === 0) loaders.push(
+            fetch(`${CONFIG.api.baseUrl}/teams`).then(r => r.json()).then(teams => {
+                allTeams = (Array.isArray(teams) ? teams : (teams.teams || [])).filter(t => t.eventId === currentEventId);
+            })
+        );
+        if (loaders.length > 0) await Promise.all(loaders);
+
         renderLeadsTable();
     } catch (error) {
         console.error('Error loading leads:', error);
         document.getElementById('leads-table-body').innerHTML = 
-            '<tr><td colspan="5" class="empty-state">Error loading leads</td></tr>';
+            '<tr><td colspan="6" class="empty-state">Error loading leads</td></tr>';
     }
 }
 
@@ -990,21 +1002,48 @@ function renderLeadsTable() {
     const tbody = document.getElementById('leads-table-body');
     
     if (allLeads.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No interest leads yet. Share the interest link to collect leads!</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No interest leads yet. Share the interest link to collect leads!</td></tr>';
         return;
     }
 
-    tbody.innerHTML = allLeads.map(lead => `
+    tbody.innerHTML = allLeads.map(lead => {
+        // Detect if this lead has been converted to a participant
+        const matchedUser = allUsers.find(u => u.email.toLowerCase() === lead.email.toLowerCase());
+        let convertedCell = '<span style="color: var(--admin-text-muted); font-size: 0.85rem;">—</span>';
+        if (matchedUser) {
+            const participation = allParticipations.find(p =>
+                p.userId === matchedUser.id && p.eventId === currentEventId
+            );
+            if (participation) {
+                // Find which team they belong to
+                const teamMembership = (participation.teamMemberships || []).find(m => m.isParticipant);
+                const team = teamMembership ? allTeams.find(t => t.id === teamMembership.teamId) : null;
+                const teamName = team ? (team.teamName || team.name || 'Unknown Team') : null;
+
+                const roles = participation.roles || [];
+                let roleLabel = 'Participant';
+                if (roles.includes('committee')) roleLabel = 'Committee';
+                else if (roles.includes('judge')) roleLabel = 'Judge';
+
+                convertedCell = teamName
+                    ? `<span style="color: var(--admin-success); font-weight: 500;">✅ ${roleLabel}</span><br><small style="color: var(--admin-text-muted);">${escapeHtml(teamName)}</small>`
+                    : `<span style="color: var(--admin-success); font-weight: 500;">✅ ${roleLabel}</span>`;
+            }
+        }
+
+        return `
         <tr>
             <td><strong>${escapeHtml(lead.firstName)} ${escapeHtml(lead.lastName)}</strong></td>
             <td>${escapeHtml(lead.email)}</td>
             <td>${new Date(lead.verifiedAt || lead.createdAt).toLocaleDateString()}</td>
+            <td>${convertedCell}</td>
             <td>
                 <button class="btn-sm" onclick="restartSequence('${lead.id}')">🔄 Restart Sequence</button>
                 <button class="btn-sm danger" onclick="deleteLead('${lead.id}')">🗑️</button>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function copyInterestLink() {

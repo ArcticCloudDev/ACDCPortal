@@ -12,6 +12,8 @@ const deliveriesStorage = new Storage('email-deliveries');
 const eventsStorage = new Storage('events');
 const runsStorage = new Storage('scheduled-runs');
 const emailLogStorage = new Storage('email-log');
+const participationsStorage = new Storage('participations');
+const usersStorage = new Storage('users');
 
 function generateGuid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -74,10 +76,15 @@ async function processScheduledEmails(context) {
             return result;
         }
 
-        // Get all verified leads
+        // Get all verified interest leads
         const leadsData = await leadsStorage.getRaw();
         const leads = (leadsData?.leads || []).filter(l => l.verified);
         context.log(`[SCHEDULED] Found ${leads.length} verified leads`);
+
+        // Get all participations and users (for committee/judges/participants)
+        const participationsData = await participationsStorage.getRaw();
+        const allParticipations = participationsData?.participations || [];
+        const allUsers = await usersStorage.getAll();
 
         // Get existing deliveries
         const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
@@ -96,29 +103,48 @@ async function processScheduledEmails(context) {
                 continue;
             }
 
-            // Get leads for this event who:
-            // 1. Joined before (or at) the campaign's scheduled send time — late joiners get the digest instead
-            // 2. Haven't already received this campaign
-            const eventLeads = leads.filter(l => l.eventId === event.id);
-            const recipientsToSend = eventLeads.filter(lead => {
-                const joinedBeforeSend = new Date(lead.createdAt) <= new Date(campaign.scheduledSendTime);
-                const alreadySent = deliveryData.deliveries.some(d =>
+            // Build the full recipient list for this event:
+            // - Event participants (committee, judges, participants) — always eligible
+            // - Verified interest leads who joined before the campaign's scheduled send time
+            // Deduplicate by email so a lead who registered as a participant is only sent one copy.
+
+            const eventParticipations = allParticipations.filter(p => p.eventId === event.id);
+            const eventParticipants = eventParticipations
+                .map(p => {
+                    const user = allUsers.find(u => u.id === p.userId);
+                    if (!user) return null;
+                    return { email: user.email, firstName: user.firstName, lastName: user.lastName, leadId: null };
+                })
+                .filter(Boolean);
+
+            const participantEmails = new Set(eventParticipants.map(p => p.email.toLowerCase()));
+
+            // Interest leads who joined before the scheduled time and are not already a participant
+            const eligibleLeads = leads
+                .filter(l => l.eventId === event.id)
+                .filter(l => new Date(l.createdAt) <= new Date(campaign.scheduledSendTime))
+                .filter(l => !participantEmails.has(l.email.toLowerCase()))
+                .map(l => ({ email: l.email, firstName: l.firstName, lastName: l.lastName, leadId: l.id }));
+
+            const allEventRecipients = [...eventParticipants, ...eligibleLeads];
+
+            const recipientsToSend = allEventRecipients.filter(recipient => {
+                return !deliveryData.deliveries.some(d =>
                     d.campaignId === campaign.id &&
-                    d.email.toLowerCase() === lead.email.toLowerCase() &&
+                    d.email.toLowerCase() === recipient.email.toLowerCase() &&
                     d.status === 'sent'
                 );
-                return joinedBeforeSend && !alreadySent;
             });
 
-            context.log(`[SCHEDULED] ${recipientsToSend.length} recipients need this email`);
+            context.log(`[SCHEDULED] ${recipientsToSend.length} recipients need this email (${eventParticipants.length} participants + ${eligibleLeads.length} leads)`);
 
             // Send to each recipient
-            for (const lead of recipientsToSend) {
+            for (const recipient of recipientsToSend) {
                 const delivery = {
                     id: generateGuid(),
                     campaignId: campaign.id,
-                    email: lead.email,
-                    leadId: lead.id,
+                    email: recipient.email,
+                    leadId: recipient.leadId || null,
                     status: 'pending',
                     createdAt: new Date().toISOString(),
                     scheduledSend: true
@@ -126,10 +152,10 @@ async function processScheduledEmails(context) {
 
                 try {
                     await sendEmail({
-                        to: lead.email,
+                        to: recipient.email,
                         subject: campaign.subject,
                         htmlContent: campaign.content,
-                        firstName: lead.firstName || 'Friend',
+                        firstName: recipient.firstName || 'Friend',
                         ctaUrl: campaign.ctaUrl,
                         ctaText: campaign.ctaText
                     });
@@ -137,13 +163,13 @@ async function processScheduledEmails(context) {
                     delivery.status = 'sent';
                     delivery.sentAt = new Date().toISOString();
                     emailsSent++;
-                    context.log(`[SCHEDULED] Sent to ${lead.email}`);
+                    context.log(`[SCHEDULED] Sent to ${recipient.email}`);
                 } catch (err) {
                     await logError(context, err);
                     delivery.status = 'failed';
                     delivery.error = err.message;
                     emailsFailed++;
-                    context.error(`[SCHEDULED] Failed to send to ${lead.email}:`, err);
+                    context.error(`[SCHEDULED] Failed to send to ${recipient.email}:`, err);
                 }
 
                 deliveryData.deliveries.push(delivery);
