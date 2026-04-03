@@ -665,8 +665,6 @@ function setupTabs() {
     });
     
     // Leads tab button handlers
-    document.getElementById('copy-interest-link')?.addEventListener('click', copyInterestLink);
-    document.getElementById('export-leads-btn')?.addEventListener('click', exportLeadsCSV);
 }
 
 // ===== Committee & Judges Management =====
@@ -967,11 +965,6 @@ async function loadInterestLeads() {
         return;
     }
 
-    // Set the interest link
-    const baseUrl = window.location.origin;
-    const interestLink = `${baseUrl}/register.html?intent=interest&eventId=${currentEventId}`;
-    document.getElementById('interest-link').value = interestLink;
-
     try {
         const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads?eventId=${currentEventId}`);
         if (!response.ok) throw new Error('Failed to load leads');
@@ -1044,47 +1037,6 @@ function renderLeadsTable() {
         </tr>
     `;
     }).join('');
-}
-
-function copyInterestLink() {
-    const linkInput = document.getElementById('interest-link');
-    linkInput.select();
-    document.execCommand('copy');
-    
-    const btn = document.getElementById('copy-interest-link');
-    const originalText = btn.textContent;
-    btn.textContent = '✓ Copied!';
-    setTimeout(() => btn.textContent = originalText, 2000);
-}
-
-function exportLeadsCSV() {
-    if (allLeads.length === 0) {
-        alert('No leads to export');
-        return;
-    }
-
-    const headers = ['First Name', 'Last Name', 'Email', 'Registered Date'];
-    const rows = allLeads.map(lead => [
-        lead.firstName,
-        lead.lastName,
-        lead.email,
-        new Date(lead.verifiedAt || lead.createdAt).toISOString().split('T')[0]
-    ]);
-
-    const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `interest-leads-${currentEventId}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 }
 
 async function deleteLead(leadId) {
