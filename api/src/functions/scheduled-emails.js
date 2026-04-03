@@ -21,13 +21,22 @@ function generateGuid() {
     });
 }
 
-// HTTP endpoint - call manually or via an external scheduler
+// HTTP endpoint - call manually or via an external scheduler (e.g. Azure Logic App)
+// Requires X-Scheduler-Secret header matching SCHEDULER_SECRET app setting
 app.http('scheduled-emails-run', {
     methods: ['POST'],
     authLevel: 'anonymous',
     route: 'scheduled-emails/run',
     handler: async (request, context) => {
-        context.log('[MANUAL] Manually triggering scheduled email check');
+        const expectedSecret = process.env.SCHEDULER_SECRET;
+        if (expectedSecret) {
+            const provided = request.headers.get('x-scheduler-secret');
+            if (!provided || provided !== expectedSecret) {
+                context.warn('[SCHEDULED] Unauthorized call - bad or missing secret');
+                return { status: 401, jsonBody: { error: 'Unauthorized' } };
+            }
+        }
+        context.log('[MANUAL] Triggering scheduled email check');
         const result = await processScheduledEmails(context);
         return {
             status: 200,

@@ -763,12 +763,16 @@
                 content: content,
                 template: selectedTemplate, // Store template name for preview
                 type: 'sequence', // Keep type as 'sequence' for filtering
-                sequenceOrder: emailOrder,
                 status: status,
                 scheduledSendTime: scheduledSendTime,
                 ctaUrl: document.getElementById('cta-url').value,
                 ctaText: document.getElementById('cta-text').value || 'Learn More'
             };
+            // Only set sequenceOrder on creation — never overwrite it on update
+            // (order only changes via the reorder buttons on the sequence editor)
+            if (!emailId) {
+                emailData.sequenceOrder = emailOrder;
+            }
             
             try {
                 let response;
