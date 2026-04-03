@@ -24,6 +24,7 @@ const SiteHeader = (() => {
         _config = Object.assign({
             title: '🏔️ ACDC Portal',
             subtitle: 'Arctic Cloud Developer Challenge',
+            logoUrl: null,
             infoBadges: null,
             containerId: 'site-header',
             showSignIn: true,
@@ -65,9 +66,12 @@ const SiteHeader = (() => {
             : '';
 
         _containerEl.className = 'event-banner' + inactiveClass;
+        const titleHTML = _config.logoUrl
+            ? `<img src="${_config.logoUrl}" alt="ACDC Logo" style="height: 48px; display: block;">`
+            : `<h1>${_config.title}</h1>${infoHTML}`;
         _containerEl.innerHTML = `
             <div class="event-banner-left">
-                <h1>${_config.title}</h1>${infoHTML}
+                ${titleHTML}
             </div>
             <div class="banner-controls">
                 ${signInHTML}
