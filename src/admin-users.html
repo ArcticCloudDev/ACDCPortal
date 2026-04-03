@@ -519,11 +519,11 @@
             // Populate team filter
             const tmSel = document.getElementById('filter-team');
             allTeams
-                .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                .sort((a, b) => (a.teamName || '').localeCompare(b.teamName || ''))
                 .forEach(t => {
                     const opt = document.createElement('option');
                     opt.value = t.id;
-                    opt.textContent = t.name;
+                    opt.textContent = t.teamName;
                     tmSel.appendChild(opt);
                 });
         }
@@ -589,7 +589,7 @@
                     eventName: event?.name || '—',
                     eventActive: !!event?.isActive,
                     teamId: p.teamId || null,
-                    teamName: team?.name || null,
+                    teamName: team?.teamName || null,
                     hasAccount: !!user,
                     isPortalAdmin: !!user?.isPortalAdmin,
                     createdAt: p.createdAt,
@@ -642,7 +642,7 @@
                     eventId: inv.eventId || null,
                     eventName: event?.name || '—', eventActive: !!event?.isActive,
                     teamId: inv.teamId || null,
-                    teamName: team?.name || null,
+                    teamName: team?.teamName || null,
                     hasAccount: !!userByEmail[email],
                     isPortalAdmin: false,
                     createdAt: inv.createdAt,
