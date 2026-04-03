@@ -419,7 +419,6 @@
                     if (e.target.value === 'live') {
                         document.getElementById('schedule-group').style.display = 'block';
                         displayUserTimezone();
-                        lockFormFields(true);
                     } else {
                         document.getElementById('schedule-group').style.display = 'none';
                         lockFormFields(false);
@@ -484,9 +483,11 @@
                 
                 // If editing existing email, load its data
                 if (emailId) {
-                    const response = await fetch(`${CONFIG.api.baseUrl}/campaigns/${emailId}`);
+                    const response = await fetch(`${CONFIG.api.baseUrl}/email/campaigns/${emailId}`);
                     if (response.ok) {
-                        const email = await response.json();
+                        const data = await response.json();
+                        const email = data.campaign;
+                        const sentCount = data.stats?.sent || 0;
                         
                         document.getElementById('subject').value = email.subject;
                         quill.clipboard.dangerouslyPasteHTML(email.content || '');
@@ -507,7 +508,11 @@
                             document.querySelector(`input[name="email-status"][value="${email.status}"]`).checked = true;
                             if (email.status === 'live') {
                                 document.getElementById('schedule-group').style.display = 'block';
-                                lockFormFields(true);
+                                displayUserTimezone();
+                                // Only lock if the email has actually been delivered
+                                if (sentCount > 0) {
+                                    lockFormFields(true);
+                                }
                             }
                         }
                         
