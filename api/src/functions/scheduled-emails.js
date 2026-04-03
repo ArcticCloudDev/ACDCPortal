@@ -96,15 +96,18 @@ async function processScheduledEmails(context) {
                 continue;
             }
 
-            // Get leads for this event who haven't received this campaign
+            // Get leads for this event who:
+            // 1. Joined before (or at) the campaign's scheduled send time — late joiners get the digest instead
+            // 2. Haven't already received this campaign
             const eventLeads = leads.filter(l => l.eventId === event.id);
             const recipientsToSend = eventLeads.filter(lead => {
+                const joinedBeforeSend = new Date(lead.createdAt) <= new Date(campaign.scheduledSendTime);
                 const alreadySent = deliveryData.deliveries.some(d =>
                     d.campaignId === campaign.id &&
                     d.email.toLowerCase() === lead.email.toLowerCase() &&
                     d.status === 'sent'
                 );
-                return !alreadySent;
+                return joinedBeforeSend && !alreadySent;
             });
 
             context.log(`[SCHEDULED] ${recipientsToSend.length} recipients need this email`);
