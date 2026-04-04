@@ -212,19 +212,62 @@ function setupEventListeners() {
     document.getElementById('invite-committee-btn').addEventListener('click', () => sendInvitation('committee'));
     document.getElementById('invite-judge-btn').addEventListener('click', () => sendInvitation('judge'));
 
-    // Event image URL preview
-    document.getElementById('event-image-url').addEventListener('input', (e) => {
-        const url = e.target.value.trim();
-        const previewImg = document.getElementById('event-image-preview-img');
-        const previewDiv = document.getElementById('event-image-preview');
-        if (url) {
-            previewImg.src = url;
-            previewDiv.style.display = 'block';
-        } else {
-            previewImg.src = '';
-            previewDiv.style.display = 'none';
+    // Event image: file picker, drag-drop, paste
+    const dropzone = document.getElementById('event-image-dropzone');
+    const fileInput = document.getElementById('event-image-file');
+
+    dropzone.addEventListener('click', (e) => {
+        if (!e.target.closest('button')) fileInput.click();
+    });
+    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.style.borderColor = '#3b82f6'; dropzone.style.background = '#eff6ff'; });
+    dropzone.addEventListener('dragleave', () => { dropzone.style.borderColor = ''; dropzone.style.background = ''; });
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = ''; dropzone.style.background = '';
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) loadEventImageFile(file);
+    });
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files[0]) loadEventImageFile(e.target.files[0]);
+    });
+    document.addEventListener('paste', (e) => {
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && active.type !== 'hidden') return;
+        const items = e.clipboardData?.items || [];
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                loadEventImageFile(item.getAsFile());
+                break;
+            }
         }
     });
+}
+
+function loadEventImageFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const data = e.target.result; // data URI
+        document.getElementById('event-image-data').value = data;
+        document.getElementById('event-image-preview-img').src = data;
+        document.getElementById('event-image-preview').style.display = 'block';
+        document.getElementById('event-image-placeholder').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearEventImage(e) {
+    if (e) e.stopPropagation();
+    document.getElementById('event-image-data').value = 'REMOVE';
+    document.getElementById('event-image-preview-img').src = '';
+    document.getElementById('event-image-preview').style.display = 'none';
+    document.getElementById('event-image-placeholder').style.display = 'block';
+}
+
+function buildEventImagePayload() {
+    const data = document.getElementById('event-image-data').value;
+    if (!data) return {}; // no change
+    if (data === 'REMOVE') return { eventImageData: null };
+    return { eventImageData: data };
 }
 
 // Status display configuration
@@ -405,15 +448,18 @@ function showForm(event = null) {
         document.getElementById('event-location').value = event.location || '';
         // Event image
         const eventImageUrl = event.eventImage || '';
-        document.getElementById('event-image-url').value = eventImageUrl;
         const previewImg = document.getElementById('event-image-preview-img');
         const previewDiv = document.getElementById('event-image-preview');
+        const placeholder = document.getElementById('event-image-placeholder');
+        document.getElementById('event-image-data').value = ''; // no base64 on load
         if (eventImageUrl) {
             previewImg.src = eventImageUrl;
             previewDiv.style.display = 'block';
+            placeholder.style.display = 'none';
         } else {
             previewImg.src = '';
             previewDiv.style.display = 'none';
+            placeholder.style.display = 'block';
         }
         document.getElementById('min-team-size').value = event.minTeamSize || 3;
         document.getElementById('max-team-size').value = event.maxTeamSize || 5;
@@ -575,7 +621,7 @@ async function handleFormSubmit(e) {
             sendInterestAcknowledgment: document.getElementById('event-interest-acknowledgment').checked,
             sendJudgeInvitationEmail: document.getElementById('event-judge-invitation-email').checked,
             sendCommitteeInvitationEmail: document.getElementById('event-committee-invitation-email').checked,
-            eventImage: document.getElementById('event-image-url').value.trim() || null,
+            ...buildEventImagePayload(),
             fileCategories: document.getElementById('event-file-categories').value
                 .split(',')
                 .map(c => c.trim())
