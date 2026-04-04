@@ -138,7 +138,7 @@ app.http('events-image', {
                 status: 200,
                 headers: {
                     'Content-Type': mimeType,
-                    'Cache-Control': 'public, max-age=86400',
+                    'Cache-Control': 'public, max-age=3600',
                     'Content-Length': String(buffer.length)
                 },
                 body: buffer
@@ -261,7 +261,7 @@ app.http('events-create', {
                 endDate: body.endDate,
                 location: body.location || '',
                 eventImageData: body.eventImageData || null,
-                eventImage: body.eventImageData ? `${portalUrl}/api/events/${newEventId}/image` : null,
+                eventImage: body.eventImageData ? `${portalUrl}/api/events/${newEventId}/image?v=${Date.now()}` : null,
                 status: newStatus,
                 registrationType: body.registrationType || 'team',
                 minTeamSize: body.minTeamSize || 3,
@@ -361,7 +361,7 @@ app.http('events-update', {
                     ? (body.eventImageData || null)
                     : existingEvent.eventImageData,
                 eventImage: body.eventImageData !== undefined
-                    ? (body.eventImageData ? `${process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net'}/api/events/${existingEvent.id}/image` : null)
+                    ? (body.eventImageData ? `${process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net'}/api/events/${existingEvent.id}/image?v=${Date.now()}` : null)
                     : existingEvent.eventImage,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
