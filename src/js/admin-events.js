@@ -211,6 +211,20 @@ function setupEventListeners() {
     // Invitation buttons
     document.getElementById('invite-committee-btn').addEventListener('click', () => sendInvitation('committee'));
     document.getElementById('invite-judge-btn').addEventListener('click', () => sendInvitation('judge'));
+
+    // Event image URL preview
+    document.getElementById('event-image-url').addEventListener('input', (e) => {
+        const url = e.target.value.trim();
+        const previewImg = document.getElementById('event-image-preview-img');
+        const previewDiv = document.getElementById('event-image-preview');
+        if (url) {
+            previewImg.src = url;
+            previewDiv.style.display = 'block';
+        } else {
+            previewImg.src = '';
+            previewDiv.style.display = 'none';
+        }
+    });
 }
 
 // Status display configuration
@@ -389,6 +403,18 @@ function showForm(event = null) {
         document.getElementById('event-start').value = event.startDate || '';
         document.getElementById('event-end').value = event.endDate || '';
         document.getElementById('event-location').value = event.location || '';
+        // Event image
+        const eventImageUrl = event.eventImage || '';
+        document.getElementById('event-image-url').value = eventImageUrl;
+        const previewImg = document.getElementById('event-image-preview-img');
+        const previewDiv = document.getElementById('event-image-preview');
+        if (eventImageUrl) {
+            previewImg.src = eventImageUrl;
+            previewDiv.style.display = 'block';
+        } else {
+            previewImg.src = '';
+            previewDiv.style.display = 'none';
+        }
         document.getElementById('min-team-size').value = event.minTeamSize || 3;
         document.getElementById('max-team-size').value = event.maxTeamSize || 5;
         document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
@@ -549,6 +575,7 @@ async function handleFormSubmit(e) {
             sendInterestAcknowledgment: document.getElementById('event-interest-acknowledgment').checked,
             sendJudgeInvitationEmail: document.getElementById('event-judge-invitation-email').checked,
             sendCommitteeInvitationEmail: document.getElementById('event-committee-invitation-email').checked,
+            eventImage: document.getElementById('event-image-url').value.trim() || null,
             fileCategories: document.getElementById('event-file-categories').value
                 .split(',')
                 .map(c => c.trim())

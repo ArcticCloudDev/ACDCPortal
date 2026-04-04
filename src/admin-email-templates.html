@@ -197,12 +197,18 @@
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label>Theme Image (optional)</label>
-                        <div style="font-size: 0.875rem; color: var(--admin-text-muted); margin-bottom: 8px;">
-                            Paste an image directly into the Introduction section below, or use a rich editor to add images
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="use-event-image" style="width: auto;" checked>
+                            <span>🖼️ Use Event Image in email header</span>
+                        </label>
+                        <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                            When enabled, the event's banner image appears below the ACDC logo in this email type. If disabled or no image is set on the event, only the ACDC logo is shown.
+                            Set the image in <strong>Event Settings → General → Event Banner Image URL</strong>.
+                        </small>
+                        <div id="event-image-preview-area" style="margin-top: 10px; display: none;">
+                            <img id="event-image-preview" src="" alt="Event image" style="max-width: 100%; max-height: 100px; border-radius: 6px; border: 1px solid var(--admin-border);">
                         </div>
-                        <div id="theme-editor" class="editor-container" style="min-height: 150px;"></div>
                     </div>
                 </div>
             </div>
@@ -265,7 +271,7 @@
     <script src="js/admin-sidebar.js"></script>
     <script src="js/permissions.js"></script>
     <script>
-        let themeEditor, bodyEditor, closingEditor;
+        let bodyEditor, closingEditor;
         let currentTemplate = 'team-welcome';
         let currentEvent = null;
         let allEvents = [];
@@ -278,19 +284,7 @@
 
             if (!currentPermissions) return;
             
-            // Initialize Quill editors (same as admin-email.html)
-            themeEditor = new Quill('#theme-editor', {
-                theme: 'snow',
-                placeholder: 'Paste theme image here or leave empty...',
-                modules: {
-                    toolbar: [
-                        ['bold', 'italic'],
-                        ['image'],
-                        ['clean']
-                    ]
-                }
-            });
-
+            // Initialize Quill editors
             bodyEditor = new Quill('#body-editor', {
                 theme: 'snow',
                 placeholder: 'Enter body text...',
@@ -308,9 +302,9 @@
             });
 
             // Listen to editor changes for live preview
-            themeEditor.on('text-change', updatePreview);
             bodyEditor.on('text-change', updatePreview);
             closingEditor.on('text-change', updatePreview);
+            document.getElementById('use-event-image').addEventListener('change', updatePreview);
 
             // Template selector click handlers
             document.querySelectorAll('.template-option').forEach(option => {
@@ -418,9 +412,20 @@
             const eventTheme = template.eventThemes[currentEvent.id] || {};
 
             // Load event-specific sections (with fallback to global defaults)
-            themeEditor.root.innerHTML = eventTheme.themeImage || '';
+            document.getElementById('use-event-image').checked = template.useEventImage !== false;
             bodyEditor.root.innerHTML = eventTheme.body || globalDefaults.body || '';
             closingEditor.root.innerHTML = eventTheme.closing || globalDefaults.closing || '';
+
+            // Show event image preview if set
+            const previewArea = document.getElementById('event-image-preview-area');
+            const previewImg = document.getElementById('event-image-preview');
+            if (currentEvent.eventImage) {
+                previewImg.src = currentEvent.eventImage;
+                previewArea.style.display = 'block';
+            } else {
+                previewImg.src = '';
+                previewArea.style.display = 'none';
+            }
         }
 
         function renderMergeFields() {
@@ -440,7 +445,7 @@
         function updatePreview() {
             if (!currentEvent) return;
 
-            const themeHtml = themeEditor.root.innerHTML;
+            const useEventImage = document.getElementById('use-event-image').checked;
             const bodyText = bodyEditor.root.innerHTML;
             const closingText = closingEditor.root.innerHTML;
 
@@ -513,11 +518,10 @@
             const config = previewConfig[currentTemplate] || previewConfig['team-welcome'];
             const mergeData = config.mergeData;
 
-            // Extract theme image if present
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = themeHtml;
-            const imgTag = tempDiv.querySelector('img');
-            const themeImageHtml = imgTag ? `<img src="${imgTag.src}" style="width: 100%; height: auto; display: block;">` : '';
+            // Use event image if toggle is on and event has one set
+            const themeImageHtml = (useEventImage && currentEvent.eventImage)
+                ? `<img src="${currentEvent.eventImage}" style="width: 100%; height: auto; display: block;">`
+                : '';
 
             const headerHtml = themeImageHtml;
 
@@ -570,8 +574,8 @@
                     template.eventThemes[currentEvent.id] = {};
                 }
                 
-                // Store all sections per-event (theme image + body/closing text)
-                template.eventThemes[currentEvent.id].themeImage = themeEditor.root.innerHTML;
+                // Store useEventImage at template level; body/closing remain per-event
+                template.useEventImage = document.getElementById('use-event-image').checked;
                 template.eventThemes[currentEvent.id].body = bodyEditor.root.innerHTML;
                 template.eventThemes[currentEvent.id].closing = closingEditor.root.innerHTML;
 

@@ -215,6 +215,7 @@ app.http('events-create', {
                 startDate: body.startDate,
                 endDate: body.endDate,
                 location: body.location || '',
+                eventImage: body.eventImage || null,
                 status: newStatus,
                 registrationType: body.registrationType || 'team',
                 minTeamSize: body.minTeamSize || 3,
@@ -311,6 +312,7 @@ app.http('events-update', {
                 sendInterestAcknowledgment: body.sendInterestAcknowledgment !== undefined ? body.sendInterestAcknowledgment : existingEvent.sendInterestAcknowledgment,
                 sendJudgeInvitationEmail: body.sendJudgeInvitationEmail !== undefined ? body.sendJudgeInvitationEmail : existingEvent.sendJudgeInvitationEmail,
                 sendCommitteeInvitationEmail: body.sendCommitteeInvitationEmail !== undefined ? body.sendCommitteeInvitationEmail : existingEvent.sendCommitteeInvitationEmail,
+                eventImage: body.eventImage !== undefined ? body.eventImage : existingEvent.eventImage,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()

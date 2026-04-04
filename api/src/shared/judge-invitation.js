@@ -49,14 +49,8 @@ async function buildJudgeInvitationEmail(invitation, context) {
         const eventTheme = template.eventThemes[invitation.eventId] || {};
         const globalDefaults = template.editableSections;
 
-        // Extract image src from HTML
-        const extractImageSrc = (html) => {
-            if (!html) return '';
-            const match = html.match(/src="([^"]+)"/);
-            return match ? match[1] : '';
-        };
-
-        const themeImageSrc = extractImageSrc(eventTheme.themeImage || '');
+        // Use eventImage from event if useEventImage is enabled on the template (default true)
+        const themeImageSrc = (template.useEventImage !== false && event.eventImage) ? event.eventImage : '';
 
         // Build accept URL from environment
         const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
