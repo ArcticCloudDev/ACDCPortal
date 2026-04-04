@@ -35,7 +35,12 @@ CREATE TABLE Events (
     SendJudgeInvitationEmail    BIT              NOT NULL DEFAULT 1,
     SendCommitteeInvitationEmail BIT             NOT NULL DEFAULT 1,
     TeamWelcomeEmailId          UNIQUEIDENTIFIER NULL,
+    SendTeamRegistrationEmail   BIT              NOT NULL DEFAULT 1,
     SharepointUrl               NVARCHAR(2000)   NULL,
+    EventImage                  NVARCHAR(2000)   NULL,
+        -- Public URL: /api/events/{id}/image — served from EventImageData
+    EventImageData              NVARCHAR(MAX)    NULL,
+        -- Base64 data URI of the event banner; stripped from API GET responses
     CreatedAt                   DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
     UpdatedAt                   DATETIME2        NULL,
 
