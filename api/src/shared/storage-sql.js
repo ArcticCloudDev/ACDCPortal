@@ -59,6 +59,8 @@ async function insertGeneric(pool, tableName, item, skipKeys = [], jsonKeys = []
 
         if (paramVal === null) {
             request.input(paramName, sql.NVarChar, null);
+        } else if (typeof paramVal === 'string' && paramVal.length > 4000) {
+            request.input(paramName, sql.NVarChar(sql.MAX), paramVal);
         } else {
             request.input(paramName, paramVal);
         }
@@ -93,6 +95,8 @@ async function updateGeneric(pool, tableName, idColumn, idValue, updates, skipKe
 
         if (paramVal === null) {
             request.input(paramName, sql.NVarChar, null);
+        } else if (typeof paramVal === 'string' && paramVal.length > 4000) {
+            request.input(paramName, sql.NVarChar(sql.MAX), paramVal);
         } else {
             request.input(paramName, paramVal);
         }
