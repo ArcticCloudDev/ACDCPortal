@@ -290,7 +290,6 @@
             // Listen to editor changes for live preview
             bodyEditor.on('text-change', updatePreview);
             closingEditor.on('text-change', updatePreview);
-            document.getElementById('use-event-image').addEventListener('change', updatePreview);
 
             // Template selector click handlers
             document.querySelectorAll('.template-option').forEach(option => {
@@ -398,7 +397,6 @@
             const eventTheme = template.eventThemes[currentEvent.id] || {};
 
             // Load event-specific sections (with fallback to global defaults)
-            document.getElementById('use-event-image') && (document.getElementById('use-event-image').checked = false);
             bodyEditor.root.innerHTML = eventTheme.body || globalDefaults.body || '';
             closingEditor.root.innerHTML = eventTheme.closing || globalDefaults.closing || '';
         }
