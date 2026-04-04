@@ -311,19 +311,17 @@ app.http('events-update', {
         try {
             const id = request.params.id;
             const body = await request.json();
-            
+
             const events = await eventsStorage.getAll();
-            const index = events.findIndex(e => e.id === id);
-            
-            if (index < 0) {
+            const existingEvent = events.find(e => e.id === id);
+
+            if (!existingEvent) {
                 return {
                     status: 404,
                     jsonBody: { error: 'Event not found' }
                 };
             }
-            
-            const existingEvent = events[index];
-            
+
             // Remove legacy fields if present in body
             delete body.isActive;
             delete body.registrationOpen;
@@ -371,10 +369,9 @@ app.http('events-update', {
             };
 
             // Note: Committee/Judge roles are managed via participations (roles[]) — no special teams needed
-            
-            events[index] = updatedEvent;
-            await eventsStorage.saveAll(events);
-            
+
+            await eventsStorage.updateFull(updatedEvent);
+
             context.log(`Event updated: ${id}`);
 
             const { eventImageData: _ueid, ...updatedEventPublic } = updatedEvent;

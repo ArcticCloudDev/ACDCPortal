@@ -278,6 +278,41 @@ async function saveEvent(pool, event) {
     }
 }
 
+// Atomic UPDATE of a single event row + its hotel date child rows (no DELETE on main Events table)
+async function updateEventFull(pool, event) {
+    const { hotelDates, hotelDefaultNights, ...eventData } = event;
+
+    // UPDATE the event row in place — no DELETE, so FK constraints on Teams/Participations are safe
+    await updateGeneric(pool, 'Events', 'Id', event.id, eventData, [], ['fileCategories']);
+
+    // Refresh hotel child rows for just this event
+    await pool.request().input('eid', event.id)
+        .query('DELETE FROM [EventHotelDates] WHERE [EventId] = @eid');
+    await pool.request().input('eid', event.id)
+        .query('DELETE FROM [EventDefaultNights] WHERE [EventId] = @eid');
+
+    if (hotelDates && Array.isArray(hotelDates)) {
+        for (const hd of hotelDates) {
+            await pool.request()
+                .input('eventId', event.id)
+                .input('hotelDate', hd.date)
+                .input('dayLabel', hd.dayLabel || '')
+                .input('dayLabelFull', hd.dayLabelFull || '')
+                .query(`INSERT INTO [EventHotelDates] (EventId, HotelDate, DayLabel, DayLabelFull)
+                        VALUES (@eventId, @hotelDate, @dayLabel, @dayLabelFull)`);
+        }
+    }
+    if (hotelDefaultNights && Array.isArray(hotelDefaultNights)) {
+        for (const night of hotelDefaultNights) {
+            await pool.request()
+                .input('eventId', event.id)
+                .input('nightLabel', night)
+                .query(`INSERT INTO [EventDefaultNights] (EventId, NightLabel)
+                        VALUES (@eventId, @nightLabel)`);
+        }
+    }
+}
+
 // ============================================================
 // PARTICIPATIONS — with hotelNights columns
 // ============================================================
@@ -641,6 +676,19 @@ class GenericStorage {
 
         // Return the merged view
         return { ...current, ...updates };
+    }
+
+    // Atomic full-object update for tables with child rows (currently Events only).
+    // Unlike saveAll, this never DELETEs the parent row so FK constraints on Teams/Participations are safe.
+    async updateFull(item) {
+        if (!this.config || !this.config.table) return item;
+        const pool = await getPool();
+        if (this.config.table === 'Events') {
+            await updateEventFull(pool, item);
+            return item;
+        }
+        // Fallback for other tables
+        return this.update(item.id, item);
     }
 
     async delete(id) {
