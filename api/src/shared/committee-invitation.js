@@ -50,7 +50,7 @@ async function buildCommitteeInvitationEmail(invitation, context) {
         const globalDefaults = template.editableSections;
 
         // Use eventImage from event if useEventImage is enabled on the template (default true)
-        const themeImageSrc = (template.useEventImage !== false && event.eventImage) ? event.eventImage : '';
+        const themeImageSrc = (template.useEventImage !== false && event.eventImageData) ? event.eventImageData : '';
 
         // Build accept URL from environment
         const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
