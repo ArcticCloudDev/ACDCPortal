@@ -67,7 +67,6 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
         const globalDefaults = template.editableSections;
 
         // Use eventImage from event if useEventImage is enabled on the template (default true)
-        const themeImageSrc = (template.useEventImage !== false && event.eventImageData) ? event.eventImageData : '';
 
         // Build merge data
         const mergeData = {
@@ -75,7 +74,6 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
             fullName: fullName,
             eventName: event.name,
             teamAdminName: teamAdminName,
-            themeImage: themeImageSrc,
             bodyText: eventTheme.body || globalDefaults.body || '',
             closingText: eventTheme.closing || globalDefaults.closing || '',
             portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'

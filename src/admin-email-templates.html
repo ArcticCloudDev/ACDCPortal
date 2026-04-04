@@ -196,20 +196,6 @@
                             <option value="">Loading events...</option>
                         </select>
                     </div>
-
-                    <div class="form-group" style="margin-top: 16px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                            <input type="checkbox" id="use-event-image" style="width: auto;" checked>
-                            <span>🖼️ Use Event Image in email header</span>
-                        </label>
-                        <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                            When enabled, the event's banner image appears below the ACDC logo in this email type. If disabled or no image is set on the event, only the ACDC logo is shown.
-                            Set the image in <strong>Event Settings → General → Event Banner Image URL</strong>.
-                        </small>
-                        <div id="event-image-preview-area" style="margin-top: 10px; display: none;">
-                            <img id="event-image-preview" src="" alt="Event image" style="max-width: 100%; max-height: 100px; border-radius: 6px; border: 1px solid var(--admin-border);">
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -412,20 +398,9 @@
             const eventTheme = template.eventThemes[currentEvent.id] || {};
 
             // Load event-specific sections (with fallback to global defaults)
-            document.getElementById('use-event-image').checked = template.useEventImage !== false;
+            document.getElementById('use-event-image') && (document.getElementById('use-event-image').checked = false);
             bodyEditor.root.innerHTML = eventTheme.body || globalDefaults.body || '';
             closingEditor.root.innerHTML = eventTheme.closing || globalDefaults.closing || '';
-
-            // Show event image preview if set
-            const previewArea = document.getElementById('event-image-preview-area');
-            const previewImg = document.getElementById('event-image-preview');
-            if (currentEvent.eventImage) {
-                previewImg.src = currentEvent.eventImage;
-                previewArea.style.display = 'block';
-            } else {
-                previewImg.src = '';
-                previewArea.style.display = 'none';
-            }
         }
 
         function renderMergeFields() {
@@ -445,7 +420,6 @@
         function updatePreview() {
             if (!currentEvent) return;
 
-            const useEventImage = document.getElementById('use-event-image').checked;
             const bodyText = bodyEditor.root.innerHTML;
             const closingText = closingEditor.root.innerHTML;
 
@@ -518,13 +492,6 @@
             const config = previewConfig[currentTemplate] || previewConfig['team-welcome'];
             const mergeData = config.mergeData;
 
-            // Use event image if toggle is on and event has one set
-            const themeImageHtml = (useEventImage && currentEvent.eventImage)
-                ? `<img src="${currentEvent.eventImage}" style="width: 100%; height: auto; display: block;">`
-                : '';
-
-            const headerHtml = themeImageHtml;
-
             // Check if current template is an invitation type
             const isInvitation = currentTemplate.startsWith('invitation-');
 
@@ -533,12 +500,20 @@
                 ? (currentTemplate === 'invitation-committee' ? '#2563eb' : '#1e3a5f')
                 : '#667eea';
 
-            // Build preview HTML
+            // Sub-label for templates that show event name above the title
+            const showEventSubLabel = currentTemplate !== 'team-welcome';
+            const subLabel = showEventSubLabel
+                ? `<p style="margin: 0; font-size: 12px; font-weight: 500; color: #93c5fd; text-transform: uppercase; letter-spacing: 1px;">${mergeData.eventName}</p>`
+                : '';
+
+            // Build preview HTML matching actual template structure
             let previewHTML = `
                 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-                    ${headerHtml}
-                    <div style="padding: 24px;">
-                        <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #1e293b;">${config.heading(mergeData.eventName)}</h2>
+                    <div style="background-color: #1a365d; padding: 28px 40px; text-align: center;">
+                        ${subLabel}
+                        <p style="margin: ${showEventSubLabel ? '6px' : '0'} 0 0; font-size: 22px; font-weight: 700; color: #ffffff; line-height: 1.3;">${config.heading(mergeData.eventName)}</p>
+                    </div>
+                    <div style="padding: 32px 40px;">
                         <div style="margin: 0 0 16px 0; color: #475569;">${bodyText}</div>
                         <div style="margin: 16px 0;">
                             <span style="display: inline-block; padding: 12px 28px; background-color: ${ctaColor}; color: white; border-radius: 6px; font-weight: 600; font-size: 14px;">
@@ -574,8 +549,7 @@
                     template.eventThemes[currentEvent.id] = {};
                 }
                 
-                // Store useEventImage at template level; body/closing remain per-event
-                template.useEventImage = document.getElementById('use-event-image').checked;
+                // Store body/closing per-event
                 template.eventThemes[currentEvent.id].body = bodyEditor.root.innerHTML;
                 template.eventThemes[currentEvent.id].closing = closingEditor.root.innerHTML;
 

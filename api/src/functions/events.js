@@ -95,10 +95,9 @@ app.http('events-list', {
     handler: async (request, context) => {
         try {
             const events = await eventsStorage.getAll();
-            // Strip large eventImageData from list response
             return {
                 status: 200,
-                jsonBody: events.map(e => { const { eventImageData, ...rest } = e; return rest; })
+                jsonBody: events
             };
         } catch (error) {
             await logError(context, error);
@@ -111,45 +110,7 @@ app.http('events-list', {
     }
 });
 
-// GET /api/events/{id}/image - Serve event banner image (public, used by email clients)
-app.http('events-image', {
-    methods: ['GET'],
-    authLevel: 'anonymous',
-    route: 'events/{id}/image',
-    handler: async (request, context) => {
-        try {
-            const id = request.params.id;
-            const events = await eventsStorage.getAll();
-            const event = events.find(e => e.id === id);
-
-            if (!event || !event.eventImageData) {
-                return { status: 404, jsonBody: { error: 'No image set for this event' } };
-            }
-
-            const match = event.eventImageData.match(/^data:([^;]+);base64,(.+)$/);
-            if (!match) {
-                return { status: 400, jsonBody: { error: 'Invalid image data' } };
-            }
-
-            const mimeType = match[1];
-            const buffer = Buffer.from(match[2], 'base64');
-
-            return {
-                status: 200,
-                headers: {
-                    'Content-Type': mimeType,
-                    'Cache-Control': 'public, max-age=3600',
-                    'Content-Length': String(buffer.length)
-                },
-                body: buffer
-            };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Error serving event image:', error);
-            return { status: 500, jsonBody: { error: 'Failed to serve image' } };
-        }
-    }
-});
+// GET /api/events/{id}/image - REMOVED (no longer used)
 
 // GET /api/events/active - Get active event
 app.http('events-active', {
@@ -172,7 +133,7 @@ app.http('events-active', {
             const { eventImageData, ...activeEventPublic } = activeEvent;
             return {
                 status: 200,
-                jsonBody: activeEventPublic
+                jsonBody: activeEvent
             };
         } catch (error) {
             await logError(context, error);
@@ -203,10 +164,9 @@ app.http('events-get', {
                 };
             }
             
-            const { eventImageData: _eid, ...eventPublic } = event;
             return {
                 status: 200,
-                jsonBody: eventPublic
+                jsonBody: event
             };
         } catch (error) {
             await logError(context, error);
@@ -252,7 +212,6 @@ app.http('events-create', {
             const hotelDefaultNights = generateDefaultHotelNights(hotelDates, body.startDate, body.endDate);
 
             const newEventId = generateGuid();
-            const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
             const newEvent = {
                 id: newEventId,
                 name: body.name,
@@ -260,8 +219,6 @@ app.http('events-create', {
                 startDate: body.startDate,
                 endDate: body.endDate,
                 location: body.location || '',
-                eventImageData: body.eventImageData || null,
-                eventImage: body.eventImageData ? `${portalUrl}/api/events/${newEventId}/image?v=${Date.now()}` : null,
                 status: newStatus,
                 registrationType: body.registrationType || 'team',
                 minTeamSize: body.minTeamSize || 3,
@@ -286,10 +243,9 @@ app.http('events-create', {
             
             context.log(`Event created: ${newEvent.id}`);
 
-            const { eventImageData: _ceid, ...newEventPublic } = newEvent;
             return {
                 status: 201,
-                jsonBody: newEventPublic
+                jsonBody: newEvent
             };
         } catch (error) {
             await logError(context, error);
@@ -357,12 +313,6 @@ app.http('events-update', {
                 sendInterestAcknowledgment: body.sendInterestAcknowledgment !== undefined ? body.sendInterestAcknowledgment : existingEvent.sendInterestAcknowledgment,
                 sendJudgeInvitationEmail: body.sendJudgeInvitationEmail !== undefined ? body.sendJudgeInvitationEmail : existingEvent.sendJudgeInvitationEmail,
                 sendCommitteeInvitationEmail: body.sendCommitteeInvitationEmail !== undefined ? body.sendCommitteeInvitationEmail : existingEvent.sendCommitteeInvitationEmail,
-                eventImageData: body.eventImageData !== undefined
-                    ? (body.eventImageData || null)
-                    : existingEvent.eventImageData,
-                eventImage: body.eventImageData !== undefined
-                    ? (body.eventImageData ? `${process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net'}/api/events/${existingEvent.id}/image?v=${Date.now()}` : null)
-                    : existingEvent.eventImage,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()
@@ -374,10 +324,9 @@ app.http('events-update', {
 
             context.log(`Event updated: ${id}`);
 
-            const { eventImageData: _ueid, ...updatedEventPublic } = updatedEvent;
             return {
                 status: 200,
-                jsonBody: updatedEventPublic
+                jsonBody: updatedEvent
             };
         } catch (error) {
             await logError(context, error);

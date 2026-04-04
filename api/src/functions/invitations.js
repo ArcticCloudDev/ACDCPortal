@@ -207,7 +207,6 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
             return match ? match[1] : html;
         };
 
-        const themeImageSrc = extractImageSrc(eventTheme.themeImage || '');
         const portalUrl = process.env.PORTAL_URL || 'https://your-portal.com';
         const acceptUrl = `${portalUrl}/accept-invitation.html?invite=${invitation.id}`;
 
@@ -218,7 +217,6 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
             fullName: inviteeName || invitation.email.split('@')[0],
             eventName: eventName,
             teamAdminName: invitation.inviterName || 'Team Admin',
-            themeImage: themeImageSrc,
             portalUrl: acceptUrl
         };
 

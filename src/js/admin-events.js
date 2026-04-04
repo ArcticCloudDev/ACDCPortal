@@ -9,8 +9,6 @@ let currentStatus = 'draft';
 let currentEventSequence = null;
 let emailEditor = null;
 let currentPermissions = null;
-let eventImageQuill = null;
-let eventImageEdited = false;
 
 function normalizeId(value) {
     return (value || '').toString().toLowerCase();
@@ -213,31 +211,6 @@ function setupEventListeners() {
     // Invitation buttons
     document.getElementById('invite-committee-btn').addEventListener('click', () => sendInvitation('committee'));
     document.getElementById('invite-judge-btn').addEventListener('click', () => sendInvitation('judge'));
-
-    // Event image: Quill editor with image paste/drop/insert support
-    eventImageQuill = new Quill('#event-image-editor', {
-        theme: 'snow',
-        placeholder: 'Paste (Ctrl+V), drag & drop, or click the image button...',
-        modules: {
-            toolbar: [['image']],
-            imageResize: {},
-            imageDrop: true
-        }
-    });
-    eventImageQuill.on('text-change', (delta, oldDelta, source) => {
-        if (source !== 'user') return;
-        eventImageEdited = true;
-        const html = eventImageQuill.root.innerHTML;
-        const match = html.match(/src="(data:[^"]+)"/);
-        document.getElementById('event-image-data').value = match ? match[1] : 'REMOVE';
-    });
-}
-
-function buildEventImagePayload() {
-    if (!eventImageEdited) return {};
-    const data = document.getElementById('event-image-data').value;
-    if (!data || data === 'REMOVE') return { eventImageData: null };
-    return { eventImageData: data };
 }
 
 // Status display configuration
@@ -416,14 +389,6 @@ function showForm(event = null) {
         document.getElementById('event-start').value = event.startDate || '';
         document.getElementById('event-end').value = event.endDate || '';
         document.getElementById('event-location').value = event.location || '';
-        // Event image
-        eventImageEdited = false;
-        document.getElementById('event-image-data').value = '';
-        if (event.eventImage) {
-            eventImageQuill.setContents([{ insert: { image: event.eventImage } }]);
-        } else {
-            eventImageQuill.setContents([]);
-        }
         document.getElementById('min-team-size').value = event.minTeamSize || 3;
         document.getElementById('max-team-size').value = event.maxTeamSize || 5;
         document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
@@ -471,11 +436,6 @@ function showForm(event = null) {
         // New events start as draft
         currentStatus = 'draft';
         document.getElementById('event-status').value = 'draft';
-
-        // Clear event image editor for new events
-        eventImageEdited = false;
-        document.getElementById('event-image-data').value = '';
-        if (eventImageQuill) eventImageQuill.setContents([]);
     }
 }
 
@@ -589,7 +549,6 @@ async function handleFormSubmit(e) {
             sendInterestAcknowledgment: document.getElementById('event-interest-acknowledgment').checked,
             sendJudgeInvitationEmail: document.getElementById('event-judge-invitation-email').checked,
             sendCommitteeInvitationEmail: document.getElementById('event-committee-invitation-email').checked,
-            ...buildEventImagePayload(),
             fileCategories: document.getElementById('event-file-categories').value
                 .split(',')
                 .map(c => c.trim())

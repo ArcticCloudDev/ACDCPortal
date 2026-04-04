@@ -173,7 +173,6 @@ app.http('system-emails-test', {
                 const globalDefaults = template.editableSections;
                 
                 // Extract image src from HTML (themeImage is stored as HTML with <img> tag)
-                const themeImageSrc = extractImageSrc(eventTheme.themeImage || '');
                 
                 const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
                 const fakeInviteId = uuidv4();
@@ -183,8 +182,6 @@ app.http('system-emails-test', {
                     fullName: data?.fullName || 'Test User',
                     ...data,
                     eventName: event.name,
-                    themeImage: themeImageSrc,
-                    noThemeImage: !themeImageSrc,
                     bodyText: eventTheme.body || globalDefaults.body || '',
                     closingText: eventTheme.closing || globalDefaults.closing || '',
                     portalUrl: portalUrl,
@@ -249,13 +246,9 @@ app.http('system-emails-send', {
             const eventTheme = template.eventThemes[eventId] || {};
             const globalDefaults = template.editableSections;
             
-            // Extract image src from HTML (themeImage is stored as HTML with <img> tag)
-            const themeImageSrc = extractImageSrc(eventTheme.themeImage || '');
-            
             const mergeData = {
                 ...data,
                 eventName: event.name,
-                themeImage: themeImageSrc,
                 bodyText: eventTheme.body || globalDefaults.body || '',
                 closingText: eventTheme.closing || globalDefaults.closing || '',
                 portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'
