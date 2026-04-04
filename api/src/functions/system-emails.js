@@ -217,6 +217,65 @@ app.http('system-emails-test', {
     }
 });
 
+// POST /api/system-emails/preview - Render a template with sample data and return HTML
+app.http('system-emails-preview', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'system-emails/preview',
+    handler: async (request, context) => {
+        try {
+            const { templateType, eventId, bodyText, closingText } = await request.json();
+
+            const config = await readData('system-email-config.json');
+            const template = config.templates[templateType];
+            if (!template) {
+                return { status: 404, jsonBody: { error: 'Template not found' } };
+            }
+
+            const eventsData = await readData('events.json');
+            const event = eventsData.find(e => e.id === eventId);
+            if (!event) {
+                return { status: 404, jsonBody: { error: 'Event not found' } };
+            }
+
+            const eventTheme = template.eventThemes?.[eventId] || {};
+            const globalDefaults = template.editableSections;
+            const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
+            const fakeInviteId = 'preview-invite-id';
+
+            const mergeData = {
+                firstName: 'Jane',
+                fullName: 'Jane Smith',
+                teamName: 'Sample Team Alpha',
+                teamAdminName: 'John Admin',
+                committedParticipants: '4',
+                eventName: event.name,
+                inviterName: 'Event Organizer',
+                bodyText: bodyText !== undefined ? bodyText : (eventTheme.body || globalDefaults.body || ''),
+                closingText: closingText !== undefined ? closingText : (eventTheme.closing || globalDefaults.closing || ''),
+                portalUrl: portalUrl,
+                acceptUrl: `${portalUrl}?invite=${fakeInviteId}`,
+                inviteId: fakeInviteId,
+                interestLink: `${portalUrl}/event.html`
+            };
+
+            const templatePath = path.join(__dirname, '../../data/email-templates', `${templateType}.html`);
+            const templateHtml = await fs.readFile(templatePath, 'utf-8');
+            const htmlContent = processTemplate(templateHtml, mergeData);
+
+            return {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+                jsonBody: { html: htmlContent }
+            };
+        } catch (error) {
+            await logError(context, error);
+            context.error('Error rendering preview:', error);
+            return { status: 500, jsonBody: { error: error.message } };
+        }
+    }
+});
+
 // POST /api/system-emails/send - Send system email (called by team creation, etc.)
 app.http('system-emails-send', {
     methods: ['POST'],

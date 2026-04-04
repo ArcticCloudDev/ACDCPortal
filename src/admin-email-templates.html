@@ -415,117 +415,46 @@
             showStatus(`Copied {{${field}}} to clipboard`, 'success');
         }
 
-        function updatePreview() {
+        async function updatePreview() {
             if (!currentEvent) return;
 
-            const bodyText = bodyEditor.root.innerHTML;
-            const closingText = closingEditor.root.innerHTML;
+            const previewEl = document.getElementById('preview-content');
+            previewEl.innerHTML = '<p style="color: var(--admin-text-muted); text-align: center; padding: 40px 20px;">Loading preview…</p>';
 
-            // Template-specific preview config
-            const previewConfig = {
-                'team-welcome': {
-                    mergeData: {
-                        teamName: 'Sample Team Alpha',
-                        fullName: 'John Doe',
-                        eventName: currentEvent.name,
-                        teamAdminName: 'Jane Smith',
-                        portalUrl: window.location.origin + '/my-page.html'
-                    },
-                    heading: (name) => `Welcome to ${name}!`,
-                    ctaText: 'Sign in',
-                    signature: (name) => `The ${name} Team`,
-                    footer: (name) => `This is an automated email from ${name}.`
-                },
-                'interest-acknowledgment': {
-                    mergeData: {
-                        fullName: 'John Doe',
-                        eventName: currentEvent.name,
-                        interestLink: window.location.origin + '/event.html'
-                    },
-                    heading: (name) => `Thanks for your interest in ${name}!`,
-                    ctaText: 'Confirm Your Interest',
-                    signature: (name) => `The ACDC Team`,
-                    footer: (name) => `You're receiving this email because you expressed interest in ${name}.`
-                },
-                'invitation-judge': {
-                    mergeData: {
-                        firstName: 'John',
-                        fullName: 'John Doe',
-                        eventName: currentEvent.name,
-                        inviterName: 'Jane Smith',
-                        acceptUrl: '#'
-                    },
-                    heading: (name) => `⚖️ You're Invited to Judge ${name}`,
-                    ctaText: 'Accept Judge Invitation',
-                    signature: (name) => `The ${name} Team`,
-                    footer: (name) => `You received this email because you were invited to judge ${name}.`
-                },
-                'invitation-committee': {
-                    mergeData: {
-                        firstName: 'John',
-                        fullName: 'John Doe',
-                        eventName: currentEvent.name,
-                        inviterName: 'Jane Smith',
-                        acceptUrl: '#'
-                    },
-                    heading: (name) => `👔 You're Invited to Join the Committee`,
-                    ctaText: 'Accept Committee Invitation',
-                    signature: (name) => `The ${name} Team`,
-                    footer: (name) => `You received this email because you were invited to the ${name} committee.`
-                },
-                'team-registration': {
-                    mergeData: {
-                        teamName: 'Sample Team Alpha',
-                        fullName: 'John Doe',
-                        eventName: currentEvent.name,
-                        committedParticipants: '4'
-                    },
-                    heading: (name) => `📋 Team Registration Confirmed`,
-                    ctaText: 'Manage Your Team',
-                    signature: (name) => `The ${name} Team`,
-                    footer: (name) => `This is an automated email from ${name}. Please do not reply to this email.`
-                },
-            };
+            try {
+                const resp = await fetch(`${CONFIG.api.baseUrl}/system-emails/preview`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        templateType: currentTemplate,
+                        eventId: currentEvent.id,
+                        bodyText: bodyEditor.root.innerHTML,
+                        closingText: closingEditor.root.innerHTML
+                    })
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const response = await resp.json();
 
-            const config = previewConfig[currentTemplate] || previewConfig['team-welcome'];
-            const mergeData = config.mergeData;
+                // Render the real email HTML inside an isolated iframe
+                let iframe = previewEl.querySelector('iframe');
+                if (!iframe) {
+                    previewEl.innerHTML = '';
+                    iframe = document.createElement('iframe');
+                    iframe.style.cssText = 'width:100%;border:none;display:block;min-height:400px;';
+                    iframe.setAttribute('sandbox', 'allow-same-origin');
+                    previewEl.appendChild(iframe);
+                }
 
-            // Check if current template is an invitation type
-            const isInvitation = currentTemplate.startsWith('invitation-');
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                doc.open();
+                doc.write(response.html);
+                doc.close();
 
-            // Build CTA button
-            const ctaColor = '#1a365d';
-
-            // Sub-label removed from all templates — only show title
-            const subLabel = '';
-
-            // Build preview HTML matching actual template structure
-            let previewHTML = `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-                    <div style="background-color: #1a365d; padding: 28px 40px; text-align: center;">
-                        ${subLabel}
-                        <p style="margin: 0; font-size: 22px; font-weight: 700; color: #ffffff; line-height: 1.3;">${config.heading(mergeData.eventName)}</p>
-                    </div>
-                    <div style="padding: 32px 40px;">
-                        <div style="margin: 0 0 16px 0; color: #475569;">${bodyText}</div>
-                        <div style="margin: 16px 0;">
-                            <span style="display: inline-block; padding: 12px 28px; background-color: ${ctaColor}; color: white; border-radius: 6px; font-weight: 600; font-size: 14px;">
-                                ${config.ctaText}
-                            </span>
-                        </div>
-                        ${isInvitation ? '<p style="margin: 8px 0 16px; font-size: 12px; color: #92400e; background: #fef3c7; display: inline-block; padding: 6px 14px; border-radius: 12px;">⏰ This invitation expires in 7 days</p>' : ''}
-                        <div style="margin: 16px 0 0 0; color: #475569;">${closingText}</div>
-                        <p style="margin: 16px 0 0 0; color: #475569;">
-                            Best regards,<br><strong>${config.signature(mergeData.eventName)}</strong>
-                        </p>
-                    </div>
-                    <div style="padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e5e7eb; font-size: 12px; color: #64748b; text-align: center;">
-                        ${config.footer(mergeData.eventName)}
-                    </div>
-                </div>
-            `;
-
-            document.getElementById('preview-content').innerHTML = previewHTML;
+                // Auto-size iframe to content
+                iframe.style.height = doc.documentElement.scrollHeight + 'px';
+            } catch (err) {
+                previewEl.innerHTML = `<p style="color: red; text-align: center; padding: 40px 20px;">Preview failed: ${err.message}</p>`;
+            }
         }
 
         async function saveTemplate() {
