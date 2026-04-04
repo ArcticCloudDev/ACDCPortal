@@ -2,7 +2,7 @@
   "templates": {
     "invitation-judge": {
       "name": "Judge Invitation Email",
-      "subject": "You're invited to judge {{eventName}}!",
+      "subject": "{{eventName}} - Judge Invitation",
       "mergeFields": [
         "firstName",
         "fullName",
@@ -29,7 +29,7 @@
     },
     "invitation-committee": {
       "name": "Committee Invitation Email",
-      "subject": "You're invited to join the {{eventName}} committee!",
+      "subject": "{{eventName}} - Committee Invitation",
       "mergeFields": [
         "firstName",
         "fullName",
@@ -45,7 +45,7 @@
     },
     "interest-acknowledgment": {
       "name": "Interest Acknowledgment Email",
-      "subject": "Thanks for your interest in {{eventName}}!",
+      "subject": "{{eventName}} - Confirm Interest",
       "mergeFields": [
         "fullName",
         "eventName",
@@ -59,7 +59,7 @@
     },
     "team-welcome": {
       "name": "Team Welcome Email",
-      "subject": "Welcome to {{eventName}}",
+      "subject": "{{eventName}} - Welcome",
       "mergeFields": [
         "teamName",
         "fullName",
