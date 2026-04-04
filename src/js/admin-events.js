@@ -395,6 +395,7 @@ function showForm(event = null) {
         document.getElementById('event-sharepoint-url').value = event.sharepointUrl || '';
         document.getElementById('sharepoint-verify-result').innerHTML = '';
         document.getElementById('event-sequence').checked = event.sequenceEnabled || false;
+        document.getElementById('event-team-registration-email').checked = event.sendTeamRegistrationEmail !== false;
         document.getElementById('event-team-welcome-email').checked = event.sendWelcomeEmail || false;
         document.getElementById('event-interest-acknowledgment').checked = event.sendInterestAcknowledgment || false;
         document.getElementById('event-judge-invitation-email').checked = event.sendJudgeInvitationEmail || false;
@@ -543,6 +544,7 @@ async function handleFormSubmit(e) {
             registrationType: registrationType,
             status: document.getElementById('event-status').value || 'draft',
             sequenceEnabled: document.getElementById('event-sequence').checked,
+            sendTeamRegistrationEmail: document.getElementById('event-team-registration-email').checked,
             sendWelcomeEmail: document.getElementById('event-team-welcome-email').checked,
             sendInterestAcknowledgment: document.getElementById('event-interest-acknowledgment').checked,
             sendJudgeInvitationEmail: document.getElementById('event-judge-invitation-email').checked,

@@ -20,6 +20,11 @@ async function sendTeamRegistrationEmail(adminEmail, eventId, teamName, committe
             return { success: false, reason: 'Event not found' };
         }
 
+        if (event.sendTeamRegistrationEmail === false) {
+            context.log(`Team registration email disabled for event ${eventId}`);
+            return { success: false, reason: 'Team registration email disabled for this event' };
+        }
+
         // Get admin's full name
         const users = await Storage.users.getAll();
         const adminUser = users.find(u => u.email?.toLowerCase() === adminEmail.toLowerCase());
