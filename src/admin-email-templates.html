@@ -494,22 +494,17 @@
             const isInvitation = currentTemplate.startsWith('invitation-');
 
             // Build CTA button
-            const ctaColor = isInvitation
-                ? (currentTemplate === 'invitation-committee' ? '#2563eb' : '#1e3a5f')
-                : '#667eea';
+            const ctaColor = '#1a365d';
 
-            // Sub-label for templates that show event name above the title
-            const showEventSubLabel = currentTemplate !== 'team-welcome';
-            const subLabel = showEventSubLabel
-                ? `<p style="margin: 0; font-size: 12px; font-weight: 500; color: #93c5fd; text-transform: uppercase; letter-spacing: 1px;">${mergeData.eventName}</p>`
-                : '';
+            // Sub-label removed from all templates — only show title
+            const subLabel = '';
 
             // Build preview HTML matching actual template structure
             let previewHTML = `
                 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
                     <div style="background-color: #1a365d; padding: 28px 40px; text-align: center;">
                         ${subLabel}
-                        <p style="margin: ${showEventSubLabel ? '6px' : '0'} 0 0; font-size: 22px; font-weight: 700; color: #ffffff; line-height: 1.3;">${config.heading(mergeData.eventName)}</p>
+                        <p style="margin: 0; font-size: 22px; font-weight: 700; color: #ffffff; line-height: 1.3;">${config.heading(mergeData.eventName)}</p>
                     </div>
                     <div style="padding: 32px 40px;">
                         <div style="margin: 0 0 16px 0; color: #475569;">${bodyText}</div>
