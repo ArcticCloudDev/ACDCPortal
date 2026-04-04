@@ -177,17 +177,21 @@ app.http('system-emails-test', {
                 const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
                 const fakeInviteId = uuidv4();
 
-                const mergeData = {
+                const baseData = {
                     firstName: data?.fullName?.split(' ')[0] || 'Test',
                     fullName: data?.fullName || 'Test User',
                     ...data,
                     eventName: event.name,
-                    bodyText: eventTheme.body || globalDefaults.body || '',
-                    closingText: eventTheme.closing || globalDefaults.closing || '',
                     portalUrl: portalUrl,
                     acceptUrl: `${portalUrl}?invite=${fakeInviteId}`,
                     inviteId: fakeInviteId,
                     inviterName: data?.teamAdminName || 'Event Organizer'
+                };
+                // Pre-resolve merge fields inside body/closing before injecting into the template
+                const mergeData = {
+                    ...baseData,
+                    bodyText: processTemplate(eventTheme.body || globalDefaults.body || '', baseData),
+                    closingText: processTemplate(eventTheme.closing || globalDefaults.closing || '', baseData)
                 };
 
                 // Load HTML template file
@@ -243,7 +247,8 @@ app.http('system-emails-preview', {
             const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
             const fakeInviteId = 'preview-invite-id';
 
-            const mergeData = {
+            // Sample values used to substitute merge fields inside body/closing text
+            const sampleData = {
                 firstName: 'Jane',
                 fullName: 'Jane Smith',
                 teamName: 'Sample Team Alpha',
@@ -251,12 +256,21 @@ app.http('system-emails-preview', {
                 committedParticipants: '4',
                 eventName: event.name,
                 inviterName: 'Event Organizer',
-                bodyText: bodyText !== undefined ? bodyText : (eventTheme.body || globalDefaults.body || ''),
-                closingText: closingText !== undefined ? closingText : (eventTheme.closing || globalDefaults.closing || ''),
                 portalUrl: portalUrl,
                 acceptUrl: `${portalUrl}?invite=${fakeInviteId}`,
                 inviteId: fakeInviteId,
                 interestLink: `${portalUrl}/event.html`
+            };
+
+            // Pre-process body/closing so {{mergeFields}} inside them are resolved
+            // before they get injected into the template (processTemplate is single-pass)
+            const rawBody = bodyText !== undefined ? bodyText : (eventTheme.body || globalDefaults.body || '');
+            const rawClosing = closingText !== undefined ? closingText : (eventTheme.closing || globalDefaults.closing || '');
+
+            const mergeData = {
+                ...sampleData,
+                bodyText: processTemplate(rawBody, sampleData),
+                closingText: processTemplate(rawClosing, sampleData)
             };
 
             const templatePath = path.join(__dirname, '../../data/email-templates', `${templateType}.html`);
@@ -304,13 +318,17 @@ app.http('system-emails-send', {
             // Build merge data
             const eventTheme = template.eventThemes[eventId] || {};
             const globalDefaults = template.editableSections;
-            
-            const mergeData = {
+
+            const baseData = {
                 ...data,
                 eventName: event.name,
-                bodyText: eventTheme.body || globalDefaults.body || '',
-                closingText: eventTheme.closing || globalDefaults.closing || '',
                 portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'
+            };
+            // Pre-resolve merge fields inside body/closing before injecting into the template
+            const mergeData = {
+                ...baseData,
+                bodyText: processTemplate(eventTheme.body || globalDefaults.body || '', baseData),
+                closingText: processTemplate(eventTheme.closing || globalDefaults.closing || '', baseData)
             };
 
             // Load HTML template file
