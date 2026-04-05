@@ -216,9 +216,20 @@
                                 <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px;">Click to copy • Paste into text sections below</div>
                             </div>
 
+                            <!-- Structural fields ordered top-to-bottom as they appear in the email -->
+                            <div class="form-group" style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--admin-border);">
+                                <label for="field-header-title">Header Title <span style="font-weight:400;color:var(--admin-text-muted)">(applies to all events)</span></label>
+                                <input type="text" id="field-header-title" style="width:100%;" placeholder="Welcome to {{eventName}}!">
+                            </div>
+
                             <div class="editor-section">
                                 <label for="body-editor">Body Text</label>
                                 <div id="body-editor" class="editor-container"></div>
+                            </div>
+
+                            <div class="form-group" style="margin-top: 16px;">
+                                <label for="field-button-text">Button Text <span style="font-weight:400;color:var(--admin-text-muted)">(leave blank for no button)</span></label>
+                                <input type="text" id="field-button-text" style="width:100%;" placeholder="View Team Dashboard">
                             </div>
 
                             <div class="editor-section">
@@ -226,17 +237,8 @@
                                 <div id="closing-editor" class="editor-container"></div>
                             </div>
 
-                            <!-- Structural Text Fields -->
-                            <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--admin-border);">
-                                <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 12px; color: var(--admin-sidebar);">Email Structure (apply to all events)</div>
-                                <div class="form-group">
-                                    <label for="field-header-title">Header Title</label>
-                                    <input type="text" id="field-header-title" style="width:100%;" placeholder="Welcome to {{eventName}}!">
-                                </div>
-                                <div class="form-group">
-                                    <label for="field-button-text">Button Text <span style="font-weight:400;color:var(--admin-text-muted)">(leave blank for no button)</span></label>
-                                    <input type="text" id="field-button-text" style="width:100%;" placeholder="View Team Dashboard">
-                                </div>
+                            <div style="padding-top: 14px; border-top: 1px solid var(--admin-border); margin-top: 4px;">
+                                <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 10px; color: var(--admin-text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Signature &amp; Footer <span style="font-weight:400;">(apply to all events)</span></div>
                                 <div class="form-group">
                                     <label for="field-signature-prefix">Signature Prefix <span style="font-weight:400;color:var(--admin-text-muted)">(e.g. "Best regards," or blank)</span></label>
                                     <input type="text" id="field-signature-prefix" style="width:100%;" placeholder="Best regards,">
