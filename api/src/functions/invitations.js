@@ -3,6 +3,7 @@ const { logError } = require('../shared/error-log');
 const { readData, writeData } = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
 const { buildInvitationEmail } = require('../shared/invitation-email');
+const { buildEmailHtml } = require('../shared/email-builder');
 const Storage = require('../shared/storage');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
@@ -226,12 +227,8 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
         mergeData.bodyText = processTemplate(rawBody, mergeData);
         mergeData.closingText = processTemplate(rawClosing, mergeData);
 
-        // Load HTML template
-        const templatePath = path.join(__dirname, '../../data/email-templates/team-welcome.html');
-        const templateHtml = await fs.readFile(templatePath, 'utf-8');
-
-        // Process template with merge data
-        const htmlContent = processTemplate(templateHtml, mergeData);
+        // Build HTML using the JSON-driven builder (no HTML template file needed)
+        const htmlContent = buildEmailHtml(template, mergeData);
         const subject = processTemplate(template.subject, mergeData);
 
         return { success: true, htmlContent, subject };

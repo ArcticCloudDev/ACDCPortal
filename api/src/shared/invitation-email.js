@@ -1,7 +1,8 @@
 // Invitation Email Builder - Unified builder for judge & committee invitation emails
-// Uses the invitation's role to select the correct template and config.
+// Uses the invitation's role to select the correct template config from system-email-config.json.
 const { readData } = require('./storage');
 const { logError } = require('./error-log');
+const { buildEmailHtml } = require('./email-builder');
 
 /**
  * Build an invitation email for any role (judge, committee, etc.)
@@ -17,7 +18,6 @@ const { logError } = require('./error-log');
 async function buildInvitationEmail(invitation, context) {
     const role = invitation.role; // e.g. 'judge' or 'committee'
     const templateKey = `invitation-${role}`;
-    const templateFile = `invitation-${role}.html`;
     const eventFlag = `send${role.charAt(0).toUpperCase() + role.slice(1)}InvitationEmail`;
 
     try {
@@ -95,12 +95,8 @@ async function buildInvitationEmail(invitation, context) {
             closingText
         };
 
-        // Load HTML template file
-        const templatePath = path.join(__dirname, `../../data/email-templates/${templateFile}`);
-        const templateHtml = await fs.readFile(templatePath, 'utf-8');
-
-        // Process template with merge data
-        const htmlContent = processTemplate(templateHtml, mergeData);
+        // Build HTML using the JSON-driven builder (no HTML template file needed)
+        const htmlContent = buildEmailHtml(template, mergeData);
 
         // Process subject with merge fields
         const subject = processTemplate(template.subject, mergeData);

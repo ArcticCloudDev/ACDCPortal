@@ -3,6 +3,13 @@
     "invitation-judge": {
       "name": "Judge Invitation Email",
       "subject": "{{eventName}} - Judge Invitation",
+      "headerTitle": "You're Invited to Judge",
+      "buttonText": "Accept Judge Invitation",
+      "buttonUrlField": "acceptUrl",
+      "signaturePrefix": "",
+      "signatureName": "The {{eventName}} Team",
+      "footer": "You received this email because {{inviterName}} invited you to judge {{eventName}}.",
+      "features": ["expiryNotice"],
       "mergeFields": [
         "firstName",
         "fullName",
@@ -30,6 +37,13 @@
     "invitation-committee": {
       "name": "Committee Invitation Email",
       "subject": "{{eventName}} - Committee Invitation",
+      "headerTitle": "You're Invited to Join the Committee",
+      "buttonText": "Accept Committee Invitation",
+      "buttonUrlField": "acceptUrl",
+      "signaturePrefix": "",
+      "signatureName": "The {{eventName}} Team",
+      "footer": "You received this email because {{inviterName}} invited you to the {{eventName}} committee.",
+      "features": ["expiryNotice"],
       "mergeFields": [
         "firstName",
         "fullName",
@@ -46,6 +60,13 @@
     "interest-acknowledgment": {
       "name": "Interest Acknowledgment Email",
       "subject": "{{eventName}} - Confirm Interest",
+      "headerTitle": "Thanks for Your Interest!",
+      "buttonText": null,
+      "buttonUrlField": null,
+      "signaturePrefix": "",
+      "signatureName": "The ACDC Team",
+      "footer": "You're receiving this email because you expressed interest in {{eventName}}.",
+      "features": [],
       "mergeFields": [
         "fullName",
         "eventName",
@@ -60,6 +81,13 @@
     "team-welcome": {
       "name": "Team Welcome Email",
       "subject": "{{eventName}} - Welcome",
+      "headerTitle": "Welcome to {{eventName}}!",
+      "buttonText": "View Team Dashboard",
+      "buttonUrlField": "portalUrl",
+      "signaturePrefix": "Best regards,",
+      "signatureName": "The {{eventName}} Team",
+      "footer": "This is an automated email from {{eventName}}. Please do not reply to this email.",
+      "features": [],
       "mergeFields": [
         "teamName",
         "fullName",
@@ -89,6 +117,13 @@
     "team-registration": {
       "name": "Team Registration Confirmed",
       "subject": "Team Registered: {{teamName}} for {{eventName}}",
+      "headerTitle": "Team Registration Confirmed!",
+      "buttonText": "Manage Your Team",
+      "buttonUrlField": "portalUrl",
+      "signaturePrefix": "Best regards,",
+      "signatureName": "The {{eventName}} Team",
+      "footer": "This is an automated email from {{eventName}}. Please do not reply to this email.",
+      "features": ["teamBox"],
       "mergeFields": [
         "teamName",
         "fullName",

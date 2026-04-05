@@ -112,11 +112,12 @@
 
         .preview-content {
             font-size: 0.875rem;
+            overflow: hidden;
         }
 
         .two-column {
             display: grid;
-            grid-template-columns: 1fr 400px;
+            grid-template-columns: 1fr 1fr;
             gap: 24px;
         }
 
@@ -223,6 +224,31 @@
                             <div class="editor-section">
                                 <label for="closing-editor">Closing Text</label>
                                 <div id="closing-editor" class="editor-container"></div>
+                            </div>
+
+                            <!-- Structural Text Fields -->
+                            <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--admin-border);">
+                                <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 12px; color: var(--admin-sidebar);">Email Structure (apply to all events)</div>
+                                <div class="form-group">
+                                    <label for="field-header-title">Header Title</label>
+                                    <input type="text" id="field-header-title" style="width:100%;" placeholder="Welcome to {{eventName}}!">
+                                </div>
+                                <div class="form-group">
+                                    <label for="field-button-text">Button Text <span style="font-weight:400;color:var(--admin-text-muted)">(leave blank for no button)</span></label>
+                                    <input type="text" id="field-button-text" style="width:100%;" placeholder="View Team Dashboard">
+                                </div>
+                                <div class="form-group">
+                                    <label for="field-signature-prefix">Signature Prefix <span style="font-weight:400;color:var(--admin-text-muted)">(e.g. "Best regards," or blank)</span></label>
+                                    <input type="text" id="field-signature-prefix" style="width:100%;" placeholder="Best regards,">
+                                </div>
+                                <div class="form-group">
+                                    <label for="field-signature-name">Signature Name</label>
+                                    <input type="text" id="field-signature-name" style="width:100%;" placeholder="The {{eventName}} Team">
+                                </div>
+                                <div class="form-group">
+                                    <label for="field-footer">Footer Text</label>
+                                    <input type="text" id="field-footer" style="width:100%;" placeholder="This is an automated email from {{eventName}}.">
+                                </div>
                             </div>
 
                             <div style="display: flex; gap: 12px; margin-top: 20px;">
@@ -399,6 +425,13 @@
             // Load event-specific sections (with fallback to global defaults)
             bodyEditor.root.innerHTML = eventTheme.body || globalDefaults.body || '';
             closingEditor.root.innerHTML = eventTheme.closing || globalDefaults.closing || '';
+
+            // Load global structural fields
+            document.getElementById('field-header-title').value = template.headerTitle || '';
+            document.getElementById('field-button-text').value = template.buttonText || '';
+            document.getElementById('field-signature-prefix').value = template.signaturePrefix || '';
+            document.getElementById('field-signature-name').value = template.signatureName || '';
+            document.getElementById('field-footer').value = template.footer || '';
         }
 
         function renderMergeFields() {
@@ -440,8 +473,7 @@
                 if (!iframe) {
                     previewEl.innerHTML = '';
                     iframe = document.createElement('iframe');
-                    // Fixed at the email's natural 600px width; CSS scales it to fit the pane
-                    iframe.style.cssText = 'width:600px;border:none;display:block;transform-origin:top left;';
+                    iframe.style.cssText = 'width:100%;border:none;display:block;';
                     iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts');
                     previewEl.appendChild(iframe);
                 }
@@ -451,13 +483,10 @@
                 doc.write(response.html);
                 doc.close();
 
-                // Scale the 600px email down to fit the preview pane width
-                const paneWidth = previewEl.clientWidth || 400;
-                const scale = Math.min(1, paneWidth / 600);
-                iframe.style.transform = `scale(${scale})`;
-                iframe.style.height = (doc.documentElement.scrollHeight) + 'px';
-                // Shrink the container height to match the scaled-down visual height
-                previewEl.style.height = Math.ceil(doc.documentElement.scrollHeight * scale) + 'px';
+                // Size iframe to its content height
+                iframe.style.height = doc.documentElement.scrollHeight + 'px';
+                previewEl.style.height = '';
+                previewEl.style.overflow = 'hidden';
             } catch (err) {
                 previewEl.innerHTML = `<p style="color: red; text-align: center; padding: 40px 20px;">Preview failed: ${err.message}</p>`;
             }
@@ -480,6 +509,13 @@
                 // Store body/closing per-event
                 template.eventThemes[currentEvent.id].body = bodyEditor.root.innerHTML;
                 template.eventThemes[currentEvent.id].closing = closingEditor.root.innerHTML;
+
+                // Store structural fields at the template level (apply to all events)
+                template.headerTitle = document.getElementById('field-header-title').value;
+                template.buttonText = document.getElementById('field-button-text').value || null;
+                template.signaturePrefix = document.getElementById('field-signature-prefix').value;
+                template.signatureName = document.getElementById('field-signature-name').value;
+                template.footer = document.getElementById('field-footer').value;
 
                 // Save to backend
                 const response = await fetch(`${CONFIG.api.baseUrl}/system-emails/config`, {

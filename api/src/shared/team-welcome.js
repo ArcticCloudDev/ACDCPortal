@@ -2,6 +2,7 @@
 const Storage = require('./storage');
 const { logError } = require('./error-log');
 const Email = require('./email');
+const { buildEmailHtml } = require('./email-builder');
 
 /**
  * Send welcome email to new team member and optionally digest of sequence emails
@@ -83,12 +84,8 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
             closingText: processTemplate(eventTheme.closing || globalDefaults.closing || '', baseData)
         };
 
-        // Load HTML template file
-        const templatePath = path.join(__dirname, '../../data/email-templates/team-welcome.html');
-        const templateHtml = await fs.readFile(templatePath, 'utf-8');
-
-        // Process template with merge data
-        const htmlContent = processTemplate(templateHtml, mergeData);
+        // Build HTML using the JSON-driven builder (no HTML template file needed)
+        const htmlContent = buildEmailHtml(template, mergeData);
 
         // Process subject with merge fields
         const subject = processTemplate(template.subject, mergeData);

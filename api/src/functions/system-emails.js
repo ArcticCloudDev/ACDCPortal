@@ -4,6 +4,7 @@ const { readData, writeData } = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
 const { uploadFile } = require('../shared/storage');
 const { buildInvitationEmail } = require('../shared/invitation-email');
+const { buildEmailHtml } = require('../shared/email-builder');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs').promises;
@@ -194,13 +195,9 @@ app.http('system-emails-test', {
                     closingText: processTemplate(eventTheme.closing || globalDefaults.closing || '', baseData)
                 };
 
-                // Load HTML template file
-                const templatePath = path.join(__dirname, '../../data/email-templates', `${templateType}.html`);
-                const templateHtml = await fs.readFile(templatePath, 'utf-8');
-                
-                // Process template with merge data
-                htmlContent = processTemplate(templateHtml, mergeData);
-                
+                // Build HTML using the JSON-driven builder
+                htmlContent = buildEmailHtml(template, mergeData);
+
                 // Process subject with merge fields
                 subject = processTemplate(template.subject, mergeData);
             }
@@ -273,9 +270,8 @@ app.http('system-emails-preview', {
                 closingText: processTemplate(rawClosing, sampleData)
             };
 
-            const templatePath = path.join(__dirname, '../../data/email-templates', `${templateType}.html`);
-            const templateHtml = await fs.readFile(templatePath, 'utf-8');
-            const htmlContent = processTemplate(templateHtml, mergeData);
+            // Build HTML using the JSON-driven builder
+            const htmlContent = buildEmailHtml(template, mergeData);
 
             return {
                 status: 200,
@@ -331,13 +327,9 @@ app.http('system-emails-send', {
                 closingText: processTemplate(eventTheme.closing || globalDefaults.closing || '', baseData)
             };
 
-            // Load HTML template file
-            const templatePath = path.join(__dirname, '../../data/email-templates', `${templateType}.html`);
-            const templateHtml = await fs.readFile(templatePath, 'utf-8');
-            
-            // Process template with merge data
-            const htmlContent = processTemplate(templateHtml, mergeData);
-            
+            // Build HTML using the JSON-driven builder
+            const htmlContent = buildEmailHtml(template, mergeData);
+
             // Process subject with merge fields
             const subject = processTemplate(template.subject, mergeData);
 
