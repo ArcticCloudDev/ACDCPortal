@@ -25,8 +25,7 @@ const { processTemplate } = require('./mail');
 function buildEmailHtml(templateConfig, mergeData) {
     const features = templateConfig.features || [];
 
-    const headerTitle   = processTemplate(templateConfig.headerTitle   || '', mergeData);
-    const signatureText = processTemplate(templateConfig.signatureText || '', mergeData);
+    const headerTitle = processTemplate(templateConfig.headerTitle || '', mergeData);
 
     const buttonText = templateConfig.buttonText
         ? processTemplate(templateConfig.buttonText, mergeData)
@@ -81,12 +80,7 @@ function buildEmailHtml(templateConfig, mergeData) {
                         </tr>
                     </table>` : '';
 
-    // Signature block — render signatureText, newlines become <br>
-    const signatureHtml = signatureText
-        ? `<div style="margin: 24px 0 0 0; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 16px; line-height: 1.6; color: #475569;">
-                                ${signatureText.replace(/\n/g, '<br>')}
-                            </div>`
-        : '';
+    // Signature block rendered as closingText (Quill HTML)
 
     return `<!DOCTYPE html>
 <html>
@@ -115,7 +109,6 @@ function buildEmailHtml(templateConfig, mergeData) {
                             <div style="margin: 24px 0 0 0; font-size: 16px; line-height: 1.6; color: #475569;">
                                 ${mergeData.closingText || ''}
                             </div>
-                            ${signatureHtml}
                         </td>
                     </tr>
                 </table>
