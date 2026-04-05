@@ -25,10 +25,8 @@ const { processTemplate } = require('./mail');
 function buildEmailHtml(templateConfig, mergeData) {
     const features = templateConfig.features || [];
 
-    const headerTitle    = processTemplate(templateConfig.headerTitle    || '', mergeData);
-    const signatureName  = processTemplate(templateConfig.signatureName  || '', mergeData);
-    const signaturePrefix = templateConfig.signaturePrefix || '';
-    const footer         = processTemplate(templateConfig.footer         || '', mergeData);
+    const headerTitle   = processTemplate(templateConfig.headerTitle   || '', mergeData);
+    const signatureText = processTemplate(templateConfig.signatureText || '', mergeData);
 
     const buttonText = templateConfig.buttonText
         ? processTemplate(templateConfig.buttonText, mergeData)
@@ -83,15 +81,12 @@ function buildEmailHtml(templateConfig, mergeData) {
                         </tr>
                     </table>` : '';
 
-    // Signature — with "Best regards," prefix or with a separator line
-    const signatureHtml = signaturePrefix
-        ? `<p style="margin: 24px 0 0 0; font-size: 16px; line-height: 1.6; color: #475569;">
-                                ${signaturePrefix}<br>
-                                <strong>${signatureName}</strong>
-                            </p>`
-        : `<div style="margin: 32px 0 0 0; padding-top: 24px; border-top: 1px solid #e2e8f0;">
-                                <p style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">${signatureName}</p>
-                            </div>`;
+    // Signature block — render signatureText, newlines become <br>
+    const signatureHtml = signatureText
+        ? `<div style="margin: 24px 0 0 0; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 16px; line-height: 1.6; color: #475569;">
+                                ${signatureText.replace(/\n/g, '<br>')}
+                            </div>`
+        : '';
 
     return `<!DOCTYPE html>
 <html>
@@ -121,13 +116,6 @@ function buildEmailHtml(templateConfig, mergeData) {
                                 ${mergeData.closingText || ''}
                             </div>
                             ${signatureHtml}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 24px 40px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
-                            <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #64748b; text-align: center;">
-                                ${footer}
-                            </p>
                         </td>
                     </tr>
                 </table>

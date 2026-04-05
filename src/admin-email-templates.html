@@ -238,18 +238,10 @@
                             </div>
 
                             <div style="padding-top: 14px; border-top: 1px solid var(--admin-border); margin-top: 4px;">
-                                <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 10px; color: var(--admin-text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Signature &amp; Footer <span style="font-weight:400;">(apply to all events)</span></div>
+                                <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 10px; color: var(--admin-text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Signature <span style="font-weight:400;">(applies to all events)</span></div>
                                 <div class="form-group">
-                                    <label for="field-signature-prefix">Signature Prefix <span style="font-weight:400;color:var(--admin-text-muted)">(e.g. "Best regards," or blank)</span></label>
-                                    <input type="text" id="field-signature-prefix" style="width:100%;" placeholder="Best regards,">
-                                </div>
-                                <div class="form-group">
-                                    <label for="field-signature-name">Signature Name</label>
-                                    <input type="text" id="field-signature-name" style="width:100%;" placeholder="The {{eventName}} Team">
-                                </div>
-                                <div class="form-group">
-                                    <label for="field-footer">Footer Text</label>
-                                    <input type="text" id="field-footer" style="width:100%;" placeholder="This is an automated email from {{eventName}}.">
+                                    <label for="field-signature-text">Signature Text <span style="font-weight:400;color:var(--admin-text-muted)">Use new lines for multi-line signatures</span></label>
+                                    <textarea id="field-signature-text" rows="3" style="width:100%;resize:vertical;" placeholder="Best regards,&#10;The {{eventName}} Team"></textarea>
                                 </div>
                             </div>
 
@@ -431,9 +423,7 @@
             // Load global structural fields
             document.getElementById('field-header-title').value = template.headerTitle || '';
             document.getElementById('field-button-text').value = template.buttonText || '';
-            document.getElementById('field-signature-prefix').value = template.signaturePrefix || '';
-            document.getElementById('field-signature-name').value = template.signatureName || '';
-            document.getElementById('field-footer').value = template.footer || '';
+            document.getElementById('field-signature-text').value = template.signatureText || '';
         }
 
         function renderMergeFields() {
@@ -515,9 +505,7 @@
                 // Store structural fields at the template level (apply to all events)
                 template.headerTitle = document.getElementById('field-header-title').value;
                 template.buttonText = document.getElementById('field-button-text').value || null;
-                template.signaturePrefix = document.getElementById('field-signature-prefix').value;
-                template.signatureName = document.getElementById('field-signature-name').value;
-                template.footer = document.getElementById('field-footer').value;
+                template.signatureText = document.getElementById('field-signature-text').value;
 
                 // Save to backend
                 const response = await fetch(`${CONFIG.api.baseUrl}/system-emails/config`, {

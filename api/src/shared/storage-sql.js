@@ -211,9 +211,7 @@ function systemEmailConfigToJs(rows) {
             headerTitle: structural.headerTitle ?? null,
             buttonText: structural.buttonText ?? null,
             buttonUrlField: structural.buttonUrlField ?? null,
-            signaturePrefix: structural.signaturePrefix ?? '',
-            signatureName: structural.signatureName ?? '',
-            footer: structural.footer ?? '',
+            signatureText: structural.signatureText ?? '',
             features: structural.features ?? []
         };
     }
@@ -508,9 +506,7 @@ async function writeSystemEmailConfig(pool, config) {
             headerTitle: t.headerTitle ?? null,
             buttonText: t.buttonText ?? null,
             buttonUrlField: t.buttonUrlField ?? null,
-            signaturePrefix: t.signaturePrefix ?? '',
-            signatureName: t.signatureName ?? '',
-            footer: t.footer ?? '',
+            signatureText: t.signatureText ?? '',
             features: t.features ?? []
         };
         await pool.request()
