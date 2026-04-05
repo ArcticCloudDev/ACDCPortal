@@ -398,8 +398,11 @@ CREATE TABLE SystemEmailConfig (
     MergeFields     NVARCHAR(MAX)    NULL,
     EditableSections NVARCHAR(MAX)   NULL,
     EventThemes     NVARCHAR(MAX)    NULL,
+    StructuralConfig NVARCHAR(MAX)   NULL,
     UpdatedAt       DATETIME2        NULL
 );
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'SystemEmailConfig' AND COLUMN_NAME = 'StructuralConfig')
+    ALTER TABLE SystemEmailConfig ADD StructuralConfig NVARCHAR(MAX) NULL;
 GO
 
 -- 22. InterestQueue

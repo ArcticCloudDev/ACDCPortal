@@ -200,12 +200,21 @@ function systemEmailConfigToJs(rows) {
     // Convert rows into the { templates: { key: {...} } } structure
     const templates = {};
     for (const row of rows) {
+        const structural = row.StructuralConfig ? JSON.parse(row.StructuralConfig) : {};
         templates[row.TemplateKey] = {
             name: row.Name,
             subject: row.Subject,
             mergeFields: row.MergeFields ? JSON.parse(row.MergeFields) : [],
             editableSections: row.EditableSections ? JSON.parse(row.EditableSections) : {},
-            eventThemes: row.EventThemes ? JSON.parse(row.EventThemes) : {}
+            eventThemes: row.EventThemes ? JSON.parse(row.EventThemes) : {},
+            // Structural fields stored as JSON blob
+            headerTitle: structural.headerTitle ?? null,
+            buttonText: structural.buttonText ?? null,
+            buttonUrlField: structural.buttonUrlField ?? null,
+            signaturePrefix: structural.signaturePrefix ?? '',
+            signatureName: structural.signatureName ?? '',
+            footer: structural.footer ?? '',
+            features: structural.features ?? []
         };
     }
     return { templates };
@@ -495,6 +504,15 @@ async function writeSystemEmailConfig(pool, config) {
     // Delete and re-insert all
     await pool.request().query('DELETE FROM [SystemEmailConfig]');
     for (const [key, t] of Object.entries(templates)) {
+        const structural = {
+            headerTitle: t.headerTitle ?? null,
+            buttonText: t.buttonText ?? null,
+            buttonUrlField: t.buttonUrlField ?? null,
+            signaturePrefix: t.signaturePrefix ?? '',
+            signatureName: t.signatureName ?? '',
+            footer: t.footer ?? '',
+            features: t.features ?? []
+        };
         await pool.request()
             .input('templateKey', key)
             .input('name', t.name)
@@ -502,8 +520,10 @@ async function writeSystemEmailConfig(pool, config) {
             .input('mergeFields', t.mergeFields ? JSON.stringify(t.mergeFields) : null)
             .input('editableSections', t.editableSections ? JSON.stringify(t.editableSections) : null)
             .input('eventThemes', t.eventThemes ? JSON.stringify(t.eventThemes) : null)
-            .query(`INSERT INTO [SystemEmailConfig] (TemplateKey, Name, Subject, MergeFields, EditableSections, EventThemes)
-                    VALUES (@templateKey, @name, @subject, @mergeFields, @editableSections, @eventThemes)`);
+            .input('structuralConfig', JSON.stringify(structural))
+            .input('updatedAt', new Date().toISOString())
+            .query(`INSERT INTO [SystemEmailConfig] (TemplateKey, Name, Subject, MergeFields, EditableSections, EventThemes, StructuralConfig, UpdatedAt)
+                    VALUES (@templateKey, @name, @subject, @mergeFields, @editableSections, @eventThemes, @structuralConfig, @updatedAt)`);
     }
 }
 

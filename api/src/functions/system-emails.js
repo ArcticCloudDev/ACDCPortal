@@ -101,6 +101,24 @@ app.http('system-emails-config-get', {
     }
 });
 
+const KNOWN_TEMPLATE_KEYS = ['invitation-judge', 'invitation-committee', 'interest-acknowledgment', 'team-welcome', 'team-registration'];
+
+function validateEmailConfig(config) {
+    if (!config || typeof config !== 'object' || Array.isArray(config)) return 'Config must be a plain object';
+    if (!config.templates || typeof config.templates !== 'object' || Array.isArray(config.templates)) return 'Config must have a templates object';
+    for (const [key, t] of Object.entries(config.templates)) {
+        if (!KNOWN_TEMPLATE_KEYS.includes(key)) return `Unknown template key: "${key}"`;
+        if (!t || typeof t !== 'object') return `Template "${key}" must be an object`;
+        if (!t.name || typeof t.name !== 'string') return `Template "${key}" is missing required field: name`;
+        if (!t.subject || typeof t.subject !== 'string') return `Template "${key}" is missing required field: subject`;
+        if (!Array.isArray(t.mergeFields)) return `Template "${key}" mergeFields must be an array`;
+        if (!t.editableSections || typeof t.editableSections !== 'object') return `Template "${key}" editableSections must be an object`;
+        if (!t.eventThemes || typeof t.eventThemes !== 'object') return `Template "${key}" eventThemes must be an object`;
+        if (t.features !== undefined && !Array.isArray(t.features)) return `Template "${key}" features must be an array`;
+    }
+    return null;
+}
+
 // PUT /api/system-emails/config - Save template configuration
 app.http('system-emails-config-put', {
     methods: ['PUT'],
@@ -109,6 +127,10 @@ app.http('system-emails-config-put', {
     handler: async (request, context) => {
         try {
             const config = await request.json();
+            const validationError = validateEmailConfig(config);
+            if (validationError) {
+                return { status: 400, jsonBody: { error: validationError } };
+            }
             await writeData('system-email-config.json', config);
             return { status: 200, jsonBody: { message: 'Config saved' } };
         } catch (error) {
