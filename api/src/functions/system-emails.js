@@ -218,10 +218,10 @@ app.http('system-emails-test', {
                 };
 
                 // Build HTML using the JSON-driven builder
-                htmlContent = buildEmailHtml(template, mergeData);
+                htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
-                // Process subject with merge fields
-                subject = processTemplate(template.subject, mergeData);
+                // Process subject — per-event override first, then global template subject
+                subject = processTemplate(eventTheme.subject || template.subject, mergeData);
             }
 
             // Send test email
@@ -293,7 +293,7 @@ app.http('system-emails-preview', {
             };
 
             // Build HTML using the JSON-driven builder
-            const htmlContent = buildEmailHtml(template, mergeData);
+            const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
             return {
                 status: 200,
@@ -349,11 +349,11 @@ app.http('system-emails-send', {
                 closingText: processTemplate(eventTheme.closing || globalDefaults.closing || '', baseData)
             };
 
-            // Build HTML using the JSON-driven builder
-            const htmlContent = buildEmailHtml(template, mergeData);
+            // Build HTML using the JSON-driven builder — pass per-event structural overrides
+            const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
-            // Process subject with merge fields
-            const subject = processTemplate(template.subject, mergeData);
+            // Process subject — per-event override first, then global template subject
+            const subject = processTemplate(eventTheme.subject || template.subject, mergeData);
 
             // Send email
             await sendEmail({

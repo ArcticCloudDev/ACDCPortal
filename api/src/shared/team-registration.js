@@ -1,6 +1,7 @@
 // Team Registration Email - Send confirmation when a team is registered
 const Storage = require('./storage');
 const { logError } = require('./error-log');
+const { buildEmailHtml } = require('./email-builder');
 
 /**
  * Send registration confirmation email to the team admin
@@ -63,15 +64,11 @@ async function sendTeamRegistrationEmail(adminEmail, eventId, teamName, committe
             portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'
         };
 
-        // Load HTML template file
-        const templatePath = path.join(__dirname, '../../data/email-templates/team-registration.html');
-        const templateHtml = await fs.readFile(templatePath, 'utf-8');
+        // Build HTML using the JSON-driven builder — pass per-event structural overrides
+        const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
-        // Process template with merge data
-        const htmlContent = processTemplate(templateHtml, mergeData);
-
-        // Process subject with merge fields
-        const subject = processTemplate(template.subject, mergeData);
+        // Process subject — per-event override first, then global template subject
+        const subject = processTemplate(eventTheme.subject || template.subject, mergeData);
 
         // Send email
         await sendEmail({

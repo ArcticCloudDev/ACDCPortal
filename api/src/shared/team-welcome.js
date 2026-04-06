@@ -84,11 +84,11 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
             closingText: processTemplate(eventTheme.closing || globalDefaults.closing || '', baseData)
         };
 
-        // Build HTML using the JSON-driven builder (no HTML template file needed)
-        const htmlContent = buildEmailHtml(template, mergeData);
+        // Build HTML using the JSON-driven builder — pass per-event structural overrides
+        const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
-        // Process subject with merge fields
-        const subject = processTemplate(template.subject, mergeData);
+        // Process subject — per-event override first, then global template subject
+        const subject = processTemplate(eventTheme.subject || template.subject, mergeData);
 
         // Send email
         const { sendEmail } = require('./mail');

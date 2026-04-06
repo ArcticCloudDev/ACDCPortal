@@ -6,6 +6,7 @@ const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
+const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
 const ParticipationsStore = new (Storage.Storage)('participations');
 
 // Phase 1: Start registration - validate captcha, store pending data
@@ -254,6 +255,15 @@ app.http('register-complete', {
             
             // Clean up pending registration
             await Storage.pendingRegistrations.delete(pending.id);
+
+            // Send welcome email for profile/solo registrations (team registrations get their own email via teams.js)
+            if (!isTeamRegistration && resolvedEventId) {
+                sendTeamWelcomeEmail(email, resolvedEventId, context)
+                    .then(result => {
+                        if (result?.success) context.log(`Welcome email sent to ${email}`);
+                    })
+                    .catch(err => context.error(`Failed to send welcome email to ${email}:`, err));
+            }
             
             return {
                 status: 200,

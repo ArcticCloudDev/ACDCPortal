@@ -227,9 +227,9 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
         mergeData.bodyText = processTemplate(rawBody, mergeData);
         mergeData.closingText = processTemplate(rawClosing, mergeData);
 
-        // Build HTML using the JSON-driven builder (no HTML template file needed)
-        const htmlContent = buildEmailHtml(template, mergeData);
-        const subject = processTemplate(template.subject, mergeData);
+        // Build HTML using the JSON-driven builder — pass per-event structural overrides
+        const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
+        const subject = processTemplate(eventTheme.subject || template.subject, mergeData);
 
         return { success: true, htmlContent, subject };
     } catch (error) {

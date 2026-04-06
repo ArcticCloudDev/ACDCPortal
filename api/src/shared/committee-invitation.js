@@ -1,4 +1,5 @@
 // Committee Invitation Email - Send invitation email when someone is invited to the committee
+const { buildEmailHtml } = require('./email-builder');
 const { readData } = require('./storage');
 const { logError } = require('./error-log');
 
@@ -75,15 +76,11 @@ async function buildCommitteeInvitationEmail(invitation, context) {
             closingText: closingText
         };
 
-        // Load HTML template file
-        const templatePath = path.join(__dirname, '../../data/email-templates/invitation-committee.html');
-        const templateHtml = await fs.readFile(templatePath, 'utf-8');
+        // Build HTML using the JSON-driven builder — pass per-event structural overrides
+        const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
-        // Process template with merge data
-        const htmlContent = processTemplate(templateHtml, mergeData);
-
-        // Process subject with merge fields
-        const subject = processTemplate(template.subject, mergeData);
+        // Process subject — per-event override first, then global template subject
+        const subject = processTemplate(eventTheme.subject || template.subject, mergeData);
 
         return {
             success: true,

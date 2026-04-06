@@ -22,13 +22,17 @@ const { processTemplate } = require('./mail');
  * @param {object} mergeData
  * @returns {string} Full HTML email string
  */
-function buildEmailHtml(templateConfig, mergeData) {
+function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
     const features = templateConfig.features || [];
 
-    const headerTitle = processTemplate(templateConfig.headerTitle || '', mergeData);
+    // Per-event overrides take precedence over global template values
+    const headerTitle = processTemplate(eventOverrides.headerTitle || templateConfig.headerTitle || '', mergeData);
 
-    const buttonText = templateConfig.buttonText
-        ? processTemplate(templateConfig.buttonText, mergeData)
+    const resolvedButtonText = eventOverrides.buttonText !== undefined
+        ? eventOverrides.buttonText
+        : templateConfig.buttonText;
+    const buttonText = resolvedButtonText
+        ? processTemplate(resolvedButtonText, mergeData)
         : null;
     const buttonUrl = templateConfig.buttonUrlField
         ? (mergeData[templateConfig.buttonUrlField] || '#')

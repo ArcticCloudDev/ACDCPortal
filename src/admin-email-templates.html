@@ -218,8 +218,13 @@
 
                             <!-- Structural fields ordered top-to-bottom as they appear in the email -->
                             <div class="form-group" style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--admin-border);">
-                                <label for="field-header-title">Header Title <span style="font-weight:400;color:var(--admin-text-muted)">(applies to all events)</span></label>
+                                <label for="field-header-title">Header Title <span style="font-weight:400;color:var(--admin-text-muted)">(per-event override)</span></label>
                                 <input type="text" id="field-header-title" style="width:100%;" placeholder="Welcome to {{eventName}}!">
+                            </div>
+
+                            <div class="form-group" style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--admin-border);">
+                                <label for="field-subject">Subject Line <span style="font-weight:400;color:var(--admin-text-muted)">(per-event override)</span></label>
+                                <input type="text" id="field-subject" style="width:100%;" placeholder="{{eventName}} - Welcome">
                             </div>
 
                             <div class="editor-section">
@@ -228,7 +233,7 @@
                             </div>
 
                             <div class="form-group" style="margin-top: 16px;">
-                                <label for="field-button-text">Button Text <span style="font-weight:400;color:var(--admin-text-muted)">(leave blank for no button)</span></label>
+                                <label for="field-button-text">Button Text <span style="font-weight:400;color:var(--admin-text-muted)">(per-event override, leave blank for no button)</span></label>
                                 <input type="text" id="field-button-text" style="width:100%;" placeholder="View Team Dashboard">
                             </div>
 
@@ -412,9 +417,10 @@
             bodyEditor.root.innerHTML = eventTheme.body || globalDefaults.body || '';
             closingEditor.root.innerHTML = eventTheme.closing || globalDefaults.closing || '';
 
-            // Load global structural fields
-            document.getElementById('field-header-title').value = template.headerTitle || '';
-            document.getElementById('field-button-text').value = template.buttonText || '';
+            // Load structural fields — per-event first, fall back to global default
+            document.getElementById('field-header-title').value = eventTheme.headerTitle || template.headerTitle || '';
+            document.getElementById('field-subject').value = eventTheme.subject || template.subject || '';
+            document.getElementById('field-button-text').value = eventTheme.buttonText !== undefined ? (eventTheme.buttonText || '') : (template.buttonText || '');
         }
 
         function renderMergeFields() {
@@ -489,13 +495,12 @@
                     template.eventThemes[currentEvent.id] = {};
                 }
                 
-                // Store body/closing per-event
+                // Store body/closing/structural fields per-event
                 template.eventThemes[currentEvent.id].body = bodyEditor.root.innerHTML;
                 template.eventThemes[currentEvent.id].closing = closingEditor.root.innerHTML;
-
-                // Store structural fields at the template level (apply to all events)
-                template.headerTitle = document.getElementById('field-header-title').value;
-                template.buttonText = document.getElementById('field-button-text').value || null;
+                template.eventThemes[currentEvent.id].headerTitle = document.getElementById('field-header-title').value || null;
+                template.eventThemes[currentEvent.id].subject = document.getElementById('field-subject').value || null;
+                template.eventThemes[currentEvent.id].buttonText = document.getElementById('field-button-text').value || null;
 
                 // Save to backend
                 const response = await fetch(`${CONFIG.api.baseUrl}/system-emails/config`, {
