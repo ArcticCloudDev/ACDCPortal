@@ -218,13 +218,8 @@
 
                             <!-- Structural fields ordered top-to-bottom as they appear in the email -->
                             <div class="form-group" style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--admin-border);">
-                                <label for="field-header-title">Header Title</label>
+                                <label for="field-header-title">Header</label>
                                 <input type="text" id="field-header-title" style="width:100%;" placeholder="Welcome to {{eventName}}!">
-                            </div>
-
-                            <div class="form-group" style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--admin-border);">
-                                <label for="field-subject">Subject Line</label>
-                                <input type="text" id="field-subject" style="width:100%;" placeholder="{{eventName}} - Welcome">
                             </div>
 
                             <div class="editor-section">
@@ -232,8 +227,8 @@
                                 <div id="body-editor" class="editor-container"></div>
                             </div>
 
-                            <div class="form-group" style="margin-top: 16px;">
-                                <label for="field-button-text">Button Text <span style="font-weight:400;color:var(--admin-text-muted)">(leave blank for no button)</span></label>
+                            <div class="form-group" id="button-text-row" style="margin-top: 16px;">
+                                <label for="field-button-text">Button Text <span style="color:var(--admin-danger)">*</span></label>
                                 <input type="text" id="field-button-text" style="width:100%;" placeholder="View Team Dashboard">
                             </div>
 
@@ -419,8 +414,13 @@
 
             // Load structural fields — per-event first, fall back to global default
             document.getElementById('field-header-title').value = eventTheme.headerTitle || template.headerTitle || '';
-            document.getElementById('field-subject').value = eventTheme.subject || template.subject || '';
-            document.getElementById('field-button-text').value = eventTheme.buttonText !== undefined ? (eventTheme.buttonText || '') : (template.buttonText || '');
+
+            // Show/hide button field based on whether this template has a button URL
+            const hasButton = !!template.buttonUrlField;
+            document.getElementById('button-text-row').style.display = hasButton ? '' : 'none';
+            if (hasButton) {
+                document.getElementById('field-button-text').value = eventTheme.buttonText !== undefined ? (eventTheme.buttonText || '') : (template.buttonText || '');
+            }
         }
 
         function renderMergeFields() {
@@ -498,13 +498,21 @@
                 // Store body/closing/structural fields per-event
                 template.eventThemes[currentEvent.id].body = bodyEditor.root.innerHTML;
                 template.eventThemes[currentEvent.id].closing = closingEditor.root.innerHTML;
-                template.eventThemes[currentEvent.id].headerTitle = document.getElementById('field-header-title').value || null;
-                template.eventThemes[currentEvent.id].subject = document.getElementById('field-subject').value || null;
-                template.eventThemes[currentEvent.id].buttonText = document.getElementById('field-button-text').value || null;
+                const headerVal = document.getElementById('field-header-title').value || null;
+                template.eventThemes[currentEvent.id].headerTitle = headerVal;
+                template.eventThemes[currentEvent.id].subject = headerVal;
 
-                // Keep top-level subject in sync so validation passes (falls back if no per-event override)
-                const subjectVal = document.getElementById('field-subject').value;
-                if (subjectVal) template.subject = subjectVal;
+                if (template.buttonUrlField) {
+                    const buttonTextVal = document.getElementById('field-button-text').value.trim();
+                    if (!buttonTextVal) {
+                        showStatus('Button text is required', 'error');
+                        return;
+                    }
+                    template.eventThemes[currentEvent.id].buttonText = buttonTextVal;
+                }
+
+                // Keep top-level subject in sync so validation passes
+                if (headerVal) template.subject = headerVal;
 
                 // Save to backend
                 const response = await fetch(`${CONFIG.api.baseUrl}/system-emails/config`, {

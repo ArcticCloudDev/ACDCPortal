@@ -1,6 +1,7 @@
 // Interest Acknowledgment Email - Send acknowledgment when an interest lead joins a team
 const Storage = require('./storage');
 const { logError } = require('./error-log');
+const { buildEmailHtml } = require('./email-builder');
 
 /**
  * Send interest acknowledgment email to a member who was a verified interest lead
@@ -42,9 +43,9 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
         const fullName = memberUser ? `${memberUser.firstName} ${memberUser.lastName}` : memberEmail;
 
         // Load system email config
+        const { processTemplate } = require('./mail');
         const fs = require('fs').promises;
         const path = require('path');
-        const { processTemplate } = require('./mail');
 
         const configPath = path.join(__dirname, '../../data/system-email-config.json');
         const configData = await fs.readFile(configPath, 'utf-8');
@@ -58,30 +59,19 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
 
         // Get event-specific theme or use global defaults
         const eventTheme = template.eventThemes[eventId] || {};
-        const globalDefaults = template.editableSections;
-
-        // Use eventImage from event if useEventImage is enabled on the template (default true)
-        const themeImageSrc = (template.useEventImage !== false && event.eventImageData) ? event.eventImageData : '';
 
         // Build merge data
         const mergeData = {
             fullName: fullName,
             eventName: event.name,
-            themeImage: themeImageSrc,
-            noThemeImage: !themeImageSrc,
-            bodyText: eventTheme.body || globalDefaults.body || '',
-            closingText: eventTheme.closing || globalDefaults.closing || ''
+            portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'
         };
 
-        // Load HTML template file
-        const templatePath = path.join(__dirname, '../../data/email-templates/interest-acknowledgment.html');
-        const templateHtml = await fs.readFile(templatePath, 'utf-8');
-
-        // Process template with merge data
-        const htmlContent = processTemplate(templateHtml, mergeData);
+        // Build email HTML via shared builder
+        const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
         // Process subject with merge fields
-        const subject = processTemplate(template.subject, mergeData);
+        const subject = processTemplate(eventTheme.subject || template.subject, mergeData);
 
         // Send email
         const { sendEmail } = require('./mail');
