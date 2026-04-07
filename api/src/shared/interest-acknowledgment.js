@@ -61,10 +61,11 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
         const eventTheme = template.eventThemes[eventId] || {};
 
         // Build merge data
+        const baseUrl = process.env.PORTAL_URL || 'https://your-portal.com';
         const mergeData = {
             fullName: fullName,
             eventName: event.name,
-            portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'
+            portalUrl: `${baseUrl}/event.html?id=${event.id}`
         };
 
         // Build email HTML via shared builder

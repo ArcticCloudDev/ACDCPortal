@@ -13,8 +13,8 @@ UPDATE SystemEmailConfig SET
 WHERE TemplateKey = 'invitation-committee';
 
 UPDATE SystemEmailConfig SET
-    StructuralConfig = N'{"headerTitle":"Thanks for Your Interest!","buttonText":null,"buttonUrlField":null,"features":[]}',
-    EditableSections = N'{"body":"<p>Thank you for expressing interest in {{eventName}}! We''re excited that you want to participate.</p><p>Please confirm your interest by clicking the button below.</p>","closing":"<p>We look forward to seeing you at the event!</p><p>The ACDC Team</p>"}',
+    StructuralConfig = N'{"headerTitle":"You''re on the List!","buttonText":"View Event","buttonUrlField":"portalUrl","features":[]}',
+    EditableSections = N'{"body":"<p>Hi {{fullName}},</p><p>Your interest in {{eventName}} has been confirmed. We''ll be in touch as registration opens.</p><p>In the meantime, check out the event details below!</p>","closing":"<p>We look forward to seeing you at the event!</p><p>The ACDC Team</p>"}',
     UpdatedAt = SYSUTCDATETIME()
 WHERE TemplateKey = 'interest-acknowledgment';
 
