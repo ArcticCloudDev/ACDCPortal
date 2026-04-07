@@ -138,6 +138,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Populate the page
         populateEventBanner();
+        setupCostHint();
         await renderTeams();
         
         // Render badges section and show nav tabs only for team participants
@@ -191,7 +192,27 @@ document.addEventListener('DOMContentLoaded', async () => {
             eventTeams = [];
         }
     }
-    
+
+    function setupCostHint() {
+        if (!currentEvent || currentEvent.costPerParticipant == null) return;
+        const participantSelect = document.getElementById('expectedParticipants');
+        const costHint = document.getElementById('cost-hint');
+        if (!participantSelect || !costHint) return;
+        const currency = currentEvent.currency || 'NOK';
+        const costPer = currentEvent.costPerParticipant;
+        function updateCostHint() {
+            const count = parseInt(participantSelect.value) || 0;
+            if (count > 0) {
+                const total = (count * costPer).toLocaleString();
+                costHint.innerHTML = `Total commitment: <strong>${total}\u00a0${currency}</strong> (${count}\u00a0\u00d7\u00a0${costPer.toLocaleString()}\u00a0${currency})`;
+            } else {
+                costHint.textContent = `${costPer.toLocaleString()}\u00a0${currency} per participant \u2014 select a count to see total.`;
+            }
+        }
+        participantSelect.addEventListener('change', updateCostHint);
+        updateCostHint();
+    }
+
     // Populate event banner using shared SiteHeader component
     function populateEventBanner() {
         // Determine status display
