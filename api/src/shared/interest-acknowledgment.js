@@ -29,7 +29,7 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
         const wasInterestLead = interestLeads.some(lead =>
             lead.email.toLowerCase() === memberEmail.toLowerCase() &&
             lead.eventId === eventId &&
-            lead.isVerified === true
+            lead.verified === true
         );
 
         if (!wasInterestLead) {

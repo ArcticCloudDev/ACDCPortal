@@ -630,7 +630,8 @@ app.http('interest-record', {
             // Mirror into participations with roles:['interest']
             try {
                 // Look up user to set userId on participation
-                const user = await Storage.users.getByEmail(normalizedEmail);
+                const allUsers = await usersStorage.getAll();
+                const user = allUsers.find(u => u.email?.toLowerCase() === normalizedEmail);
                 const userId = user ? user.id : null;
 
                 const partData = await participationsStorage.getRaw();
@@ -681,7 +682,8 @@ app.http('interest-record', {
 
             // Trigger sequence emails
             try {
-                await triggerSequenceEmailsForLead(lead, event, context);
+                const seqResult = await triggerSequenceEmailsForLead(lead, event, context);
+                context.log(`[INTEREST-RECORD] Sequence result: sent=${seqResult.sent}, reason=${seqResult.reason}, campaigns=${seqResult.totalCampaigns}`);
             } catch (seqError) {
                 context.error('[INTEREST-RECORD] Sequence email error:', seqError);
             }
