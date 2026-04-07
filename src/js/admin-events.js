@@ -551,7 +551,6 @@ async function handleFormSubmit(e) {
             sendInterestAcknowledgment: document.getElementById('event-interest-acknowledgment').checked,
             sendJudgeInvitationEmail: document.getElementById('event-judge-invitation-email').checked,
             sendCommitteeInvitationEmail: document.getElementById('event-committee-invitation-email').checked,
-            ...buildEventImagePayload(),
             fileCategories: document.getElementById('event-file-categories').value
                 .split(',')
                 .map(c => c.trim())
