@@ -208,6 +208,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             infoBadges: [
                 { icon: '📅', text: formatDateRange(currentEvent.startDate, currentEvent.endDate), id: 'event-dates' },
                 { icon: '📍', text: currentEvent.location || 'TBD', id: 'event-location' },
+                ...(currentEvent.costPerParticipant != null ? [{ icon: '💰', text: `${currentEvent.costPerParticipant.toLocaleString()} ${currentEvent.currency || 'NOK'} / person`, id: 'event-cost' }] : []),
                 { text: statusText, id: 'event-status', className: 'status-badge' }
             ],
             showSignIn: false,
@@ -1954,6 +1955,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         
         document.getElementById('close-create-team').addEventListener('click', () => createTeamModal.classList.remove('active'));
+
+        // Dynamic cost hint: update as participant count is selected
+        const participantSelect = document.getElementById('expectedParticipants');
+        const costHint = document.getElementById('cost-hint');
+        if (currentEvent.costPerParticipant != null && costHint) {
+            const currency = currentEvent.currency || 'NOK';
+            const costPer = currentEvent.costPerParticipant;
+            function updateCostHint() {
+                const count = parseInt(participantSelect.value) || 0;
+                if (count > 0) {
+                    const total = (count * costPer).toLocaleString();
+                    costHint.innerHTML = `Total commitment: <strong>${total} ${currency}</strong> (${count} × ${costPer.toLocaleString()} ${currency})`;
+                } else {
+                    costHint.textContent = `${costPer.toLocaleString()} ${currency} per participant — select a count to see total.`;
+                }
+            }
+            participantSelect.addEventListener('change', updateCostHint);
+            updateCostHint();
+        }
         
         // Solo queue modal
         const soloQueueModal = document.getElementById('solo-queue-modal');

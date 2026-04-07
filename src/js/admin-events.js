@@ -391,6 +391,8 @@ function showForm(event = null) {
         document.getElementById('event-location').value = event.location || '';
         document.getElementById('min-team-size').value = event.minTeamSize || 3;
         document.getElementById('max-team-size').value = event.maxTeamSize || 5;
+        document.getElementById('event-cost-per-participant').value = event.costPerParticipant != null ? event.costPerParticipant : '';
+        document.getElementById('event-currency').value = event.currency || 'NOK';
         document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
         document.getElementById('event-sharepoint-url').value = event.sharepointUrl || '';
         document.getElementById('sharepoint-verify-result').innerHTML = '';
@@ -562,6 +564,10 @@ async function handleFormSubmit(e) {
             eventData.minTeamSize = parseInt(document.getElementById('min-team-size').value) || 3;
             eventData.maxTeamSize = parseInt(document.getElementById('max-team-size').value) || 5;
         }
+
+        const costRaw = document.getElementById('event-cost-per-participant').value.trim();
+        eventData.costPerParticipant = costRaw !== '' ? parseFloat(costRaw) : null;
+        eventData.currency = document.getElementById('event-currency').value || 'NOK';
 
         const eventId = document.getElementById('event-id').value;
 
