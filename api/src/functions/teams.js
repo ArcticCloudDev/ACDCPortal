@@ -264,6 +264,7 @@ app.http('teams-delete', {
             const participationsStorage = new GenericStorage('participations');
             const allParticipations = await participationsStorage.getAll();
             let participationsChanged = 0;
+            const noRemainingTeamEmails = []; // emails of participants who end up with no team
 
             for (const p of allParticipations) {
                 const memberships = p.teamMemberships || [];
@@ -290,10 +291,12 @@ app.http('teams-delete', {
                             p.hotelPaidBy = 'committee';
                             context.log(`Hotel payer reverted to committee for ${p.email}`);
                         } else {
-                            // Pure participant with no team — clear everything
+                            // Pure participant with no team — clear everything and mark
+                            // their email so we can clean up sequence deliveries below.
                             p.hotelPaidBy = null;
                             p.hotelNights = {};
                             context.log(`Cleared hotel for ${p.email} (no remaining teams)`);
+                            if (p.email) noRemainingTeamEmails.push(p.email.toLowerCase());
                         }
                     }
                     
@@ -305,6 +308,23 @@ app.http('teams-delete', {
             if (participationsChanged > 0) {
                 await participationsStorage.saveAll(allParticipations);
                 context.log(`Cleaned ${participationsChanged} participation(s) for team ${teamId}`);
+            }
+
+            // 1b. Remove EmailDeliveries for pure participants who have no remaining team.
+            // These records are orphaned — the person is no longer a participant of any
+            // team for this event so the "sent" status in the sequence overview is stale.
+            let deliveriesRemoved = 0;
+            if (noRemainingTeamEmails.length > 0) {
+                const deliveriesStorage = new GenericStorage('email-deliveries');
+                const allDeliveries = await deliveriesStorage.getAll();
+                const remainingDeliveries = allDeliveries.filter(d =>
+                    !d.email || !noRemainingTeamEmails.includes(d.email.toLowerCase())
+                );
+                deliveriesRemoved = allDeliveries.length - remainingDeliveries.length;
+                if (deliveriesRemoved > 0) {
+                    await deliveriesStorage.saveAll(remainingDeliveries);
+                    context.log(`Removed ${deliveriesRemoved} orphaned delivery record(s) for team ${teamId}`);
+                }
             }
 
             // 2. Delete badge claims that belong to this team
@@ -348,7 +368,8 @@ app.http('teams-delete', {
                     cleanup: {
                         participationsUpdated: participationsChanged,
                         badgeClaimsRemoved: claimsRemoved,
-                        invitationsRemoved: invitationsRemoved
+                        invitationsRemoved: invitationsRemoved,
+                        deliveriesRemoved: deliveriesRemoved
                     }
                 }
             };

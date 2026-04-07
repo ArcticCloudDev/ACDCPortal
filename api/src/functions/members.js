@@ -171,11 +171,17 @@ app.http('members-remove', {
             const invitationsStorage = new GenericStorage('invitations');
             const deliveriesStorage = new GenericStorage('email-deliveries');
             const sequenceProgressStorage = new GenericStorage('sequence-progress');
+            const interestLeadsStorage = new GenericStorage('interest-leads');
 
             const allParticipations = await participationsStorage.getAll();
             const matchedParticipations = allParticipations.filter(p => {
-                if (p.userId !== memberId) return false;
-                if (teamId && p.teamId === teamId) return true;
+                // Match by userId if set; fall back to email match for leads registered
+                // before the user had a system account (userId was null on those rows).
+                const byUserId = p.userId && p.userId === memberId;
+                const byEmail = user.email && p.email &&
+                    p.email.toLowerCase() === user.email.toLowerCase();
+                if (!byUserId && !byEmail) return false;
+                if (teamId && (p.teamId === teamId || (p.teamMemberships || []).some(m => m.teamId === teamId))) return true;
                 if (eventId && p.eventId === eventId) return true;
                 return !teamId && !eventId;
             });
@@ -184,7 +190,8 @@ app.http('members-remove', {
                 participations: 0,
                 invitations: 0,
                 deliveries: 0,
-                sequenceProgress: 0
+                sequenceProgress: 0,
+                interestLeads: 0
             };
 
             for (const participation of matchedParticipations) {
@@ -228,14 +235,37 @@ app.http('members-remove', {
                     }
                 }
             }
-            
+
+            // Clean up InterestLeads by email (independent of participation records).
+            const allLeads = await interestLeadsStorage.getAll();
+            const remainingLeads = allLeads.filter(lead =>
+                !lead.email || lead.email.toLowerCase() !== user.email.toLowerCase()
+            );
+            if (remainingLeads.length < allLeads.length) {
+                cleaned.interestLeads = allLeads.length - remainingLeads.length;
+                await interestLeadsStorage.saveAll(remainingLeads);
+            }
+
+            // Safety-net: if no participations were found above (can happen when
+            // the lead had userId=null), still clean deliveries by email.
+            if (cleaned.participations === 0) {
+                const allDeliveries = await deliveriesStorage.getAll();
+                const remainingDeliveries = allDeliveries.filter(d =>
+                    !d.email || d.email.toLowerCase() !== user.email.toLowerCase()
+                );
+                if (remainingDeliveries.length < allDeliveries.length) {
+                    cleaned.deliveries += allDeliveries.length - remainingDeliveries.length;
+                    await deliveriesStorage.saveAll(remainingDeliveries);
+                }
+            }
+
             // Remove from allowed emails
             await Storage.allowedEmails.remove(user.email);
             
             // Delete user
             await Storage.users.delete(memberId);
             
-            context.log(`Member ${memberId} removed. Cleaned ${cleaned.participations} participations, ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries, ${cleaned.sequenceProgress} sequence progress rows.`);
+            context.log(`Member ${memberId} removed. Cleaned ${cleaned.participations} participations, ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries, ${cleaned.sequenceProgress} sequence-progress rows, ${cleaned.interestLeads} interest leads.`);
             return {
                 status: 200,
                 jsonBody: {
