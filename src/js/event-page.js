@@ -226,12 +226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         SiteHeader.render({
             title: currentEvent.name,
             subtitle: null,
-            infoBadges: [
-                { icon: '📅', text: formatDateRange(currentEvent.startDate, currentEvent.endDate), id: 'event-dates' },
-                { icon: '📍', text: currentEvent.location || 'TBD', id: 'event-location' },
-                ...(currentEvent.costPerParticipant != null ? [{ icon: '💰', text: `${currentEvent.costPerParticipant.toLocaleString()} ${currentEvent.currency || 'NOK'} / person`, id: 'event-cost' }] : []),
-                { text: statusText, id: 'event-status', className: 'status-badge' }
-            ],
+            infoBadges: [],
             showSignIn: false,
             inactive: false
         });
@@ -242,13 +237,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         SiteHeader.update({ authUser: Auth.getUser(), user: currentUser, isAdmin });
 
-        // Apply status-specific background to the badge
-        const statusEl = document.getElementById('event-status');
-        if (statusEl) {
-            if (status === 'live') statusEl.style.background = 'rgba(16, 185, 129, 0.3)';
-            else if (status === 'registration') statusEl.style.background = 'rgba(40, 167, 69, 0.3)';
-            else if (status === 'pre-registration') statusEl.style.background = 'rgba(245, 158, 11, 0.3)';
-            else statusEl.style.background = 'rgba(100, 116, 139, 0.3)';
+        // Populate event info strip below the banner
+        const infoStrip = document.getElementById('event-info-strip');
+        if (infoStrip) {
+            const stripItems = [
+                `<span class="info-item">📅 ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}</span>`,
+                currentEvent.location ? `<span class="info-item">📍 ${escapeHtml(currentEvent.location)}</span>` : '',
+                currentEvent.costPerParticipant != null ? `<span class="info-item">💰 ${currentEvent.costPerParticipant.toLocaleString()} ${currentEvent.currency || 'NOK'} / person</span>` : '',
+                `<span class="status-chip">${escapeHtml(statusText)}</span>`,
+            ].filter(Boolean).join('');
+            infoStrip.innerHTML = stripItems;
+            infoStrip.classList.remove('hidden');
         }
 
         const banner = SiteHeader.getElements().container;

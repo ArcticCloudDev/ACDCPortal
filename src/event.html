@@ -832,6 +832,33 @@
             gap: 10px;
         }
         
+        /* Event info strip (date, location, cost, status) */
+        .event-info-strip {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 20px;
+            padding: 12px 20px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        .event-info-strip .info-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .event-info-strip .status-chip {
+            margin-left: auto;
+            background: rgba(40, 167, 69, 0.15);
+            color: #166534;
+            border-radius: 20px;
+            padding: 2px 12px;
+            font-weight: 600;
+            font-size: 0.82rem;
+        }
+
         /* Pre-registration info section */
         .pre-reg-section {
             background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
@@ -1675,6 +1702,9 @@
         <div id="content" class="hidden">
             <!-- Event Banner (rendered by SiteHeader) -->
             <div id="site-header"></div>
+
+            <!-- Event Info Strip -->
+            <div id="event-info-strip" class="event-info-strip hidden"></div>
 
             <!-- Pre-Registration Info (shown when event is in pre-registration status) -->
             <div id="pre-reg-section" class="pre-reg-section hidden">
