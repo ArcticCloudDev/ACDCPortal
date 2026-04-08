@@ -1014,7 +1014,7 @@ function renderLeadsTable() {
         // Use profile name if the lead was submitted without one
         const displayFirst = lead.firstName || matchedUser?.firstName || '';
         const displayLast = lead.lastName || matchedUser?.lastName || '';
-        let convertedCell = '<span style="color: var(--admin-text-muted); font-size: 0.85rem;">�</span>';
+        let convertedCell = '<span style="color: var(--admin-text-muted); font-size: 0.85rem;">—</span>';
         if (matchedUser) {
             const participation = allParticipations.find(p =>
                 p.userId === matchedUser.id && p.eventId === currentEventId
@@ -1342,7 +1342,7 @@ async function loadEmailDeliveryStats(emails) {
         const verifiedLeads = leads.filter(l => l.verified);
         const totalRecipients = verifiedLeads.length + recipients.length;
         
-        // Calculate stats for each email � match by email address
+        // Calculate stats for each email — match by email address
         const stats = {};
         emails.forEach(email => {
             const emailId = normalizeId(email.id);
