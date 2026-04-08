@@ -227,12 +227,6 @@ app.http('register-complete', {
             
             if (resolvedEventId) {
                 const roles = isParticipant ? ['participant'] : [];
-                const teamMemberships = teamId ? [{
-                    teamId: teamId,
-                    isAdmin: true,
-                    isParticipant: isParticipant,
-                    joinedAt: now
-                }] : [];
                 const participation = {
                     id: uuidv4(),
                     userId: userId,
@@ -243,13 +237,10 @@ app.http('register-complete', {
                     isTeamAdmin: !!teamId,
                     hotelNights: {},
                     hotelPaidBy: null,
-                    teamMemberships: teamMemberships,
                     createdAt: now,
                     updatedAt: now
                 };
-                const participations = await ParticipationsStore.getAll();
-                participations.push(participation);
-                await ParticipationsStore.saveAll(participations);
+                await ParticipationsStore.create(participation);
                 context.log(`Participation created for ${email} in event ${resolvedEventId}`);
             }
             

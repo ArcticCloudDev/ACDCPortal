@@ -301,12 +301,18 @@ app.http('teams-delete', {
                     }
                     
                     p.updatedAt = new Date().toISOString();
+                    await participationsStorage.update(p.id, {
+                        teamId: p.teamId,
+                        isTeamAdmin: p.isTeamAdmin,
+                        hotelPaidBy: p.hotelPaidBy,
+                        hotelNights: p.hotelNights,
+                        updatedAt: p.updatedAt
+                    });
                     participationsChanged++;
                 }
             }
 
             if (participationsChanged > 0) {
-                await participationsStorage.saveAll(allParticipations);
                 context.log(`Cleaned ${participationsChanged} participation(s) for team ${teamId}`);
             }
 
@@ -317,12 +323,14 @@ app.http('teams-delete', {
             if (noRemainingTeamEmails.length > 0) {
                 const deliveriesStorage = new GenericStorage('email-deliveries');
                 const allDeliveries = await deliveriesStorage.getAll();
-                const remainingDeliveries = allDeliveries.filter(d =>
-                    !d.email || !noRemainingTeamEmails.includes(d.email.toLowerCase())
+                const removedDeliveries = allDeliveries.filter(d =>
+                    d.email && noRemainingTeamEmails.includes(d.email.toLowerCase())
                 );
-                deliveriesRemoved = allDeliveries.length - remainingDeliveries.length;
+                deliveriesRemoved = removedDeliveries.length;
+                for (const d of removedDeliveries) {
+                    await deliveriesStorage.delete(d.id);
+                }
                 if (deliveriesRemoved > 0) {
-                    await deliveriesStorage.saveAll(remainingDeliveries);
                     context.log(`Removed ${deliveriesRemoved} orphaned delivery record(s) for team ${teamId}`);
                 }
             }
@@ -330,22 +338,26 @@ app.http('teams-delete', {
             // 2. Delete badge claims that belong to this team
             const badgeClaimsStorage = new GenericStorage('badge-claims');
             const allClaims = await badgeClaimsStorage.getAll();
-            const remainingClaims = allClaims.filter(c => c.teamId !== teamId);
-            const claimsRemoved = allClaims.length - remainingClaims.length;
+            const removedClaims = allClaims.filter(c => c.teamId === teamId);
+            const claimsRemoved = removedClaims.length;
 
+            for (const c of removedClaims) {
+                await badgeClaimsStorage.delete(c.id);
+            }
             if (claimsRemoved > 0) {
-                await badgeClaimsStorage.saveAll(remainingClaims);
                 context.log(`Removed ${claimsRemoved} badge claim(s) for team ${teamId}`);
             }
 
             // 3. Cancel/remove pending invitations for this team
             const invitationsStorage = new GenericStorage('invitations');
             const allInvitations = await invitationsStorage.getAll();
-            const remainingInvitations = allInvitations.filter(i => i.teamId !== teamId);
-            const invitationsRemoved = allInvitations.length - remainingInvitations.length;
+            const removedInvitations = allInvitations.filter(i => i.teamId === teamId);
+            const invitationsRemoved = removedInvitations.length;
 
+            for (const inv of removedInvitations) {
+                await invitationsStorage.delete(inv.id);
+            }
             if (invitationsRemoved > 0) {
-                await invitationsStorage.saveAll(remainingInvitations);
                 context.log(`Removed ${invitationsRemoved} invitation(s) for team ${teamId}`);
             }
 

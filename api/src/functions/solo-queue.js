@@ -109,8 +109,7 @@ app.http('solo-queue-join', {
                 joinedAt: new Date().toISOString()
             };
             
-            queue.push(entry);
-            await soloQueueStorage.saveAll(queue);
+            await soloQueueStorage.create(entry);
             
             // Mark user as registered in interest queue if they were in it
             await markRegisteredInInterestQueue(userId, eventId, context);
@@ -155,8 +154,7 @@ app.http('solo-queue-leave', {
                 };
             }
             
-            queue.splice(index, 1);
-            await soloQueueStorage.saveAll(queue);
+            await soloQueueStorage.delete(id);
             
             context.log(`Solo queue entry ${id} removed`);
             return {

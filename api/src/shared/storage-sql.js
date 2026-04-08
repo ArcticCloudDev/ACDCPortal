@@ -329,7 +329,16 @@ async function insertParticipation(pool, item) {
     const roles = Array.isArray(rest.roles) ? rest.roles.join(',') : rest.roles;
 
     const request = pool.request();
-    const i = (name, val) => { request.input(name, val === null || val === undefined ? sql.NVarChar : undefined, val ?? null); };
+    // Helper for nullable string/id/date values: passes NVarChar type for null, auto-detects otherwise
+    const i = (name, val) => {
+        if (val === null || val === undefined) {
+            request.input(name, sql.NVarChar, null);
+        } else {
+            request.input(name, val);
+        }
+    };
+    // Helper for BIT (boolean) columns — mssql cannot auto-detect JS booleans
+    const ib = (name, val) => request.input(name, sql.Bit, val ? 1 : 0);
 
     i('id', rest.id);
     i('userId', rest.userId || null);
@@ -337,14 +346,14 @@ async function insertParticipation(pool, item) {
     i('eventId', rest.eventId);
     i('roles', roles || null);
     i('teamId', rest.teamId || null);
-    i('isTeamAdmin', rest.isTeamAdmin ? true : false);
-    i('hotelMonTue', !!hotelNights['mon-tue']);
-    i('hotelTueWed', !!hotelNights['tue-wed']);
-    i('hotelWedThu', !!hotelNights['wed-thu']);
-    i('hotelThuFri', !!hotelNights['thu-fri']);
-    i('hotelFriSat', !!hotelNights['fri-sat']);
-    i('hotelSatSun', !!hotelNights['sat-sun']);
-    i('hotelSunMon', !!hotelNights['sun-mon']);
+    ib('isTeamAdmin', rest.isTeamAdmin);
+    ib('hotelMonTue', hotelNights['mon-tue']);
+    ib('hotelTueWed', hotelNights['tue-wed']);
+    ib('hotelWedThu', hotelNights['wed-thu']);
+    ib('hotelThuFri', hotelNights['thu-fri']);
+    ib('hotelFriSat', hotelNights['fri-sat']);
+    ib('hotelSatSun', hotelNights['sat-sun']);
+    ib('hotelSunMon', hotelNights['sun-mon']);
     i('hotelPaidBy', rest.hotelPaidBy || null);
     i('convertedFrom', rest.convertedFrom || null);
     i('convertedAt', rest.convertedAt || null);
@@ -708,6 +717,11 @@ class GenericStorage {
     async delete(id) {
         if (!this.config || !this.config.table) return false;
         const pool = await getPool();
+        // Clean up child rows for Events before deleting the parent
+        if (this.config.table === 'Events') {
+            await pool.request().input('eid', id).query('DELETE FROM [EventHotelDates] WHERE EventId = @eid');
+            await pool.request().input('eid', id).query('DELETE FROM [EventDefaultNights] WHERE EventId = @eid');
+        }
         const result = await pool.request()
             .input('id', id)
             .query(`DELETE FROM [${this.config.table}] WHERE [${this.config.idCol}] = @id`);

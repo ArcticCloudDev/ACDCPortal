@@ -204,58 +204,68 @@ app.http('members-remove', {
 
                 // Clean invitations for this person/event.
                 const invitations = await invitationsStorage.getAll();
-                const filteredInvitations = invitations.filter(inv => {
+                const removedInvitations = invitations.filter(inv => {
                     const emailMatch = pEmail && inv.email && inv.email.toLowerCase() === pEmail.toLowerCase();
-                    return !(emailMatch && inv.eventId === pEventId);
+                    return emailMatch && inv.eventId === pEventId;
                 });
-                if (filteredInvitations.length < invitations.length) {
-                    cleaned.invitations += invitations.length - filteredInvitations.length;
-                    await invitationsStorage.saveAll(filteredInvitations);
+                if (removedInvitations.length > 0) {
+                    cleaned.invitations += removedInvitations.length;
+                    for (const inv of removedInvitations) {
+                        await invitationsStorage.delete(inv.id);
+                    }
                 }
 
                 // Clean deliveries tied to this user/email.
                 const deliveries = await deliveriesStorage.getAll();
-                const filteredDeliveries = deliveries.filter(d => {
-                    if (pUserId && d.userId === pUserId) return false;
-                    if (pEmail && d.email && d.email.toLowerCase() === pEmail.toLowerCase()) return false;
-                    return true;
+                const removedDeliveries = deliveries.filter(d => {
+                    if (pUserId && d.userId === pUserId) return true;
+                    if (pEmail && d.email && d.email.toLowerCase() === pEmail.toLowerCase()) return true;
+                    return false;
                 });
-                if (filteredDeliveries.length < deliveries.length) {
-                    cleaned.deliveries += deliveries.length - filteredDeliveries.length;
-                    await deliveriesStorage.saveAll(filteredDeliveries);
+                if (removedDeliveries.length > 0) {
+                    cleaned.deliveries += removedDeliveries.length;
+                    for (const d of removedDeliveries) {
+                        await deliveriesStorage.delete(d.id);
+                    }
                 }
 
                 // Clean sequence progress if present (legacy JSON-backed dataset).
                 const progressRows = await sequenceProgressStorage.getAll();
                 if (Array.isArray(progressRows) && progressRows.length > 0) {
-                    const filteredProgress = progressRows.filter(p => !(p.userId === pUserId && p.eventId === pEventId));
-                    if (filteredProgress.length < progressRows.length) {
-                        cleaned.sequenceProgress += progressRows.length - filteredProgress.length;
-                        await sequenceProgressStorage.saveAll(filteredProgress);
+                    const removedProgress = progressRows.filter(p => p.userId === pUserId && p.eventId === pEventId);
+                    if (removedProgress.length > 0) {
+                        cleaned.sequenceProgress += removedProgress.length;
+                        for (const prog of removedProgress) {
+                            await sequenceProgressStorage.delete(prog.id);
+                        }
                     }
                 }
             }
 
             // Clean up InterestLeads by email (independent of participation records).
             const allLeads = await interestLeadsStorage.getAll();
-            const remainingLeads = allLeads.filter(lead =>
-                !lead.email || lead.email.toLowerCase() !== user.email.toLowerCase()
+            const removedLeads = allLeads.filter(lead =>
+                lead.email && lead.email.toLowerCase() === user.email.toLowerCase()
             );
-            if (remainingLeads.length < allLeads.length) {
-                cleaned.interestLeads = allLeads.length - remainingLeads.length;
-                await interestLeadsStorage.saveAll(remainingLeads);
+            if (removedLeads.length > 0) {
+                cleaned.interestLeads = removedLeads.length;
+                for (const lead of removedLeads) {
+                    await interestLeadsStorage.delete(lead.id);
+                }
             }
 
             // Safety-net: if no participations were found above (can happen when
             // the lead had userId=null), still clean deliveries by email.
             if (cleaned.participations === 0) {
                 const allDeliveries = await deliveriesStorage.getAll();
-                const remainingDeliveries = allDeliveries.filter(d =>
-                    !d.email || d.email.toLowerCase() !== user.email.toLowerCase()
+                const removedDeliveries = allDeliveries.filter(d =>
+                    d.email && d.email.toLowerCase() === user.email.toLowerCase()
                 );
-                if (remainingDeliveries.length < allDeliveries.length) {
-                    cleaned.deliveries += allDeliveries.length - remainingDeliveries.length;
-                    await deliveriesStorage.saveAll(remainingDeliveries);
+                if (removedDeliveries.length > 0) {
+                    cleaned.deliveries += removedDeliveries.length;
+                    for (const d of removedDeliveries) {
+                        await deliveriesStorage.delete(d.id);
+                    }
                 }
             }
 

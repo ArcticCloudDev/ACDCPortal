@@ -200,11 +200,11 @@ app.http('events-create', {
             // If new event has active status, deactivate others
             const newStatus = body.status || 'draft';
             if (isActiveStatus(newStatus)) {
-                events.forEach(e => {
+                for (const e of events) {
                     if (isActiveStatus(e.status)) {
-                        e.status = 'completed';
+                        await eventsStorage.update(e.id, { status: 'completed' });
                     }
-                });
+                }
             }
             
             // Generate hotel dates from event dates
@@ -238,8 +238,7 @@ app.http('events-create', {
 
             // Note: Committee/Judge roles are managed via participations (roles[]) — no special teams needed
             
-            events.push(newEvent);
-            await eventsStorage.saveAll(events);
+            await eventsStorage.create(newEvent);
             
             context.log(`Event created: ${newEvent.id}`);
 
@@ -359,8 +358,7 @@ app.http('events-delete', {
             }
             
             const deletedEvent = events[index];
-            events.splice(index, 1);
-            await eventsStorage.saveAll(events);
+            await eventsStorage.delete(id);
             
             context.log(`Event deleted: ${id}`);
             
