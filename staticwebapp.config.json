@@ -3,6 +3,24 @@
     {
       "route": "/api/*",
       "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/*.html",
+      "headers": {
+        "Content-Type": "text/html; charset=utf-8"
+      }
+    },
+    {
+      "route": "/js/*.js",
+      "headers": {
+        "Content-Type": "text/javascript; charset=utf-8"
+      }
+    },
+    {
+      "route": "/css/*.css",
+      "headers": {
+        "Content-Type": "text/css; charset=utf-8"
+      }
     }
   ],
   "navigationFallback": {
