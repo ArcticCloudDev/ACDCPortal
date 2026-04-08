@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     sendError = otpResult.message || 'Failed to send code.';
                 }
             } catch (otpErr) {
-                // Cooldown or rate limit â€” still show code entry (OTP may already be pending)
+                // Cooldown or rate limit — still show code entry (OTP may already be pending)
                 sendError = otpErr.message || 'Failed to send code.';
             }
             

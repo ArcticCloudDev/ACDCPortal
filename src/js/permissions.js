@@ -8,7 +8,7 @@
 //   renderAdminSidebar('events', permissions);
 
 const Permissions = {
-    // Loaded at runtime from data/role-permissions.json â€” single source of truth
+    // Loaded at runtime from data/role-permissions.json — single source of truth
     ROLE_CONFIG: null,
     _configLoaded: false,
 
@@ -30,7 +30,7 @@ const Permissions = {
     /**
      * Resolve effective permissions for the current logged-in user.
      * Returns null if not logged in.
-     * Caches the result â€” call clearCache() to force a refresh.
+     * Caches the result — call clearCache() to force a refresh.
      *
      * @returns {Promise<Object|null>} Permissions object:
      *   {
@@ -161,7 +161,7 @@ const Permissions = {
 
     /**
      * Get a display label for the user's role context.
-     * e.g. "Committee Â· ACDC 2027" or "Judge Â· ACDC 2027"
+     * e.g. "Committee · ACDC 2027" or "Judge · ACDC 2027"
      */
     getRoleLabel(permissions) {
         if (!permissions) return '';
@@ -173,9 +173,9 @@ const Permissions = {
             : 'Member';
 
         if (eventNames.length === 1) {
-            return `${roleLabel} Â· ${eventNames[0]}`;
+            return `${roleLabel} · ${eventNames[0]}`;
         } else if (eventNames.length > 1) {
-            return `${roleLabel} Â· ${eventNames.length} events`;
+            return `${roleLabel} · ${eventNames.length} events`;
         }
         return roleLabel;
     },

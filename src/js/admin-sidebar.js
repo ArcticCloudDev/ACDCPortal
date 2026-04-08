@@ -38,7 +38,7 @@ function renderAdminSidebar(activePage = '', permissions = null) {
 
     for (const item of SIDEBAR_NAV_ITEMS) {
         if (item.section) {
-            // Buffer the section header â€” only render it if at least one item follows
+            // Buffer the section header — only render it if at least one item follows
             pendingSection = `<div class="nav-section">${item.section}</div>`;
             lastSectionHadItems = false;
         } else if (item.page) {

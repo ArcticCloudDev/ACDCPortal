@@ -619,7 +619,7 @@ function renderClaimRow(claim, canReview) {
             <td><strong>${escapeHtml(badgeName)}</strong></td>
             <td><span class="category-pill ${badgeCategory}">${catConfig.label || badgeCategory}</span></td>
             <td>${escapeHtml(teamName)}</td>
-            <td class="claim-evidence" title="${escapeHtml(claim.evidence || '')}">${escapeHtml(claim.evidence || 'â€”')}</td>
+            <td class="claim-evidence" title="${escapeHtml(claim.evidence || '')}">${escapeHtml(claim.evidence || '—')}</td>
             <td><span class="status-pill ${claim.status}">${statusIcon(claim.status)} ${capitalize(claim.status)}</span></td>
             <td style="font-size: 0.8rem; color: var(--admin-text-muted);">${claimedDate}</td>
             <td>
@@ -771,7 +771,7 @@ function viewDeclineComments(claimId) {
     commentsEl.innerHTML = `<strong>Reviewer comments:</strong><br>${escapeHtml(claim.declineReason)}`;
     commentsEl.style.display = 'block';
 
-    // Hide decision controls â€” this is just a read-only view
+    // Hide decision controls — this is just a read-only view
     document.getElementById('review-decision').parentElement.style.display = 'none';
     document.getElementById('decline-reason-group').style.display = 'none';
     document.querySelector('#review-modal .modal-footer .primary').style.display = 'none';
@@ -870,7 +870,7 @@ function renderExclusiveRow(badge) {
         `;
     }
 
-    // Not yet awarded â€” show team dropdown + award button
+    // Not yet awarded — show team dropdown + award button
     return `
         <tr>
             <td><strong>${escapeHtml(badge.badgeName)}</strong></td>

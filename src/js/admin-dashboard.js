@@ -178,9 +178,9 @@ function renderTeamsTable(userMap = {}, memberCounts = {}) {
         return `
             <tr>
                 <td>${escapeHtml(team.teamName)}</td>
-                <td style="color: var(--admin-text-muted); font-size: 0.8rem;">${escapeHtml((() => { const u = userMap[team.adminUserId]; return u ? (u.firstName && u.lastName ? u.firstName + ' ' + u.lastName : u.email) : team.adminEmail || 'â€”'; })())}</td>
+                <td style="color: var(--admin-text-muted); font-size: 0.8rem;">${escapeHtml((() => { const u = userMap[team.adminUserId]; return u ? (u.firstName && u.lastName ? u.firstName + ' ' + u.lastName : u.email) : team.adminEmail || '—'; })())}</td>
                 <td><span class="badge count">${memberCounts[team.id] ?? team.committedParticipants ?? 0}</span></td>
-                <td>${event ? escapeHtml(event.name) : 'â€”'}</td>
+                <td>${event ? escapeHtml(event.name) : '—'}</td>
                 <td style="color: var(--admin-text-muted);">${createdDate}</td>
                 <td><a href="event.html?id=${team.eventId}" class="btn-sm">View</a></td>
             </tr>

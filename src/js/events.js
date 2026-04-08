@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 if (!currentUser.profileComplete) {
-                    // Allow interest-only users through â€” check interest leads by email
+                    // Allow interest-only users through — check interest leads by email
                     let hasInterest = false;
                     try {
                         const resp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);

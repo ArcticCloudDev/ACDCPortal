@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const wakeTimer = setTimeout(() => {
         if (loadingDiv.classList.contains('hidden')) return;
         if (!loadingDiv.querySelector('.loader-wake')) {
-            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">ðŸ»â€â„ï¸</span> <span class="wake-zzz">ðŸ’¤</span></span><div class="wake-title">Waking up the Arctic Database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class="wake-subtitle">â˜• Brewing some Arctic coffee to speed things up...</div></div>');
+            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span><div class="wake-title">Waking up the Arctic Database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up...</div></div>');
         }
     }, 1200);
     const content = document.getElementById('content');
@@ -218,18 +218,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Determine status display
         const status = currentEvent.status || 'draft';
         let statusText = 'Coming Soon';
-        if (status === 'live') statusText = 'ðŸš€ Live';
-        else if (status === 'registration') statusText = 'âœ“ Registration Open';
-        else if (status === 'pre-registration') statusText = 'ðŸ”” Pre-Registration';
-        else if (status === 'completed') statusText = 'âœ“ Completed';
+        if (status === 'live') statusText = '🚀 Live';
+        else if (status === 'registration') statusText = '✓ Registration Open';
+        else if (status === 'pre-registration') statusText = '🔔 Pre-Registration';
+        else if (status === 'completed') statusText = '✓ Completed';
 
         SiteHeader.render({
             title: currentEvent.name,
             subtitle: null,
             infoBadges: [
-                { icon: 'ðŸ“…', text: formatDateRange(currentEvent.startDate, currentEvent.endDate), id: 'event-dates' },
-                { icon: 'ðŸ“', text: currentEvent.location || 'TBD', id: 'event-location' },
-                ...(currentEvent.costPerParticipant != null ? [{ icon: 'ðŸ’°', text: `${currentEvent.costPerParticipant.toLocaleString()} ${currentEvent.currency || 'NOK'} / person`, id: 'event-cost' }] : []),
+                { icon: '📅', text: formatDateRange(currentEvent.startDate, currentEvent.endDate), id: 'event-dates' },
+                { icon: '📍', text: currentEvent.location || 'TBD', id: 'event-location' },
+                ...(currentEvent.costPerParticipant != null ? [{ icon: '💰', text: `${currentEvent.costPerParticipant.toLocaleString()} ${currentEvent.currency || 'NOK'} / person`, id: 'event-cost' }] : []),
                 { text: statusText, id: 'event-status', className: 'status-badge' }
             ],
             showSignIn: false,
@@ -286,49 +286,49 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 if (isJudge) {
                     roleSection.classList.add('judge');
-                    document.getElementById('role-confirmed-icon').textContent = 'âš–ï¸';
+                    document.getElementById('role-confirmed-icon').textContent = '⚖️';
                     document.getElementById('role-confirmed-title').textContent = `You're a Judge for ${currentEvent.name}`;
                     document.getElementById('role-confirmed-message').textContent = 
                         `You've been registered as a judge for this event. We'll notify you when judging details are available.`;
-                    document.getElementById('role-confirmed-badge').textContent = 'âœ“ Judge â€” Confirmed';
+                    document.getElementById('role-confirmed-badge').textContent = '✓ Judge — Confirmed';
                     document.getElementById('role-confirmed-details').innerHTML = 
-                        `ðŸ“… ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}` +
-                        (currentEvent.location ? ` &nbsp;â€¢&nbsp; ðŸ“ ${currentEvent.location}` : '') +
+                        `📅 ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}` +
+                        (currentEvent.location ? ` &nbsp;•&nbsp; 📍 ${currentEvent.location}` : '') +
                         `<br><span style="margin-top: 8px; display: inline-block;">We'll be in touch with judging criteria, schedules, and logistics closer to the event.</span>`;
                     // Show admin portal link for judges
                     const adminLink = document.getElementById('role-admin-link');
                     if (adminLink) {
-                        adminLink.textContent = 'âš–ï¸ Open Judge Portal';
+                        adminLink.textContent = '⚖️ Open Judge Portal';
                         adminLink.classList.remove('hidden');
                     }
                 } else if (isCommittee) {
                     roleSection.classList.add('committee');
-                    document.getElementById('role-confirmed-icon').textContent = 'ðŸ›ï¸';
+                    document.getElementById('role-confirmed-icon').textContent = '🏛️';
                     document.getElementById('role-confirmed-title').textContent = `You're on the Committee for ${currentEvent.name}`;
                     document.getElementById('role-confirmed-message').textContent = 
                         `You've been registered as a committee member for this event. We'll notify you as things progress.`;
-                    document.getElementById('role-confirmed-badge').textContent = 'âœ“ Committee Member â€” Confirmed';
+                    document.getElementById('role-confirmed-badge').textContent = '✓ Committee Member — Confirmed';
                     document.getElementById('role-confirmed-details').innerHTML = 
-                        `ðŸ“… ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}` +
-                        (currentEvent.location ? ` &nbsp;â€¢&nbsp; ðŸ“ ${currentEvent.location}` : '') +
+                        `📅 ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}` +
+                        (currentEvent.location ? ` &nbsp;•&nbsp; 📍 ${currentEvent.location}` : '') +
                         `<br><span style="margin-top: 8px; display: inline-block;">You'll receive updates as the event planning progresses.</span>`;
                     // Show admin portal link for committee
                     const adminLink = document.getElementById('role-admin-link');
                     if (adminLink) {
-                        adminLink.textContent = 'ðŸ›ï¸ Open Committee Portal';
+                        adminLink.textContent = '🏛️ Open Committee Portal';
                         adminLink.classList.remove('hidden');
                     }
                 } else if (isInterest) {
                     roleSection.classList.add('interest');
-                    document.getElementById('role-confirmed-icon').textContent = 'ðŸ””';
+                    document.getElementById('role-confirmed-icon').textContent = '🔔';
                     document.getElementById('role-confirmed-title').textContent = `You've registered interest for ${currentEvent.name}`;
                     document.getElementById('role-confirmed-message').textContent = 
                         `We'll notify you when registration opens. You'll be among the first to know!`;
-                    document.getElementById('role-confirmed-badge').textContent = 'âœ“ Interest Registered';
+                    document.getElementById('role-confirmed-badge').textContent = '✓ Interest Registered';
                     document.getElementById('role-confirmed-details').innerHTML = 
-                        `ðŸ“… ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}` +
-                        (currentEvent.location ? ` &nbsp;â€¢&nbsp; ðŸ“ ${currentEvent.location}` : '') +
-                        `<br><span style="margin-top: 8px; display: inline-block;">Keep an eye on your inbox â€” we'll send updates as the event takes shape.</span>`;
+                        `📅 ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}` +
+                        (currentEvent.location ? ` &nbsp;•&nbsp; 📍 ${currentEvent.location}` : '') +
+                        `<br><span style="margin-top: 8px; display: inline-block;">Keep an eye on your inbox — we'll send updates as the event takes shape.</span>`;
 
                     // Show upgrade options if event is open for registration
                     const eventStatus = currentEvent.status || 'draft';
@@ -350,7 +350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updateRoleHotelAlert();
                 }
             }
-            // Don't return â€” let page continue so modal infrastructure is available
+            // Don't return — let page continue so modal infrastructure is available
             // (but participant-facing sections are already hidden above)
         }
         
@@ -371,7 +371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     interestLink.href = `register.html?intent=interest&eventId=${currentEvent.id}`;
                 }
             }
-            // Hide the teams area â€” nothing to show yet
+            // Hide the teams area — nothing to show yet
             const teamsSection = document.querySelector('.teams-section');
             if (teamsSection) teamsSection.classList.add('hidden');
             const noTeams = document.getElementById('no-teams');
@@ -409,7 +409,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             teamsContainer.classList.remove('hidden');
             noTeams.classList.add('hidden');
-            // Hide "Create New Team / Join Solo Queue" â€” user already has a team
+            // Hide "Create New Team / Join Solo Queue" — user already has a team
             if (createSection) createSection.classList.add('hidden');
             
             // Build team cards with participants
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
     
-    // Handle file upload â€” POST multipart to API which uploads to SharePoint
+    // Handle file upload — POST multipart to API which uploads to SharePoint
     async function handleFileUpload(teamId, category, file) {
         const progressEl = document.getElementById(`upload-progress-${teamId}`);
         const uploadBtn = document.getElementById(`upload-btn-${teamId}`);
@@ -513,7 +513,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             if (progressEl) {
                 progressEl.classList.remove('hidden');
-                progressEl.textContent = `â³ Uploading "${file.name}"â€¦`;
+                progressEl.textContent = `⏳ Uploading "${file.name}"…`;
             }
             if (uploadBtn) uploadBtn.disabled = true;
 
@@ -538,7 +538,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             if (progressEl) {
-                progressEl.textContent = `âœ… "${file.name}" uploaded successfully!`;
+                progressEl.textContent = `✅ "${file.name}" uploaded successfully!`;
                 setTimeout(() => progressEl.classList.add('hidden'), 3000);
             }
 
@@ -549,7 +549,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             console.error('File upload error:', error);
             if (progressEl) {
-                progressEl.textContent = `âŒ Upload failed: ${error.message}`;
+                progressEl.textContent = `❌ Upload failed: ${error.message}`;
                 progressEl.classList.remove('hidden');
             }
             alert('Failed to upload file: ' + error.message);
@@ -558,7 +558,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Handle file removal â€” DELETE via API (removes from SharePoint)
+    // Handle file removal — DELETE via API (removes from SharePoint)
     async function handleFileRemove(teamId, filePath) {
         if (!confirm('Are you sure you want to remove this file from SharePoint?')) return;
 
@@ -582,7 +582,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Delete a team (portal admin / committee only)
     async function deleteTeam(teamId, teamName) {
-        if (!confirm(`Are you sure you want to delete team "${teamName}"?\n\nThis will also remove:\nâ€¢ Team memberships from all participants\nâ€¢ Hotel bookings (for participants with no other role)\nâ€¢ Badge claims for this team\nâ€¢ Pending invitations\n\nThis action cannot be undone.`)) {
+        if (!confirm(`Are you sure you want to delete team "${teamName}"?\n\nThis will also remove:\n• Team memberships from all participants\n• Hotel bookings (for participants with no other role)\n• Badge claims for this team\n• Pending invitations\n\nThis action cannot be undone.`)) {
             return;
         }
         try {
@@ -677,11 +677,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (pendingInvitations.length > 0) {
             pendingCardsHtml = pendingInvitations.map(inv => `
                 <div class="participant-card pending-card">
-                    <div class="pending-icon">âœ‰ï¸</div>
+                    <div class="pending-icon">✉️</div>
                     <div class="name">Invitation Sent</div>
                     <div class="detail-row email">${escapeHtml(inv.email)}</div>
                     <div class="roles">
-                        <span class="role-tag pending">â³ Pending</span>
+                        <span class="role-tag pending">⏳ Pending</span>
                     </div>
                     <div class="pending-date">Sent ${new Date(inv.createdAt).toLocaleDateString()}</div>
                 </div>
@@ -704,7 +704,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isAdmin && unlockSlots > 0) {
             unlockSlotsHtml = `
                 <div class="unlock-slot" data-team-id="${team.id}">
-                    <span class="unlock-icon">ðŸ”“</span>
+                    <span class="unlock-icon">🔓</span>
                     <span class="unlock-text">Unlock 1 more</span>
                 </div>
             `;
@@ -723,16 +723,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             (currentParticipation?.roles || []).includes('committee');
         
         const deleteButtonHtml = canDeleteTeam ? `
-            <button class="btn-delete-team" data-team-id="${team.id}" data-team-name="${escapeHtml(team.teamName)}" title="Delete team" style="background: none; border: 1px solid #fca5a5; color: #dc2626; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.85rem;">ðŸ—‘ï¸</button>
+            <button class="btn-delete-team" data-team-id="${team.id}" data-team-name="${escapeHtml(team.teamName)}" title="Delete team" style="background: none; border: 1px solid #fca5a5; color: #dc2626; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.85rem;">🗑️</button>
         ` : '';
         
         return `
             <div class="team-card" data-team-id="${team.id}">
                 <div class="team-card-body">
                     <div class="team-stats">
-                        <span>ðŸ‘¥ ${realParticipantCount}/${committedParticipants} committed</span>
-                        ${pendingInvitations.length > 0 ? `<span>âœ‰ï¸ ${pendingInvitations.length} pending</span>` : ''}
-                        <span>${emptyCommittedSlots > 0 ? `ðŸ“‹ ${emptyCommittedSlots} open` : 'âœ“ Full'}</span>
+                        <span>👥 ${realParticipantCount}/${committedParticipants} committed</span>
+                        ${pendingInvitations.length > 0 ? `<span>✉️ ${pendingInvitations.length} pending</span>` : ''}
+                        <span>${emptyCommittedSlots > 0 ? `📋 ${emptyCommittedSlots} open` : '✓ Full'}</span>
                     </div>
                     <div class="participants-grid">
                         ${participantCards.join('')}
@@ -746,7 +746,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
     }
     
-    // Build uploads section â€” loads files from SharePoint API
+    // Build uploads section — loads files from SharePoint API
     async function buildUploadsSection(team) {
         const categories = (currentEvent.fileCategories && currentEvent.fileCategories.length > 0)
             ? currentEvent.fileCategories
@@ -770,7 +770,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <span class="file-category-badge">${escapeHtml(f.category || 'General')}</span>
                         <a href="${escapeHtml(f.webUrl)}" target="_blank" rel="noopener" class="file-name file-link">${escapeHtml(f.name)}</a>
                         <span class="file-size">${formatFileSize(f.size)}</span>
-                        <button class="btn-remove" data-team-id="${team.id}" data-file-path="Events/${currentEvent.id}/${team.id}/${f.name}" title="Remove">âœ•</button>
+                        <button class="btn-remove" data-team-id="${team.id}" data-file-path="Events/${currentEvent.id}/${team.id}/${f.name}" title="Remove">✕</button>
                     </div>
                 `).join('')}
               </div>`
@@ -778,7 +778,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         return `
             <div class="team-uploads">
-                <h4>ðŸ“ Team Deliverables</h4>
+                <h4>📁 Team Deliverables</h4>
                 ${filesHtml}
                 <div class="upload-box">
                     <div class="upload-row">
@@ -786,7 +786,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             ${categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
                         </select>
                         <input type="file" id="file-${team.id}" style="display:none;" accept="*/*">
-                        <button class="btn btn-secondary btn-upload" id="upload-btn-${team.id}" onclick="document.getElementById('file-${team.id}').click()">ðŸ“Ž Upload File</button>
+                        <button class="btn btn-secondary btn-upload" id="upload-btn-${team.id}" onclick="document.getElementById('file-${team.id}').click()">📎 Upload File</button>
                     </div>
                     <div id="upload-progress-${team.id}" class="upload-progress hidden"></div>
                 </div>
@@ -840,7 +840,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Group badges by category
         const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3, 'exclusive': 4 };
-        const categoryLabels = { 'soft': 'ðŸ¤ Soft Skills', 'low-code': 'âš¡ Low-Code', 'pro-code': 'ðŸ’» Pro-Code', 'sponsor': 'ðŸ¢ Sponsor', 'exclusive': 'ðŸ† Exclusive' };
+        const categoryLabels = { 'soft': '🤝 Soft Skills', 'low-code': '⚡ Low-Code', 'pro-code': '💻 Pro-Code', 'sponsor': '🏢 Sponsor', 'exclusive': '🏆 Exclusive' };
 
         // Get claims for this team
         const teamClaims = teamId ? badgeClaims.filter(c => c.teamId === teamId) : [];
@@ -851,7 +851,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isCommittee = userRoles.includes('committee');
         const canAward = isJudge || isCommittee;
 
-        // Collect badges grouped â€” exclusive badges go into their own 'exclusive' category
+        // Collect badges grouped — exclusive badges go into their own 'exclusive' category
         const grouped = {};
         for (const eb of eventBadges) {
             const badge = eb.badge;
@@ -956,12 +956,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (claim && claim.status === 'approved') {
                     statusHtml = `<span class="badge-claim-status approved" title="Approved">Approved</span>`;
                     if (claim.blogUrl) {
-                        actionHtml = `<a href="${escapeHtml(claim.blogUrl)}" target="_blank" class="btn-badge-blog" title="View blog post">ðŸ“ Blog</a>`;
+                        actionHtml = `<a href="${escapeHtml(claim.blogUrl)}" target="_blank" class="btn-badge-blog" title="View blog post">📝 Blog</a>`;
                     }
                 } else if (claim && claim.status === 'pending') {
-                    statusHtml = `<span class="badge-claim-status submitted" title="Submitted â€” awaiting review">Submitted</span>`;
+                    statusHtml = `<span class="badge-claim-status submitted" title="Submitted — awaiting review">Submitted</span>`;
                     if (claim.blogUrl) {
-                        actionHtml = `<a href="${escapeHtml(claim.blogUrl)}" target="_blank" class="btn-badge-blog" title="View blog post">ðŸ“ Blog</a>`;
+                        actionHtml = `<a href="${escapeHtml(claim.blogUrl)}" target="_blank" class="btn-badge-blog" title="View blog post">📝 Blog</a>`;
                     }
                 } else if (claim && claim.status === 'declined') {
                     statusHtml = `<span class="badge-claim-status rejected" title="Rejected">Rejected</span>`;
@@ -970,7 +970,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         actionHtml = `<button class="btn-badge-claim" onclick="openClaimBadge('${eventBadge.id}', '${teamId}', '${safeName}')">Re-claim</button>`;
                     }
                 } else if (isExclusive) {
-                    statusHtml = `<span class="badge-claim-status exclusive" title="Exclusive â€” awarded by judges">ðŸ†</span>`;
+                    statusHtml = `<span class="badge-claim-status exclusive" title="Exclusive — awarded by judges">🏆</span>`;
                     if (canAward) {
                         const safeName = badge.name.replace(/'/g, "\\'");
                         actionHtml = `<button class="btn-badge-award" onclick="openAwardBadge('${eventBadge.id}', '${safeName}')">Award</button>`;
@@ -987,7 +987,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (isExclusive && claim && claim.status === 'approved') {
                     // Show which team was awarded
                     const awardedTeam = eventTeams.find(t => t.id === claim.teamId);
-                    assignedHtml = `<span class="badge-assigned-name" style="color: #d97706; font-weight: 600;">ðŸ† ${awardedTeam ? escapeHtml(awardedTeam.teamName) : 'Unknown team'}</span>`;
+                    assignedHtml = `<span class="badge-assigned-name" style="color: #d97706; font-weight: 600;">🏆 ${awardedTeam ? escapeHtml(awardedTeam.teamName) : 'Unknown team'}</span>`;
                 } else if (isExclusive) {
                     assignedHtml = `<span class="badge-assigned-name" style="color: #94a3b8; font-style: italic;">Awaiting award...</span>`;
                 } else if (!isExclusive && teamId) {
@@ -995,7 +995,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     assignedHtml = `
                         <select class="badge-assign-select" data-eb-id="${eventBadge.id}" data-team-id="${teamId}"
                                 onchange="assignBadgeMember(this)" title="Assign team member"${isApproved ? ' disabled' : ''}>
-                            <option value="">â€” assign â€”</option>
+                            <option value="">— assign —</option>
                             ${memberOptions.map(m =>
                                 `<option value="${m.userId}" ${m.userId === assignedUserId ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
                             ).join('')}
@@ -1013,7 +1013,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 // Build rejection reason line (visible to team members)
                 const rejectionHtml = (claim && claim.status === 'declined' && claim.declineReason)
-                    ? `<div class="badge-reject-reason">ðŸ’¬ ${escapeHtml(claim.declineReason)}</div>`
+                    ? `<div class="badge-reject-reason">💬 ${escapeHtml(claim.declineReason)}</div>`
                     : '';
 
                 panelsHtml += `
@@ -1042,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         container.innerHTML = `
             <div class="badges-section-header">
-                <h3>ðŸ… Badges <span class="badge-stats">${claimedCount}/${totalBadges} claimed Â· ${earnedPoints}/${totalPoints} points</span></h3>
+                <h3>🏅 Badges <span class="badge-stats">${claimedCount}/${totalBadges} claimed · ${earnedPoints}/${totalPoints} points</span></h3>
             </div>
             <div class="badge-tabs">
                 ${tabsHtml}
@@ -1059,10 +1059,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const hotelNights = participation.hotelNights || {};
         const hasAnyHotel = Object.values(hotelNights).some(v => v === true);
         const hotelStatusHtml = hasAnyHotel
-            ? `<div class="hotel-status ok">ðŸ¨ Hotel âœ“</div>`
+            ? `<div class="hotel-status ok">🏨 Hotel ✓</div>`
             : `<div class="hotel-status missing" title="Click to set hotel nights"
                     onclick="openEditOnHotel('${user.id}', '${participation.id}', '${teamId}')">
-                    âš ï¸ Hotel missing
+                    ⚠️ Hotel missing
                </div>`;
 
         return `
@@ -1073,14 +1073,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                  data-can-edit="${canEdit}">
                 <div class="name">${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</div>
                 <div class="detail-row email">${escapeHtml(user.email)}</div>
-                <div class="detail-row">ðŸ“± ${escapeHtml(user.phone || 'N/A')}</div>
-                ${user.allergies ? `<div class="detail-row">âš ï¸ ${escapeHtml(user.allergies)}</div>` : ''}
+                <div class="detail-row">📱 ${escapeHtml(user.phone || 'N/A')}</div>
+                ${user.allergies ? `<div class="detail-row">⚠️ ${escapeHtml(user.allergies)}</div>` : ''}
                 <div class="roles">
                     ${membership.isAdmin ? '<span class="role-tag admin">Admin</span>' : ''}
                     ${membership.isParticipant ? '<span class="role-tag participant">Participant</span>' : ''}
                     ${hotelStatusHtml}
                 </div>
-                ${canEdit ? '<button class="btn btn-small btn-secondary edit-participant-btn">âœï¸ Edit</button>' : ''}
+                ${canEdit ? '<button class="btn btn-small btn-secondary edit-participant-btn">✏️ Edit</button>' : ''}
             </div>
         `;
     }
@@ -1164,20 +1164,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!hasAnyNight) {
             hotelAlert.innerHTML = `
                 <div class="hotel-urgency-alert">
-                    <div class="alert-icon">ðŸ¨</div>
+                    <div class="alert-icon">🏨</div>
                     <div class="alert-title">Hotel Booking Needed!</div>
                     <div class="alert-message">
                         Please select your hotel nights as soon as possible so we can finalize room reservations.
-                        <br>Rooms fill up quickly â€” don't miss out!
+                        <br>Rooms fill up quickly — don't miss out!
                     </div>
-                    <button onclick="openSelfEditHotel()">ðŸ›ï¸ Select Hotel Nights Now</button>
+                    <button onclick="openSelfEditHotel()">🛏️ Select Hotel Nights Now</button>
                 </div>
             `;
         } else {
             const nightCount = Object.values(hotelNights).filter(v => v === true).length;
             hotelAlert.innerHTML = `
                 <div class="hotel-ok-badge">
-                    âœ… Hotel: ${nightCount} night${nightCount !== 1 ? 's' : ''} selected
+                    ✅ Hotel: ${nightCount} night${nightCount !== 1 ? 's' : ''} selected
                 </div>
             `;
         }
@@ -1301,7 +1301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // BADGE CLAIMING
     // ============================================================
 
-    // Open claim badge dialog (common badges â€” self-claim by team)
+    // Open claim badge dialog (common badges — self-claim by team)
     window.openClaimBadge = function(eventBadgeId, teamId, badgeName) {
         const modal = document.getElementById('badge-claim-modal');
         if (!modal) return;
@@ -1315,7 +1315,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         modal.classList.remove('hidden');
     };
 
-    // Open award badge dialog (exclusive badges â€” judges pick a team to award)
+    // Open award badge dialog (exclusive badges — judges pick a team to award)
     window.openAwardBadge = function(eventBadgeId, badgeName) {
         const modal = document.getElementById('badge-award-modal');
         if (!modal) return;
@@ -1346,7 +1346,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (modal) modal.classList.add('hidden');
     };
 
-    // Submit badge award (exclusive badges â€” judge awards to a team)
+    // Submit badge award (exclusive badges — judge awards to a team)
     window.submitBadgeAward = async function() {
         const eventBadgeId = document.getElementById('badge-award-eb-id').value;
         const teamId = document.getElementById('badge-award-team').value;
@@ -1493,7 +1493,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Always compute fresh from event dates â€” never trust stored hotelDates
+        // Always compute fresh from event dates — never trust stored hotelDates
         const hotelDates = computeHotelDates(currentEvent.startDate, currentEvent.endDate);
 
         let html = '';
@@ -1517,7 +1517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="hotel-night">
                         <input type="checkbox" id="edit-hotel-${nightId}" data-night-id="${nightId}">
                         <label for="edit-hotel-${nightId}" class="night-checkbox">
-                            <span class="night-icon">ðŸŒ™</span>
+                            <span class="night-icon">🌙</span>
                         </label>
                     </div>
                 `;
@@ -1716,10 +1716,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function showResendOption(email, invitationId, errorDiv, successDiv) {
         errorDiv.innerHTML = `
             <div style="display: flex; flex-direction: column; gap: 12px;">
-                <div>ðŸ“§ An invitation is already pending for <strong>${escapeHtml(email)}</strong></div>
+                <div>📧 An invitation is already pending for <strong>${escapeHtml(email)}</strong></div>
                 <div style="display: flex; gap: 8px;">
                     <button type="button" class="btn btn-small btn-secondary" onclick="resendExistingInvitation('${invitationId}')">
-                        ðŸ”„ Resend Invitation
+                        🔄 Resend Invitation
                     </button>
                     <button type="button" class="btn btn-small btn-ghost" onclick="document.getElementById('invite-error').classList.add('hidden')">
                         Dismiss
@@ -1746,7 +1746,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             errorDiv.style.color = '';
             errorDiv.style.borderColor = '';
             
-            successDiv.textContent = 'âœ… Invitation resent successfully!';
+            successDiv.textContent = '✅ Invitation resent successfully!';
             successDiv.classList.remove('hidden');
             
             document.getElementById('invite-email').value = '';
@@ -1773,7 +1773,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const membersList = document.getElementById('team-members-list');
         const adminActions = document.getElementById('team-admin-actions');
         
-        title.textContent = `ðŸ‘¥ ${team.teamName}`;
+        title.textContent = `👥 ${team.teamName}`;
         membersList.innerHTML = '<p>Loading members...</p>';
         
         modal.classList.add('active');
@@ -1835,8 +1835,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 </div>
                             </div>
                             <div class="member-roles">
-                                ${m.membership.isAdmin ? '<span class="role-badge admin">â­ Admin</span>' : ''}
-                                ${m.membership.isParticipant ? '<span class="role-badge participant">ðŸ‘¤ Participant</span>' : ''}
+                                ${m.membership.isAdmin ? '<span class="role-badge admin">⭐ Admin</span>' : ''}
+                                ${m.membership.isParticipant ? '<span class="role-badge participant">👤 Participant</span>' : ''}
                             </div>
                         </div>
                     `;
@@ -1846,22 +1846,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Render pending invitations (only for admins)
             if (pendingInvitations.length > 0) {
                 html += `<div class="pending-invitations-section" style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed #e2e8f0;">
-                    <p style="color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">ðŸ“§ Pending Invitations</p>
+                    <p style="color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">📧 Pending Invitations</p>
                 `;
                 html += pendingInvitations.map(inv => {
                     const sentDate = new Date(inv.createdAt).toLocaleDateString();
                     return `
                         <div class="member-row invitation-pending" style="background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%); border-radius: 8px; margin-bottom: 8px;">
                             <div class="member-info">
-                                <div class="avatar" style="background: #f59e0b; color: white;">ðŸ“§</div>
+                                <div class="avatar" style="background: #f59e0b; color: white;">📧</div>
                                 <div>
                                     <div class="name" style="color: #92400e;">${escapeHtml(inv.email)}</div>
-                                    <div class="email" style="color: #a16207;">Invited ${sentDate} â€¢ Awaiting response</div>
+                                    <div class="email" style="color: #a16207;">Invited ${sentDate} • Awaiting response</div>
                                 </div>
                             </div>
                             <div class="member-roles">
-                                <span class="role-badge" style="background: #fef3c7; color: #92400e; border: 1px solid #f59e0b;">â³ Pending</span>
-                                <button class="btn btn-small btn-ghost" onclick="cancelInvitation('${inv.id}')" title="Cancel invitation" style="padding: 4px 8px; margin-left: 8px;">âœ•</button>
+                                <span class="role-badge" style="background: #fef3c7; color: #92400e; border: 1px solid #f59e0b;">⏳ Pending</span>
+                                <button class="btn btn-small btn-ghost" onclick="cancelInvitation('${inv.id}')" title="Cancel invitation" style="padding: 4px 8px; margin-left: 8px;">✕</button>
                             </div>
                         </div>
                     `;
@@ -1878,7 +1878,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Show remaining empty spots (for admins)
             if (isTeamAdmin && remainingSpots > 0) {
                 html += `<div class="empty-spots-section" style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed #e2e8f0;">
-                    <p style="color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">ðŸª‘ Available Spots (${remainingSpots})</p>
+                    <p style="color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">🪑 Available Spots (${remainingSpots})</p>
                 `;
                 for (let i = 0; i < remainingSpots; i++) {
                     html += `

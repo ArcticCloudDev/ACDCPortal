@@ -326,7 +326,7 @@ function escapeHtml(text) {
 }
 
 async function deleteTeam(teamId, teamName) {
-    if (!confirm(`Are you sure you want to delete team "${teamName}"?\n\nThis will also remove:\nâ€¢ Team memberships from all participants\nâ€¢ Hotel bookings (for participants with no other role)\nâ€¢ Badge claims for this team\nâ€¢ Pending invitations\n\nThis action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete team "${teamName}"?\n\nThis will also remove:\n• Team memberships from all participants\n• Hotel bookings (for participants with no other role)\n• Badge claims for this team\n• Pending invitations\n\nThis action cannot be undone.`)) {
         return;
     }
 

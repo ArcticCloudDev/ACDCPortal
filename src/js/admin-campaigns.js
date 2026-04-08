@@ -146,9 +146,9 @@ function renderSequences() {
                     <div class="sequence-info">
                         <h3>${escapeHtml(seq.name)}</h3>
                         <div class="sequence-meta">
-                            ${seq.emailCount || 0} email${(seq.emailCount || 0) !== 1 ? 's' : ''} â€¢ 
-                            ${seq.stats?.sent || 0} sent â€¢ 
-                            ${seq.stats?.failed || 0} failed â€¢ 
+                            ${seq.emailCount || 0} email${(seq.emailCount || 0) !== 1 ? 's' : ''} • 
+                            ${seq.stats?.sent || 0} sent • 
+                            ${seq.stats?.failed || 0} failed • 
                             Created ${createdDate}
                         </div>
                     </div>
@@ -274,7 +274,7 @@ async function loadSequenceStats(sequenceId) {
                     <strong style="font-size: 0.9rem;">Events using this sequence:</strong>
                     ${eventStats.map(e => `
                         <div style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;">
-                            â€¢ ${escapeHtml(e.name)}: ${e.verified} verified leads, ${e.teams} team members
+                            • ${escapeHtml(e.name)}: ${e.verified} verified leads, ${e.teams} team members
                         </div>
                     `).join('')}
                 </div>

@@ -1,9 +1,9 @@
 // ACDC Portal - Auth Module (Custom OTP + JWT)
-// No external auth provider â€” uses our own OTP verification + JWT sessions
+// No external auth provider — uses our own OTP verification + JWT sessions
 // Maintains the same interface as the old MSAL wrapper for compatibility
 
 const Auth = {
-    // Initialize â€” load session from localStorage
+    // Initialize — load session from localStorage
     init() {
         // Check if token is expired
         const token = this._getToken();
@@ -39,7 +39,7 @@ const Auth = {
         }
     },
 
-    // "Login" â€” redirect to unified register/sign-in page
+    // "Login" — redirect to unified register/sign-in page
     // Pages that need auth call Auth.login() which sends the user to
     // register.html where the email check routes to OTP (known) or registration (new).
     login(loginHint) {
@@ -55,15 +55,15 @@ const Auth = {
         localStorage.setItem(CONFIG.auth.userKey, JSON.stringify(user));
     },
 
-    // Logout â€” clear session and redirect to home
+    // Logout — clear session and redirect to home
     logout() {
         this._clearSession();
         window.location.href = '/events.html';
     },
 
-    // Handle redirect â€” kept for compatibility
+    // Handle redirect — kept for compatibility
     // Old code calls `await Auth.handleRedirect()` on page load.
-    // With JWT, there's no redirect to handle â€” just return null.
+    // With JWT, there's no redirect to handle — just return null.
     async handleRedirect() {
         // No-op: JWT auth doesn't use redirects
         return null;

@@ -3,7 +3,7 @@
 // Flow B (new user, sign-in):  Email → Profile Form (name/phone) → reCAPTCHA → Send OTP → Verify → Complete → redirect
 // Flow C (new user, team):     Email → Full Form (profile + team) → reCAPTCHA → Send OTP → Verify → Complete → Success
 // Flow D (interest):           Same as A or B, but after auth → record interest for eventId → interest success
-// No external auth provider — everything happens on this page
+// No external auth provider � everything happens on this page
 
 const RECAPTCHA_SITE_KEY = '6Lc7aKwsAAAAAA5DkTtC2lFIF5eAGVTHpQAkZFep';
 
@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showStep('email');
     });
 
-    // --- Step 2: Registration Form submission (register flow — profile or team) ---
+    // --- Step 2: Registration Form submission (register flow � profile or team) ---
     registrationForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const isLoginFlow = flowMode === 'login' || flowMode === 'interest-login';
             const emailToVerify = isLoginFlow ? currentEmail : pendingFormData.email;
 
-            // Verify the OTP code — returns JWT + user data
+            // Verify the OTP code � returns JWT + user data
             const verifyResult = await API.auth.verifyOtp(emailToVerify, code);
 
             if (!verifyResult.success) {
@@ -460,7 +460,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 lastName: user.lastName || (pendingFormData ? pendingFormData.lastName : '')
             });
 
-            // Redirect to the event page — they'll see their interest card there
+            // Redirect to the event page � they'll see their interest card there
             window.location.href = `event.html?id=${eventId}`;
 
         } catch (error) {

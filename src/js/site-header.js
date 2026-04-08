@@ -1,6 +1,6 @@
 // Shared Site Header Component
 // Renders the top banner bar + self-contained profile modal.
-// Works identically on events.html and event.html â€” no page-specific config needed.
+// Works identically on events.html and event.html — no page-specific config needed.
 //
 // Usage:
 //   SiteHeader.render({
@@ -128,7 +128,7 @@ const SiteHeader = (() => {
     }
 
     // ============================================================
-    // Profile Modal â€” injected once, reused across any page
+    // Profile Modal — injected once, reused across any page
     // ============================================================
 
     function _ensureProfileModal() {

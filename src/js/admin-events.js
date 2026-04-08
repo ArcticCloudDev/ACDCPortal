@@ -1010,7 +1010,7 @@ function renderLeadsTable() {
     tbody.innerHTML = allLeads.map(lead => {
         // Detect if this lead has been converted to a participant
         const matchedUser = allUsers.find(u => u.email.toLowerCase() === lead.email.toLowerCase());
-        let convertedCell = '<span style="color: var(--admin-text-muted); font-size: 0.85rem;">â€”</span>';
+        let convertedCell = '<span style="color: var(--admin-text-muted); font-size: 0.85rem;">—</span>';
         if (matchedUser) {
             const participation = allParticipations.find(p =>
                 p.userId === matchedUser.id && p.eventId === currentEventId
@@ -1335,7 +1335,7 @@ async function loadEmailDeliveryStats(emails) {
         const verifiedLeads = leads.filter(l => l.verified);
         const totalRecipients = verifiedLeads.length + recipients.length;
         
-        // Calculate stats for each email â€” match by email address
+        // Calculate stats for each email — match by email address
         const stats = {};
         emails.forEach(email => {
             const emailId = normalizeId(email.id);
