@@ -1010,31 +1010,38 @@ function renderLeadsTable() {
     tbody.innerHTML = allLeads.map(lead => {
         // Detect if this lead has been converted to a participant
         const matchedUser = allUsers.find(u => u.email.toLowerCase() === lead.email.toLowerCase());
-        let convertedCell = '<span style="color: var(--admin-text-muted); font-size: 0.85rem;">�</span>';
+
+        // Use profile name if the lead was submitted without one
+        const displayFirst = lead.firstName || matchedUser?.firstName || '';
+        const displayLast = lead.lastName || matchedUser?.lastName || '';
+        let convertedCell = '<span style="color: var(--admin-text-muted); font-size: 0.85rem;">�</span>';
         if (matchedUser) {
             const participation = allParticipations.find(p =>
                 p.userId === matchedUser.id && p.eventId === currentEventId
             );
             if (participation) {
-                // Find which team they belong to
-                const teamMembership = (participation.teamMemberships || []).find(m => m.isParticipant);
-                const team = teamMembership ? allTeams.find(t => t.id === teamMembership.teamId) : null;
-                const teamName = team ? (team.teamName || team.name || 'Unknown Team') : null;
-
                 const roles = participation.roles || [];
-                let roleLabel = 'Participant';
-                if (roles.includes('committee')) roleLabel = 'Committee';
-                else if (roles.includes('judge')) roleLabel = 'Judge';
+                const teamMembership = (participation.teamMemberships || []).find(m => m.isParticipant);
+                const isConverted = roles.includes('committee') || roles.includes('judge') || !!teamMembership;
 
-                convertedCell = teamName
-                    ? `<span style="color: var(--admin-success); font-weight: 500;">✅ ${roleLabel}</span><br><small style="color: var(--admin-text-muted);">${escapeHtml(teamName)}</small>`
-                    : `<span style="color: var(--admin-success); font-weight: 500;">✅ ${roleLabel}</span>`;
+                if (isConverted) {
+                    const team = teamMembership ? allTeams.find(t => t.id === teamMembership.teamId) : null;
+                    const teamName = team ? (team.teamName || team.name || 'Unknown Team') : null;
+
+                    let roleLabel = 'Participant';
+                    if (roles.includes('committee')) roleLabel = 'Committee';
+                    else if (roles.includes('judge')) roleLabel = 'Judge';
+
+                    convertedCell = teamName
+                        ? `<span style="color: var(--admin-success); font-weight: 500;">✅ ${roleLabel}</span><br><small style="color: var(--admin-text-muted);">${escapeHtml(teamName)}</small>`
+                        : `<span style="color: var(--admin-success); font-weight: 500;">✅ ${roleLabel}</span>`;
+                }
             }
         }
 
         return `
         <tr>
-            <td><strong>${escapeHtml(lead.firstName)} ${escapeHtml(lead.lastName)}</strong></td>
+            <td><strong>${escapeHtml(displayFirst)} ${escapeHtml(displayLast)}</strong></td>
             <td>${escapeHtml(lead.email)}</td>
             <td>${new Date(lead.verifiedAt || lead.createdAt).toLocaleDateString()}</td>
             <td>${convertedCell}</td>
@@ -1335,7 +1342,7 @@ async function loadEmailDeliveryStats(emails) {
         const verifiedLeads = leads.filter(l => l.verified);
         const totalRecipients = verifiedLeads.length + recipients.length;
         
-        // Calculate stats for each email � match by email address
+        // Calculate stats for each email � match by email address
         const stats = {};
         emails.forEach(email => {
             const emailId = normalizeId(email.id);
