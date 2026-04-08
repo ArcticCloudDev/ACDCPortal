@@ -5,7 +5,7 @@
 // Flow D (interest):           Same as A or B, but after auth → record interest for eventId → interest success
 // No external auth provider — everything happens on this page
 
-const RECAPTCHA_SITE_KEY = '6LcjN1YsAAAAALq6PKDAsDnRc4KnDzUJnScPTxiy';
+const RECAPTCHA_SITE_KEY = '6Lc7aKwsAAAAAA5DkTtC2lFIF5eAGVTHpQAkZFep';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const stepEmail = document.getElementById('step-email');
