@@ -79,7 +79,7 @@ app.http('register-start', {
                 firstName,
                 lastName,
                 phone: phone || null,
-                registrationType: isTeamRegistration ? 'team' : 'profile',
+                type: isTeamRegistration ? 'team' : (registrationType === 'interest' ? 'interest' : 'profile'),
                 createdAt: new Date().toISOString(),
                 expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 min expiry
             };
@@ -173,7 +173,7 @@ app.http('register-complete', {
                 };
             }
             
-            const { firstName, lastName, phone, teamName, numberOfParticipants, willParticipate, registrationType, eventId: pendingEventId } = pending;
+            const { firstName, lastName, phone, teamName, numberOfParticipants, willParticipate, type: registrationType, eventId: pendingEventId } = pending;
             const isTeamRegistration = registrationType === 'team';
             const isParticipant = isTeamRegistration ? (willParticipate !== false) : false;
             
