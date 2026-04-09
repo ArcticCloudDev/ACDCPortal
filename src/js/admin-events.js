@@ -396,7 +396,7 @@ function showForm(event = null) {
         document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
         document.getElementById('event-sharepoint-url').value = event.sharepointUrl || '';
         document.getElementById('sharepoint-verify-result').innerHTML = '';
-        document.getElementById('event-sequence').checked = event.sequenceEnabled || false;
+        // sequenceEnabled is managed automatically via the Sequence tab
         document.getElementById('event-team-registration-email').checked = event.sendTeamRegistrationEmail !== false;
         document.getElementById('event-team-welcome-email').checked = event.sendWelcomeEmail || false;
         document.getElementById('event-interest-acknowledgment').checked = event.sendInterestAcknowledgment || false;
@@ -548,7 +548,7 @@ async function handleFormSubmit(e) {
             location: document.getElementById('event-location').value.trim(),
             registrationType: registrationType,
             status: document.getElementById('event-status').value || 'draft',
-            sequenceEnabled: document.getElementById('event-sequence').checked,
+            // sequenceEnabled is not sent from this form — managed by Sequence tab
             sendTeamRegistrationEmail: document.getElementById('event-team-registration-email').checked,
             sendWelcomeEmail: document.getElementById('event-team-welcome-email').checked,
             sendInterestAcknowledgment: document.getElementById('event-interest-acknowledgment').checked,

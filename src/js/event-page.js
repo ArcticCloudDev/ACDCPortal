@@ -2275,11 +2275,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         _termsOnConfirm = onConfirm;
         document.getElementById('registration-terms-title').textContent = `Before you continue: ${actionTitle}`;
         document.getElementById('registration-terms-body').innerHTML = termsHtml;
-        document.getElementById('registration-terms-modal').classList.remove('hidden');
+        document.getElementById('registration-terms-modal').classList.add('active');
     }
 
     window.closeRegistrationTermsModal = function() {
-        document.getElementById('registration-terms-modal').classList.add('hidden');
+        document.getElementById('registration-terms-modal').classList.remove('active');
         _termsOnConfirm = null;
     };
 
