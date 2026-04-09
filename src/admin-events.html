@@ -459,10 +459,11 @@
         }
         .collapsible-section > summary .expand-hint {
             margin-left: auto;
-            font-size: 0.7rem;
-            font-weight: 400;
-            color: #60a5fa;
-            letter-spacing: 0;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #1d4ed8;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
         }
         .collapsible-section > summary::-webkit-details-marker { display: none; }
         .collapsible-section > summary::after {
@@ -474,7 +475,7 @@
             transition: transform 0.2s ease;
             transform: rotate(-90deg);
         }
-        .collapsible-section[open] > summary::after { transform: rotate(0deg); }
+        .collapsible-section[open] > summary .expand-hint { display: none; }
         .collapsible-section[open] > summary { background: #dbeafe; }
         .collapsible-section > summary:hover { background: #dbeafe; }
         .collapsible-section .collapsible-body {

@@ -41,6 +41,12 @@ CREATE TABLE Events (
         -- Public URL: /api/events/{id}/image — served from EventImageData
     EventImageData              NVARCHAR(MAX)    NULL,
         -- Base64 data URI of the event banner; stripped from API GET responses
+    TeamRegistrationTerms       NVARCHAR(MAX)    NULL,
+        -- HTML shown in a confirmation modal before team registration
+    SoloQueueTerms              NVARCHAR(MAX)    NULL,
+        -- HTML shown in a confirmation modal before joining the solo queue
+    SingleRegistrationTerms     NVARCHAR(MAX)    NULL,
+        -- HTML shown in a confirmation modal before individual registration
     CreatedAt                   DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
     UpdatedAt                   DATETIME2        NULL,
 
