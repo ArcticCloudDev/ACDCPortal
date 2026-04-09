@@ -437,7 +437,8 @@
         /* Collapsible section */
         .collapsible-section {
             margin-top: 20px;
-            border: 1px solid var(--admin-border);
+            border: 1px solid #bfdbfe;
+            border-left: 3px solid var(--admin-primary);
             border-radius: 8px;
             overflow: hidden;
         }
@@ -445,31 +446,44 @@
             list-style: none;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 10px 14px;
-            background: var(--admin-bg-subtle, #f8fafc);
+            padding: 11px 16px;
+            background: #eff6ff;
             font-weight: 600;
-            font-size: 0.9rem;
-            color: var(--admin-text);
+            font-size: 0.875rem;
+            color: #1e40af;
             cursor: pointer;
             user-select: none;
             gap: 8px;
+            transition: background 0.15s;
+            letter-spacing: 0.01em;
+        }
+        .collapsible-section > summary .expand-hint {
+            margin-left: auto;
+            font-size: 0.7rem;
+            font-weight: 400;
+            color: #60a5fa;
+            letter-spacing: 0;
         }
         .collapsible-section > summary::-webkit-details-marker { display: none; }
         .collapsible-section > summary::after {
-            content: '▸';
-            font-size: 0.8rem;
-            color: var(--admin-text-muted);
-            margin-left: auto;
-            transition: transform 0.15s;
+            content: '▼';
+            font-size: 0.65rem;
+            color: var(--admin-primary);
+            margin-left: 6px;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+            transform: rotate(-90deg);
         }
-        .collapsible-section[open] > summary::after { transform: rotate(90deg); }
-        .collapsible-section > summary:hover { background: var(--admin-hover-bg, #f1f5f9); }
+        .collapsible-section[open] > summary::after { transform: rotate(0deg); }
+        .collapsible-section[open] > summary { background: #dbeafe; }
+        .collapsible-section > summary:hover { background: #dbeafe; }
         .collapsible-section .collapsible-body {
-            padding: 14px 16px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
             gap: 0;
+            border-top: 1px solid #bfdbfe;
+            background: #fff;
         }
 
         /* Radio buttons styling */
@@ -882,7 +896,7 @@
                                         </div>
 
                                         <details class="collapsible-section" style="margin-top: 16px;">
-                                            <summary>📧 Email Notifications</summary>
+                                            <summary>📧 Email Notifications<span class="expand-hint">click to expand</span></summary>
                                             <div class="collapsible-body">
                                                 <div class="form-group">
                                                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
@@ -952,30 +966,32 @@
                                             </div>
                                         </details>
 
-                                        <div class="form-group" style="margin-top: 24px;">
-                                            <h3 style="margin-bottom: 12px;">📋 Registration Confirmation Texts</h3>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-bottom: 16px;">
-                                                These texts are shown to participants in a confirmation dialog <strong>before</strong> they proceed with registration. HTML is supported (e.g. <code>&lt;strong&gt;</code>, <code>&lt;ul&gt;</code>, <code>&lt;li&gt;</code>). Leave blank to skip the confirmation dialog for that action.
-                                            </small>
+                                        <details class="collapsible-section" style="margin-top: 20px;">
+                                            <summary>📋 Registration Confirmation Texts<span class="expand-hint">click to expand</span></summary>
+                                            <div class="collapsible-body">
+                                                <small style="color: var(--admin-text-muted); display: block; margin-bottom: 16px; line-height: 1.5;">
+                                                    Shown in a confirmation dialog <strong>before</strong> participants proceed. HTML is supported (e.g. <code>&lt;strong&gt;</code>, <code>&lt;ul&gt;</code>, <code>&lt;li&gt;</code>). Leave blank to skip the dialog for that action.
+                                                </small>
 
-                                            <div id="team-terms-field">
-                                                <label style="font-weight: 600; margin-bottom: 4px; display: block;">👥 Team Registration</label>
-                                                <textarea id="event-team-registration-terms" rows="5" placeholder="e.g. By registering a team you commit to participating in the event. No-shows will be invoiced for the full participation fee of 16 500 NOK per person." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
-                                                <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant clicks "Register a Team".</small>
-                                            </div>
+                                                <div id="team-terms-field">
+                                                    <label style="font-weight: 600; margin-bottom: 4px; display: block;">👥 Team Registration</label>
+                                                    <textarea id="event-team-registration-terms" rows="5" placeholder="e.g. By registering a team you commit to participating in the event. No-shows will be invoiced for the full participation fee of 16 500 NOK per person." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant clicks "Register a Team".</small>
+                                                </div>
 
-                                            <div style="margin-top: 16px;" id="solo-terms-field">
-                                                <label style="font-weight: 600; margin-bottom: 4px; display: block;">🎲 Solo Queue</label>
-                                                <textarea id="event-solo-queue-terms" rows="4" placeholder="e.g. Joining the solo queue means you're open to being matched with a team or other solo participants. There is no commitment until you are matched and accept." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
-                                                <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant clicks "Join Solo Queue".</small>
-                                            </div>
+                                                <div style="margin-top: 16px;" id="solo-terms-field">
+                                                    <label style="font-weight: 600; margin-bottom: 4px; display: block;">🎲 Solo Queue</label>
+                                                    <textarea id="event-solo-queue-terms" rows="4" placeholder="e.g. Joining the solo queue means you're open to being matched with a team or other solo participants. There is no commitment until you are matched and accept." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant clicks "Join Solo Queue".</small>
+                                                </div>
 
-                                            <div style="margin-top: 16px;" id="single-terms-field">
-                                                <label style="font-weight: 600; margin-bottom: 4px; display: block;">👤 Individual Registration</label>
-                                                <textarea id="event-single-registration-terms" rows="4" placeholder="e.g. By registering individually you commit to attending the event." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
-                                                <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant registers for a solo/individual event.</small>
+                                                <div style="margin-top: 16px;" id="single-terms-field">
+                                                    <label style="font-weight: 600; margin-bottom: 4px; display: block;">👤 Individual Registration</label>
+                                                    <textarea id="event-single-registration-terms" rows="4" placeholder="e.g. By registering individually you commit to attending the event." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant registers for a solo/individual event.</small>
+                                                </div>
                                             </div>
-                                        </div>
+                                        </details>
                                     </div>
                                 </div>
 
