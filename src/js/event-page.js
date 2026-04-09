@@ -1967,10 +1967,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Create team modal
         const createTeamModal = document.getElementById('create-team-modal');
         document.getElementById('create-team-btn').addEventListener('click', () => {
-            if (isRegistrationOpen()) {
-                createTeamModal.classList.add('active');
-            } else {
+            if (!isRegistrationOpen()) {
                 alert('Registration is not open for this event.');
+                return;
+            }
+            const terms = currentEvent.teamRegistrationTerms;
+            if (terms) {
+                showRegistrationTermsModal('Register a Team', terms, () => createTeamModal.classList.add('active'));
+            } else {
+                createTeamModal.classList.add('active');
             }
         });
         
@@ -1979,10 +1984,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Solo queue modal
         const soloQueueModal = document.getElementById('solo-queue-modal');
         document.getElementById('join-solo-btn').addEventListener('click', () => {
-            if (isRegistrationOpen()) {
-                soloQueueModal.classList.add('active');
-            } else {
+            if (!isRegistrationOpen()) {
                 alert('Registration is closed for this event.');
+                return;
+            }
+            const terms = currentEvent.soloQueueTerms;
+            if (terms) {
+                showRegistrationTermsModal('Join Solo Queue', terms, () => soloQueueModal.classList.add('active'));
+            } else {
+                soloQueueModal.classList.add('active');
             }
         });
         
@@ -2254,6 +2264,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Populate profile form
     // Logout handled by SiteHeader component
+
+    // ============================================================
+    // REGISTRATION TERMS MODAL
+    // ============================================================
+
+    let _termsOnConfirm = null;
+
+    function showRegistrationTermsModal(actionTitle, termsHtml, onConfirm) {
+        _termsOnConfirm = onConfirm;
+        document.getElementById('registration-terms-title').textContent = `Before you continue: ${actionTitle}`;
+        document.getElementById('registration-terms-body').innerHTML = termsHtml;
+        document.getElementById('registration-terms-modal').classList.remove('hidden');
+    }
+
+    window.closeRegistrationTermsModal = function() {
+        document.getElementById('registration-terms-modal').classList.add('hidden');
+        _termsOnConfirm = null;
+    };
+
+    window.confirmRegistrationTerms = function() {
+        const cb = _termsOnConfirm;
+        closeRegistrationTermsModal();
+        if (cb) cb();
+    };
 });
 
 console.log('Event page script loaded');

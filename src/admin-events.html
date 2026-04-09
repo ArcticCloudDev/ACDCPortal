@@ -434,6 +434,44 @@
             border-bottom: 1px solid var(--admin-border);
         }
 
+        /* Collapsible section */
+        .collapsible-section {
+            margin-top: 20px;
+            border: 1px solid var(--admin-border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .collapsible-section > summary {
+            list-style: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: var(--admin-bg-subtle, #f8fafc);
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--admin-text);
+            cursor: pointer;
+            user-select: none;
+            gap: 8px;
+        }
+        .collapsible-section > summary::-webkit-details-marker { display: none; }
+        .collapsible-section > summary::after {
+            content: '▸';
+            font-size: 0.8rem;
+            color: var(--admin-text-muted);
+            margin-left: auto;
+            transition: transform 0.15s;
+        }
+        .collapsible-section[open] > summary::after { transform: rotate(90deg); }
+        .collapsible-section > summary:hover { background: var(--admin-hover-bg, #f1f5f9); }
+        .collapsible-section .collapsible-body {
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
         /* Radio buttons styling */
         .radio-group {
             display: flex;
@@ -843,70 +881,100 @@
                                             <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Leave blank if participation is free. Shown to participants when they register a team.</small>
                                         </div>
 
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                <input type="checkbox" id="event-sequence" style="width: auto;">
-                                                <span>📧 Enable Email Sequence</span>
-                                            </label>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                <strong>Automated emails for interest leads.</strong> When enabled, the email sequence will be sent to verified interest leads.
-                                                Configure the sequence content in the <strong>Sequence</strong> tab below.
-                                            </small>
-                                        </div>
+                                        <details class="collapsible-section" style="margin-top: 16px;">
+                                            <summary>📧 Email Notifications</summary>
+                                            <div class="collapsible-body">
+                                                <div class="form-group">
+                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                        <input type="checkbox" id="event-sequence" style="width: auto;">
+                                                        <span>📧 Enable Email Sequence</span>
+                                                    </label>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                        <strong>Automated emails for interest leads.</strong> When enabled, the email sequence will be sent to verified interest leads.
+                                                        Configure the sequence content in the <strong>Sequence</strong> tab below.
+                                                    </small>
+                                                </div>
 
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                <input type="checkbox" id="event-team-registration-email" style="width: auto;">
-                                                <span>📋 Send Team Registration Confirmation Email</span>
-                                            </label>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                <strong>Confirmation email for the team admin upon registration.</strong> When enabled, the team admin will receive a confirmation email when a new team is registered.
-                                                Customize the email in <strong>Email Templates</strong> under Team Registration.
-                                            </small>
-                                        </div>
+                                                <div class="form-group" style="margin-top: 16px;">
+                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                        <input type="checkbox" id="event-team-registration-email" style="width: auto;">
+                                                        <span>📋 Send Team Registration Confirmation Email</span>
+                                                    </label>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                        <strong>Confirmation email for the team admin upon registration.</strong> When enabled, the team admin will receive a confirmation email when a new team is registered.
+                                                        Customize the email in <strong>Email Templates</strong> under Team Registration.
+                                                    </small>
+                                                </div>
 
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                <input type="checkbox" id="event-team-welcome-email" style="width: auto;">
-                                                <span>👋 Send Team Welcome Email</span>
-                                            </label>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                <strong>Welcome email for new team members.</strong> When enabled, team members will receive a welcome email when they join a team.
-                                                Customize the email theme and text in <strong>Email Templates</strong> under Theme section.
-                                            </small>
-                                        </div>
+                                                <div class="form-group" style="margin-top: 16px;">
+                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                        <input type="checkbox" id="event-team-welcome-email" style="width: auto;">
+                                                        <span>👋 Send Team Welcome Email</span>
+                                                    </label>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                        <strong>Welcome email for new team members.</strong> When enabled, team members will receive a welcome email when they join a team.
+                                                        Customize the email theme and text in <strong>Email Templates</strong> under Theme section.
+                                                    </small>
+                                                </div>
 
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                <input type="checkbox" id="event-interest-acknowledgment" style="width: auto;">
-                                                <span>✉️ Send Interest Acknowledgment Email</span>
-                                            </label>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                <strong>Acknowledgment email for interest leads joining a team.</strong> When enabled, members who previously registered interest will receive an acknowledgment email when they join a team.
-                                                Customize the email in <strong>Email Templates</strong> under the Interest template.
-                                            </small>
-                                        </div>
+                                                <div class="form-group" style="margin-top: 16px;">
+                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                        <input type="checkbox" id="event-interest-acknowledgment" style="width: auto;">
+                                                        <span>✉️ Send Interest Acknowledgment Email</span>
+                                                    </label>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                        <strong>Acknowledgment email for interest leads joining a team.</strong> When enabled, members who previously registered interest will receive an acknowledgment email when they join a team.
+                                                        Customize the email in <strong>Email Templates</strong> under the Interest template.
+                                                    </small>
+                                                </div>
 
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                <input type="checkbox" id="event-judge-invitation-email" style="width: auto;">
-                                                <span>⚖️ Send Judge Invitation Email</span>
-                                            </label>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                <strong>Custom invitation email for judges.</strong> When enabled, judges will receive a role-specific invitation email with customizable content.
-                                                Customize the email in <strong>Email Templates</strong> under Judge Invite.
-                                            </small>
-                                        </div>
+                                                <div class="form-group" style="margin-top: 16px;">
+                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                        <input type="checkbox" id="event-judge-invitation-email" style="width: auto;">
+                                                        <span>⚖️ Send Judge Invitation Email</span>
+                                                    </label>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                        <strong>Custom invitation email for judges.</strong> When enabled, judges will receive a role-specific invitation email with customizable content.
+                                                        Customize the email in <strong>Email Templates</strong> under Judge Invite.
+                                                    </small>
+                                                </div>
 
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                <input type="checkbox" id="event-committee-invitation-email" style="width: auto;">
-                                                <span>👔 Send Committee Invitation Email</span>
-                                            </label>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                <strong>Custom invitation email for committee members.</strong> When enabled, committee members will receive a role-specific invitation email with customizable content.
-                                                Customize the email in <strong>Email Templates</strong> under Committee Invite.
+                                                <div class="form-group" style="margin-top: 16px;">
+                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                        <input type="checkbox" id="event-committee-invitation-email" style="width: auto;">
+                                                        <span>👔 Send Committee Invitation Email</span>
+                                                    </label>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                        <strong>Custom invitation email for committee members.</strong> When enabled, committee members will receive a role-specific invitation email with customizable content.
+                                                        Customize the email in <strong>Email Templates</strong> under Committee Invite.
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </details>
+
+                                        <div class="form-group" style="margin-top: 24px;">
+                                            <h3 style="margin-bottom: 12px;">📋 Registration Confirmation Texts</h3>
+                                            <small style="color: var(--admin-text-muted); display: block; margin-bottom: 16px;">
+                                                These texts are shown to participants in a confirmation dialog <strong>before</strong> they proceed with registration. HTML is supported (e.g. <code>&lt;strong&gt;</code>, <code>&lt;ul&gt;</code>, <code>&lt;li&gt;</code>). Leave blank to skip the confirmation dialog for that action.
                                             </small>
+
+                                            <div id="team-terms-field">
+                                                <label style="font-weight: 600; margin-bottom: 4px; display: block;">👥 Team Registration</label>
+                                                <textarea id="event-team-registration-terms" rows="5" placeholder="e.g. By registering a team you commit to participating in the event. No-shows will be invoiced for the full participation fee of 16 500 NOK per person." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
+                                                <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant clicks "Register a Team".</small>
+                                            </div>
+
+                                            <div style="margin-top: 16px;" id="solo-terms-field">
+                                                <label style="font-weight: 600; margin-bottom: 4px; display: block;">🎲 Solo Queue</label>
+                                                <textarea id="event-solo-queue-terms" rows="4" placeholder="e.g. Joining the solo queue means you're open to being matched with a team or other solo participants. There is no commitment until you are matched and accept." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
+                                                <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant clicks "Join Solo Queue".</small>
+                                            </div>
+
+                                            <div style="margin-top: 16px;" id="single-terms-field">
+                                                <label style="font-weight: 600; margin-bottom: 4px; display: block;">👤 Individual Registration</label>
+                                                <textarea id="event-single-registration-terms" rows="4" placeholder="e.g. By registering individually you commit to attending the event." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
+                                                <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant registers for a solo/individual event.</small>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

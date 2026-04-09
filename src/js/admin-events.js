@@ -402,6 +402,9 @@ function showForm(event = null) {
         document.getElementById('event-interest-acknowledgment').checked = event.sendInterestAcknowledgment || false;
         document.getElementById('event-judge-invitation-email').checked = event.sendJudgeInvitationEmail || false;
         document.getElementById('event-committee-invitation-email').checked = event.sendCommitteeInvitationEmail || false;
+        document.getElementById('event-team-registration-terms').value = event.teamRegistrationTerms || '';
+        document.getElementById('event-solo-queue-terms').value = event.soloQueueTerms || '';
+        document.getElementById('event-single-registration-terms').value = event.singleRegistrationTerms || '';
         
         // Set registration type
         const regType = event.registrationType || 'team';
@@ -555,7 +558,10 @@ async function handleFormSubmit(e) {
                 .split(',')
                 .map(c => c.trim())
                 .filter(c => c.length > 0),
-            sharepointUrl: document.getElementById('event-sharepoint-url').value.trim() || null
+            sharepointUrl: document.getElementById('event-sharepoint-url').value.trim() || null,
+            teamRegistrationTerms: document.getElementById('event-team-registration-terms').value.trim() || null,
+            soloQueueTerms: document.getElementById('event-solo-queue-terms').value.trim() || null,
+            singleRegistrationTerms: document.getElementById('event-single-registration-terms').value.trim() || null,
         };
         
         // Only include team size if team type

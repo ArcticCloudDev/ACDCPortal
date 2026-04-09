@@ -2086,6 +2086,23 @@
         </div>
     </div>
 
+    <!-- Registration Terms Confirmation Modal -->
+    <div id="registration-terms-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeRegistrationTermsModal()">
+        <div class="modal-dialog" style="max-width: 540px;">
+            <div class="modal-header">
+                <h3 id="registration-terms-title">Before you continue</h3>
+                <button class="modal-close-btn" onclick="closeRegistrationTermsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="registration-terms-body" style="line-height: 1.6; color: var(--text-primary);"></div>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 16px 20px; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-ghost" onclick="closeRegistrationTermsModal()">Cancel</button>
+                <button class="btn btn-primary" id="registration-terms-confirm-btn" onclick="confirmRegistrationTerms()">I Understand — Continue</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Badge Award Modal (Exclusive badges — judges pick a team) -->
     <div id="badge-award-modal" class="hidden">
         <div class="badge-modal-backdrop" onclick="closeAwardModal()"></div>

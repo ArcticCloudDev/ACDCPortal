@@ -231,6 +231,9 @@ app.http('events-create', {
                 sendInterestAcknowledgment: body.sendInterestAcknowledgment || false,
                 sendJudgeInvitationEmail: body.sendJudgeInvitationEmail !== undefined ? body.sendJudgeInvitationEmail : true,
                 sendCommitteeInvitationEmail: body.sendCommitteeInvitationEmail !== undefined ? body.sendCommitteeInvitationEmail : true,
+                teamRegistrationTerms: body.teamRegistrationTerms || null,
+                soloQueueTerms: body.soloQueueTerms || null,
+                singleRegistrationTerms: body.singleRegistrationTerms || null,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 createdAt: new Date().toISOString()
