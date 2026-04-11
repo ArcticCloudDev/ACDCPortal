@@ -1983,7 +1983,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Solo queue modal
         const soloQueueModal = document.getElementById('solo-queue-modal');
-        document.getElementById('join-solo-btn').addEventListener('click', () => {
+        const openSoloQueueModal = () => {
             if (!isRegistrationOpen()) {
                 alert('Registration is closed for this event.');
                 return;
@@ -1994,7 +1994,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 soloQueueModal.classList.add('active');
             }
-        });
+        };
+        document.getElementById('join-solo-btn').addEventListener('click', openSoloQueueModal);
+        const interestSoloBtn = document.getElementById('interest-solo-btn');
+        if (interestSoloBtn) interestSoloBtn.addEventListener('click', openSoloQueueModal);
         
         document.getElementById('close-solo-queue').addEventListener('click', () => soloQueueModal.classList.remove('active'));
         
