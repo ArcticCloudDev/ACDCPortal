@@ -2087,18 +2087,16 @@
     </div>
 
     <!-- Registration Terms Confirmation Modal -->
-    <div id="registration-terms-modal" class="modal-overlay" onclick="if(event.target===this)closeRegistrationTermsModal()">
-        <div class="modal-dialog" style="max-width: 540px;">
+    <div id="registration-terms-modal" class="modal-overlay">
+        <div class="modal">
             <div class="modal-header">
-                <h3 id="registration-terms-title">Before you continue</h3>
-                <button class="modal-close-btn" onclick="closeRegistrationTermsModal()">&times;</button>
+                <h2 id="registration-terms-title">Before you continue</h2>
+                <button class="modal-close" onclick="closeRegistrationTermsModal()">&times;</button>
             </div>
-            <div class="modal-body">
-                <div id="registration-terms-body" style="line-height: 1.6; color: var(--text-primary);"></div>
-            </div>
-            <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 16px 20px; border-top: 1px solid var(--border-color);">
-                <button class="btn btn-ghost" onclick="closeRegistrationTermsModal()">Cancel</button>
-                <button class="btn btn-primary" id="registration-terms-confirm-btn" onclick="confirmRegistrationTerms()">I Understand — Continue</button>
+            <div id="registration-terms-body" style="line-height: 1.6; margin-bottom: 24px;"></div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="closeRegistrationTermsModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmRegistrationTerms()">I Understand — Continue</button>
             </div>
         </div>
     </div>
