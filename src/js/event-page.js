@@ -1971,12 +1971,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 alert('Registration is not open for this event.');
                 return;
             }
+            const termsDisplay = document.getElementById('team-terms-display');
             const terms = currentEvent.teamRegistrationTerms;
             if (terms) {
-                showRegistrationTermsModal('Register a Team', terms, () => createTeamModal.classList.add('active'));
+                const rendered = terms.includes('<') ? terms : terms.replace(/\n/g, '<br>');
+                termsDisplay.innerHTML = rendered;
+                termsDisplay.classList.remove('hidden');
             } else {
-                createTeamModal.classList.add('active');
+                termsDisplay.innerHTML = '';
+                termsDisplay.classList.add('hidden');
             }
+            createTeamModal.classList.add('active');
         });
         
         document.getElementById('close-create-team').addEventListener('click', () => createTeamModal.classList.remove('active'));
@@ -1988,12 +1993,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 alert('Registration is closed for this event.');
                 return;
             }
+            const termsDisplay = document.getElementById('solo-terms-display');
             const terms = currentEvent.soloQueueTerms;
             if (terms) {
-                showRegistrationTermsModal('Join Solo Queue', terms, () => soloQueueModal.classList.add('active'));
+                const rendered = terms.includes('<') ? terms : terms.replace(/\n/g, '<br>');
+                termsDisplay.innerHTML = rendered;
+                termsDisplay.classList.remove('hidden');
             } else {
-                soloQueueModal.classList.add('active');
+                termsDisplay.innerHTML = '';
+                termsDisplay.classList.add('hidden');
             }
+            soloQueueModal.classList.add('active');
         };
         document.getElementById('join-solo-btn').addEventListener('click', openSoloQueueModal);
         const interestSoloBtn = document.getElementById('interest-solo-btn');

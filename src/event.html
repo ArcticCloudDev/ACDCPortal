@@ -1810,7 +1810,9 @@
                 <h2>🏔️ Create New Team</h2>
                 <button class="modal-close" id="close-create-team">&times;</button>
             </div>
-            
+
+            <div id="team-terms-display" class="hidden" style="margin-bottom: 16px; line-height: 1.6;"></div>
+
             <form id="create-team-form">
                 <div class="form-group">
                     <label for="teamName">Team Name *</label>
@@ -1927,17 +1929,19 @@
                 <h2>🎲 Join Solo Queue</h2>
                 <button class="modal-close" id="close-solo-queue">&times;</button>
             </div>
-            
+
+            <div id="solo-terms-display" class="hidden" style="margin-bottom: 16px; line-height: 1.6;"></div>
+
             <form id="solo-queue-form">
                 <div class="form-group">
                     <label for="solo-note">Note (optional)</label>
                     <textarea id="solo-note" rows="3" placeholder="Tell us about your skills, preferences, or anything else..." maxlength="500"></textarea>
                     <span class="field-hint">E.g., "Experienced in C#, prefer backend work"</span>
                 </div>
-                
+
                 <div id="solo-queue-error" class="error-message hidden"></div>
                 <div id="solo-queue-success" class="success-message hidden"></div>
-                
+
                 <button type="submit" class="btn btn-primary" id="join-queue-btn">
                     <span class="btn-text">Join Solo Queue</span>
                     <span class="btn-loading hidden">Joining...</span>
