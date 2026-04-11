@@ -2277,7 +2277,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     function showRegistrationTermsModal(actionTitle, termsHtml, onConfirm) {
         _termsOnConfirm = onConfirm;
         document.getElementById('registration-terms-title').textContent = `Before you continue: ${actionTitle}`;
-        document.getElementById('registration-terms-body').innerHTML = termsHtml;
+        // Plain text (no HTML tags): preserve line breaks. HTML content: render as-is.
+        const rendered = termsHtml.includes('<') ? termsHtml : termsHtml.replace(/\n/g, '<br>');
+        document.getElementById('registration-terms-body').innerHTML = rendered;
         document.getElementById('registration-terms-modal').classList.add('active');
     }
 
