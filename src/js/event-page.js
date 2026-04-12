@@ -1968,17 +1968,68 @@ document.addEventListener('DOMContentLoaded', async () => {
                 alert('Registration is not open for this event.');
                 return;
             }
-            const termsDisplay = document.getElementById('team-terms-display');
+
+            // Populate participant select from event min/max settings
+            const select = document.getElementById('expectedParticipants');
+            const min = currentEvent.minTeamSize || 3;
+            const max = currentEvent.maxTeamSize || 5;
+            select.innerHTML = '<option value="">Select...</option>';
+            for (let i = min; i <= max; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = i;
+                select.appendChild(opt);
+            }
+
+            // Reset to step 1
+            document.getElementById('create-team-step-1').classList.remove('hidden');
+            document.getElementById('create-team-step-2').classList.add('hidden');
+            document.getElementById('create-team-step1-error').classList.add('hidden');
+            document.getElementById('create-team-error').classList.add('hidden');
+            document.getElementById('create-team-success').classList.add('hidden');
+            document.getElementById('create-team-ack').checked = false;
+            document.getElementById('step-indicator-1').classList.add('active');
+            document.getElementById('step-indicator-2').classList.remove('active');
+
+            createTeamModal.classList.add('active');
+        });
+
+        document.getElementById('create-team-next').addEventListener('click', () => {
+            const teamName = document.getElementById('teamName').value.trim();
+            const expectedParticipants = document.getElementById('expectedParticipants').value;
+            const errorDiv = document.getElementById('create-team-step1-error');
+            if (!teamName || !expectedParticipants) {
+                errorDiv.textContent = 'Please fill in all fields.';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            errorDiv.classList.add('hidden');
+
+            // Inject terms into step 2
+            const termsDisplay = document.getElementById('create-team-terms-display');
+            const ackLabel = document.getElementById('create-team-ack-label');
             const terms = currentEvent.teamRegistrationTerms;
             if (terms) {
                 const rendered = terms.includes('<') ? terms : terms.replace(/\n/g, '<br>');
                 termsDisplay.innerHTML = rendered;
-                termsDisplay.classList.remove('hidden');
+                termsDisplay.style.display = '';
+                ackLabel.textContent = 'I have read and agree to the terms above';
             } else {
-                termsDisplay.innerHTML = '';
-                termsDisplay.classList.add('hidden');
+                termsDisplay.style.display = 'none';
+                ackLabel.textContent = 'I confirm I want to create this team';
             }
-            createTeamModal.classList.add('active');
+
+            document.getElementById('create-team-step-1').classList.add('hidden');
+            document.getElementById('create-team-step-2').classList.remove('hidden');
+            document.getElementById('step-indicator-1').classList.remove('active');
+            document.getElementById('step-indicator-2').classList.add('active');
+        });
+
+        document.getElementById('create-team-back').addEventListener('click', () => {
+            document.getElementById('create-team-step-2').classList.add('hidden');
+            document.getElementById('create-team-step-1').classList.remove('hidden');
+            document.getElementById('step-indicator-2').classList.remove('active');
+            document.getElementById('step-indicator-1').classList.add('active');
         });
         
         document.getElementById('close-create-team').addEventListener('click', () => createTeamModal.classList.remove('active'));
@@ -2200,7 +2251,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const submitBtn = document.getElementById('create-team-submit');
         const errorDiv = document.getElementById('create-team-error');
         const successDiv = document.getElementById('create-team-success');
-        
+
+        const ackCheckbox = document.getElementById('create-team-ack');
+        if (!ackCheckbox.checked) {
+            errorDiv.textContent = 'Please acknowledge to proceed.';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
         const teamName = document.getElementById('teamName').value.trim();
         const expectedParticipants = document.getElementById('expectedParticipants').value;
         const creatorParticipates = document.querySelector('input[name="creatorParticipates"]:checked').value === 'yes';
@@ -2254,6 +2312,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('teamName').value = '';
             document.getElementById('expectedParticipants').value = '';
             document.querySelector('input[name="creatorParticipates"][value="yes"]').checked = true;
+            document.getElementById('create-team-ack').checked = false;
             
             // Reload teams and close modal
             await loadEventTeams();

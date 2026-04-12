@@ -650,6 +650,50 @@
             font-weight: 500;
             color: var(--primary-color);
         }
+
+        /* Create Team modal — step indicators */
+        .modal-step-indicators {
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        .modal-step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .modal-step .step-num {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--border-color);
+            color: #6c757d;
+            font-size: 0.85rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, color 0.2s;
+        }
+        .modal-step.active .step-num {
+            background: var(--primary-color);
+            color: #fff;
+        }
+        .modal-step .step-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+            font-weight: 500;
+        }
+        .modal-step.active .step-label {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        .modal-step-connector {
+            flex: 1;
+            height: 2px;
+            background: var(--border-color);
+            margin: 0 10px;
+        }
         
         /* Team file uploads section */
         .team-uploads {
@@ -1949,49 +1993,74 @@
                 <button class="modal-close" id="close-create-team">&times;</button>
             </div>
 
-            <div id="team-terms-display" class="hidden" style="margin-bottom: 16px; line-height: 1.6;"></div>
+            <div class="modal-step-indicators">
+                <div class="modal-step active" id="step-indicator-1">
+                    <span class="step-num">1</span>
+                    <span class="step-label">Team Details</span>
+                </div>
+                <div class="modal-step-connector"></div>
+                <div class="modal-step" id="step-indicator-2">
+                    <span class="step-num">2</span>
+                    <span class="step-label">Review &amp; Confirm</span>
+                </div>
+            </div>
 
             <form id="create-team-form">
-                <div class="form-group">
-                    <label for="teamName">Team Name *</label>
-                    <input type="text" id="teamName" name="teamName" required 
-                           placeholder="Enter team name">
+                <!-- Step 1: Team details -->
+                <div id="create-team-step-1">
+                    <div class="form-group">
+                        <label for="teamName">Team Name *</label>
+                        <input type="text" id="teamName" name="teamName" required
+                               placeholder="Enter team name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="expectedParticipants">Number of Participants *</label>
+                        <select id="expectedParticipants" name="expectedParticipants" required>
+                            <option value="">Select...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Will you participate in the event?</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="creatorParticipates" value="yes" checked>
+                                <span>Yes, I will participate</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="creatorParticipates" value="no">
+                                <span>No, I'm only the team admin</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="create-team-step1-error" class="error-message hidden"></div>
+                    <button type="button" class="btn btn-primary" id="create-team-next" style="width: 100%;">Next →</button>
                 </div>
-                
-                <div class="form-group">
-                    <label for="expectedParticipants">Expected Participants *</label>
-                    <select id="expectedParticipants" name="expectedParticipants" required>
-                        <option value="">Select...</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
-                    </select>
-                    <p class="field-hint" id="cost-hint">Maximum 5 participants per team. This determines the locked-in cost.</p>
-                </div>
-                
-                <div class="form-group">
-                    <label>Will you participate in the event?</label>
-                    <div class="radio-group">
-                        <label class="radio-label">
-                            <input type="radio" name="creatorParticipates" value="yes" checked>
-                            <span>Yes, I will participate</span>
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="creatorParticipates" value="no">
-                            <span>No, I'm only the team admin</span>
+
+                <!-- Step 2: Terms & acknowledgement -->
+                <div id="create-team-step-2" class="hidden">
+                    <div id="create-team-terms-display" style="margin-bottom: 16px; line-height: 1.6; padding: 14px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--border-radius);"></div>
+
+                    <div class="form-group">
+                        <label class="radio-label" style="border-color: var(--primary-color); background: rgba(0, 120, 212, 0.04);">
+                            <input type="checkbox" id="create-team-ack">
+                            <span id="create-team-ack-label">I acknowledge and agree to proceed</span>
                         </label>
                     </div>
+
+                    <div id="create-team-error" class="error-message hidden"></div>
+                    <div id="create-team-success" class="success-message hidden"></div>
+
+                    <div style="display: flex; gap: 12px; margin-top: 8px;">
+                        <button type="button" class="btn btn-secondary" id="create-team-back">← Back</button>
+                        <button type="submit" class="btn btn-primary" id="create-team-submit" style="flex: 1;">
+                            <span class="btn-text">Create Team</span>
+                            <span class="btn-loading hidden">Creating...</span>
+                        </button>
+                    </div>
                 </div>
-                
-                <div id="create-team-error" class="error-message hidden"></div>
-                <div id="create-team-success" class="success-message hidden"></div>
-                
-                <button type="submit" class="btn btn-primary" id="create-team-submit">
-                    <span class="btn-text">Create Team</span>
-                    <span class="btn-loading hidden">Creating...</span>
-                </button>
             </form>
         </div>
     </div>
