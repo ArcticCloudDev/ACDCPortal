@@ -929,16 +929,29 @@
             border: 2px solid #2563eb;
         }
         .role-confirmed-section.interest {
-            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-            border: 2px solid #16a34a;
+            background: linear-gradient(160deg, #f0fdf4 0%, #ffffff 60%);
+            border: 1.5px solid #86efac;
+            padding: 24px 28px 0;
+            max-width: 640px;
+            margin-left: auto;
+            margin-right: auto;
+            overflow: hidden;
         }
         .role-confirmed-section .role-icon {
             font-size: 3rem;
             margin-bottom: 16px;
         }
+        .role-confirmed-section.interest .role-icon {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
         .role-confirmed-section h2 {
             margin: 0 0 12px;
             font-size: 1.4rem;
+        }
+        .role-confirmed-section.interest h2 {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
         }
         .role-confirmed-section.judge h2 { color: #92400e; }
         .role-confirmed-section.committee h2 { color: #1e40af; }
@@ -948,6 +961,10 @@
             margin: 0 0 8px;
             line-height: 1.5;
             color: #475569;
+        }
+        .role-confirmed-section.interest p {
+            font-size: 0.88rem;
+            margin: 0 0 4px;
         }
         .role-confirmed-section .role-badge {
             display: inline-block;
@@ -970,7 +987,10 @@
         .role-confirmed-section.interest .role-badge {
             background: #dcfce7;
             color: #15803d;
-            border: 2px solid #16a34a;
+            border: 1.5px solid #4ade80;
+            font-size: 0.76rem;
+            padding: 4px 12px;
+            margin-top: 10px;
         }
         .role-confirmed-section .role-details {
             margin-top: 20px;
@@ -978,6 +998,11 @@
             border-top: 1px solid rgba(0,0,0,0.1);
             font-size: 0.9rem;
             color: #64748b;
+        }
+        .role-confirmed-section.interest .role-details {
+            margin-top: 12px;
+            padding-top: 12px;
+            font-size: 0.8rem;
         }
         .role-confirmed-section .admin-portal-link {
             display: inline-block;
@@ -1003,63 +1028,65 @@
             color: white;
         }
 
-        /* Interest upgrade actions */
+        /* Interest upgrade: flush action tiles at card bottom */
         .interest-upgrade {
-            margin-top: 28px;
-            padding-top: 24px;
-            border-top: 2px dashed #86efac;
-        }
-        .interest-upgrade .upgrade-heading {
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: #166534;
-            margin: 0 0 16px;
-        }
-        .interest-upgrade .upgrade-buttons {
-            display: flex;
-            gap: 14px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        .interest-upgrade .upgrade-btn {
-            border-radius: 12px;
-            padding: 14px 32px;
-            font-weight: 600;
-            font-size: 1rem;
-        }
-        .interest-upgrade .upgrade-hint {
-            margin-top: 12px;
-            font-size: 0.85rem;
-            color: #64748b;
+            margin: 18px -28px 0;
+            padding: 0;
+            border-top: 1px solid #d1fae5;
         }
 
-        /* Inline queue status panel inside interest card */
-        .interest-queue-panel {
+        .interest-action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .interest-action-tile {
             display: flex;
-            align-items: center;
-            gap: 14px;
-            background: rgba(22, 163, 74, 0.07);
-            border: 1.5px solid #86efac;
-            border-radius: 12px;
-            padding: 14px 18px;
-            text-align: left;
-        }
-        .iq-icon { font-size: 2rem; flex-shrink: 0; line-height: 1; }
-        .iq-body { flex: 1; min-width: 0; }
-        .iq-title { font-weight: 700; color: #15803d; font-size: 0.95rem; margin: 0 0 3px; }
-        .iq-sub { font-size: 0.82rem; color: #475569; margin: 0 0 6px; }
-        .iq-position { font-size: 0.88rem; color: #166534; margin: 0; }
-        .iq-position strong { font-size: 1.05rem; }
-        .btn-ghost-green {
+            flex-direction: column;
+            padding: 15px 20px;
             background: transparent;
-            border: 2px solid #16a34a;
-            color: #15803d;
             cursor: pointer;
-            transition: background 0.15s, color 0.15s;
+            text-decoration: none;
+            border: none;
+            text-align: left;
+            transition: background 0.15s;
+            font-family: inherit;
+            position: relative;
+            gap: 3px;
+            color: inherit;
         }
-        .btn-ghost-green:hover {
-            background: #f0fdf4;
-            color: #166534;
+        .interest-action-tile:first-child {
+            border-right: 1px solid #d1fae5;
+        }
+        .interest-action-tile:hover { background: rgba(22,163,74,0.07); }
+
+        .iat-icon  { font-size: 1.25rem; margin-bottom: 1px; }
+        .iat-label { font-weight: 700; font-size: 0.82rem; color: #15803d; }
+        .iat-hint  { font-size: 0.73rem; color: #64748b; }
+        .iat-pos   { font-size: 0.78rem; font-weight: 600; color: #166534; }
+
+        .interest-action-tile.tile-queued { background: rgba(22,163,74,0.04); cursor: default; }
+        .interest-action-tile.tile-queued:hover { background: rgba(22,163,74,0.07); }
+
+        .iat-leave {
+            position: absolute;
+            top: 11px;
+            right: 14px;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 0.71rem;
+            cursor: pointer;
+            padding: 3px 7px;
+            border-radius: 4px;
+            font-family: inherit;
+            transition: color 0.15s, background 0.15s;
+        }
+        .iat-leave:hover { color: #dc2626; background: #fef2f2; }
+
+        @media (max-width: 460px) {
+            .interest-action-grid { grid-template-columns: 1fr; }
+            .interest-action-tile:first-child { border-right: none; border-bottom: 1px solid #d1fae5; }
         }
 
         /* Hotel urgency alert for judges/committee */
@@ -1756,39 +1783,37 @@
                 <!-- Upgrade options for interest-only users -->
                 <div id="interest-upgrade-actions" class="interest-upgrade hidden">
 
-                    <!-- State A: Not yet in queue -->
+                    <!-- State A: Not in queue -->
                     <div id="upgrade-not-queued">
-                        <p class="upgrade-heading">Ready to participate?</p>
-                        <div class="upgrade-buttons">
-                            <a href="register.html?intent=team" id="upgrade-register-team-link" class="btn btn-primary btn-lg upgrade-btn upgrade-register-team-link">
-                                👥 Register a Team
+                        <div class="interest-action-grid">
+                            <a href="register.html?intent=team" class="interest-action-tile upgrade-register-team-link">
+                                <span class="iat-icon">👥</span>
+                                <span class="iat-label">Register a Team</span>
+                                <span class="iat-hint">Participate as a group</span>
                             </a>
-                            <button id="interest-solo-btn" class="btn btn-secondary btn-lg upgrade-btn">
-                                🎲 Join Solo Queue
+                            <button id="interest-solo-btn" class="interest-action-tile">
+                                <span class="iat-icon">🎲</span>
+                                <span class="iat-label">Join Solo Queue</span>
+                                <span class="iat-hint">We'll match you with others</span>
                             </button>
                         </div>
-                        <p class="upgrade-hint">No team? Join solo and we'll match you with others!</p>
                     </div>
 
-                    <!-- State B: In the solo queue -->
+                    <!-- State B: In queue -->
                     <div id="upgrade-in-queue" class="hidden">
-                        <div class="interest-queue-panel">
-                            <div class="iq-icon">🎲</div>
-                            <div class="iq-body">
-                                <p class="iq-title">You're in the Solo Queue</p>
-                                <p class="iq-sub">We'll match you with solo players or teams looking for members.</p>
-                                <p class="iq-position">Queue position: <strong id="interest-queue-position">—</strong></p>
+                        <div class="interest-action-grid">
+                            <a href="register.html?intent=team" class="interest-action-tile upgrade-register-team-link">
+                                <span class="iat-icon">👥</span>
+                                <span class="iat-label">Register a Team</span>
+                                <span class="iat-hint">Participate as a group</span>
+                            </a>
+                            <div class="interest-action-tile tile-queued">
+                                <button id="leave-queue-interest-btn" class="iat-leave">✕ Leave</button>
+                                <span class="iat-icon">🎲</span>
+                                <span class="iat-label">In Solo Queue</span>
+                                <span class="iat-pos">Position <strong id="interest-queue-position">—</strong></span>
                             </div>
                         </div>
-                        <div class="upgrade-buttons" style="margin-top: 16px;">
-                            <a href="register.html?intent=team" class="btn btn-primary upgrade-btn upgrade-register-team-link">
-                                👥 Register a Team
-                            </a>
-                            <button id="leave-queue-interest-btn" class="btn btn-ghost-green upgrade-btn">
-                                ✕ Leave Queue
-                            </button>
-                        </div>
-                        <p class="upgrade-hint">You can still register as a team while in the queue.</p>
                     </div>
 
                 </div>
