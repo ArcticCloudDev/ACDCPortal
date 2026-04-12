@@ -1956,9 +1956,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Setup modals
     function setupModals() {
-        // Helper to check if registration is open
+        // Helper to check if registration is open — must match the conditions used to show upgrade/create buttons
         const isRegistrationOpen = () => {
-            return currentEvent.status === 'registration';
+            const s = currentEvent.status;
+            return s === 'registration' || s === 'registration-open' || !!currentEvent.registrationOpen;
         };
         
         // Create team modal
