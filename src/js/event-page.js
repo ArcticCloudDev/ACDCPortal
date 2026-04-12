@@ -334,10 +334,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (eventStatus === 'registration-open' || eventStatus === 'pre-registration' || currentEvent.registrationOpen) {
                         const upgradeDiv = document.getElementById('interest-upgrade-actions');
                         if (upgradeDiv) upgradeDiv.classList.remove('hidden');
-                        // Set eventId on all register-team links in the upgrade section
-                        document.querySelectorAll('.upgrade-register-team-link').forEach(link => {
-                            link.href = `register.html?intent=team&eventId=${currentEvent.id}`;
-                        });
                     }
                 }
 
@@ -2026,6 +2022,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Leave queue button (interest card inline)
         document.getElementById('leave-queue-interest-btn')?.addEventListener('click', async () => {
             await leaveSoloQueue();
+        });
+
+        // Register a Team buttons in interest card — delegate to the same handler as the main button
+        ['upgrade-register-team-btn-a', 'upgrade-register-team-btn-b'].forEach(id => {
+            document.getElementById(id)?.addEventListener('click', () => {
+                document.getElementById('create-team-btn')?.click();
+            });
         });
         
         // Team details modal

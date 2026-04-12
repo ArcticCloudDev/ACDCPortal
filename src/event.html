@@ -1044,12 +1044,12 @@
             display: flex;
             flex-direction: column;
             padding: 15px 20px;
-            background: transparent;
+            background: #f8fafc;
             cursor: pointer;
             text-decoration: none;
             border: none;
             text-align: left;
-            transition: background 0.15s;
+            transition: background 0.15s, transform 0.1s, box-shadow 0.1s;
             font-family: inherit;
             position: relative;
             gap: 3px;
@@ -1058,10 +1058,20 @@
         .interest-action-tile:first-child {
             border-right: 1px solid #d1fae5;
         }
-        .interest-action-tile:hover { background: rgba(22,163,74,0.07); }
+        .interest-action-tile:hover:not(.tile-queued) {
+            background: #f0fdf4;
+            transform: translateY(-1px);
+            box-shadow: inset 0 -2px 0 #16a34a;
+        }
+        .iat-blue { background: #eff6ff; }
+        .iat-blue:hover { background: #dbeafe !important; box-shadow: inset 0 -2px 0 #2563eb !important; }
+        .iat-blue .iat-label { color: #1d4ed8; }
+        .iat-green { background: #f0fdf4; }
+        .iat-green:hover { background: #dcfce7 !important; box-shadow: inset 0 -2px 0 #16a34a !important; }
+        .iat-green .iat-label { color: #15803d; }
 
         .iat-icon  { font-size: 1.25rem; margin-bottom: 1px; }
-        .iat-label { font-weight: 700; font-size: 0.82rem; color: #15803d; }
+        .iat-label { font-weight: 700; font-size: 0.82rem; }
         .iat-hint  { font-size: 0.73rem; color: #64748b; }
         .iat-pos   { font-size: 0.78rem; font-weight: 600; color: #166534; }
 
@@ -1786,12 +1796,12 @@
                     <!-- State A: Not in queue -->
                     <div id="upgrade-not-queued">
                         <div class="interest-action-grid">
-                            <a href="register.html?intent=team" class="interest-action-tile upgrade-register-team-link">
+                            <button id="upgrade-register-team-btn-a" class="interest-action-tile iat-blue">
                                 <span class="iat-icon">👥</span>
                                 <span class="iat-label">Register a Team</span>
                                 <span class="iat-hint">Participate as a group</span>
-                            </a>
-                            <button id="interest-solo-btn" class="interest-action-tile">
+                            </button>
+                            <button id="interest-solo-btn" class="interest-action-tile iat-green">
                                 <span class="iat-icon">🎲</span>
                                 <span class="iat-label">Join Solo Queue</span>
                                 <span class="iat-hint">We'll match you with others</span>
@@ -1802,11 +1812,11 @@
                     <!-- State B: In queue -->
                     <div id="upgrade-in-queue" class="hidden">
                         <div class="interest-action-grid">
-                            <a href="register.html?intent=team" class="interest-action-tile upgrade-register-team-link">
+                            <button id="upgrade-register-team-btn-b" class="interest-action-tile iat-blue">
                                 <span class="iat-icon">👥</span>
                                 <span class="iat-label">Register a Team</span>
                                 <span class="iat-hint">Participate as a group</span>
-                            </a>
+                            </button>
                             <div class="interest-action-tile tile-queued">
                                 <button id="leave-queue-interest-btn" class="iat-leave">✕ Leave</button>
                                 <span class="iat-icon">🎲</span>
