@@ -971,6 +971,7 @@ async function removeRegisteredMember(participationId, name, role) {
 
 // ===== Interest Leads Management =====
 let allLeads = [];
+let allSoloQueueForEvent = [];
 
 async function loadInterestLeads() {
     if (!currentEventId) {
@@ -986,7 +987,7 @@ async function loadInterestLeads() {
         const data = await response.json();
         allLeads = data.leads || [];
 
-        // Ensure participations, users, and teams are loaded so we can show conversion status
+        // Ensure participations, users, teams and solo queue are loaded
         const loaders = [];
         if (allParticipations.length === 0) loaders.push(API.participations.list().then(r => { allParticipations = r; }));
         if (allUsers.length === 0) loaders.push(API.users.list().then(r => { allUsers = r; }));
@@ -994,6 +995,13 @@ async function loadInterestLeads() {
             fetch(`${CONFIG.api.baseUrl}/teams`).then(r => r.json()).then(teams => {
                 allTeams = (Array.isArray(teams) ? teams : (teams.teams || [])).filter(t => t.eventId === currentEventId);
             })
+        );
+        // Always refresh solo queue so it's up to date
+        loaders.push(
+            fetch(`${CONFIG.api.baseUrl}/solo-queue?eventId=${currentEventId}`)
+                .then(r => r.json())
+                .then(entries => { allSoloQueueForEvent = Array.isArray(entries) ? entries : []; })
+                .catch(() => { allSoloQueueForEvent = []; })
         );
         if (loaders.length > 0) await Promise.all(loaders);
 
@@ -1014,13 +1022,15 @@ function renderLeadsTable() {
     }
 
     tbody.innerHTML = allLeads.map(lead => {
-        // Detect if this lead has been converted to a participant
         const matchedUser = allUsers.find(u => u.email.toLowerCase() === lead.email.toLowerCase());
-
-        // Use profile name if the lead was submitted without one
         const displayFirst = lead.firstName || matchedUser?.firstName || '';
         const displayLast = lead.lastName || matchedUser?.lastName || '';
-        let convertedCell = '<span style="color: var(--admin-text-muted); font-size: 0.85rem;">—</span>';
+
+        // Determine status: Converted > In Queue > Interest
+        let statusCell;
+        let isConverted = false;
+        let convertedDetail = '';
+
         if (matchedUser) {
             const participation = allParticipations.find(p =>
                 p.userId === matchedUser.id && p.eventId === currentEventId
@@ -1028,21 +1038,33 @@ function renderLeadsTable() {
             if (participation) {
                 const roles = participation.roles || [];
                 const teamMembership = (participation.teamMemberships || []).find(m => m.isParticipant);
-                const isConverted = roles.includes('committee') || roles.includes('judge') || !!teamMembership;
+                isConverted = roles.includes('committee') || roles.includes('judge') || !!teamMembership;
 
                 if (isConverted) {
                     const team = teamMembership ? allTeams.find(t => t.id === teamMembership.teamId) : null;
-                    const teamName = team ? (team.teamName || team.name || 'Unknown Team') : null;
-
+                    const teamName = team ? (team.teamName || team.name || '') : '';
                     let roleLabel = 'Participant';
                     if (roles.includes('committee')) roleLabel = 'Committee';
                     else if (roles.includes('judge')) roleLabel = 'Judge';
-
-                    convertedCell = teamName
-                        ? `<span style="color: var(--admin-success); font-weight: 500;">✅ ${roleLabel}</span><br><small style="color: var(--admin-text-muted);">${escapeHtml(teamName)}</small>`
-                        : `<span style="color: var(--admin-success); font-weight: 500;">✅ ${roleLabel}</span>`;
+                    convertedDetail = teamName ? `<br><small style="color:var(--admin-text-muted);">${escapeHtml(teamName)}</small>` : '';
+                    statusCell = `<span class="lead-status-pill status-converted">✅ ${roleLabel}</span>${convertedDetail}`;
                 }
             }
+
+            if (!isConverted) {
+                // Check solo queue
+                const inQueue = allSoloQueueForEvent.find(q => q.userId === matchedUser.id);
+                if (inQueue) {
+                    const pos = allSoloQueueForEvent
+                        .sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt))
+                        .findIndex(q => q.userId === matchedUser.id) + 1;
+                    statusCell = `<span class="lead-status-pill status-queued">🎲 In Queue</span><br><small style="color:var(--admin-text-muted);">Position ${pos} of ${allSoloQueueForEvent.length}</small>`;
+                }
+            }
+        }
+
+        if (!statusCell) {
+            statusCell = `<span class="lead-status-pill status-interest">🔔 Interest</span>`;
         }
 
         return `
@@ -1050,7 +1072,7 @@ function renderLeadsTable() {
             <td><strong>${escapeHtml(displayFirst)} ${escapeHtml(displayLast)}</strong></td>
             <td>${escapeHtml(lead.email)}</td>
             <td>${new Date(lead.verifiedAt || lead.createdAt).toLocaleDateString()}</td>
-            <td>${convertedCell}</td>
+            <td>${statusCell}</td>
             <td>
                 <button class="btn-sm" onclick="restartSequence('${lead.id}')">🔄 Restart Sequence</button>
                 <button class="btn-sm danger" onclick="deleteLead('${lead.id}')">🗑️</button>
