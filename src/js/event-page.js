@@ -334,9 +334,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (eventStatus === 'registration-open' || eventStatus === 'pre-registration' || currentEvent.registrationOpen) {
                         const upgradeDiv = document.getElementById('interest-upgrade-actions');
                         if (upgradeDiv) upgradeDiv.classList.remove('hidden');
-                        // Set eventId on the register team link
-                        const upgradeLink = document.getElementById('upgrade-register-team-link');
-                        if (upgradeLink) upgradeLink.href = `register.html?intent=team&eventId=${currentEvent.id}`;
+                        // Set eventId on all register-team links in the upgrade section
+                        document.querySelectorAll('.upgrade-register-team-link').forEach(link => {
+                            link.href = `register.html?intent=team&eventId=${currentEvent.id}`;
+                        });
                     }
                 }
 
@@ -2017,8 +2018,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             await joinSoloQueue();
         });
         
-        // Leave queue button
+        // Leave queue button (teams tab)
         document.getElementById('leave-queue-btn').addEventListener('click', async () => {
+            await leaveSoloQueue();
+        });
+
+        // Leave queue button (interest card inline)
+        document.getElementById('leave-queue-interest-btn')?.addEventListener('click', async () => {
             await leaveSoloQueue();
         });
         
@@ -2106,15 +2112,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     function showSoloQueueStatus(position, total) {
-        document.getElementById('solo-queue-status').classList.remove('hidden');
-        document.getElementById('queue-position').textContent = `${position} of ${total}`;
-        // Hide the join solo button when in queue
-        document.getElementById('join-solo-btn').classList.add('hidden');
+        const roleSection = document.getElementById('role-confirmed-section');
+        const isInterestUser = roleSection && roleSection.classList.contains('interest');
+
+        if (isInterestUser) {
+            document.getElementById('upgrade-not-queued').classList.add('hidden');
+            document.getElementById('upgrade-in-queue').classList.remove('hidden');
+            document.getElementById('interest-queue-position').textContent = `${position} of ${total}`;
+            document.getElementById('solo-queue-status').classList.add('hidden');
+        } else {
+            document.getElementById('solo-queue-status').classList.remove('hidden');
+            document.getElementById('queue-position').textContent = `${position} of ${total}`;
+            document.getElementById('join-solo-btn').classList.add('hidden');
+        }
     }
     
     function hideSoloQueueStatus() {
-        document.getElementById('solo-queue-status').classList.add('hidden');
-        document.getElementById('join-solo-btn').classList.remove('hidden');
+        const roleSection = document.getElementById('role-confirmed-section');
+        const isInterestUser = roleSection && roleSection.classList.contains('interest');
+
+        if (isInterestUser) {
+            document.getElementById('upgrade-not-queued').classList.remove('hidden');
+            document.getElementById('upgrade-in-queue').classList.add('hidden');
+        } else {
+            document.getElementById('solo-queue-status').classList.add('hidden');
+            document.getElementById('join-solo-btn').classList.remove('hidden');
+        }
     }
     
     // Join solo queue

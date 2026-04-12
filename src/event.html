@@ -1033,6 +1033,35 @@
             color: #64748b;
         }
 
+        /* Inline queue status panel inside interest card */
+        .interest-queue-panel {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: rgba(22, 163, 74, 0.07);
+            border: 1.5px solid #86efac;
+            border-radius: 12px;
+            padding: 14px 18px;
+            text-align: left;
+        }
+        .iq-icon { font-size: 2rem; flex-shrink: 0; line-height: 1; }
+        .iq-body { flex: 1; min-width: 0; }
+        .iq-title { font-weight: 700; color: #15803d; font-size: 0.95rem; margin: 0 0 3px; }
+        .iq-sub { font-size: 0.82rem; color: #475569; margin: 0 0 6px; }
+        .iq-position { font-size: 0.88rem; color: #166534; margin: 0; }
+        .iq-position strong { font-size: 1.05rem; }
+        .btn-ghost-green {
+            background: transparent;
+            border: 2px solid #16a34a;
+            color: #15803d;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .btn-ghost-green:hover {
+            background: #f0fdf4;
+            color: #166534;
+        }
+
         /* Hotel urgency alert for judges/committee */
         .hotel-urgency-alert {
             margin-top: 20px;
@@ -1726,16 +1755,42 @@
 
                 <!-- Upgrade options for interest-only users -->
                 <div id="interest-upgrade-actions" class="interest-upgrade hidden">
-                    <p class="upgrade-heading">Ready to participate?</p>
-                    <div class="upgrade-buttons">
-                        <a href="register.html?intent=team" id="upgrade-register-team-link" class="btn btn-primary btn-lg upgrade-btn">
-                            👥 Register a Team
-                        </a>
-                        <button id="interest-solo-btn" class="btn btn-secondary btn-lg upgrade-btn">
-                            🎲 Join Solo Queue
-                        </button>
+
+                    <!-- State A: Not yet in queue -->
+                    <div id="upgrade-not-queued">
+                        <p class="upgrade-heading">Ready to participate?</p>
+                        <div class="upgrade-buttons">
+                            <a href="register.html?intent=team" id="upgrade-register-team-link" class="btn btn-primary btn-lg upgrade-btn upgrade-register-team-link">
+                                👥 Register a Team
+                            </a>
+                            <button id="interest-solo-btn" class="btn btn-secondary btn-lg upgrade-btn">
+                                🎲 Join Solo Queue
+                            </button>
+                        </div>
+                        <p class="upgrade-hint">No team? Join solo and we'll match you with others!</p>
                     </div>
-                    <p class="upgrade-hint">No team? Join solo and we'll match you with others!</p>
+
+                    <!-- State B: In the solo queue -->
+                    <div id="upgrade-in-queue" class="hidden">
+                        <div class="interest-queue-panel">
+                            <div class="iq-icon">🎲</div>
+                            <div class="iq-body">
+                                <p class="iq-title">You're in the Solo Queue</p>
+                                <p class="iq-sub">We'll match you with solo players or teams looking for members.</p>
+                                <p class="iq-position">Queue position: <strong id="interest-queue-position">—</strong></p>
+                            </div>
+                        </div>
+                        <div class="upgrade-buttons" style="margin-top: 16px;">
+                            <a href="register.html?intent=team" class="btn btn-primary upgrade-btn upgrade-register-team-link">
+                                👥 Register a Team
+                            </a>
+                            <button id="leave-queue-interest-btn" class="btn btn-ghost-green upgrade-btn">
+                                ✕ Leave Queue
+                            </button>
+                        </div>
+                        <p class="upgrade-hint">You can still register as a team while in the queue.</p>
+                    </div>
+
                 </div>
 
                 <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
