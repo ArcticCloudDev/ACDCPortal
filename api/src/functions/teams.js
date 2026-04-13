@@ -120,44 +120,46 @@ app.http('teams-create', {
             
             // Generate team ID
             const teamId = uuidv4();
-            
+
             // Get active event ID
             const eventId = teamData.eventId || await getActiveEventId();
-            
+
+            // Extract adminEmail separately — not a DB column, used only for email sending
+            const adminEmail = teamData.adminEmail;
+
             const newTeam = {
                 id: teamId,
                 eventId: eventId,
                 teamName: teamData.teamName,
-                committedParticipants: teamData.committedParticipants,
-                adminEmail: teamData.adminEmail,
+                numberOfParticipants: teamData.committedParticipants,
                 adminUserId: teamData.adminUserId,
                 createdAt: new Date().toISOString()
             };
-            
+
             // Save team
             const savedTeam = await Storage.teams.create(newTeam);
-            
+
             // Send registration confirmation email to team admin (async, don't wait)
-            if (newTeam.adminEmail && newTeam.eventId) {
-                sendTeamRegistrationEmail(newTeam.adminEmail, newTeam.eventId, newTeam.teamName, newTeam.committedParticipants, context)
+            if (adminEmail && newTeam.eventId) {
+                sendTeamRegistrationEmail(adminEmail, newTeam.eventId, newTeam.teamName, newTeam.numberOfParticipants, context)
                     .then(result => {
                         if (result.success) {
-                            context.log(`Team registration email sent to ${newTeam.adminEmail}`);
+                            context.log(`Team registration email sent to ${adminEmail}`);
                         }
                     })
                     .catch(error => {
-                        context.error(`Failed to send team registration email to ${newTeam.adminEmail}:`, error);
+                        context.error(`Failed to send team registration email to ${adminEmail}:`, error);
                     });
 
                 // Send interest acknowledgment email if member was a verified interest lead
-                sendInterestAcknowledgmentEmail(newTeam.adminEmail, newTeam.eventId, context)
+                sendInterestAcknowledgmentEmail(adminEmail, newTeam.eventId, context)
                     .then(result => {
                         if (result.success) {
-                            context.log(`Interest acknowledgment email sent to ${newTeam.adminEmail}`);
+                            context.log(`Interest acknowledgment email sent to ${adminEmail}`);
                         }
                     })
                     .catch(error => {
-                        context.error(`Failed to send interest acknowledgment email to ${newTeam.adminEmail}:`, error);
+                        context.error(`Failed to send interest acknowledgment email to ${adminEmail}:`, error);
                     });
             }
             
