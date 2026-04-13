@@ -9,6 +9,7 @@ const { sendTeamRegistrationEmail } = require('../shared/team-registration');
 const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 
 const eventsStorage = new GenericStorage('events');
+const soloQueueStorage = new GenericStorage('solo-queue');
 
 // Helper to check if event status means it's active (visible to public)
 function isActiveStatus(status) {
@@ -163,6 +164,20 @@ app.http('teams-create', {
                     });
             }
             
+            // Auto-remove creator from solo queue for this event (if they were in it)
+            if (teamData.adminUserId && newTeam.eventId) {
+                try {
+                    const queue = await soloQueueStorage.getAll();
+                    const entry = queue.find(q => q.userId === teamData.adminUserId && q.eventId === newTeam.eventId);
+                    if (entry) {
+                        await soloQueueStorage.delete(entry.id);
+                        context.log(`Removed ${teamData.adminUserId} from solo queue after team creation`);
+                    }
+                } catch (e) {
+                    context.log(`Warning: could not remove user from solo queue: ${e.message}`);
+                }
+            }
+
             context.log(`Team created: ${newTeam.teamName}`);
             return {
                 status: 201,
