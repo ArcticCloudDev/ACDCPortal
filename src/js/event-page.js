@@ -2308,21 +2308,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             successDiv.textContent = 'Team created successfully!';
             successDiv.classList.remove('hidden');
-            
-            // Reset form
-            document.getElementById('teamName').value = '';
-            document.getElementById('expectedParticipants').value = '';
-            document.querySelector('input[name="creatorParticipates"][value="yes"]').checked = true;
-            document.getElementById('create-team-ack').checked = false;
-            
-            // Reload teams and close modal
-            await loadEventTeams();
-            await renderTeams();
-            renderBadgesSection();
-            
+
+            // Reload page so role section + team view update correctly
             setTimeout(() => {
-                document.getElementById('create-team-modal').classList.remove('active');
-            }, 1500);
+                location.reload();
+            }, 1200);
             
         } catch (error) {
             errorDiv.textContent = error.message || 'Could not create team.';
