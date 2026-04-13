@@ -2170,6 +2170,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const roleSection = document.getElementById('role-confirmed-section');
         const isInterestUser = roleSection && roleSection.classList.contains('interest');
 
+        // If user has a team, never show the queue card
+        const hasTeam = currentParticipation?.teamId ||
+            (Array.isArray(currentParticipation?.teamMemberships) && currentParticipation.teamMemberships.length > 0);
+        if (hasTeam) return;
+
         if (isInterestUser) {
             document.getElementById('upgrade-not-queued').classList.add('hidden');
             document.getElementById('upgrade-in-queue').classList.remove('hidden');
