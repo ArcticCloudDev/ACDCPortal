@@ -1132,21 +1132,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const hotelTabBtn = document.getElementById('tab-hotel-btn');
             if (currentEvent.hotelEnabled) {
                 hotelTabBtn.classList.remove('hidden');
-                // Build hotel calendar from event data
-                buildHotelCalendar();
-                // Populate hotel nights from participation data
-                const hotelNights = participation?.hotelNights || {};
-                const defaultNights = currentEvent.hotelDefaultNights || [];
-                document.querySelectorAll('.hotel-calendar input[type="checkbox"]').forEach(cb => {
-                    const nightId = cb.dataset.nightId;
-                    // Check if this night is in saved data, otherwise use default
-                    if (hotelNights[nightId] !== undefined) {
-                        cb.checked = hotelNights[nightId];
-                    } else {
-                        cb.checked = defaultNights.includes(nightId);
-                    }
-                });
-                updateHotelNightsCount();
+                // Build hotel calendar with saved nights pre-applied
+                buildHotelCalendar(participation?.hotelNights || {});
             } else {
                 hotelTabBtn.classList.add('hidden');
             }
@@ -1228,18 +1215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Build hotel calendar and populate
         if (currentEvent.hotelEnabled) {
-            buildHotelCalendar();
-            const hotelNights = currentParticipation?.hotelNights || {};
-            const defaultNights = currentEvent.hotelDefaultNights || [];
-            document.querySelectorAll('.hotel-calendar input[type="checkbox"]').forEach(cb => {
-                const nightId = cb.dataset.nightId;
-                if (hotelNights[nightId] !== undefined) {
-                    cb.checked = hotelNights[nightId];
-                } else {
-                    cb.checked = defaultNights.includes(nightId);
-                }
-            });
-            updateHotelNightsCount();
+            buildHotelCalendar(currentParticipation?.hotelNights || {});
         }
         
         // Clear any old messages
@@ -1508,25 +1484,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Build hotel calendar from event start/end dates
-    function buildHotelCalendar() {
+    // Build hotel calendar.
+    // savedNights: hotelNights object from participation (may be all-false for new/old records).
+    // Falls back to event defaults when no nights are saved.
+    function buildHotelCalendar(savedNights = {}) {
         const container = document.getElementById('hotel-calendar-container');
 
-        if (!currentEvent.startDate || !currentEvent.endDate) {
+        // Prefer the pre-computed hotelDates array (includes configured days before/after event).
+        // Fall back to computing on the fly if the API didn't return child table data.
+        let hotelDays = (currentEvent.hotelDates && currentEvent.hotelDates.length > 0)
+            ? currentEvent.hotelDates
+            : computeHotelDates(currentEvent.startDate, currentEvent.endDate);
+
+        if (!hotelDays || hotelDays.length === 0) {
             container.innerHTML = '<p class="text-muted">No event dates configured.</p>';
             return;
         }
 
-        // Always compute fresh from event dates — never trust stored hotelDates
-        const hotelDates = computeHotelDates(currentEvent.startDate, currentEvent.endDate);
-
         const defaultNights = currentEvent.hotelDefaultNights || [];
         const isMandatory = currentEvent.hotelMandatory || false;
-        // Admins (portal admin or committee) can still edit even when mandatory
         const isAdmin = currentUser?.isPortalAdmin || (currentParticipation?.roles || []).includes('committee');
 
-        let html = '';
+        // If no nights have been saved yet (all false), seed from event defaults.
+        const hasAnySaved = Object.values(savedNights).some(v => v === true);
 
-        hotelDates.forEach((dateInfo, index) => {
+        let html = '';
+        hotelDays.forEach((dateInfo, index) => {
             const date = new Date(dateInfo.date + 'T12:00:00');
             const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -1537,17 +1520,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             `;
 
-            if (index < hotelDates.length - 1) {
-                const nextDate = hotelDates[index + 1];
+            if (index < hotelDays.length - 1) {
+                const nextDate = hotelDays[index + 1];
                 const nightId = `${dateInfo.dayLabel.toLowerCase()}-${nextDate.dayLabel.toLowerCase()}`;
                 const isDefaultNight = defaultNights.includes(nightId);
                 const isLocked = isMandatory && isDefaultNight && !isAdmin;
 
+                // Determine initial checked state:
+                //  - locked (mandatory) nights → always on
+                //  - nights explicitly saved as true → on
+                //  - no nights saved yet → default nights are on as starting point
+                const isChecked = isLocked
+                    || (savedNights[nightId] === true)
+                    || (!hasAnySaved && isDefaultNight);
+
                 html += `
                     <div class="hotel-night">
-                        <input type="checkbox" id="edit-hotel-${nightId}" data-night-id="${nightId}"${isLocked ? ' disabled title="Mandatory night — cannot be changed"' : ''}>
-                        <label for="edit-hotel-${nightId}" class="night-checkbox${isLocked ? ' night-locked' : ''}">
-                            <span class="night-icon">${isLocked ? '🔒' : '🌙'}</span>
+                        <input type="checkbox" id="edit-hotel-${nightId}" data-night-id="${nightId}"
+                               ${isChecked ? 'checked' : ''}
+                               ${isLocked ? ' disabled title="Mandatory night — cannot be changed"' : ''}>
+                        <label for="edit-hotel-${nightId}" class="night-checkbox">
+                            <span class="night-icon">🌙</span>
+                            ${isLocked ? '<span class="lock-badge">🔒</span>' : ''}
                         </label>
                     </div>
                 `;
@@ -1559,6 +1553,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
             cb.addEventListener('change', updateHotelNightsCount);
         });
+
+        updateHotelNightsCount();
     }
     
     // Update hotel nights count display

@@ -458,7 +458,7 @@
             align-items: center;
             justify-content: center;
             gap: 0;
-            padding: 15px 5px;
+            padding: 20px 10px;
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             border-radius: var(--border-radius);
             margin-bottom: 20px;
@@ -469,14 +469,14 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 8px 4px;
-            min-width: 40px;
+            padding: 8px 6px;
+            min-width: 48px;
             flex-shrink: 0;
         }
         
         .day-label {
-            font-weight: 600;
-            font-size: 0.8rem;
+            font-weight: 700;
+            font-size: 0.85rem;
             color: var(--text-color);
         }
         
@@ -484,6 +484,7 @@
             font-size: 0.7rem;
             color: var(--text-muted);
             margin-top: 2px;
+            white-space: nowrap;
         }
         
         .hotel-night {
@@ -491,45 +492,121 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            position: relative;
         }
         
         .hotel-night input[type="checkbox"] {
             display: none;
         }
         
+        /* Connecting arm: left side of the circle */
+        .night-checkbox::before {
+            content: '';
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 14px;
+            height: 5px;
+            background: #ced4da;
+            border-radius: 3px 0 0 3px;
+            transition: background 0.2s;
+        }
+        
+        /* Connecting arm: right side of the circle */
+        .night-checkbox::after {
+            content: '';
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 14px;
+            height: 5px;
+            background: #ced4da;
+            border-radius: 0 3px 3px 0;
+            transition: background 0.2s;
+        }
+        
         .night-checkbox {
-            width: 32px;
-            height: 32px;
-            border: 2px dashed #adb5bd;
+            position: relative;
+            width: 44px;
+            height: 44px;
+            border: 2.5px dashed #ced4da;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition: all 0.2s;
-            background: white;
+            background: #fff;
+            flex-shrink: 0;
         }
         
         .night-checkbox:hover {
-            border-color: var(--primary-color);
-            transform: scale(1.05);
+            border-color: #1976d2;
+            border-style: solid;
+            transform: scale(1.08);
         }
         
         .night-icon {
-            font-size: 0.85rem;
-            opacity: 0.3;
+            font-size: 1.1rem;
+            opacity: 0.2;
             transition: all 0.2s;
+            position: relative;
+            z-index: 1;
         }
         
+        /* Lock badge that overlays the bottom-right corner of the circle */
+        .lock-badge {
+            position: absolute;
+            bottom: -4px;
+            right: -4px;
+            font-size: 0.6rem;
+            line-height: 1;
+            background: #fff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            z-index: 2;
+        }
+        
+        /* ── CHECKED state: solid blue circle, bright icon, blue arms ── */
         .hotel-night input[type="checkbox"]:checked + .night-checkbox {
             background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
-            border: 2px solid #1565c0;
-            box-shadow: 0 2px 6px rgba(25, 118, 210, 0.4);
+            border: 2.5px solid #1565c0;
+            box-shadow: 0 3px 10px rgba(25, 118, 210, 0.45);
         }
         
         .hotel-night input[type="checkbox"]:checked + .night-checkbox .night-icon {
             opacity: 1;
             filter: brightness(0) invert(1);
+        }
+        
+        .hotel-night input[type="checkbox"]:checked + .night-checkbox::before,
+        .hotel-night input[type="checkbox"]:checked + .night-checkbox::after {
+            background: #1976d2;
+        }
+        
+        /* ── LOCKED (disabled + mandatory) state: same blue as checked ── */
+        .hotel-night input[type="checkbox"]:disabled + .night-checkbox {
+            background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+            border: 2.5px solid #1565c0;
+            box-shadow: 0 3px 10px rgba(25, 118, 210, 0.35);
+            cursor: not-allowed;
+        }
+        
+        .hotel-night input[type="checkbox"]:disabled + .night-checkbox .night-icon {
+            opacity: 1;
+            filter: brightness(0) invert(1);
+        }
+        
+        .hotel-night input[type="checkbox"]:disabled + .night-checkbox::before,
+        .hotel-night input[type="checkbox"]:disabled + .night-checkbox::after {
+            background: #1976d2;
         }
         
         .hotel-summary {
