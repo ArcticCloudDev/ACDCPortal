@@ -15,6 +15,11 @@ dist/
 .vscode/settings.json
 *.swp
 
+# Temporary / backup files
+*.bak
+debug-*.html
+temp-*.json
+
 # OS files
 .DS_Store
 Thumbs.db
