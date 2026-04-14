@@ -1,7 +1,8 @@
 // ACDC Portal - Events API
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { Storage } = require('../shared/storage');
+const StorageModule = require('../shared/storage');
+const { Storage } = StorageModule;
 
 const eventsStorage = new Storage('events');
 const teamsStorage = new Storage('teams');
@@ -146,7 +147,7 @@ app.http('events-active', {
     }
 });
 
-// GET /api/events/:id - Get event by ID
+// GET /api/events/:id - Get event by ID (loads child tables incl. hotelDefaultNights)
 app.http('events-get', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -154,8 +155,7 @@ app.http('events-get', {
     handler: async (request, context) => {
         try {
             const id = request.params.id;
-            const events = await eventsStorage.getAll();
-            const event = events.find(e => e.id === id);
+            const event = await StorageModule.events.getById(id);
             
             if (!event) {
                 return {
