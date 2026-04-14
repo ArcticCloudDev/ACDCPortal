@@ -3,7 +3,7 @@
 // Flow B (new user, sign-in):  Email → Profile Form (name/phone) → reCAPTCHA → Send OTP → Verify → Complete → redirect
 // Flow C (new user, team):     Email → Full Form (profile + team) → reCAPTCHA → Send OTP → Verify → Complete → Success
 // Flow D (interest):           Same as A or B, but after auth → record interest for eventId → interest success
-// No external auth provider � everything happens on this page
+// No external auth provider � everything happens on this page
 
 const RECAPTCHA_SITE_KEY = '6Lc7aKwsAAAAAA5DkTtC2lFIF5eAGVTHpQAkZFep';
 
@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const stepForm = document.getElementById('step-form');
     const stepOtp = document.getElementById('step-otp');
     const stepCompleting = document.getElementById('step-completing');
+    const stepHotel = document.getElementById('step-hotel');
     const stepSuccess = document.getElementById('step-success');
 
     const emailCheckForm = document.getElementById('email-check-form');
@@ -139,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showStep('email');
     });
 
-    // --- Step 2: Registration Form submission (register flow � profile or team) ---
+    // --- Step 2: Registration Form submission (register flow � profile or team) ---
     registrationForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -240,7 +241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const isLoginFlow = flowMode === 'login' || flowMode === 'interest-login';
             const emailToVerify = isLoginFlow ? currentEmail : pendingFormData.email;
 
-            // Verify the OTP code � returns JWT + user data
+            // Verify the OTP code � returns JWT + user data
             const verifyResult = await API.auth.verifyOtp(emailToVerify, code);
 
             if (!verifyResult.success) {
@@ -276,9 +277,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // New user + interest: registration done, now record interest
                     await recordInterestAndShow();
                 } else if (flowMode === 'register-team') {
-                    // Team registration: redirect to event page
+                    // Team registration: check if hotel step is needed
                     const targetEventId = completeResult.eventId || eventId;
-                    if (targetEventId) {
+                    if (targetEventId && completeResult.isParticipant) {
+                        // Fetch event to check hotel config
+                        let eventData = null;
+                        try { eventData = await API.events.get(targetEventId); } catch (e) { /* skip hotel step if fetch fails */ }
+                        if (eventData && eventData.hotelEnabled) {
+                            // Fetch participation to get participationId
+                            let participation = null;
+                            try { participation = await API.participations.get(completeResult.userId, targetEventId); } catch (e) { /* skip */ }
+                            if (participation && participation.id) {
+                                showHotelStep(eventData, participation.id, targetEventId);
+                            } else {
+                                window.location.href = `/event.html?id=${targetEventId}`;
+                            }
+                        } else {
+                            window.location.href = `/event.html?id=${targetEventId}`;
+                        }
+                    } else if (targetEventId) {
                         window.location.href = `/event.html?id=${targetEventId}`;
                     } else {
                         // Fallback: show success page if no eventId
@@ -341,6 +358,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         stepForm.classList.add('hidden');
         stepOtp.classList.add('hidden');
         stepCompleting.classList.add('hidden');
+        stepHotel.classList.add('hidden');
         stepSuccess.classList.add('hidden');
 
         // Welcome-back banner (login flow only)
@@ -441,12 +459,117 @@ document.addEventListener('DOMContentLoaded', async () => {
                 stepCompleting.classList.remove('hidden');
                 break;
 
+            case 'hotel':
+                if (flowMode === 'register-team') updateProgress(4);
+                stepHotel.classList.remove('hidden');
+                break;
+
             case 'success':
                 updateProgress(4);
                 stepSuccess.classList.remove('hidden');
                 break;
         }
     }
+
+    // --- Hotel Step Builder (post-team-registration) ---
+    function showHotelStep(event, participationId, targetEventId) {
+        // Hide all other steps
+        stepEmail.classList.add('hidden');
+        stepForm.classList.add('hidden');
+        stepOtp.classList.add('hidden');
+        stepCompleting.classList.add('hidden');
+        stepSuccess.classList.add('hidden');
+
+        // Build hotel night calendar in the container
+        const container = document.getElementById('hotel-nights-container');
+        const defaultNights = event.hotelDefaultNights || [];
+        const isMandatory = event.hotelMandatory || false;
+
+        // Compute hotel dates: 1 day before event start through 1 day after event end
+        const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const hotelDates = [];
+        const startD = new Date(event.startDate + 'T12:00:00');
+        const endD = new Date(event.endDate + 'T12:00:00');
+        startD.setDate(startD.getDate() - 1);
+        endD.setDate(endD.getDate() + 1);
+        const cur = new Date(startD);
+        while (cur <= endD) {
+            hotelDates.push({ date: cur.toISOString().split('T')[0], dayLabel: dayLabels[cur.getDay()] });
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        // Check if any optional nights exist (nights not in defaultNights)
+        const optionalNights = [];
+        hotelDates.forEach((d, i) => {
+            if (i < hotelDates.length - 1) {
+                const nightId = `${d.dayLabel.toLowerCase()}-${hotelDates[i + 1].dayLabel.toLowerCase()}`;
+                if (!defaultNights.includes(nightId)) optionalNights.push(nightId);
+            }
+        });
+        if (optionalNights.length > 0) {
+            document.getElementById('hotel-optional-notice').classList.remove('hidden');
+        }
+
+        // Build calendar HTML
+        let html = '<div class="hotel-calendar" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">';
+        hotelDates.forEach((dateInfo, index) => {
+            const date = new Date(dateInfo.date + 'T12:00:00');
+            const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            html += `<div class="hotel-day" style="text-align:center;min-width:48px;"><div class="day-label" style="font-size:0.75rem;color:var(--text-muted);">${dateInfo.dayLabel}</div><div class="day-date" style="font-size:0.85rem;">${monthDay}</div></div>`;
+            if (index < hotelDates.length - 1) {
+                const nextDate = hotelDates[index + 1];
+                const nightId = `${dateInfo.dayLabel.toLowerCase()}-${nextDate.dayLabel.toLowerCase()}`;
+                const isDefault = defaultNights.includes(nightId);
+                const isLocked = isDefault && isMandatory;
+                html += `<div class="hotel-night" style="display:flex;flex-direction:column;align-items:center;">`;
+                html += `<input type="checkbox" id="reg-hotel-${nightId}" data-night-id="${nightId}"${isDefault ? ' checked' : ''}${isLocked ? ' disabled' : ''} style="margin-bottom:2px;">`;
+                html += `<label for="reg-hotel-${nightId}" style="font-size:0.8rem;cursor:${isLocked ? 'default' : 'pointer'};">${isLocked ? '🔒' : '🌙'}</label>`;
+                html += `</div>`;
+            }
+        });
+        html += '</div>';
+        container.innerHTML = html;
+
+        // Update summary
+        function updateSummary() {
+            const checked = Array.from(container.querySelectorAll('input[type="checkbox"]')).filter(cb => cb.checked);
+            const countEl = document.getElementById('hotel-nights-summary');
+            countEl.textContent = `${checked.length} night${checked.length !== 1 ? 's' : ''} selected for your stay`;
+        }
+        container.querySelectorAll('input[type="checkbox"]:not([disabled])').forEach(cb => cb.addEventListener('change', updateSummary));
+        updateSummary();
+
+        showStep('hotel');
+
+        // Wire acknowledge button
+        const ackBtn = document.getElementById('acknowledge-hotel-btn');
+        ackBtn.addEventListener('click', async () => {
+            ackBtn.disabled = true;
+            ackBtn.querySelector('.btn-text').classList.add('hidden');
+            ackBtn.querySelector('.btn-loading').classList.remove('hidden');
+            document.getElementById('hotel-step-error').classList.add('hidden');
+
+            // Gather selected nights
+            const hotelNights = {};
+            container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                hotelNights[cb.dataset.nightId] = cb.checked;
+            });
+
+            try {
+                await API.participations.updateHotel(participationId, hotelNights, true);
+                window.location.href = `/event.html?id=${targetEventId}`;
+            } catch (err) {
+                console.error('Hotel save error:', err);
+                const errorDiv = document.getElementById('hotel-step-error');
+                errorDiv.textContent = err.message || 'Failed to save hotel booking. Please update it from your event page.';
+                errorDiv.classList.remove('hidden');
+                ackBtn.disabled = false;
+                ackBtn.querySelector('.btn-text').classList.remove('hidden');
+                ackBtn.querySelector('.btn-loading').classList.add('hidden');
+            }
+        }, { once: true });
+    }
+
     // --- Record Interest Helper (used by both interest-login and interest-register flows) ---
     async function recordInterestAndShow() {
         showStep('completing');
@@ -460,7 +583,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 lastName: user.lastName || (pendingFormData ? pendingFormData.lastName : '')
             });
 
-            // Redirect to the event page � they'll see their interest card there
+            // Redirect to the event page � they'll see their interest card there
             window.location.href = `event.html?id=${eventId}`;
 
         } catch (error) {

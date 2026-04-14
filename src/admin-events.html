@@ -996,6 +996,36 @@
                                                 </div>
                                             </div>
                                         </details>
+
+                                        <details class="collapsible-section" style="margin-top: 20px;">
+                                            <summary>🏨 Hotel Booking<span class="expand-hint">click to expand</span></summary>
+                                            <div class="collapsible-body">
+                                                <small style="color: var(--admin-text-muted); display: block; margin-bottom: 16px; line-height: 1.5;">
+                                                    Configure hotel booking for this event. When enabled, participants will be prompted to acknowledge their hotel nights after registering. Default nights (event nights) are pre-selected. Optional nights (day before/after) can be added by the participant.
+                                                </small>
+
+                                                <div class="form-group">
+                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                        <input type="checkbox" id="event-hotel-enabled" style="width: auto;">
+                                                        <span>🏨 Hotel is part of this event</span>
+                                                    </label>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                        When enabled, participants will see a hotel booking step after team registration and a hotel status indicator on the event page.
+                                                    </small>
+                                                </div>
+
+                                                <div class="form-group" style="margin-top: 16px;" id="hotel-mandatory-field">
+                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                        <input type="checkbox" id="event-hotel-mandatory" style="width: auto;">
+                                                        <span>🔒 Default nights are mandatory (locked)</span>
+                                                    </label>
+                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
+                                                        When enabled, the pre-selected event nights cannot be unchecked by participants — only admins can change them. Optional nights (day before / day after) remain freely selectable.
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </details>
+
                                     </div>
                                 </div>
 

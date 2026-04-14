@@ -405,6 +405,8 @@ function showForm(event = null) {
         document.getElementById('event-team-registration-terms').value = event.teamRegistrationTerms || '';
         document.getElementById('event-solo-queue-terms').value = event.soloQueueTerms || '';
         document.getElementById('event-single-registration-terms').value = event.singleRegistrationTerms || '';
+        document.getElementById('event-hotel-enabled').checked = event.hotelEnabled || false;
+        document.getElementById('event-hotel-mandatory').checked = event.hotelMandatory || false;
         
         // Set registration type
         const regType = event.registrationType || 'team';
@@ -562,6 +564,8 @@ async function handleFormSubmit(e) {
             teamRegistrationTerms: document.getElementById('event-team-registration-terms').value.trim() || null,
             soloQueueTerms: document.getElementById('event-solo-queue-terms').value.trim() || null,
             singleRegistrationTerms: document.getElementById('event-single-registration-terms').value.trim() || null,
+            hotelEnabled: document.getElementById('event-hotel-enabled').checked,
+            hotelMandatory: document.getElementById('event-hotel-mandatory').checked,
         };
         
         // Only include team size if team type

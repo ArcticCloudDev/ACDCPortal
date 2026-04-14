@@ -356,10 +356,12 @@ const API = {
             });
         },
 
-        async updateHotel(participationId, hotelNights) {
+        async updateHotel(participationId, hotelNights, hotelAcknowledged) {
+            const body = { hotelNights };
+            if (hotelAcknowledged !== undefined) body.hotelAcknowledged = hotelAcknowledged;
             return API.request(`/participations/${participationId}/hotel`, {
                 method: 'PUT',
-                body: JSON.stringify({ hotelNights })
+                body: JSON.stringify(body)
             });
         },
 

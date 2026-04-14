@@ -234,6 +234,8 @@ app.http('events-create', {
                 teamRegistrationTerms: body.teamRegistrationTerms || null,
                 soloQueueTerms: body.soloQueueTerms || null,
                 singleRegistrationTerms: body.singleRegistrationTerms || null,
+                hotelEnabled: body.hotelEnabled || false,
+                hotelMandatory: body.hotelMandatory || false,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 createdAt: new Date().toISOString()
@@ -315,6 +317,8 @@ app.http('events-update', {
                 sendInterestAcknowledgment: body.sendInterestAcknowledgment !== undefined ? body.sendInterestAcknowledgment : existingEvent.sendInterestAcknowledgment,
                 sendJudgeInvitationEmail: body.sendJudgeInvitationEmail !== undefined ? body.sendJudgeInvitationEmail : existingEvent.sendJudgeInvitationEmail,
                 sendCommitteeInvitationEmail: body.sendCommitteeInvitationEmail !== undefined ? body.sendCommitteeInvitationEmail : existingEvent.sendCommitteeInvitationEmail,
+                hotelEnabled: body.hotelEnabled !== undefined ? body.hotelEnabled : existingEvent.hotelEnabled,
+                hotelMandatory: body.hotelMandatory !== undefined ? body.hotelMandatory : existingEvent.hotelMandatory,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()

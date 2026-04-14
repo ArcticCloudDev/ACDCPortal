@@ -675,26 +675,23 @@ app.http('participations-update-hotel', {
         try {
             const id = request.params.id;
             const body = await request.json();
-            const { hotelNights } = body;
+            const { hotelNights, hotelAcknowledged } = body;
 
-            const participations = await participationsStorage.getAll();
-            const index = participations.findIndex(p => p.id === id);
-
-            if (index < 0) {
+            const participation = await participationsStorage.getById(id);
+            if (!participation) {
                 return { status: 404, jsonBody: { error: 'Participation not found' } };
             }
 
             const updatedAt = new Date().toISOString();
-            const updated = {
-                ...participations[index],
-                hotelNights,
-                updatedAt
-            };
+            const changes = { updatedAt };
 
-            await participationsStorage.update(id, { hotelNights, updatedAt });
+            if (hotelNights !== undefined) changes.hotelNights = hotelNights;
+            if (hotelAcknowledged !== undefined) changes.hotelAcknowledged = hotelAcknowledged;
 
-            context.log(`Hotel nights updated for participation ${id}`);
-            return { status: 200, jsonBody: updated };
+            await participationsStorage.update(id, changes);
+
+            context.log(`Hotel updated for participation ${id} (acknowledged=${hotelAcknowledged})`);
+            return { status: 200, jsonBody: { ...participation, ...changes } };
         } catch (error) {
             await logError(context, error);
             context.error('Error updating hotel nights:', error);

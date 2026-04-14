@@ -174,6 +174,7 @@ function participationRowToJs(row) {
         'sat-sun': !!row.HotelNight_SatSun,
         'sun-mon': !!row.HotelNight_SunMon,
     };
+    obj.hotelAcknowledged = !!row.HotelAcknowledged;
     return obj;
 }
 
@@ -354,6 +355,7 @@ async function insertParticipation(pool, item) {
     ib('hotelFriSat', hotelNights['fri-sat']);
     ib('hotelSatSun', hotelNights['sat-sun']);
     ib('hotelSunMon', hotelNights['sun-mon']);
+    ib('hotelAcknowledged', rest.hotelAcknowledged);
     i('hotelPaidBy', rest.hotelPaidBy || null);
     i('convertedFrom', rest.convertedFrom || null);
     i('convertedAt', rest.convertedAt || null);
@@ -365,11 +367,11 @@ async function insertParticipation(pool, item) {
     await request.query(`
         INSERT INTO [Participations] (Id, UserId, Email, EventId, Roles, TeamId, IsTeamAdmin,
             HotelNight_MonTue, HotelNight_TueWed, HotelNight_WedThu, HotelNight_ThuFri,
-            HotelNight_FriSat, HotelNight_SatSun, HotelNight_SunMon,
+            HotelNight_FriSat, HotelNight_SatSun, HotelNight_SunMon, HotelAcknowledged,
             HotelPaidBy, ConvertedFrom, ConvertedAt, ConvertedVia, InvitationId, CreatedAt, UpdatedAt)
         VALUES (@id, @userId, @email, @eventId, @roles, @teamId, @isTeamAdmin,
             @hotelMonTue, @hotelTueWed, @hotelWedThu, @hotelThuFri,
-            @hotelFriSat, @hotelSatSun, @hotelSunMon,
+            @hotelFriSat, @hotelSatSun, @hotelSunMon, @hotelAcknowledged,
             @hotelPaidBy, @convertedFrom, @convertedAt, @convertedVia, @invitationId, @createdAt, @updatedAt)
     `);
 }
@@ -401,6 +403,13 @@ async function updateParticipation(pool, id, updates) {
                 request.input(p, boolVal);
                 setClauses.push(`[${col}] = @${p}`);
             }
+            continue;
+        }
+
+        if (key === 'hotelAcknowledged') {
+            const p = `u${pi++}`;
+            request.input(p, sql.Bit, val ? 1 : 0);
+            setClauses.push(`[HotelAcknowledged] = @${p}`);
             continue;
         }
 

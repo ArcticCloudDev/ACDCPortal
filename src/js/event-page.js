@@ -1494,6 +1494,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Always compute fresh from event dates — never trust stored hotelDates
         const hotelDates = computeHotelDates(currentEvent.startDate, currentEvent.endDate);
 
+        const defaultNights = currentEvent.hotelDefaultNights || [];
+        const isMandatory = currentEvent.hotelMandatory || false;
+        // Admins (portal admin or committee) can still edit even when mandatory
+        const isAdmin = currentUser?.isPortalAdmin || (currentParticipation?.roles || []).includes('committee');
+
         let html = '';
 
         hotelDates.forEach((dateInfo, index) => {
@@ -1510,12 +1515,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (index < hotelDates.length - 1) {
                 const nextDate = hotelDates[index + 1];
                 const nightId = `${dateInfo.dayLabel.toLowerCase()}-${nextDate.dayLabel.toLowerCase()}`;
+                const isDefaultNight = defaultNights.includes(nightId);
+                const isLocked = isMandatory && isDefaultNight && !isAdmin;
 
                 html += `
                     <div class="hotel-night">
-                        <input type="checkbox" id="edit-hotel-${nightId}" data-night-id="${nightId}">
-                        <label for="edit-hotel-${nightId}" class="night-checkbox">
-                            <span class="night-icon">🌙</span>
+                        <input type="checkbox" id="edit-hotel-${nightId}" data-night-id="${nightId}"${isLocked ? ' disabled title="Mandatory night — cannot be changed"' : ''}>
+                        <label for="edit-hotel-${nightId}" class="night-checkbox${isLocked ? ' night-locked' : ''}">
+                            <span class="night-icon">${isLocked ? '🔒' : '🌙'}</span>
                         </label>
                     </div>
                 `;
