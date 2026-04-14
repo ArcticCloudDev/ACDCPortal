@@ -16,17 +16,17 @@ async function markRegisteredInInterestQueue(userId, eventId, context) {
         if (!user || !user.email) return;
 
         // Check interest queue
-        const data = await interestQueueStorage.getRaw();
-        if (!data || !data.entries) return;
+        const entries = await interestQueueStorage.getAll();
 
-        const entryIndex = data.entries.findIndex(e => 
+        const entry = entries.find(e => 
             e.email.toLowerCase() === user.email.toLowerCase() && !e.registeredEventId
         );
 
-        if (entryIndex >= 0) {
-            data.entries[entryIndex].registeredEventId = eventId;
-            data.entries[entryIndex].registeredAt = new Date().toISOString();
-            await interestQueueStorage.saveRaw(data);
+        if (entry) {
+            await interestQueueStorage.update(entry.id, {
+                registeredEventId: eventId,
+                registeredAt: new Date().toISOString()
+            });
             context.log(`Marked interest queue entry for ${user.email} as registered (solo queue)`);
         }
     } catch (error) {

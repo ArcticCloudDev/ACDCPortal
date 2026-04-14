@@ -46,10 +46,10 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
         }
         
         // Get sequence campaigns for this sequence
-        const campaignData = await campaignsStorage.getRaw();
-        context.log(`[SEQUENCE] Loaded ${campaignData?.campaigns?.length || 0} total campaigns`);
+        const allCampaigns = await campaignsStorage.getAll();
+        context.log(`[SEQUENCE] Loaded ${allCampaigns.length} total campaigns`);
         
-        const sequenceCampaigns = (campaignData?.campaigns || [])
+        const sequenceCampaigns = allCampaigns
             .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence')
             .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
 
@@ -64,9 +64,9 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
         }
 
         // Get existing deliveries for this email
-        const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
+        const existingDeliveries = await deliveriesStorage.getAll();
         const userDeliveries = new Set(
-            deliveryData.deliveries
+            existingDeliveries
                 .filter(d => d.email.toLowerCase() === lead.email.toLowerCase() && d.status === 'sent')
                 .map(d => d.campaignId)
         );
@@ -177,7 +177,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 
                 // Create individual delivery records for each campaign (for tracking)
                 for (const campaign of campaignsToSend) {
-                    deliveryData.deliveries.push({
+                    await deliveriesStorage.create({
                         id: generateGuid(),
                         campaignId: campaign.id,
                         email: lead.email,
@@ -198,7 +198,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 result.reason = 'send-failed';
             }
 
-            deliveryData.deliveries.push(delivery);
+            await deliveriesStorage.create(delivery);
         } else {
             // Single email - send normally
             const campaign = campaignsToSend[0];
@@ -238,11 +238,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 result.reason = 'send-failed';
             }
 
-            deliveryData.deliveries.push(delivery);
-        }
-
-        if (deliveryData.deliveries.length > 0) {
-            await deliveriesStorage.saveRaw(deliveryData);
+            await deliveriesStorage.create(delivery);
         }
 
         context.log(`[SEQUENCE] COMPLETE: Sent ${sent}/${campaignsToSend.length} sequence emails to ${lead.email} for event ${event.id}`);
@@ -317,34 +313,31 @@ app.http('interest-register', {
             const codeExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutes
 
             // Check for existing lead (verified or not) - update with new code
-            const data = await leadsStorage.getRaw();
-            const leads = data.leads || [];
-            const existingIndex = leads.findIndex(l => 
-                l.eventId === eventId && 
+            const allLeads = await leadsStorage.getAll();
+            const existingLead = allLeads.find(l =>
+                l.eventId === eventId &&
                 l.email.toLowerCase() === email.toLowerCase()
             );
 
             const lead = {
-                id: existingIndex >= 0 ? leads[existingIndex].id : generateGuid(),
+                id: existingLead ? existingLead.id : generateGuid(),
                 eventId,
                 email: email.toLowerCase(),
                 firstName: firstName.trim(),
                 lastName: lastName.trim(),
                 verificationCode,
                 codeExpiresAt,
-                verified: existingIndex >= 0 ? leads[existingIndex].verified : false,
-                verifiedAt: existingIndex >= 0 ? leads[existingIndex].verifiedAt : null,
-                createdAt: existingIndex >= 0 ? leads[existingIndex].createdAt : new Date().toISOString(),
+                verified: existingLead ? existingLead.verified : false,
+                verifiedAt: existingLead ? existingLead.verifiedAt : null,
+                createdAt: existingLead ? existingLead.createdAt : new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
 
-            if (existingIndex >= 0) {
-                leads[existingIndex] = lead;
+            if (existingLead) {
+                await leadsStorage.update(lead.id, lead);
             } else {
-                leads.push(lead);
+                await leadsStorage.create(lead);
             }
-
-            await leadsStorage.saveRaw({ leads });
 
             // Send verification email
             try {
@@ -392,22 +385,19 @@ app.http('interest-verify', {
                 return { status: 400, jsonBody: { error: 'leadId and code are required' } };
             }
 
-            const data = await leadsStorage.getRaw();
-            const leads = data.leads || [];
-            const leadIndex = leads.findIndex(l => l.id === leadId);
+            const lead = await leadsStorage.getById(leadId);
 
-            if (leadIndex < 0) {
+            if (!lead) {
                 return { status: 404, jsonBody: { error: 'Registration not found' } };
             }
 
-            const lead = leads[leadIndex];
-
             // Check if this email+event combo is already verified by someone else
             // (could happen if they register again with a new request while one is pending)
-            const alreadyVerified = leads.find(l => 
-                l.eventId === lead.eventId && 
-                l.email.toLowerCase() === lead.email.toLowerCase() && 
-                l.verified && 
+            const allLeadsForVerify = await leadsStorage.getAll();
+            const alreadyVerified = allLeadsForVerify.find(l =>
+                l.eventId === lead.eventId &&
+                l.email.toLowerCase() === lead.email.toLowerCase() &&
+                l.verified &&
                 l.id !== lead.id
             );
             
@@ -452,42 +442,47 @@ app.http('interest-verify', {
             }
 
             // Mark as verified
+            const verifiedAt = new Date().toISOString();
             const verifiedLead = {
                 ...lead,
                 verified: true,
-                verifiedAt: new Date().toISOString(),
-                verificationCode: null, // Clear the code
+                verifiedAt,
+                verificationCode: null,
                 codeExpiresAt: null
             };
-            
-            leads[leadIndex] = verifiedLead;
 
-            await leadsStorage.saveRaw({ leads });
+            await leadsStorage.update(leadId, {
+                verified: true,
+                verifiedAt,
+                verificationCode: null,
+                codeExpiresAt: null,
+                updatedAt: new Date().toISOString()
+            });
 
             context.log(`Interest verified for ${verifiedLead.email}`);
 
             // Mirror verified interest into participations with roles:['interest']
             try {
-                const partData = await participationsStorage.getRaw();
-                const participations = partData?.participations || [];
-                const existingPart = participations.findIndex(p =>
+                const allPartsForVerify = await participationsStorage.getAll();
+                const existingPart = allPartsForVerify.find(p =>
                     p.email?.toLowerCase() === verifiedLead.email.toLowerCase() &&
                     p.eventId === verifiedLead.eventId
                 );
 
-                if (existingPart >= 0) {
+                if (existingPart) {
                     // Already has a participation — ensure 'interest' role is present
-                    if (!participations[existingPart].roles) participations[existingPart].roles = [];
-                    if (!participations[existingPart].roles.includes('interest')) {
-                        participations[existingPart].roles.push('interest');
-                    }
-                    participations[existingPart].interestVerified = true;
-                    participations[existingPart].interestDate = verifiedLead.verifiedAt;
-                    participations[existingPart].interestSource = 'interest-form';
-                    participations[existingPart].updatedAt = new Date().toISOString();
+                    const roles = existingPart.roles || [];
+                    if (!roles.includes('interest')) roles.push('interest');
+                    await participationsStorage.update(existingPart.id, {
+                        roles,
+                        interestVerified: true,
+                        interestDate: verifiedLead.verifiedAt,
+                        interestSource: 'interest-form',
+                        updatedAt: new Date().toISOString()
+                    });
                 } else {
                     // Create new participation (email-only, no userId yet)
-                    participations.push({
+                    await participationsStorage.create({
                         id: generateGuid(),
                         email: verifiedLead.email.toLowerCase(),
                         userId: null,
@@ -505,8 +500,6 @@ app.http('interest-verify', {
                         updatedAt: new Date().toISOString()
                     });
                 }
-
-                await participationsStorage.saveRaw({ participations });
                 context.log(`Participation with interest role created/updated for ${verifiedLead.email}`);
             } catch (partError) {
                 context.error('Warning: Failed to create interest participation:', partError);
@@ -584,14 +577,13 @@ app.http('interest-record', {
             const leadLastName = (lastName || '').trim();
 
             // Check for existing lead
-            const data = await leadsStorage.getRaw();
-            const leads = data.leads || [];
-            const existingIndex = leads.findIndex(l =>
+            const allLeadsForRecord = await leadsStorage.getAll();
+            const existingLead = allLeadsForRecord.find(l =>
                 l.eventId === eventId &&
                 l.email.toLowerCase() === normalizedEmail
             );
 
-            if (existingIndex >= 0 && leads[existingIndex].verified) {
+            if (existingLead && existingLead.verified) {
                 // Already registered interest — just return success
                 return {
                     status: 200,
@@ -605,7 +597,7 @@ app.http('interest-record', {
 
             // Create or update lead as verified (no separate verification needed — already authenticated)
             const lead = {
-                id: existingIndex >= 0 ? leads[existingIndex].id : generateGuid(),
+                id: existingLead ? existingLead.id : generateGuid(),
                 eventId,
                 email: normalizedEmail,
                 firstName: leadFirstName,
@@ -614,16 +606,15 @@ app.http('interest-record', {
                 codeExpiresAt: null,
                 verified: true,
                 verifiedAt: new Date().toISOString(),
-                createdAt: existingIndex >= 0 ? leads[existingIndex].createdAt : new Date().toISOString(),
+                createdAt: existingLead ? existingLead.createdAt : new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
 
-            if (existingIndex >= 0) {
-                leads[existingIndex] = lead;
+            if (existingLead) {
+                await leadsStorage.update(lead.id, lead);
             } else {
-                leads.push(lead);
+                await leadsStorage.create(lead);
             }
-            await leadsStorage.saveRaw({ leads });
 
             context.log(`Interest recorded (authenticated) for ${normalizedEmail} on event ${event.name}`);
 
@@ -634,28 +625,27 @@ app.http('interest-record', {
                 const user = allUsers.find(u => u.email?.toLowerCase() === normalizedEmail);
                 const userId = user ? user.id : null;
 
-                const partData = await participationsStorage.getRaw();
-                const participations = partData?.participations || [];
-                const existingPart = participations.findIndex(p =>
+                const allPartsForRecord = await participationsStorage.getAll();
+                const existingPart = allPartsForRecord.find(p =>
                     p.email?.toLowerCase() === normalizedEmail &&
                     p.eventId === eventId
                 );
 
-                if (existingPart >= 0) {
-                    if (!participations[existingPart].roles) participations[existingPart].roles = [];
-                    if (!participations[existingPart].roles.includes('interest')) {
-                        participations[existingPart].roles.push('interest');
-                    }
+                if (existingPart) {
+                    const roles = existingPart.roles || [];
+                    if (!roles.includes('interest')) roles.push('interest');
+                    const updates = {
+                        roles,
+                        interestVerified: true,
+                        interestDate: lead.verifiedAt,
+                        interestSource: 'unified-register',
+                        updatedAt: new Date().toISOString()
+                    };
                     // Update userId if we found the user and it wasn't set before
-                    if (userId && !participations[existingPart].userId) {
-                        participations[existingPart].userId = userId;
-                    }
-                    participations[existingPart].interestVerified = true;
-                    participations[existingPart].interestDate = lead.verifiedAt;
-                    participations[existingPart].interestSource = 'unified-register';
-                    participations[existingPart].updatedAt = new Date().toISOString();
+                    if (userId && !existingPart.userId) updates.userId = userId;
+                    await participationsStorage.update(existingPart.id, updates);
                 } else {
-                    participations.push({
+                    await participationsStorage.create({
                         id: generateGuid(),
                         email: normalizedEmail,
                         userId: userId,
@@ -673,8 +663,6 @@ app.http('interest-record', {
                         updatedAt: new Date().toISOString()
                     });
                 }
-
-                await participationsStorage.saveRaw({ participations });
                 context.log(`Participation with interest role created/updated for ${normalizedEmail}`);
             } catch (partError) {
                 context.error('Warning: Failed to create interest participation:', partError);
@@ -717,8 +705,7 @@ app.http('interest-list', {
         try {
             const eventId = request.query.get('eventId');
 
-            const data = await leadsStorage.getRaw();
-            let leads = data.leads || [];
+            let leads = await leadsStorage.getAll();
 
             // Filter by event if specified
             if (eventId) {
@@ -775,18 +762,14 @@ app.http('interest-delete', {
             // Cascade: clean up email deliveries for this lead
             let cleaned = { deliveries: 0, participations: 0 };
             try {
-                const delData = await deliveriesStorage.getRaw() || { deliveries: [] };
-                const deliveries = delData.deliveries || [];
-                const before = deliveries.length;
-                const filtered = deliveries.filter(d => {
-                    if (d.leadId === id) return false;
-                    if (email && d.email?.toLowerCase() === email.toLowerCase() && !d.userId) return false;
-                    return true;
+                const allDeliveries = await deliveriesStorage.getAll();
+                const toDeleteDeliveries = allDeliveries.filter(d => {
+                    if (d.leadId === id) return true;
+                    if (email && d.email?.toLowerCase() === email.toLowerCase() && !d.userId) return true;
+                    return false;
                 });
-                if (filtered.length < before) {
-                    cleaned.deliveries = before - filtered.length;
-                    await deliveriesStorage.saveRaw({ deliveries: filtered });
-                }
+                for (const d of toDeleteDeliveries) await deliveriesStorage.delete(d.id);
+                cleaned.deliveries = toDeleteDeliveries.length;
             } catch (e) { context.log(`Warning: delivery cleanup failed: ${e.message}`); }
 
             // Cascade: remove 'interest' role from SQL participations for this lead's email + event
@@ -838,8 +821,7 @@ app.http('interest-restart-sequence', {
 
             if (leadId) {
                 // Lead-based restart
-                const data = await leadsStorage.getRaw();
-                const lead = (data.leads || []).find(l => l.id === leadId);
+                const lead = await leadsStorage.getById(leadId);
                 if (!lead) {
                     return { status: 404, jsonBody: { error: 'Lead not found' } };
                 }
@@ -865,27 +847,18 @@ app.http('interest-restart-sequence', {
             context.log(`[RESTART] Manually restarting sequence for ${recipient.email}`);
 
             // Delete existing delivery records for this recipient to allow resend
-            const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
-            const beforeCount = deliveryData.deliveries.length;
             const normalizedEmail = (recipient.email || '').toLowerCase();
-            if (leadId) {
-                deliveryData.deliveries = deliveryData.deliveries.filter(d => {
-                    if (d.leadId === leadId) return false;
-                    if (normalizedEmail && (d.email || '').toLowerCase() === normalizedEmail) return false;
-                    return true;
-                });
-            } else {
-                deliveryData.deliveries = deliveryData.deliveries.filter(d => {
-                    if (d.userId === userId) return false;
-                    if (normalizedEmail && (d.email || '').toLowerCase() === normalizedEmail) return false;
-                    return true;
-                });
-            }
-            const removedCount = beforeCount - deliveryData.deliveries.length;
-            
-            if (removedCount > 0) {
-                await deliveriesStorage.saveRaw(deliveryData);
-                context.log(`[RESTART] Deleted ${removedCount} existing delivery records for ${leadId || userId}`);
+            const allDeliveriesForRestart = await deliveriesStorage.getAll();
+            const deliveriesToDelete = allDeliveriesForRestart.filter(d => {
+                if (leadId) {
+                    return d.leadId === leadId || (normalizedEmail && (d.email || '').toLowerCase() === normalizedEmail);
+                } else {
+                    return d.userId === userId || (normalizedEmail && (d.email || '').toLowerCase() === normalizedEmail);
+                }
+            });
+            for (const d of deliveriesToDelete) await deliveriesStorage.delete(d.id);
+            if (deliveriesToDelete.length > 0) {
+                context.log(`[RESTART] Deleted ${deliveriesToDelete.length} existing delivery records for ${leadId || userId}`);
             }
 
             // Fetch event to get sequenceId
@@ -901,8 +874,8 @@ app.http('interest-restart-sequence', {
             const triggerResult = await triggerSequenceEmailsForLead(recipient, event, context);
 
             // Get delivery count after sending
-            const updatedDeliveryData = await deliveriesStorage.getRaw();
-            const sentDeliveries = (updatedDeliveryData?.deliveries || [])
+            const updatedDeliveries = await deliveriesStorage.getAll();
+            const sentDeliveries = updatedDeliveries
                 .filter(d => {
                     if (leadId) return d.leadId === leadId && d.status === 'sent';
                     return d.userId === userId && d.status === 'sent';

@@ -19,10 +19,10 @@ app.http('deliveries-scheduled-runs', {
     route: 'deliveries/scheduled-runs',
     handler: async (request, context) => {
         try {
-            const data = await runsStorage.getRaw() || { runs: [] };
-            
-            // Return last 10 runs
-            const recentRuns = data.runs.slice(0, 10);
+            const allRuns = await runsStorage.getAll();
+            const recentRuns = allRuns
+                .sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
+                .slice(0, 10);
             
             return {
                 status: 200,
@@ -69,8 +69,7 @@ app.http('deliveries-event', {
             }
 
             // Get all campaigns for this sequence
-            const campaignData = await campaignsStorage.getRaw();
-            const sequenceCampaigns = (campaignData?.campaigns || [])
+            const sequenceCampaigns = (await campaignsStorage.getAll())
                 .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence')
                 .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
 
@@ -81,19 +80,17 @@ app.http('deliveries-event', {
             );
 
             // Get all deliveries for these campaigns
-            const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
-            const eventDeliveries = deliveryData.deliveries.filter(d =>
+            const allEventDeliveries = await deliveriesStorage.getAll();
+            const eventDeliveries = allEventDeliveries.filter(d =>
                 campaignIds.has((d.campaignId || '').toString().toLowerCase())
             );
 
             // Get all verified leads for this event
-            const leadsData = await leadsStorage.getRaw();
-            const eventLeads = (leadsData.leads || [])
+            const eventLeads = (await leadsStorage.getAll())
                 .filter(l => l.eventId === eventId && l.verified);
 
             // Get all participations for this event to find judges, committee, and participants
-            const participationsData = await participationsStorage.getRaw();
-            const eventParticipations = (participationsData?.participations || [])
+            const eventParticipations = (await participationsStorage.getAll())
                 .filter(p => p.eventId === eventId);
 
             // Build recipients from participations (with their roles)
@@ -154,26 +151,21 @@ app.http('deliveries-retry', {
             }
 
             // Get the delivery record
-            const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
-            const deliveryIndex = deliveryData.deliveries.findIndex(d => d.id === deliveryId);
+            const delivery = await deliveriesStorage.getById(deliveryId);
 
-            if (deliveryIndex < 0) {
+            if (!delivery) {
                 return { status: 404, jsonBody: { error: 'Delivery not found' } };
             }
 
-            const delivery = deliveryData.deliveries[deliveryIndex];
-
             // Get campaign details
-            const campaignData = await campaignsStorage.getRaw();
-            const campaign = campaignData?.campaigns?.find(c => c.id === delivery.campaignId);
+            const campaign = await campaignsStorage.getById(delivery.campaignId);
 
             if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
             // Get lead details
-            const leadsData = await leadsStorage.getRaw();
-            const lead = leadsData.leads?.find(l => l.id === delivery.leadId);
+            const lead = await leadsStorage.getById(delivery.leadId);
 
             if (!lead) {
                 return { status: 404, jsonBody: { error: 'Lead not found' } };
@@ -194,22 +186,17 @@ app.http('deliveries-retry', {
 
                 context.log(`[RETRY] Email sent successfully!`);
                 
-                // Update delivery record
-                deliveryData.deliveries[deliveryIndex] = {
-                    ...delivery,
+                const updatedDelivery = await deliveriesStorage.update(deliveryId, {
                     status: 'sent',
                     sentAt: new Date().toISOString(),
-                    error: null,
-                    retriedAt: new Date().toISOString()
-                };
-
-                await deliveriesStorage.saveRaw(deliveryData);
+                    errorMessage: null
+                });
 
                 return {
                     status: 200,
                     jsonBody: { 
                         message: 'Email sent successfully',
-                        delivery: deliveryData.deliveries[deliveryIndex]
+                        delivery: updatedDelivery
                     }
                 };
             } catch (err) {
@@ -217,22 +204,17 @@ app.http('deliveries-retry', {
                 context.log(`[RETRY] ERROR sending email: ${err.message}`);
                 context.error(err);
                 
-                // Update delivery record with new error
-                deliveryData.deliveries[deliveryIndex] = {
-                    ...delivery,
+                const failedDelivery = await deliveriesStorage.update(deliveryId, {
                     status: 'failed',
-                    error: err.message,
-                    retriedAt: new Date().toISOString()
-                };
-
-                await deliveriesStorage.saveRaw(deliveryData);
+                    errorMessage: err.message
+                });
 
                 return {
                     status: 500,
                     jsonBody: { 
                         error: 'Failed to send email',
                         message: err.message,
-                        delivery: deliveryData.deliveries[deliveryIndex]
+                        delivery: failedDelivery
                     }
                 };
             }

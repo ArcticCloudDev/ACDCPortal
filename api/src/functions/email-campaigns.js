@@ -28,8 +28,7 @@ app.http('email-campaigns-list', {
     handler: async (request, context) => {
         try {
             const eventId = request.query.get('eventId');
-            const data = await campaignsStorage.getRaw();
-            let campaigns = data?.campaigns || [];
+            let campaigns = await campaignsStorage.getAll();
 
             if (eventId) {
                 campaigns = campaigns.filter(c => c.eventId === eventId);
@@ -39,7 +38,7 @@ app.http('email-campaigns-list', {
             campaigns.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
             // Add delivery stats
-            const deliveries = (await deliveriesStorage.getRaw())?.deliveries || [];
+            const deliveries = await deliveriesStorage.getAll();
             campaigns = campaigns.map(campaign => {
                 const campaignDeliveries = deliveries.filter(d => d.campaignId === campaign.id);
                 return {
@@ -70,8 +69,7 @@ app.http('campaigns-get', {
     handler: async (request, context) => {
         try {
             const campaignId = request.params.id;
-            const data = await campaignsStorage.getRaw();
-            const campaign = (data?.campaigns || []).find(c => c.id === campaignId);
+            const campaign = await campaignsStorage.getById(campaignId);
 
             if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
@@ -94,16 +92,15 @@ app.http('email-campaigns-get', {
     handler: async (request, context) => {
         try {
             const campaignId = request.params.id;
-            const data = await campaignsStorage.getRaw();
-            const campaign = (data?.campaigns || []).find(c => c.id === campaignId);
+            const campaign = await campaignsStorage.getById(campaignId);
 
             if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
             // Get deliveries for this campaign
-            const deliveriesData = await deliveriesStorage.getRaw();
-            const deliveries = (deliveriesData?.deliveries || [])
+            const allDeliveries = await deliveriesStorage.getAll();
+            const deliveries = allDeliveries
                 .filter(d => d.campaignId === campaignId)
                 .sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
 
@@ -151,8 +148,6 @@ app.http('campaigns-create', {
                 return { status: 400, jsonBody: { error: 'subject and content are required' } };
             }
 
-            const data = await campaignsStorage.getRaw() || { campaigns: [] };
-
             const campaign = {
                 id: generateId(),
                 sequenceId: sequenceId || null,
@@ -167,8 +162,7 @@ app.http('campaigns-create', {
                 createdAt: new Date().toISOString()
             };
 
-            data.campaigns.push(campaign);
-            await campaignsStorage.saveRaw(data);
+            await campaignsStorage.create(campaign);
 
             return { status: 201, jsonBody: campaign };
         } catch (error) {
@@ -193,10 +187,9 @@ app.http('email-campaigns-create', {
                 return { status: 400, jsonBody: { error: 'sequenceId, subject, and content are required' } };
             }
 
-            const data = await campaignsStorage.getRaw() || { campaigns: [] };
-
             // Calculate sequence order within this sequence
-            const sequenceEmails = data.campaigns.filter(c => c.sequenceId === sequenceId);
+            const allExistingCampaigns = await campaignsStorage.getAll();
+            const sequenceEmails = allExistingCampaigns.filter(c => c.sequenceId === sequenceId);
             const sequenceOrder = sequenceEmails.length + 1;
 
             const campaign = {
@@ -208,14 +201,13 @@ app.http('email-campaigns-create', {
                 ctaText: ctaText || null,
                 type: 'sequence',
                 sequenceOrder,
-                status: status || 'draft', // draft or live
-                scheduledSendTime: scheduledSendTime || null, // ISO timestamp
+                status: status || 'draft',
+                scheduledSendTime: scheduledSendTime || null,
                 createdAt: new Date().toISOString(),
                 createdBy: createdBy || null
             };
 
-            data.campaigns.push(campaign);
-            await campaignsStorage.saveRaw(data);
+            await campaignsStorage.create(campaign);
 
             return { status: 201, jsonBody: campaign };
         } catch (error) {
@@ -235,28 +227,26 @@ app.http('campaigns-update', {
         try {
             const campaignId = request.params.id;
             const body = await request.json();
-            const data = await campaignsStorage.getRaw();
 
-            const index = (data?.campaigns || []).findIndex(c => c.id === campaignId);
-            if (index === -1) {
+            const campaign = await campaignsStorage.getById(campaignId);
+            if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
-            const campaign = data.campaigns[index];
-            if (body.subject !== undefined) campaign.subject = body.subject;
-            if (body.content !== undefined) campaign.content = body.content;
-            if (body.ctaUrl !== undefined) campaign.ctaUrl = body.ctaUrl;
-            if (body.ctaText !== undefined) campaign.ctaText = body.ctaText;
-            if (body.type !== undefined) campaign.type = body.type;
-            if (body.sequenceOrder !== undefined) campaign.sequenceOrder = body.sequenceOrder;
-            if (body.status !== undefined) campaign.status = body.status;
-            if (body.scheduledSendTime !== undefined) campaign.scheduledSendTime = body.scheduledSendTime;
-            campaign.updatedAt = new Date().toISOString();
+            const updates = {};
+            if (body.subject !== undefined) updates.subject = body.subject;
+            if (body.content !== undefined) updates.content = body.content;
+            if (body.ctaUrl !== undefined) updates.ctaUrl = body.ctaUrl;
+            if (body.ctaText !== undefined) updates.ctaText = body.ctaText;
+            if (body.type !== undefined) updates.type = body.type;
+            if (body.sequenceOrder !== undefined) updates.sequenceOrder = body.sequenceOrder;
+            if (body.status !== undefined) updates.status = body.status;
+            if (body.scheduledSendTime !== undefined) updates.scheduledSendTime = body.scheduledSendTime;
+            updates.updatedAt = new Date().toISOString();
 
-            data.campaigns[index] = campaign;
-            await campaignsStorage.saveRaw(data);
+            const updated = await campaignsStorage.update(campaignId, updates);
 
-            return { status: 200, jsonBody: campaign };
+            return { status: 200, jsonBody: updated };
         } catch (error) {
             await logError(context, error);
             context.error('Campaign update error:', error);
@@ -274,28 +264,26 @@ app.http('email-campaigns-update', {
         try {
             const campaignId = request.params.id;
             const body = await request.json();
-            const data = await campaignsStorage.getRaw();
 
-            const index = (data?.campaigns || []).findIndex(c => c.id === campaignId);
-            if (index === -1) {
+            const campaign = await campaignsStorage.getById(campaignId);
+            if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
             // Update allowed fields
-            const campaign = data.campaigns[index];
-            if (body.subject !== undefined) campaign.subject = body.subject;
-            if (body.content !== undefined) campaign.content = body.content;
-            if (body.ctaUrl !== undefined) campaign.ctaUrl = body.ctaUrl;
-            if (body.ctaText !== undefined) campaign.ctaText = body.ctaText;
-            if (body.sequenceOrder !== undefined) campaign.sequenceOrder = body.sequenceOrder;
-            if (body.status !== undefined) campaign.status = body.status; // draft or live
-            if (body.scheduledSendTime !== undefined) campaign.scheduledSendTime = body.scheduledSendTime;
-            campaign.updatedAt = new Date().toISOString();
+            const updates = {};
+            if (body.subject !== undefined) updates.subject = body.subject;
+            if (body.content !== undefined) updates.content = body.content;
+            if (body.ctaUrl !== undefined) updates.ctaUrl = body.ctaUrl;
+            if (body.ctaText !== undefined) updates.ctaText = body.ctaText;
+            if (body.sequenceOrder !== undefined) updates.sequenceOrder = body.sequenceOrder;
+            if (body.status !== undefined) updates.status = body.status;
+            if (body.scheduledSendTime !== undefined) updates.scheduledSendTime = body.scheduledSendTime;
+            updates.updatedAt = new Date().toISOString();
 
-            data.campaigns[index] = campaign;
-            await campaignsStorage.saveRaw(data);
+            const updated = await campaignsStorage.update(campaignId, updates);
 
-            return { status: 200, jsonBody: campaign };
+            return { status: 200, jsonBody: updated };
         } catch (error) {
             await logError(context, error);
             context.error('Campaign update error:', error);
@@ -313,18 +301,15 @@ app.http('campaigns-delete', {
         try {
             const campaignId = request.params.id;
 
-            const campaignData = await campaignsStorage.getRaw();
-            const index = (campaignData?.campaigns || []).findIndex(c => c.id === campaignId);
-            if (index === -1) {
+            const exists = await campaignsStorage.getById(campaignId);
+            if (!exists) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
-            campaignData.campaigns.splice(index, 1);
-            await campaignsStorage.saveRaw(campaignData);
+            await campaignsStorage.delete(campaignId);
 
-            const deliveryData = await deliveriesStorage.getRaw();
-            if (deliveryData?.deliveries) {
-                deliveryData.deliveries = deliveryData.deliveries.filter(d => d.campaignId !== campaignId);
-                await deliveriesStorage.saveRaw(deliveryData);
+            const allDeliveriesForCampaign = await deliveriesStorage.getAll();
+            for (const d of allDeliveriesForCampaign.filter(d => d.campaignId === campaignId)) {
+                await deliveriesStorage.delete(d.id);
             }
 
             return { status: 200, jsonBody: { message: 'Campaign deleted' } };
@@ -345,20 +330,15 @@ app.http('email-campaigns-delete', {
         try {
             const campaignId = request.params.id;
 
-            // Delete campaign
-            const campaignData = await campaignsStorage.getRaw();
-            const index = (campaignData?.campaigns || []).findIndex(c => c.id === campaignId);
-            if (index === -1) {
+            const existsEmail = await campaignsStorage.getById(campaignId);
+            if (!existsEmail) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
-            campaignData.campaigns.splice(index, 1);
-            await campaignsStorage.saveRaw(campaignData);
+            await campaignsStorage.delete(campaignId);
 
-            // Delete associated deliveries
-            const deliveryData = await deliveriesStorage.getRaw();
-            if (deliveryData?.deliveries) {
-                deliveryData.deliveries = deliveryData.deliveries.filter(d => d.campaignId !== campaignId);
-                await deliveriesStorage.saveRaw(deliveryData);
+            const allDeliveriesForEmailCampaign = await deliveriesStorage.getAll();
+            for (const d of allDeliveriesForEmailCampaign.filter(d => d.campaignId === campaignId)) {
+                await deliveriesStorage.delete(d.id);
             }
 
             return { status: 200, jsonBody: { message: 'Campaign deleted' } };
@@ -386,16 +366,15 @@ app.http('email-campaigns-send', {
             }
 
             // Get campaign
-            const campaignData = await campaignsStorage.getRaw();
-            const campaign = (campaignData?.campaigns || []).find(c => c.id === campaignId);
+            const campaign = await campaignsStorage.getById(campaignId);
             if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
             // Get existing deliveries to avoid duplicates
-            const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
+            const existingDeliveries = await deliveriesStorage.getAll();
             const existingEmails = new Set(
-                deliveryData.deliveries
+                existingDeliveries
                     .filter(d => d.campaignId === campaignId && d.status === 'sent')
                     .map(d => d.email.toLowerCase())
             );
@@ -435,15 +414,13 @@ app.http('email-campaigns-send', {
                 } catch (err) {
                     await logError(context, err);
                     delivery.status = 'failed';
-                    delivery.error = err.message;
+                    delivery.errorMessage = err.message;
                     results.failed++;
                     results.errors.push({ email: recipient.email, error: err.message });
                 }
 
-                deliveryData.deliveries.push(delivery);
+                await deliveriesStorage.create(delivery);
             }
-
-            await deliveriesStorage.saveRaw(deliveryData);
 
             return { status: 200, jsonBody: results };
         } catch (error) {
@@ -477,8 +454,8 @@ app.http('email-trigger-sequence', {
             }
 
             // Get sequence campaigns for this event
-            const campaignData = await campaignsStorage.getRaw();
-            const sequenceCampaigns = (campaignData?.campaigns || [])
+            const allCampaignsForEvent = await campaignsStorage.getAll();
+            const sequenceCampaigns = allCampaignsForEvent
                 .filter(c => c.eventId === eventId && c.type === 'sequence')
                 .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
 
@@ -487,9 +464,9 @@ app.http('email-trigger-sequence', {
             }
 
             // Get existing deliveries for this user
-            const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
+            const existingUserDeliveries = await deliveriesStorage.getAll();
             const userDeliveries = new Set(
-                deliveryData.deliveries
+                existingUserDeliveries
                     .filter(d => d.email.toLowerCase() === user.email.toLowerCase() && d.status === 'sent')
                     .map(d => d.campaignId)
             );
@@ -528,14 +505,12 @@ app.http('email-trigger-sequence', {
                 } catch (err) {
                     await logError(context, err);
                     delivery.status = 'failed';
-                    delivery.error = err.message;
+                    delivery.errorMessage = err.message;
                     results.failed++;
                 }
 
-                deliveryData.deliveries.push(delivery);
+                await deliveriesStorage.create(delivery);
             }
-
-            await deliveriesStorage.saveRaw(deliveryData);
 
             context.log(`Sequence emails for user ${user.email} on event ${eventId}: sent=${results.sent}, skipped=${results.skipped}`);
             return { status: 200, jsonBody: results };
@@ -555,8 +530,8 @@ app.http('email-campaigns-deliveries', {
     handler: async (request, context) => {
         try {
             const campaignId = request.params.id;
-            const deliveryData = await deliveriesStorage.getRaw();
-            const deliveries = (deliveryData?.deliveries || [])
+            const allDeliveriesById = await deliveriesStorage.getAll();
+            const deliveries = allDeliveriesById
                 .filter(d => d.campaignId === campaignId)
                 .sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
 

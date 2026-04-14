@@ -15,12 +15,10 @@ app.http('sequences-list', {
     route: 'sequences',
     handler: async (request, context) => {
         try {
-            const data = await sequencesStorage.getRaw();
-            let sequences = data?.sequences || [];
+            let sequences = await sequencesStorage.getAll();
             
             // Add email counts and stats to each sequence
-            const campaignData = await campaignsStorage.getRaw();
-            const campaigns = campaignData?.campaigns || [];
+            const campaigns = await campaignsStorage.getAll();
             
             sequences = sequences.map(seq => {
                 const seqEmails = campaigns.filter(c => c.sequenceId === seq.id);
@@ -57,22 +55,20 @@ app.http('sequences-get', {
         try {
             const sequenceId = request.params.id;
             
-            const data = await sequencesStorage.getRaw();
-            const sequence = (data?.sequences || []).find(s => s.id === sequenceId);
+            const sequence = await sequencesStorage.getById(sequenceId);
             
             if (!sequence) {
                 return { status: 404, jsonBody: { error: 'Sequence not found' } };
             }
             
             // Get emails for this sequence
-            const campaignData = await campaignsStorage.getRaw();
-            const emails = (campaignData?.campaigns || [])
+            const allCampaigns = await campaignsStorage.getAll();
+            const emails = allCampaigns
                 .filter(c => c.sequenceId === sequenceId)
                 .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
             
             // Add stats to each email
-            const deliveryData = await deliveriesStorage.getRaw();
-            const deliveries = deliveryData?.deliveries || [];
+            const deliveries = await deliveriesStorage.getAll();
             
             const emailsWithStats = emails.map(email => {
                 const emailDeliveries = deliveries.filter(d => d.campaignId === email.id);
@@ -115,8 +111,6 @@ app.http('sequences-create', {
                 return { status: 400, jsonBody: { error: 'Name is required' } };
             }
             
-            const data = await sequencesStorage.getRaw() || { sequences: [] };
-            
             const sequence = {
                 id: uuidv4(),
                 name,
@@ -125,8 +119,7 @@ app.http('sequences-create', {
                 updatedAt: new Date().toISOString()
             };
             
-            data.sequences.push(sequence);
-            await sequencesStorage.saveRaw(data);
+            await sequencesStorage.create(sequence);
             
             return { status: 201, jsonBody: { sequence } };
         } catch (error) {
@@ -148,23 +141,21 @@ app.http('sequences-update', {
             const body = await request.json();
             const { name, description } = body;
             
-            const data = await sequencesStorage.getRaw();
-            const index = (data?.sequences || []).findIndex(s => s.id === sequenceId);
+            const existing = await sequencesStorage.getById(sequenceId);
             
-            if (index === -1) {
+            if (!existing) {
                 return { status: 404, jsonBody: { error: 'Sequence not found' } };
             }
             
-            data.sequences[index] = {
-                ...data.sequences[index],
-                name: name || data.sequences[index].name,
-                description: description !== undefined ? description : data.sequences[index].description,
+            const updates = {
+                name: name || existing.name,
+                description: description !== undefined ? description : existing.description,
                 updatedAt: new Date().toISOString()
             };
             
-            await sequencesStorage.saveRaw(data);
+            const updated = await sequencesStorage.update(sequenceId, updates);
             
-            return { status: 200, jsonBody: { sequence: data.sequences[index] } };
+            return { status: 200, jsonBody: { sequence: updated } };
         } catch (error) {
             await logError(context, error);
             context.error('Sequence update error:', error);
@@ -183,14 +174,13 @@ app.http('sequences-delete', {
             const sequenceId = request.params.id;
             
             // Delete sequence
-            const data = await sequencesStorage.getRaw();
-            const sequences = (data?.sequences || []).filter(s => s.id !== sequenceId);
-            await sequencesStorage.saveRaw({ sequences });
+            await sequencesStorage.delete(sequenceId);
             
             // Delete all emails in this sequence
-            const campaignData = await campaignsStorage.getRaw();
-            const campaigns = (campaignData?.campaigns || []).filter(c => c.sequenceId !== sequenceId);
-            await campaignsStorage.saveRaw({ campaigns });
+            const allCampaignsToDelete = await campaignsStorage.getAll();
+            for (const campaign of allCampaignsToDelete.filter(c => c.sequenceId === sequenceId)) {
+                await campaignsStorage.delete(campaign.id);
+            }
             
             // Note: We keep delivery records for analytics
             
@@ -213,8 +203,7 @@ app.http('sequences-copy', {
             const sourceId = request.params.id;
             
             // Get source sequence
-            const data = await sequencesStorage.getRaw();
-            const sourceSequence = (data?.sequences || []).find(s => s.id === sourceId);
+            const sourceSequence = await sequencesStorage.getById(sourceId);
             
             if (!sourceSequence) {
                 return { status: 404, jsonBody: { error: 'Source sequence not found' } };
@@ -229,12 +218,11 @@ app.http('sequences-copy', {
                 updatedAt: new Date().toISOString()
             };
             
-            data.sequences.push(newSequence);
-            await sequencesStorage.saveRaw(data);
+            await sequencesStorage.create(newSequence);
             
             // Copy all emails
-            const campaignData = await campaignsStorage.getRaw();
-            const sourceEmails = (campaignData?.campaigns || [])
+            const allSourceCampaigns = await campaignsStorage.getAll();
+            const sourceEmails = allSourceCampaigns
                 .filter(c => c.sequenceId === sourceId)
                 .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
             
@@ -243,13 +231,14 @@ app.http('sequences-copy', {
                 id: uuidv4(),
                 sequenceId: newSequence.id,
                 createdAt: new Date().toISOString(),
-                status: 'draft',  // Always set copied emails to draft
-                scheduledSendTime: null,  // Clear any scheduled time
+                status: 'draft',
+                scheduledSendTime: null,
                 stats: { sent: 0, failed: 0 }
             }));
             
-            campaignData.campaigns.push(...newEmails);
-            await campaignsStorage.saveRaw(campaignData);
+            for (const email of newEmails) {
+                await campaignsStorage.create(email);
+            }
             
             return { 
                 status: 201, 

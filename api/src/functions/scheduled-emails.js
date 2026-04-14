@@ -58,8 +58,7 @@ async function processScheduledEmails(context) {
         const processedCampaigns = [];
 
         // Get all campaigns
-        const campaignData = await campaignsStorage.getRaw();
-        const campaigns = campaignData?.campaigns || [];
+        const campaigns = await campaignsStorage.getAll();
 
         // Filter for live campaigns with scheduledSendTime that has passed
         const dueCampaigns = campaigns.filter(c =>
@@ -77,17 +76,15 @@ async function processScheduledEmails(context) {
         }
 
         // Get all verified interest leads
-        const leadsData = await leadsStorage.getRaw();
-        const leads = (leadsData?.leads || []).filter(l => l.verified);
+        const leads = (await leadsStorage.getAll()).filter(l => l.verified);
         context.log(`[SCHEDULED] Found ${leads.length} verified leads`);
 
         // Get all participations and users (for committee/judges/participants)
-        const participationsData = await participationsStorage.getRaw();
-        const allParticipations = participationsData?.participations || [];
+        const allParticipations = await participationsStorage.getAll();
         const allUsers = await usersStorage.getAll();
 
         // Get existing deliveries
-        const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
+        const existingDeliveries = await deliveriesStorage.getAll();
 
         // Get events for context
         const events = await eventsStorage.getAll();
@@ -129,7 +126,7 @@ async function processScheduledEmails(context) {
             const allEventRecipients = [...eventParticipants, ...eligibleLeads];
 
             const recipientsToSend = allEventRecipients.filter(recipient => {
-                return !deliveryData.deliveries.some(d =>
+                return !existingDeliveries.some(d =>
                     d.campaignId === campaign.id &&
                     d.email.toLowerCase() === recipient.email.toLowerCase() &&
                     d.status === 'sent'
@@ -167,12 +164,13 @@ async function processScheduledEmails(context) {
                 } catch (err) {
                     await logError(context, err);
                     delivery.status = 'failed';
-                    delivery.error = err.message;
+                    delivery.errorMessage = err.message;
                     emailsFailed++;
                     context.error(`[SCHEDULED] Failed to send to ${recipient.email}:`, err);
                 }
 
-                deliveryData.deliveries.push(delivery);
+                await deliveriesStorage.create(delivery);
+                existingDeliveries.push(delivery);
             }
 
             processedCampaigns.push({
@@ -185,15 +183,8 @@ async function processScheduledEmails(context) {
             });
         }
 
-        // Save all deliveries
-        if (deliveryData.deliveries.length > 0) {
-            await deliveriesStorage.saveRaw(deliveryData);
-        }
-
-        // Log to email-log.json for unified history
+        // Log to email-log for unified history
         if (processedCampaigns.length > 0) {
-            const emailLogData = await emailLogStorage.getRaw() || { emails: [] };
-            
             for (const campaign of processedCampaigns) {
                 const emailLog = {
                     id: generateGuid(),
@@ -210,10 +201,8 @@ async function processScheduledEmails(context) {
                     source: 'scheduled',
                     campaignId: campaign.id
                 };
-                emailLogData.emails.push(emailLog);
+                await emailLogStorage.create(emailLog);
             }
-            
-            await emailLogStorage.saveRaw(emailLogData);
             context.log(`[SCHEDULED] Logged ${processedCampaigns.length} campaigns to email-log`);
         }
 
@@ -235,8 +224,6 @@ async function processScheduledEmails(context) {
 
 async function recordRun(startTime, sent, failed, campaigns, context, error = null) {
     try {
-        const data = await runsStorage.getRaw() || { runs: [] };
-
         const run = {
             id: generateGuid(),
             startTime: startTime.toISOString(),
@@ -250,13 +237,17 @@ async function recordRun(startTime, sent, failed, campaigns, context, error = nu
             status: error ? 'error' : 'success'
         };
 
-        // Keep only last 100 runs
-        data.runs.unshift(run);
-        if (data.runs.length > 100) {
-            data.runs = data.runs.slice(0, 100);
+        await runsStorage.create(run);
+
+        // Prune runs beyond 100 (keep most recent)
+        const allRuns = await runsStorage.getAll();
+        if (allRuns.length > 100) {
+            const sorted = allRuns.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+            for (const old of sorted.slice(100)) {
+                await runsStorage.delete(old.id);
+            }
         }
 
-        await runsStorage.saveRaw(data);
         context.log(`[SCHEDULED] Run recorded: ${run.id}`);
 
         return run;

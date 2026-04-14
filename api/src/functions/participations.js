@@ -16,7 +16,6 @@ const interestQueueStorage = new Storage('interest-queue');
 const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
 const invitationsStorage = new Storage('invitations');
-const sequenceProgressStorage = new Storage('sequence-progress');
 const { sendEmail } = require('../shared/mail');
 const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
@@ -55,8 +54,8 @@ async function triggerSequenceEmails(userId, eventId, context) {
             return;
         }
 
-        const campaignData = await campaignsStorage.getRaw();
-        const sequenceCampaigns = (campaignData?.campaigns || [])
+        const allCampaigns = await campaignsStorage.getAll();
+        const sequenceCampaigns = allCampaigns
             .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence' && c.status === 'live')
             .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
 
@@ -65,9 +64,9 @@ async function triggerSequenceEmails(userId, eventId, context) {
             return;
         }
 
-        const deliveryData = await deliveriesStorage.getRaw() || { deliveries: [] };
+        const existingDeliveries = await deliveriesStorage.getAll();
         const userDeliveries = new Set(
-            deliveryData.deliveries
+            existingDeliveries
                 .filter(d => d.email.toLowerCase() === user.email.toLowerCase() && d.status === 'sent')
                 .map(d => d.campaignId)
         );
@@ -148,7 +147,7 @@ async function triggerSequenceEmails(userId, eventId, context) {
 
             // Record deliveries for all campaigns included in the digest
             for (const campaign of campaignsToSend) {
-                deliveryData.deliveries.push({
+                await deliveriesStorage.create({
                     id: uuidv4(),
                     campaignId: campaign.id,
                     email: user.email,
@@ -163,20 +162,18 @@ async function triggerSequenceEmails(userId, eventId, context) {
         } catch (err) {
             await logError(context, err);
             for (const campaign of campaignsToSend) {
-                deliveryData.deliveries.push({
+                await deliveriesStorage.create({
                     id: uuidv4(),
                     campaignId: campaign.id,
                     email: user.email,
                     userId: user.id,
                     status: 'failed',
-                    error: err.message,
+                    errorMessage: err.message,
                     createdAt: new Date().toISOString()
                 });
             }
             context.log(`Failed to send digest to ${user.email}: ${err.message}`);
         }
-
-        await deliveriesStorage.saveRaw(deliveryData);
     } catch (error) {
         await logError(context, error);
         context.log(`Warning: Failed to trigger sequence emails: ${error.message}`);
@@ -189,17 +186,16 @@ async function removeFromInterestQueue(userId, eventId, context) {
         const user = users.find(u => u.id === userId);
         if (!user || !user.email) return;
 
-        const data = await interestQueueStorage.getRaw();
-        if (!data || !data.entries) return;
-
-        const entryIndex = data.entries.findIndex(e =>
+        const entries = await interestQueueStorage.getAll();
+        const entry = entries.find(e =>
             e.email.toLowerCase() === user.email.toLowerCase() && !e.registeredEventId
         );
 
-        if (entryIndex >= 0) {
-            data.entries[entryIndex].registeredEventId = eventId;
-            data.entries[entryIndex].registeredAt = new Date().toISOString();
-            await interestQueueStorage.saveRaw(data);
+        if (entry) {
+            await interestQueueStorage.update(entry.id, {
+                registeredEventId: eventId,
+                registeredAt: new Date().toISOString()
+            });
             context.log(`Marked interest queue entry for ${user.email} as registered for event ${eventId}`);
         }
     } catch (error) {
@@ -452,55 +448,33 @@ app.http('participations-delete', {
             await participationsStorage.delete(id);
 
             // Cascade: clean up related data
-            let cleaned = { invitations: 0, deliveries: 0, sequenceProgress: 0 };
+            let cleaned = { invitations: 0, deliveries: 0 };
 
             // 1. Clean up invitations for this email + event
             try {
-                const invData = await invitationsStorage.getRaw();
-                const invitations = invData?.invitations || [];
-                const before = invitations.length;
-                const filtered = invitations.filter(inv => 
-                    !(inv.email?.toLowerCase() === email?.toLowerCase() && inv.eventId === eventId)
+                const allInvitations = await invitationsStorage.getAll();
+                const invToDelete = allInvitations.filter(inv =>
+                    inv.email?.toLowerCase() === email?.toLowerCase() && inv.eventId === eventId
                 );
-                if (filtered.length < before) {
-                    cleaned.invitations = before - filtered.length;
-                    await invitationsStorage.saveRaw({ invitations: filtered });
-                }
+                for (const inv of invToDelete) await invitationsStorage.delete(inv.id);
+                cleaned.invitations = invToDelete.length;
             } catch (e) { context.log(`Warning: invitation cleanup failed: ${e.message}`); }
 
             // 2. Clean up email deliveries for this user/email
             try {
-                const delData = await deliveriesStorage.getRaw() || { deliveries: [] };
-                const deliveries = delData.deliveries || [];
-                const before = deliveries.length;
-                const filtered = deliveries.filter(d => {
-                    if (userId && d.userId === userId) return false;
-                    if (email && d.email?.toLowerCase() === email.toLowerCase()) return false;
-                    return true;
+                const allDeliveries = await deliveriesStorage.getAll();
+                const delToDelete = allDeliveries.filter(d => {
+                    if (userId && d.userId === userId) return true;
+                    if (email && d.email?.toLowerCase() === email.toLowerCase()) return true;
+                    return false;
                 });
-                if (filtered.length < before) {
-                    cleaned.deliveries = before - filtered.length;
-                    await deliveriesStorage.saveRaw({ deliveries: filtered });
-                }
+                for (const d of delToDelete) await deliveriesStorage.delete(d.id);
+                cleaned.deliveries = delToDelete.length;
             } catch (e) { context.log(`Warning: delivery cleanup failed: ${e.message}`); }
 
-            // 3. Clean up sequence progress
-            try {
-                const progData = await sequenceProgressStorage.getRaw();
-                const progress = progData?.progress || progData || [];
-                if (Array.isArray(progress)) {
-                    const before = progress.length;
-                    const filtered = progress.filter(p => 
-                        !(p.userId === userId && p.eventId === eventId)
-                    );
-                    if (filtered.length < before) {
-                        cleaned.sequenceProgress = before - filtered.length;
-                        await sequenceProgressStorage.saveRaw(progData?.progress ? { progress: filtered } : filtered);
-                    }
-                }
-            } catch (e) { context.log(`Warning: sequence progress cleanup failed: ${e.message}`); }
+            // 3. (sequence-progress table has been removed — no cleanup needed)
 
-            context.log(`Deleted participation ${id} (${email}). Cleaned: ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries, ${cleaned.sequenceProgress} sequence progress`);
+            context.log(`Deleted participation ${id} (${email}). Cleaned: ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries`);
 
             return { status: 200, jsonBody: { success: true, cleaned } };
         } catch (error) {
