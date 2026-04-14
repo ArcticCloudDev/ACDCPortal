@@ -1461,15 +1461,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Compute hotel dates from event start/end (1 day before to 1 day after)
     function computeHotelDates(startDate, endDate) {
+        const daysBefore = currentEvent.hotelDaysBefore ?? 1;
+        const daysAfter = currentEvent.hotelDaysAfter ?? 1;
         const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const dates = [];
 
         // Use noon to avoid timezone date-shifting
         const start = new Date(startDate + 'T12:00:00');
-        start.setDate(start.getDate() - 1);
+        start.setDate(start.getDate() - Math.max(0, daysBefore));
 
         const end = new Date(endDate + 'T12:00:00');
-        end.setDate(end.getDate() + 1);
+        end.setDate(end.getDate() + Math.max(0, daysAfter));
 
         const current = new Date(start);
         while (current <= end) {

@@ -26,17 +26,17 @@ function isRegistrationOpen(status) {
 }
 
 // Helper to generate hotel dates (1 day before start to 1 day after end)
-function generateHotelDates(startDate, endDate) {
+function generateHotelDates(startDate, endDate, daysBefore = 1, daysAfter = 1) {
     const dates = [];
     const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dayLabelsFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     
     // Use noon to avoid timezone date-shifting (YYYY-MM-DD parsed as UTC midnight can shift)
     const start = new Date(startDate + 'T12:00:00');
-    start.setDate(start.getDate() - 1);
+    start.setDate(start.getDate() - Math.max(0, daysBefore));
     
     const end = new Date(endDate + 'T12:00:00');
-    end.setDate(end.getDate() + 1);
+    end.setDate(end.getDate() + Math.max(0, daysAfter));
     
     // Generate dates
     const current = new Date(start);
@@ -208,7 +208,9 @@ app.http('events-create', {
             }
             
             // Generate hotel dates from event dates
-            const hotelDates = generateHotelDates(body.startDate, body.endDate);
+            const daysBefore = body.hotelDaysBefore !== undefined ? parseInt(body.hotelDaysBefore) : 1;
+            const daysAfter = body.hotelDaysAfter !== undefined ? parseInt(body.hotelDaysAfter) : 1;
+            const hotelDates = generateHotelDates(body.startDate, body.endDate, daysBefore, daysAfter);
             const hotelDefaultNights = generateDefaultHotelNights(hotelDates, body.startDate, body.endDate);
 
             const newEventId = generateGuid();
@@ -236,6 +238,8 @@ app.http('events-create', {
                 singleRegistrationTerms: body.singleRegistrationTerms || null,
                 hotelEnabled: body.hotelEnabled || false,
                 hotelMandatory: body.hotelMandatory || false,
+                hotelDaysBefore: body.hotelDaysBefore !== undefined ? parseInt(body.hotelDaysBefore) : 1,
+                hotelDaysAfter: body.hotelDaysAfter !== undefined ? parseInt(body.hotelDaysAfter) : 1,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 createdAt: new Date().toISOString()
@@ -289,6 +293,8 @@ app.http('events-update', {
             // Check if event dates changed - if so, regenerate hotel dates
             const datesChanged = (body.startDate && body.startDate !== existingEvent.startDate) ||
                                  (body.endDate && body.endDate !== existingEvent.endDate);
+            const hotelConfigChanged = (body.hotelDaysBefore !== undefined && body.hotelDaysBefore !== existingEvent.hotelDaysBefore) ||
+                                       (body.hotelDaysAfter !== undefined && body.hotelDaysAfter !== existingEvent.hotelDaysAfter);
             
             // Determine final start/end dates
             const finalStartDate = body.startDate || existingEvent.startDate;
@@ -298,8 +304,10 @@ app.http('events-update', {
             let hotelDates = existingEvent.hotelDates;
             let hotelDefaultNights = existingEvent.hotelDefaultNights;
             
-            if (datesChanged || !hotelDates || hotelDates.length === 0) {
-                hotelDates = generateHotelDates(finalStartDate, finalEndDate);
+            if (datesChanged || hotelConfigChanged || !hotelDates || hotelDates.length === 0) {
+                const finalDaysBefore = body.hotelDaysBefore !== undefined ? parseInt(body.hotelDaysBefore) : (existingEvent.hotelDaysBefore ?? 1);
+                const finalDaysAfter = body.hotelDaysAfter !== undefined ? parseInt(body.hotelDaysAfter) : (existingEvent.hotelDaysAfter ?? 1);
+                hotelDates = generateHotelDates(finalStartDate, finalEndDate, finalDaysBefore, finalDaysAfter);
                 hotelDefaultNights = generateDefaultHotelNights(hotelDates, finalStartDate, finalEndDate);
             }
             
@@ -319,6 +327,8 @@ app.http('events-update', {
                 sendCommitteeInvitationEmail: body.sendCommitteeInvitationEmail !== undefined ? body.sendCommitteeInvitationEmail : existingEvent.sendCommitteeInvitationEmail,
                 hotelEnabled: body.hotelEnabled !== undefined ? body.hotelEnabled : existingEvent.hotelEnabled,
                 hotelMandatory: body.hotelMandatory !== undefined ? body.hotelMandatory : existingEvent.hotelMandatory,
+                hotelDaysBefore: body.hotelDaysBefore !== undefined ? parseInt(body.hotelDaysBefore) : (existingEvent.hotelDaysBefore ?? 1),
+                hotelDaysAfter: body.hotelDaysAfter !== undefined ? parseInt(body.hotelDaysAfter) : (existingEvent.hotelDaysAfter ?? 1),
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()

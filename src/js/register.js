@@ -485,13 +485,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         const defaultNights = event.hotelDefaultNights || [];
         const isMandatory = event.hotelMandatory || false;
 
-        // Compute hotel dates: 1 day before event start through 1 day after event end
+        // Compute hotel dates using event-configured booking window
+        const daysBefore = event.hotelDaysBefore ?? 1;
+        const daysAfter = event.hotelDaysAfter ?? 1;
         const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const hotelDates = [];
         const startD = new Date(event.startDate + 'T12:00:00');
         const endD = new Date(event.endDate + 'T12:00:00');
-        startD.setDate(startD.getDate() - 1);
-        endD.setDate(endD.getDate() + 1);
+        startD.setDate(startD.getDate() - Math.max(0, daysBefore));
+        endD.setDate(endD.getDate() + Math.max(0, daysAfter));
         const cur = new Date(startD);
         while (cur <= endD) {
             hotelDates.push({ date: cur.toISOString().split('T')[0], dayLabel: dayLabels[cur.getDay()] });
