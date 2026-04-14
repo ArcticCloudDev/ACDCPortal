@@ -111,26 +111,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // Sync interest role: if user has a verified interest lead, ensure 'interest' is on participation
-        if (!currentParticipation.roles || !currentParticipation.roles.includes('interest')) {
-            try {
-                const resp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
-                if (resp.ok) {
-                    const data = await resp.json();
-                    const leads = Array.isArray(data) ? data : (data.leads || []);
-                    const hasInterestLead = leads.some(l =>
-                        l.email.toLowerCase() === currentUser.email.toLowerCase() &&
-                        l.eventId === eventId
-                    );
-                    if (hasInterestLead) {
-                        await API.participations.addRoles(currentParticipation.id, ['interest']);
-                        if (!currentParticipation.roles) currentParticipation.roles = [];
-                        currentParticipation.roles.push('interest');
-                    }
+        // Sync interest role with verified interest leads
+        try {
+            const resp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
+            if (resp.ok) {
+                const data = await resp.json();
+                const leads = Array.isArray(data) ? data : (data.leads || []);
+                const hasInterestLead = leads.some(l =>
+                    l.email.toLowerCase() === currentUser.email.toLowerCase() &&
+                    l.eventId === eventId
+                );
+                const hasInterestRole = currentParticipation.roles?.includes('interest');
+                if (hasInterestLead && !hasInterestRole) {
+                    await API.participations.addRoles(currentParticipation.id, ['interest']);
+                    if (!currentParticipation.roles) currentParticipation.roles = [];
+                    currentParticipation.roles.push('interest');
+                } else if (!hasInterestLead && hasInterestRole) {
+                    await API.participations.removeRoles(currentParticipation.id, ['interest']);
+                    currentParticipation.roles = currentParticipation.roles.filter(r => r !== 'interest');
                 }
-            } catch (e) {
-                console.error('Failed to sync interest role:', e);
             }
+        } catch (e) {
+            console.error('Failed to sync interest role:', e);
         }
         
         // Load teams for this event

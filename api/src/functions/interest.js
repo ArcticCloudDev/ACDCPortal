@@ -761,20 +761,16 @@ app.http('interest-delete', {
         try {
             const id = request.params.id;
 
-            const data = await leadsStorage.getRaw();
-            const leads = data.leads || [];
-            const leadIndex = leads.findIndex(l => l.id === id);
+            const lead = await leadsStorage.getById(id);
 
-            if (leadIndex < 0) {
+            if (!lead) {
                 return { status: 404, jsonBody: { error: 'Lead not found' } };
             }
 
-            const lead = leads[leadIndex];
             const email = lead.email;
 
-            // Remove the lead
-            leads.splice(leadIndex, 1);
-            await leadsStorage.saveRaw({ leads });
+            // Remove the lead (atomic single-row delete)
+            await leadsStorage.delete(id);
 
             // Cascade: clean up email deliveries for this lead
             let cleaned = { deliveries: 0, participations: 0 };
@@ -793,19 +789,22 @@ app.http('interest-delete', {
                 }
             } catch (e) { context.log(`Warning: delivery cleanup failed: ${e.message}`); }
 
-            // Cascade: clean up interest-only participations for this email
+            // Cascade: remove 'interest' role from SQL participations for this lead's email + event
             try {
-                const partData = await participationsStorage.getRaw() || { participations: [] };
-                const participations = partData.participations || [];
-                const beforePart = participations.length;
-                const filteredPart = participations.filter(p => {
-                    if (email && p.email?.toLowerCase() === email.toLowerCase() &&
-                        p.roles?.length === 1 && p.roles[0] === 'interest') return false;
-                    return true;
-                });
-                if (filteredPart.length < beforePart) {
-                    cleaned.participations = beforePart - filteredPart.length;
-                    await participationsStorage.saveRaw({ participations: filteredPart });
+                const allParts = await participationsStorage.getAll();
+                for (const p of allParts) {
+                    if (!email || p.email?.toLowerCase() !== email.toLowerCase()) continue;
+                    if (lead.eventId && p.eventId !== lead.eventId) continue;
+                    const roles = p.roles || [];
+                    if (!roles.includes('interest')) continue;
+                    if (roles.length === 1) {
+                        // Only role was 'interest' — delete the participation entirely
+                        await participationsStorage.delete(p.id);
+                    } else {
+                        // Has other roles — just strip 'interest'
+                        await participationsStorage.update(p.id, { roles: roles.filter(r => r !== 'interest') });
+                    }
+                    cleaned.participations++;
                 }
             } catch (e) { context.log(`Warning: participation cleanup failed: ${e.message}`); }
 
