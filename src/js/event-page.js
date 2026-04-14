@@ -1460,8 +1460,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Compute hotel dates from event start/end (1 day before to 1 day after)
     function computeHotelDates(startDate, endDate) {
-        const daysBefore = currentEvent.hotelDaysBefore ?? 1;
-        const daysAfter = currentEvent.hotelDaysAfter ?? 1;
+        const daysBefore = currentEvent.hotelDaysBefore ?? 0;
+        const daysAfter = currentEvent.hotelDaysAfter ?? 0;
         const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const dates = [];
 

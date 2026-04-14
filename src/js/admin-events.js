@@ -407,8 +407,8 @@ function showForm(event = null) {
         document.getElementById('event-single-registration-terms').value = event.singleRegistrationTerms || '';
         document.getElementById('event-hotel-enabled').checked = event.hotelEnabled || false;
         document.getElementById('event-hotel-mandatory').checked = event.hotelMandatory || false;
-        document.getElementById('event-hotel-days-before').value = event.hotelDaysBefore ?? 1;
-        document.getElementById('event-hotel-days-after').value = event.hotelDaysAfter ?? 1;
+        document.getElementById('event-hotel-days-before').value = event.hotelDaysBefore ?? 0;
+        document.getElementById('event-hotel-days-after').value = event.hotelDaysAfter ?? 0;
         
         // Set registration type
         const regType = event.registrationType || 'team';
@@ -568,8 +568,8 @@ async function handleFormSubmit(e) {
             singleRegistrationTerms: document.getElementById('event-single-registration-terms').value.trim() || null,
             hotelEnabled: document.getElementById('event-hotel-enabled').checked,
             hotelMandatory: document.getElementById('event-hotel-mandatory').checked,
-            hotelDaysBefore: parseInt(document.getElementById('event-hotel-days-before').value) || 1,
-            hotelDaysAfter: parseInt(document.getElementById('event-hotel-days-after').value) || 1,
+            hotelDaysBefore: parseInt(document.getElementById('event-hotel-days-before').value) || 0,
+            hotelDaysAfter: parseInt(document.getElementById('event-hotel-days-after').value) || 0,
         };
         
         // Only include team size if team type
