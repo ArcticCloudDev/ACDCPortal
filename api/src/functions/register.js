@@ -227,6 +227,20 @@ app.http('register-complete', {
             
             if (resolvedEventId) {
                 const roles = isParticipant ? ['participant'] : [];
+
+                // Pre-populate default hotel nights if hotel is enabled for this event
+                let defaultHotelNights = {};
+                try {
+                    const resolvedEvent = await Storage.events.getById(resolvedEventId);
+                    if (resolvedEvent?.hotelEnabled && resolvedEvent.hotelDefaultNights?.length) {
+                        for (const night of resolvedEvent.hotelDefaultNights) {
+                            defaultHotelNights[night] = true;
+                        }
+                    }
+                } catch (e) {
+                    context.log(`Could not load event for hotel defaults: ${e.message}`);
+                }
+
                 const participation = {
                     id: uuidv4(),
                     userId: userId,
@@ -235,7 +249,7 @@ app.http('register-complete', {
                     roles: roles,
                     teamId: teamId,
                     isTeamAdmin: !!teamId,
-                    hotelNights: {},
+                    hotelNights: defaultHotelNights,
                     hotelPaidBy: null,
                     createdAt: now,
                     updatedAt: now

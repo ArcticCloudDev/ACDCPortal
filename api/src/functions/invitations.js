@@ -570,6 +570,19 @@ app.http('invitations-accept', {
                     const initialHotelPaidBy = (inviteRole === 'committee' || inviteRole === 'judge')
                         ? 'committee' : null;
 
+                    // Pre-populate default hotel nights if hotel is enabled for this event
+                    let defaultHotelNights = {};
+                    try {
+                        const resolvedEvent = await Storage.events.getById(eventId);
+                        if (resolvedEvent?.hotelEnabled && resolvedEvent.hotelDefaultNights?.length) {
+                            for (const night of resolvedEvent.hotelDefaultNights) {
+                                defaultHotelNights[night] = true;
+                            }
+                        }
+                    } catch (e) {
+                        context.log(`Could not load event for hotel defaults: ${e.message}`);
+                    }
+
                     // Create new participation with roles[]
                     const newParticipation = {
                         id: uuidv4(),
@@ -579,7 +592,7 @@ app.http('invitations-accept', {
                         roles: [inviteRole],
                         teamId: invitation.teamId || null,
                         isTeamAdmin: false,
-                        hotelNights: {},
+                        hotelNights: defaultHotelNights,
                         hotelPaidBy: initialHotelPaidBy,
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
