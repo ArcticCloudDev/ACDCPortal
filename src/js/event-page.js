@@ -1053,15 +1053,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Build a participant card with full details
     function buildParticipantCard(user, membership, participation, canEdit, teamId) {
-        // Determine hotel status
+        // Determine hotel status — only shown when hotel is enabled for the event
         const hotelNights = participation.hotelNights || {};
         const hasAnyHotel = Object.values(hotelNights).some(v => v === true);
-        const hotelStatusHtml = hasAnyHotel
-            ? `<div class="hotel-status ok">🏨 Hotel ✓</div>`
-            : `<div class="hotel-status missing" title="Click to set hotel nights"
-                    onclick="openEditOnHotel('${user.id}', '${participation.id}', '${teamId}')">
-                    ⚠️ Hotel missing
-               </div>`;
+        let hotelStatusHtml = '';
+        if (currentEvent.hotelEnabled) {
+            hotelStatusHtml = hasAnyHotel
+                ? `<div class="hotel-status ok">🏨 Hotel ✓</div>`
+                : `<div class="hotel-status missing" title="Click to set hotel nights"
+                        onclick="openEditOnHotel('${user.id}', '${participation.id}', '${teamId}')">
+                        ⚠️ Hotel missing
+                   </div>`;
+        }
 
         return `
             <div class="participant-card ${canEdit ? 'editable' : ''}" 
@@ -1124,24 +1127,29 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 rolesTab.classList.add('hidden');
             }
-            
-            // Build hotel calendar from event data
-            buildHotelCalendar();
-            
-            // Populate hotel nights from participation data
-            const hotelNights = participation?.hotelNights || {};
-            const defaultNights = currentEvent.hotelDefaultNights || [];
-            
-            document.querySelectorAll('.hotel-calendar input[type="checkbox"]').forEach(cb => {
-                const nightId = cb.dataset.nightId;
-                // Check if this night is in saved data, otherwise use default
-                if (hotelNights[nightId] !== undefined) {
-                    cb.checked = hotelNights[nightId];
-                } else {
-                    cb.checked = defaultNights.includes(nightId);
-                }
-            });
-            updateHotelNightsCount();
+
+            // Show/hide hotel tab based on event config
+            const hotelTabBtn = document.getElementById('tab-hotel-btn');
+            if (currentEvent.hotelEnabled) {
+                hotelTabBtn.classList.remove('hidden');
+                // Build hotel calendar from event data
+                buildHotelCalendar();
+                // Populate hotel nights from participation data
+                const hotelNights = participation?.hotelNights || {};
+                const defaultNights = currentEvent.hotelDefaultNights || [];
+                document.querySelectorAll('.hotel-calendar input[type="checkbox"]').forEach(cb => {
+                    const nightId = cb.dataset.nightId;
+                    // Check if this night is in saved data, otherwise use default
+                    if (hotelNights[nightId] !== undefined) {
+                        cb.checked = hotelNights[nightId];
+                    } else {
+                        cb.checked = defaultNights.includes(nightId);
+                    }
+                });
+                updateHotelNightsCount();
+            } else {
+                hotelTabBtn.classList.add('hidden');
+            }
             
             // Show modal
             modal.classList.add('active');
@@ -1155,7 +1163,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Update hotel alert on role confirmation section
     function updateRoleHotelAlert() {
         const hotelAlert = document.getElementById('role-hotel-alert');
-        if (!hotelAlert || !currentEvent?.hotelDates || currentEvent.hotelDates.length === 0) return;
+        if (!hotelAlert) return;
+        if (!currentEvent?.hotelEnabled) {
+            hotelAlert.innerHTML = '';
+            return;
+        }
+        if (!currentEvent?.hotelDates || currentEvent.hotelDates.length === 0) return;
         
         const hotelNights = currentParticipation?.hotelNights || {};
         const hasAnyNight = Object.values(hotelNights).some(v => v === true);
@@ -1193,6 +1206,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Hide roles tab (no team context)
         document.getElementById('tab-roles-btn').classList.add('hidden');
+
+        // Show/hide hotel tab based on event config
+        const hotelTabBtn = document.getElementById('tab-hotel-btn');
+        if (currentEvent.hotelEnabled) {
+            hotelTabBtn.classList.remove('hidden');
+        } else {
+            hotelTabBtn.classList.add('hidden');
+        }
         
         // Populate with current user data
         document.getElementById('edit-userId').value = currentUser.id;
@@ -1206,18 +1227,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('edit-allergies').value = currentUser.allergies || '';
         
         // Build hotel calendar and populate
-        buildHotelCalendar();
-        const hotelNights = currentParticipation?.hotelNights || {};
-        const defaultNights = currentEvent.hotelDefaultNights || [];
-        document.querySelectorAll('.hotel-calendar input[type="checkbox"]').forEach(cb => {
-            const nightId = cb.dataset.nightId;
-            if (hotelNights[nightId] !== undefined) {
-                cb.checked = hotelNights[nightId];
-            } else {
-                cb.checked = defaultNights.includes(nightId);
-            }
-        });
-        updateHotelNightsCount();
+        if (currentEvent.hotelEnabled) {
+            buildHotelCalendar();
+            const hotelNights = currentParticipation?.hotelNights || {};
+            const defaultNights = currentEvent.hotelDefaultNights || [];
+            document.querySelectorAll('.hotel-calendar input[type="checkbox"]').forEach(cb => {
+                const nightId = cb.dataset.nightId;
+                if (hotelNights[nightId] !== undefined) {
+                    cb.checked = hotelNights[nightId];
+                } else {
+                    cb.checked = defaultNights.includes(nightId);
+                }
+            });
+            updateHotelNightsCount();
+        }
         
         // Clear any old messages
         document.getElementById('edit-participant-error').classList.add('hidden');
