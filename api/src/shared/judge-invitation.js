@@ -29,14 +29,9 @@ async function buildJudgeInvitationEmail(invitation, context) {
         const firstName = inviteeUser ? inviteeUser.firstName : invitation.email.split('@')[0];
         const fullName = inviteeUser ? `${inviteeUser.firstName} ${inviteeUser.lastName}` : firstName;
 
-        // Load system email config
-        const fs = require('fs').promises;
-        const path = require('path');
+        // Load system email config from SQL
         const { processTemplate } = require('./mail');
-
-        const configPath = path.join(__dirname, '../../data/system-email-config.json');
-        const configData = await fs.readFile(configPath, 'utf-8');
-        const config = JSON.parse(configData);
+        const config = await Storage.readData('system-email-config.json');
         const template = config.templates['invitation-judge'];
 
         if (!template) {

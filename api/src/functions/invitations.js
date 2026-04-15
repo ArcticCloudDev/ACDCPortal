@@ -161,10 +161,8 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
 // Helper to build team welcome email for invited participants using the team-welcome template
 async function buildTeamWelcomeEmailForInvitation(invitation, context) {
     try {
-        // Load system email config
-        const configPath = path.join(__dirname, '../../data/system-email-config.json');
-        const configData = await fs.readFile(configPath, 'utf-8');
-        const config = JSON.parse(configData);
+        // Load system email config from SQL
+        const config = await Storage.readData('system-email-config.json');
         const template = config.templates['team-welcome'];
 
         if (!template) {

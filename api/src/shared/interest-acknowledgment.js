@@ -42,14 +42,9 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
         const memberUser = users.find(u => u.email?.toLowerCase() === memberEmail.toLowerCase());
         const fullName = memberUser ? `${memberUser.firstName} ${memberUser.lastName}` : memberEmail;
 
-        // Load system email config
+        // Load system email config from SQL
         const { processTemplate } = require('./mail');
-        const fs = require('fs').promises;
-        const path = require('path');
-
-        const configPath = path.join(__dirname, '../../data/system-email-config.json');
-        const configData = await fs.readFile(configPath, 'utf-8');
-        const config = JSON.parse(configData);
+        const config = await Storage.readData('system-email-config.json');
         const template = config.templates['interest-acknowledgment'];
 
         if (!template) {

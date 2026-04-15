@@ -54,10 +54,8 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
         const path = require('path');
         const { processTemplate } = require('./mail');
 
-        // Load system email config
-        const configPath = path.join(__dirname, '../../data/system-email-config.json');
-        const configData = await fs.readFile(configPath, 'utf-8');
-        const config = JSON.parse(configData);
+        // Load system email config from SQL
+        const config = await Storage.readData('system-email-config.json');
         const template = config.templates['team-welcome'];
 
         if (!template) {
