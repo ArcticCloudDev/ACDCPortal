@@ -1582,10 +1582,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             allergies: document.getElementById('edit-allergies').value.trim()
         };
         
-        // Validate required fields
-        if (!userData.firstName || !userData.lastName) {
-            errorDiv.textContent = 'First Name and Last Name are required.';
+        // Validate required fields — switch to Personal tab so errors are visible
+        if (!userData.firstName || !userData.lastName || !userData.phone) {
+            // Switch to Personal tab
+            document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector('.modal-tab[data-tab="tab-personal"]').classList.add('active');
+            document.getElementById('tab-personal').classList.add('active');
+            const missing = [];
+            if (!userData.firstName) missing.push('First Name');
+            if (!userData.lastName)  missing.push('Last Name');
+            if (!userData.phone)     missing.push('Phone');
+            errorDiv.textContent = `${missing.join(', ')} ${missing.length > 1 ? 'are' : 'is'} required.`;
             errorDiv.classList.remove('hidden');
+            // Focus the first missing field
+            if (!userData.firstName)     document.getElementById('edit-firstName').focus();
+            else if (!userData.lastName) document.getElementById('edit-lastName').focus();
+            else                         document.getElementById('edit-phone').focus();
             return;
         }
         
