@@ -219,10 +219,3 @@ app.http('interest-queue-mark-notified', {
         }
     }
 });
-        } catch (error) {
-            await logError(context, error);
-            context.error('Error marking as notified:', error);
-            return { status: 500, jsonBody: { error: error.message } };
-        }
-    }
-});
