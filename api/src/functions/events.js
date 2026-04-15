@@ -76,9 +76,9 @@ function generateDefaultHotelNights(hotelDates, eventStartDate, eventEndDate) {
             continue;
         }
         
-        // Include nights from event start through event end
-        // (last event day → next morning checkout is a valid default)
-        if (currentDate >= eventStart && currentDate <= eventEnd) {
+        // Include nights strictly within the event (first day up to but not including end day).
+        // Nights before the event or on/after the event end date are extra — not defaults.
+        if (currentDate >= eventStart && currentDate < eventEnd) {
             const fromDay = dayLabels[currentDate.getDay()];
             const toDay = dayLabels[nextDate.getDay()];
             defaults.push(`${fromDay}-${toDay}`);
