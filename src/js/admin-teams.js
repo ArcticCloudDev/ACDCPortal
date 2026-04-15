@@ -6,6 +6,7 @@ let allTeams = [];
 let teamCounts = {};
 let allParticipations = [];
 let allUsers = [];
+let allInvitations = [];
 const expandedTeams = new Set();
 let currentPermissions = null;
 
@@ -50,11 +51,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadData() {
     try {
-        const [events, teams, participations, users] = await Promise.all([
+        const [events, teams, participations, users, invitations] = await Promise.all([
             API.events.list(),
             API.teams.list(),
             API.participations.list(),
-            API.users.list()
+            API.users.list(),
+            API.invitations.list()
         ]);
 
         // Scope event-bearing entities by permissions
@@ -62,6 +64,7 @@ async function loadData() {
         allTeams = Permissions.filterByEvent(currentPermissions, teams);
         allParticipations = Permissions.filterByEvent(currentPermissions, participations);
         allUsers = users || [];
+        allInvitations = (invitations || []).filter(i => i.status === 'pending');
 
         populateEventFilter();
 
@@ -148,6 +151,7 @@ function renderTeamsTable() {
         });
         
         const memberCount = teamCounts[team.id] || 0;
+        const pendingCount = allInvitations.filter(i => i.teamId === team.id).length;
         const committed = team.committedParticipants || 3;
         
         let countClass = 'partial';
@@ -185,14 +189,30 @@ function renderTeamsTable() {
             `;
         }).join('');
 
+        const pendingInvites = allInvitations.filter(i => i.teamId === team.id);
+        const inviteRows = pendingInvites.map(invite => {
+            const isExpiredInvite = invite.isExpired;
+            const cancelBtn = canDelete
+                ? `<button class="btn-sm" style="color:#dc2626;border-color:#fca5a5;" onclick="cancelInvitation('${invite.id}', '${escapeHtml(invite.email).replace(/'/g, "\\'")}', '${team.id}')">Cancel</button>`
+                : '';
+            return `
+                <tr style="opacity:${isExpiredInvite ? '0.6' : '1'}">
+                    <td><em style="color:#64748b;">${escapeHtml(invite.email)}</em></td>
+                    <td><span class="badge partial" style="font-size:0.7rem;">${isExpiredInvite ? 'Expired' : 'Invited'}</span></td>
+                    <td style="text-align:right;">${cancelBtn}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const totalShown = members.length + pendingInvites.length;
         const detailsHtml = isExpanded ? `
             <tr class="member-details-row">
                 <td colspan="6">
                     <div class="member-details-wrap">
-                        <div class="member-title">Team Members (${members.length})</div>
-                        ${members.length === 0
-                            ? '<div class="member-empty">No members in this team.</div>'
-                            : `<table class="member-list"><tbody>${memberRows}</tbody></table>`}
+                        <div class="member-title">Team Members (${members.length})${pendingInvites.length > 0 ? ` &nbsp;Â·&nbsp; <span style="color:#64748b;font-weight:normal;">${pendingInvites.length} pending invite${pendingInvites.length > 1 ? 's' : ''}</span>` : ''}</div>
+                        ${totalShown === 0
+                            ? '<div class="member-empty">No members or invitations yet.</div>'
+                            : `<table class="member-list"><tbody>${memberRows}${inviteRows}</tbody></table>`}
                     </div>
                 </td>
             </tr>
@@ -203,7 +223,7 @@ function renderTeamsTable() {
                 <td><strong>${escapeHtml(team.teamName)}</strong></td>
                 <td>${event ? escapeHtml(event.name) : '<em style="color:#94a3b8">Unknown</em>'}</td>
                 <td style="color: #64748b;">${escapeHtml(adminInfo.name || adminInfo.email || 'Unknown')}</td>
-                <td><span class="badge ${countClass}">${memberCount}/${committed}</span></td>
+                <td><span class="badge ${countClass}" title="${memberCount} members${pendingCount > 0 ? ', ' + pendingCount + ' invited' : ''}">${memberCount}${pendingCount > 0 ? '+' + pendingCount : ''}/${committed}</span></td>
                 <td style="color: #64748b;">${createdDate}</td>
                 <td style="display: flex; gap: 6px; align-items: center;">
                     <button class="btn-sm expand-btn" onclick="toggleTeamMembers('${team.id}')">${isExpanded ? 'Hide' : 'Members'}</button>
@@ -257,6 +277,19 @@ function toggleTeamMembers(teamId) {
         expandedTeams.add(teamId);
     }
     renderTeamsTable();
+}
+
+async function cancelInvitation(inviteId, email, teamId) {
+    if (!confirm(`Cancel invitation for "${email}"?`)) return;
+    try {
+        await API.invitations.cancel(inviteId);
+        allInvitations = allInvitations.filter(i => i.id !== inviteId);
+        renderTeamsTable();
+        updateStats();
+    } catch (error) {
+        console.error('Error cancelling invitation:', error);
+        alert('Failed to cancel invitation: ' + error.message);
+    }
 }
 
 async function removeTeamMember(participationId, memberName, teamId) {
@@ -326,7 +359,7 @@ function escapeHtml(text) {
 }
 
 async function deleteTeam(teamId, teamName) {
-    if (!confirm(`Are you sure you want to delete team "${teamName}"?\n\nThis will also remove:\n• Team memberships from all participants\n• Hotel bookings (for participants with no other role)\n• Badge claims for this team\n• Pending invitations\n\nThis action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete team "${teamName}"?\n\nThis will also remove:\nï¿½ Team memberships from all participants\nï¿½ Hotel bookings (for participants with no other role)\nï¿½ Badge claims for this team\nï¿½ Pending invitations\n\nThis action cannot be undone.`)) {
         return;
     }
 
