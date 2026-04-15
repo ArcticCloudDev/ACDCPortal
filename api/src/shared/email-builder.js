@@ -38,6 +38,10 @@ function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
         ? (mergeData[templateConfig.buttonUrlField] || '#')
         : null;
 
+    // Process body and closing through template engine so merge fields ({{fullName}} etc.) are resolved
+    const bodyText = processTemplate(mergeData.bodyText || '', mergeData);
+    const closingText = processTemplate(mergeData.closingText || '', mergeData);
+
     // --- Optional blocks ---
 
     // Team details box (team-registration)
@@ -105,13 +109,13 @@ function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
                     <tr>
                         <td style="padding: 40px;">
                             <div style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #475569;">
-                                ${mergeData.bodyText || ''}
+                                ${bodyText}
                             </div>
                             ${teamBoxHtml}
                             ${buttonHtml}
                             ${expiryHtml}
                             <div style="margin: 24px 0 0 0; font-size: 16px; line-height: 1.6; color: #475569;">
-                                ${mergeData.closingText || ''}
+                                ${closingText}
                             </div>
                         </td>
                     </tr>

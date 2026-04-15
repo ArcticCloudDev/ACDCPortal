@@ -1,6 +1,10 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { readData, writeData } = require('../shared/storage');
+const Storage = require('../shared/storage');
+const ParticipationsStore = new Storage.Storage('participations');
+const InvitationsStore = new Storage.Storage('invitations');
+const SoloQueueStore = new Storage.Storage('solo-queue');
+const EmailLogStore = new Storage.Storage('email-log');
 const { sendEmail, sendBulkEmail, processTemplate, SENDER_EMAIL } = require('../shared/mail');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
@@ -111,20 +115,11 @@ app.http('email-recipients', {
             }
 
             // Load all data
-            const usersData = await readData('users.json');
-            const users = Array.isArray(usersData) ? usersData : (usersData.users || []);
-            
-            const teamsData = await readData('teams.json');
-            const teams = Array.isArray(teamsData) ? teamsData : (teamsData.teams || []);
-            
-            const participationsData = await readData('participations.json');
-            const participations = Array.isArray(participationsData) ? participationsData : (participationsData.participations || []);
-            
-            const invitationsData = await readData('invitations.json');
-            const invitations = Array.isArray(invitationsData) ? invitationsData : (invitationsData.invitations || []);
-            
-            const soloQueueData = await readData('solo-queue.json');
-            const soloQueue = Array.isArray(soloQueueData) ? soloQueueData : (soloQueueData.entries || []);
+            const users = await Storage.users.getAll();
+            const teams = await Storage.teams.getAll();
+            const participations = await ParticipationsStore.getAll();
+            const invitations = await InvitationsStore.getAll();
+            const soloQueue = await SoloQueueStore.getAll();
 
             // Get teams for this event
             const eventTeams = teams.filter(t => t.eventId === eventId);
@@ -265,12 +260,10 @@ app.http('email-send', {
             }
             
             emailLog.status = emailLog.results.failed === 0 ? 'completed' : 'completed-with-errors';
-            
+
             // Save to log
-            const logData = await readData('email-log.json');
-            logData.emails.push(emailLog);
-            await writeData('email-log.json', logData);
-            
+            await EmailLogStore.create(emailLog);
+
             return { status: 200, jsonBody: emailLog };
         } catch (error) {
             await logError(context, error);
@@ -287,11 +280,9 @@ app.http('email-history', {
     route: 'email/history',
     handler: async (request, context) => {
         try {
-            const logData = await readData('email-log.json');
+            const allEmails = await EmailLogStore.getAll();
             // Return most recent first
-            const emails = logData.emails.sort((a, b) => 
-                new Date(b.sentAt) - new Date(a.sentAt)
-            );
+            const emails = allEmails.sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
             return { status: 200, jsonBody: emails };
         } catch (error) {
             await logError(context, error);

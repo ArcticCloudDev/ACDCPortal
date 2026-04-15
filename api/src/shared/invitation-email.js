@@ -1,6 +1,6 @@
 // Invitation Email Builder - Unified builder for judge & committee invitation emails
 // Uses the invitation's role to select the correct template config from system-email-config.json.
-const { readData } = require('./storage');
+const Storage = require('./storage');
 const { logError } = require('./error-log');
 const { buildEmailHtml } = require('./email-builder');
 
@@ -22,8 +22,7 @@ async function buildInvitationEmail(invitation, context) {
 
     try {
         // Get event
-        const events = await readData('events.json');
-        const event = events.find(e => e.id === invitation.eventId);
+        const event = await Storage.events.getById(invitation.eventId);
         if (!event) {
             context.warn(`Event ${invitation.eventId} not found for ${role} invitation email`);
             return { success: false, reason: 'Event not found' };
@@ -36,8 +35,7 @@ async function buildInvitationEmail(invitation, context) {
         }
 
         // Get invitee's name if they exist in users
-        const users = await readData('users.json');
-        const inviteeUser = users.find(u => u.email?.toLowerCase() === invitation.email.toLowerCase());
+        const inviteeUser = await Storage.users.getByEmail(invitation.email);
         const firstName = inviteeUser ? inviteeUser.firstName : invitation.email.split('@')[0];
         const fullName = inviteeUser ? `${inviteeUser.firstName} ${inviteeUser.lastName}` : firstName;
 

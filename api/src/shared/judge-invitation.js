@@ -1,6 +1,6 @@
 // Judge Invitation Email - Send invitation email when someone is invited as a judge
 const { buildEmailHtml } = require('./email-builder');
-const { readData } = require('./storage');
+const Storage = require('./storage');
 const { logError } = require('./error-log');
 
 /**
@@ -12,8 +12,7 @@ const { logError } = require('./error-log');
 async function buildJudgeInvitationEmail(invitation, context) {
     try {
         // Get event
-        const events = await readData('events.json');
-        const event = events.find(e => e.id === invitation.eventId);
+        const event = await Storage.events.getById(invitation.eventId);
         if (!event) {
             context.warn(`Event ${invitation.eventId} not found for judge invitation email`);
             return { success: false, reason: 'Event not found' };
@@ -26,8 +25,7 @@ async function buildJudgeInvitationEmail(invitation, context) {
         }
 
         // Get invitee's name if they exist in users
-        const users = await readData('users.json');
-        const inviteeUser = users.find(u => u.email?.toLowerCase() === invitation.email.toLowerCase());
+        const inviteeUser = await Storage.users.getByEmail(invitation.email);
         const firstName = inviteeUser ? inviteeUser.firstName : invitation.email.split('@')[0];
         const fullName = inviteeUser ? `${inviteeUser.firstName} ${inviteeUser.lastName}` : firstName;
 

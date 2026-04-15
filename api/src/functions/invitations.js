@@ -1,6 +1,5 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { readData, writeData } = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
 const { buildInvitationEmail } = require('../shared/invitation-email');
 const { buildEmailHtml } = require('../shared/email-builder');
@@ -9,15 +8,19 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const path = require('path');
 
+// Atomic per-row stores — no delete-all-reinsert, ever
+const InvitationsStore = new Storage.Storage('invitations');
+const ParticipationsStore = new Storage.Storage('participations');
+const UsersStore = new Storage.Storage('users');
+const EmailDeliveriesStore = new Storage.Storage('email-deliveries');
+const EmailCampaignsStore = new Storage.Storage('email-campaigns');
+
 /**
  * Trigger sequence emails for a user after accepting invitation.
- * Same logic as participations.js triggerSequenceEmails but uses readData/writeData.
  */
 async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, context) {
     try {
-        const usersData = await readData('users.json');
-        const users = Array.isArray(usersData) ? usersData : (usersData.users || []);
-        const user = users.find(u => u.id === userId);
+        const user = await Storage.users.getById(userId);
         const email = user?.email || userEmail;
         const firstName = user?.firstName || 'Participant';
 
@@ -27,16 +30,13 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
         }
 
         // Look up event to get its sequenceId
-        const eventsData = await readData('events.json');
-        const events = Array.isArray(eventsData) ? eventsData : (eventsData.events || []);
-        const event = events.find(e => e.id === eventId);
+        const event = await Storage.events.getById(eventId);
         if (!event || !event.sequenceEnabled || !event.sequenceId) {
             context.log(`Event ${eventId} not found or sequence not enabled`);
             return;
         }
 
-        const campaignData = await readData('email-campaigns.json');
-        const campaigns = campaignData?.campaigns || campaignData || [];
+        const campaigns = await EmailCampaignsStore.getAll();
         const sequenceCampaigns = campaigns
             .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence' && c.status === 'live')
             .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
@@ -46,10 +46,9 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
             return;
         }
 
-        const deliveryData = await readData('email-deliveries.json') || { deliveries: [] };
-        const deliveries = deliveryData.deliveries || [];
+        const allDeliveries = await EmailDeliveriesStore.getAll();
         const userDeliveries = new Set(
-            deliveries
+            allDeliveries
                 .filter(d => d.email.toLowerCase() === email.toLowerCase() && d.status === 'sent')
                 .map(d => d.campaignId)
         );
@@ -62,10 +61,6 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
         }
 
         // Build digest email with all unsent campaigns in one message
-        const fs = require('fs').promises;
-        const path = require('path');
-        const { processTemplate } = require('../shared/mail');
-
         const messageBlocks = campaignsToSend.map((campaign, index) => `
             <tr>
                 <td style="padding: 0;">
@@ -128,9 +123,9 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
                 htmlContent: digestHtml
             });
 
-            // Record deliveries for all campaigns included in the digest
+            // Record each delivery atomically — no delete-all-reinsert
             for (const campaign of campaignsToSend) {
-                deliveries.push({
+                await EmailDeliveriesStore.create({
                     id: uuidv4(),
                     campaignId: campaign.id,
                     email: email,
@@ -145,7 +140,7 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
         } catch (err) {
             await logError(context, err);
             for (const campaign of campaignsToSend) {
-                deliveries.push({
+                await EmailDeliveriesStore.create({
                     id: uuidv4(),
                     campaignId: campaign.id,
                     email: email,
@@ -157,27 +152,10 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
             }
             context.log(`Failed to send digest to ${email}: ${err.message}`);
         }
-
-        await writeData('email-deliveries.json', { deliveries });
     } catch (error) {
         await logError(context, error);
         context.log(`Warning: Failed to trigger sequence emails: ${error.message}`);
     }
-}
-
-// Helper to get invitations array from data (handles both {invitations:[]} and [] formats)
-function getInvitationsArray(data) {
-    return data.invitations || data;
-}
-
-// Helper to get users array from data (users.json is a plain array)
-function getUsersArray(data) {
-    return Array.isArray(data) ? data : (data.users || []);
-}
-
-// Helper to get teams array from data (teams.json is a plain array)
-function getTeamsArray(data) {
-    return Array.isArray(data) ? data : (data.teams || []);
 }
 
 // Helper to build team welcome email for invited participants using the team-welcome template
@@ -262,8 +240,7 @@ app.http('invitations-create', {
 
             if (teamId) {
                 // Team-based invitation — get team info
-                const teamsData = await readData('teams.json');
-                const team = teamsData.find(t => t.id === teamId);
+                const team = await Storage.teams.getById(teamId);
                 if (!team) {
                     return { status: 404, jsonBody: { error: 'Team not found' } };
                 }
@@ -272,8 +249,7 @@ app.http('invitations-create', {
 
                 // Check if user already on a team (only for participant invites)
                 if (!role || role === 'participant') {
-                    const usersData = await readData('users.json');
-                    const existingUser = usersData.find(u => u.email.toLowerCase() === email.toLowerCase());
+                    const existingUser = await Storage.users.getByEmail(email);
                     if (existingUser && existingUser.teamId) {
                         return { status: 400, jsonBody: { error: `${email} is already on a team` } };
                     }
@@ -281,9 +257,8 @@ app.http('invitations-create', {
             }
             
             // Check for existing pending invitation for same email+event+role combo
-            const invitationsData = await readData('invitations.json');
-            const invitations = invitationsData.invitations || invitationsData;
-            const existingInvite = invitations.find(i => {
+            const allInvitations = await InvitationsStore.getAll();
+            const existingInvite = allInvitations.find(i => {
                 if (i.email.toLowerCase() !== email.toLowerCase() || i.status !== 'pending') return false;
                 // For role invites, check same event+role
                 if (role && i.role === role && i.eventId === resolvedEventId) return true;
@@ -321,14 +296,7 @@ app.http('invitations-create', {
                 expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
             };
             
-            // Handle both {invitations: []} and plain [] formats
-            if (invitationsData.invitations) {
-                invitationsData.invitations.push(invitation);
-                await writeData('invitations.json', invitationsData);
-            } else {
-                invitationsData.push(invitation);
-                await writeData('invitations.json', { invitations: invitationsData });
-            }
+            await InvitationsStore.create(invitation);
             
             // For judge/committee invitations: add to allowed emails
             // This ensures they can log in when they click the invitation link
@@ -396,9 +364,8 @@ app.http('invitations-list', {
             const teamId = request.query.get('teamId');
             const email = request.query.get('email');
             
-            const invitationsData = await readData('invitations.json');
-            let invitations = invitationsData.invitations || invitationsData;
-            
+            let invitations = await InvitationsStore.getAll();
+
             // Filter by team
             if (teamId) {
                 invitations = invitations.filter(i => i.teamId === teamId);
@@ -435,16 +402,14 @@ app.http('invitations-get', {
     handler: async (request, context) => {
         try {
             const id = request.params.id;
-            const invitationsData = await readData('invitations.json');
-            const invitations = getInvitationsArray(invitationsData);
-            const invitation = invitations.find(i => i.id === id);
-            
+            const invitation = await InvitationsStore.getById(id);
+
             if (!invitation) {
                 return { status: 404, jsonBody: { error: 'Invitation not found' } };
             }
-            
+
             const isExpired = new Date(invitation.expiresAt) < new Date();
-            
+
             // Enrich with event name if eventId is present
             let eventName = null;
             let eventStartDate = null;
@@ -452,8 +417,7 @@ app.http('invitations-get', {
             let eventLocation = null;
             if (invitation.eventId) {
                 try {
-                    const eventsData = await readData('events.json');
-                    const event = eventsData.find(e => e.id === invitation.eventId);
+                    const event = await Storage.events.getById(invitation.eventId);
                     if (event) {
                         eventName = event.name;
                         eventStartDate = event.startDate || null;
@@ -493,16 +457,12 @@ app.http('invitations-accept', {
                 return { status: 400, jsonBody: { error: 'userId and userEmail are required' } };
             }
             
-            const invitationsData = await readData('invitations.json');
-            const invitations = getInvitationsArray(invitationsData);
-            const invitationIndex = invitations.findIndex(i => i.id === id);
-            
-            if (invitationIndex === -1) {
+            const invitation = await InvitationsStore.getById(id);
+
+            if (!invitation) {
                 return { status: 404, jsonBody: { error: 'Invitation not found' } };
             }
-            
-            const invitation = invitations[invitationIndex];
-            
+
             // Verify email matches
             if (invitation.email.toLowerCase() !== userEmail.toLowerCase()) {
                 return { status: 403, jsonBody: { error: 'Email does not match invitation' } };
@@ -521,56 +481,41 @@ app.http('invitations-accept', {
             // Resolve eventId from team if not on invitation
             let eventId = invitation.eventId;
             if (!eventId && invitation.teamId) {
-                const teamsData = await readData('teams.json');
-                const teams = getTeamsArray(teamsData);
-                const team = teams.find(t => t.id === invitation.teamId);
+                const team = await Storage.teams.getById(invitation.teamId);
                 eventId = team?.eventId;
             }
             
-            // Get user info
-            const usersData = await readData('users.json');
-            const users = getUsersArray(usersData);
-            const userIndex = users.findIndex(u => u.id === userId);
-            
-            if (userIndex === -1) {
+            // Get user and update atomically
+            const existingUser = await UsersStore.getById(userId);
+
+            if (!existingUser) {
                 return { status: 404, jsonBody: { error: 'User not found' } };
             }
-            
-            // For team participant invites, update legacy teamId on user
+
+            const userUpdates = { updatedAt: new Date().toISOString() };
             if (invitation.teamId && (!invitation.role || invitation.role === 'participant')) {
-                users[userIndex].teamId = invitation.teamId;
-                users[userIndex].updatedAt = new Date().toISOString();
+                userUpdates.teamId = invitation.teamId;
             }
-            
-            // Fill in first/last name from invitation if user has blank values
-            if (invitation.inviteeFirstName && !users[userIndex].firstName) {
-                users[userIndex].firstName = invitation.inviteeFirstName;
+            if (invitation.inviteeFirstName && !existingUser.firstName) {
+                userUpdates.firstName = invitation.inviteeFirstName;
             }
-            if (invitation.inviteeLastName && !users[userIndex].lastName) {
-                users[userIndex].lastName = invitation.inviteeLastName;
+            if (invitation.inviteeLastName && !existingUser.lastName) {
+                userUpdates.lastName = invitation.inviteeLastName;
             }
+            await UsersStore.update(userId, userUpdates);
             
-            await writeData('users.json', users);
-            
-            // Create or update participation for this event
+            // Create or update participation for this event (atomic per-row)
             if (eventId) {
-                const participationsData = await readData('participations.json');
-                const participations = participationsData.participations || participationsData;
-                
-                // Determine roles for this invitation
                 const inviteRole = invitation.role || 'participant';
-                
-                // Check if user already has a participation for this event (email + eventId is the unique key)
-                let participationIndex = participations.findIndex(
+                const allParticipations = await ParticipationsStore.getAll();
+                const existingParticipation = allParticipations.find(
                     p => p.email?.toLowerCase() === userEmail.toLowerCase() && p.eventId === eventId
                 );
-                
-                if (participationIndex === -1) {
-                    // Determine hotelPaidBy for judges/committee
+
+                if (!existingParticipation) {
                     const initialHotelPaidBy = (inviteRole === 'committee' || inviteRole === 'judge')
                         ? 'committee' : null;
 
-                    // Pre-populate default hotel nights if hotel is enabled for this event
                     let defaultHotelNights = {};
                     try {
                         const resolvedEvent = await Storage.events.getById(eventId);
@@ -583,12 +528,11 @@ app.http('invitations-accept', {
                         context.log(`Could not load event for hotel defaults: ${e.message}`);
                     }
 
-                    // Create new participation with roles[]
-                    const newParticipation = {
+                    await ParticipationsStore.create({
                         id: uuidv4(),
-                        eventId: eventId,
+                        eventId,
                         email: userEmail.toLowerCase(),
-                        userId: userId,
+                        userId,
                         roles: [inviteRole],
                         teamId: invitation.teamId || null,
                         isTeamAdmin: false,
@@ -596,49 +540,45 @@ app.http('invitations-accept', {
                         hotelPaidBy: initialHotelPaidBy,
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
-                    };
-                    participations.push(newParticipation);
+                    });
                 } else {
-                    // Update existing participation — add role
-                    const existing = participations[participationIndex];
-                    if (!existing.roles) existing.roles = [];
-                    if (!existing.roles.includes(inviteRole)) {
-                        existing.roles.push(inviteRole);
-                    }
-                    // If team invite, set the team and update teamMemberships
+                    const updatedRoles = [...(existingParticipation.roles || [])];
+                    if (!updatedRoles.includes(inviteRole)) updatedRoles.push(inviteRole);
+
+                    const partUpdates = {
+                        roles: updatedRoles,
+                        userId: existingParticipation.userId || userId,
+                        email: existingParticipation.email || userEmail.toLowerCase(),
+                        updatedAt: new Date().toISOString()
+                    };
+
                     if (invitation.teamId && inviteRole === 'participant') {
-                        existing.teamId = invitation.teamId;
-                        existing.isTeamAdmin = false;
-                        // Remove 'interest' role — user is upgrading to full participant
-                        const interestIdx = existing.roles.indexOf('interest');
+                        partUpdates.teamId = invitation.teamId;
+                        partUpdates.isTeamAdmin = false;
+                        const interestIdx = updatedRoles.indexOf('interest');
                         if (interestIdx !== -1) {
-                            existing.roles.splice(interestIdx, 1);
-                            // Track the conversion from interest to participant
-                            existing.convertedFrom = 'interest';
-                            existing.convertedAt = new Date().toISOString();
-                            existing.convertedVia = 'invitation';
-                            existing.invitationId = invitation.id;
+                            updatedRoles.splice(interestIdx, 1);
+                            partUpdates.roles = updatedRoles;
+                            partUpdates.convertedFrom = 'interest';
+                            partUpdates.convertedAt = new Date().toISOString();
+                            partUpdates.convertedVia = 'invitation';
+                            partUpdates.invitationId = invitation.id;
                         }
                     }
-                    // Populate userId/email if missing
-                    existing.userId = existing.userId || userId;
-                    existing.email = existing.email || userEmail.toLowerCase();
-                    existing.updatedAt = new Date().toISOString();
-                    participations[participationIndex] = existing;
-                }
-                
-                await writeData('participations.json', { participations });
 
-                // Trigger sequence emails for ALL roles — judges/committee get the same info as participants
+                    await ParticipationsStore.update(existingParticipation.id, partUpdates);
+                }
+
                 triggerSequenceEmailsForInvite(userId, userEmail, eventId, context)
                     .catch(err => context.log(`Failed sequence emails for ${userEmail}: ${err.message}`));
             }
-            
-            // Update invitation status
-            invitations[invitationIndex].status = 'accepted';
-            invitations[invitationIndex].acceptedAt = new Date().toISOString();
-            invitations[invitationIndex].acceptedBy = userId;
-            await writeData('invitations.json', { invitations });
+
+            // Update invitation status atomically
+            await InvitationsStore.update(id, {
+                status: 'accepted',
+                acceptedAt: new Date().toISOString(),
+                acceptedBy: userId
+            });
             
             return { 
                 status: 200, 
@@ -666,17 +606,16 @@ app.http('invitations-cancel', {
     handler: async (request, context) => {
         try {
             const id = request.params.id;
-            const invitationsData = await readData('invitations.json');
-            const invitations = getInvitationsArray(invitationsData);
-            const invitationIndex = invitations.findIndex(i => i.id === id);
-            
-            if (invitationIndex === -1) {
+            const existing = await InvitationsStore.getById(id);
+
+            if (!existing) {
                 return { status: 404, jsonBody: { error: 'Invitation not found' } };
             }
-            
-            invitations[invitationIndex].status = 'cancelled';
-            invitations[invitationIndex].cancelledAt = new Date().toISOString();
-            await writeData('invitations.json', { invitations });
+
+            await InvitationsStore.update(id, {
+                status: 'cancelled',
+                cancelledAt: new Date().toISOString()
+            });
             
             return { status: 200, jsonBody: { success: true } };
         } catch (error) {
@@ -695,49 +634,47 @@ app.http('invitations-resend', {
     handler: async (request, context) => {
         try {
             const id = request.params.id;
-            const invitationsData = await readData('invitations.json');
-            const invitations = getInvitationsArray(invitationsData);
-            const invitation = invitations.find(i => i.id === id);
-            
+            const invitation = await InvitationsStore.getById(id);
+
             if (!invitation) {
                 return { status: 404, jsonBody: { error: 'Invitation not found' } };
             }
-            
+
             if (invitation.status !== 'pending') {
                 return { status: 400, jsonBody: { error: 'Can only resend pending invitations' } };
             }
-            
-            // Extend expiration
-            invitation.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+            const newExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+            // Update expiry in a local copy for use in the email builder
+            const invitationForEmail = { ...invitation, expiresAt: newExpiry };
             
             // Send email - route by role
             let htmlContent, emailSubject;
 
-            if (invitation.role === 'judge' || invitation.role === 'committee') {
-                const result = await buildInvitationEmail(invitation, context);
+            if (invitationForEmail.role === 'judge' || invitationForEmail.role === 'committee') {
+                const result = await buildInvitationEmail(invitationForEmail, context);
                 if (!result.success) {
-                    throw new Error(`${invitation.role} invitation template failed: ${result.reason}`);
+                    throw new Error(`${invitationForEmail.role} invitation template failed: ${result.reason}`);
                 }
                 htmlContent = result.htmlContent;
                 emailSubject = `Reminder: ${result.subject}`;
             } else {
                 // Team/participant invitation — use team-welcome template
-                const result = await buildTeamWelcomeEmailForInvitation(invitation, context);
+                const result = await buildTeamWelcomeEmailForInvitation(invitationForEmail, context);
                 if (!result.success) {
                     throw new Error(`Team welcome template failed: ${result.reason}`);
                 }
                 htmlContent = result.htmlContent;
                 emailSubject = `Reminder: ${result.subject}`;
             }
-            
+
             await sendEmail({
-                to: invitation.email,
+                to: invitationForEmail.email,
                 subject: emailSubject,
                 htmlContent
             });
-            
-            invitation.lastResent = new Date().toISOString();
-            await writeData('invitations.json', { invitations });
+
+            await InvitationsStore.update(id, { expiresAt: newExpiry });
             
             return { status: 200, jsonBody: { success: true } };
         } catch (error) {

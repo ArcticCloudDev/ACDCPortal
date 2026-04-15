@@ -1,7 +1,9 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { readData, writeData } = require('../shared/storage');
+const Storage = require('../shared/storage');
 const { v4: uuidv4 } = require('uuid');
+
+const InterestQueueStore = new Storage.Storage('interest-queue');
 
 // Get all interest queue entries (admin)
 app.http('interest-queue-list', {
@@ -10,12 +12,8 @@ app.http('interest-queue-list', {
     route: 'interest-queue',
     handler: async (request, context) => {
         try {
-            const data = await readData('interest-queue.json');
-            const entries = data.entries || [];
-            
-            // Sort by created date (newest first)
+            const entries = await InterestQueueStore.getAll();
             entries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            
             return { status: 200, jsonBody: entries };
         } catch (error) {
             await logError(context, error);
@@ -39,15 +37,13 @@ app.http('interest-queue-add', {
                 return { status: 400, jsonBody: { error: 'Email is required' } };
             }
 
-            const data = await readData('interest-queue.json');
-            
-            // Check if email already exists
-            const existing = data.entries.find(e => 
+            const entries = await InterestQueueStore.getAll();
+            const existing = entries.find(e =>
                 e.email.toLowerCase() === email.toLowerCase() && !e.registeredEventId
             );
-            
+
             if (existing) {
-                return { status: 409, jsonBody: { 
+                return { status: 409, jsonBody: {
                     error: 'You are already on the interest list!',
                     entry: existing
                 }};
@@ -66,9 +62,7 @@ app.http('interest-queue-add', {
                 registeredEventId: null
             };
 
-            data.entries.push(newEntry);
-            await writeData('interest-queue.json', data);
-
+            await InterestQueueStore.create(newEntry);
             return { status: 201, jsonBody: newEntry };
         } catch (error) {
             await logError(context, error);
@@ -86,18 +80,13 @@ app.http('interest-queue-check', {
     handler: async (request, context) => {
         try {
             const email = decodeURIComponent(request.params.email);
-            const data = await readData('interest-queue.json');
-            
-            const entry = data.entries.find(e => 
+            const entries = await InterestQueueStore.getAll();
+            const entry = entries.find(e =>
                 e.email.toLowerCase() === email.toLowerCase() && !e.registeredEventId
             );
-            
-            return { 
-                status: 200, 
-                jsonBody: { 
-                    inQueue: !!entry,
-                    entry: entry || null
-                }
+            return {
+                status: 200,
+                jsonBody: { inQueue: !!entry, entry: entry || null }
             };
         } catch (error) {
             await logError(context, error);
@@ -107,7 +96,7 @@ app.http('interest-queue-check', {
     }
 });
 
-// Remove from interest queue (by email or id)
+// Remove from interest queue (by id or email)
 app.http('interest-queue-remove', {
     methods: ['DELETE'],
     authLevel: 'anonymous',
@@ -115,20 +104,17 @@ app.http('interest-queue-remove', {
     handler: async (request, context) => {
         try {
             const identifier = decodeURIComponent(request.params.identifier);
-            const data = await readData('interest-queue.json');
-            
-            const index = data.entries.findIndex(e => 
-                e.id === identifier || e.email.toLowerCase() === identifier.toLowerCase()
-            );
-            
-            if (index === -1) {
+            let entry = await InterestQueueStore.getById(identifier);
+            if (!entry) {
+                // Try by email
+                const all = await InterestQueueStore.getAll();
+                entry = all.find(e => e.email.toLowerCase() === identifier.toLowerCase());
+            }
+            if (!entry) {
                 return { status: 404, jsonBody: { error: 'Entry not found' } };
             }
-
-            const removed = data.entries.splice(index, 1)[0];
-            await writeData('interest-queue.json', data);
-
-            return { status: 200, jsonBody: { removed } };
+            await InterestQueueStore.delete(entry.id);
+            return { status: 200, jsonBody: { removed: entry } };
         } catch (error) {
             await logError(context, error);
             context.error('Error removing from interest queue:', error);
@@ -151,29 +137,23 @@ app.http('interest-queue-mark-registered', {
                 return { status: 400, jsonBody: { error: 'email and eventId are required' } };
             }
 
-            const data = await readData('interest-queue.json');
-            
-            // Find all entries for this email that haven't registered yet
-            const entries = data.entries.filter(e => 
+            const entries = await InterestQueueStore.getAll();
+            const toUpdate = entries.filter(e =>
                 e.email.toLowerCase() === email.toLowerCase() && !e.registeredEventId
             );
-            
-            if (entries.length === 0) {
+
+            if (toUpdate.length === 0) {
                 return { status: 200, jsonBody: { message: 'No pending entries found', updated: 0 } };
             }
 
-            // Mark them as registered
-            entries.forEach(entry => {
-                entry.registeredEventId = eventId;
-                entry.registeredAt = new Date().toISOString();
-            });
+            for (const entry of toUpdate) {
+                await InterestQueueStore.update(entry.id, {
+                    registeredEventId: eventId,
+                    registeredAt: new Date().toISOString()
+                });
+            }
 
-            await writeData('interest-queue.json', data);
-
-            return { status: 200, jsonBody: { 
-                message: 'Entries marked as registered',
-                updated: entries.length
-            }};
+            return { status: 200, jsonBody: { message: 'Entries marked as registered', updated: toUpdate.length } };
         } catch (error) {
             await logError(context, error);
             context.error('Error marking as registered:', error);
@@ -189,9 +169,7 @@ app.http('interest-queue-stats', {
     route: 'interest-queue/stats',
     handler: async (request, context) => {
         try {
-            const data = await readData('interest-queue.json');
-            const entries = data.entries || [];
-            
+            const entries = await InterestQueueStore.getAll();
             const stats = {
                 total: entries.length,
                 pending: entries.filter(e => !e.registeredEventId).length,
@@ -199,7 +177,6 @@ app.http('interest-queue-stats', {
                 notified: entries.filter(e => e.notified && !e.registeredEventId).length,
                 notNotified: entries.filter(e => !e.notified && !e.registeredEventId).length
             };
-            
             return { status: 200, jsonBody: stats };
         } catch (error) {
             await logError(context, error);
@@ -217,27 +194,31 @@ app.http('interest-queue-mark-notified', {
     handler: async (request, context) => {
         try {
             const body = await request.json();
-            const { entryIds } = body; // optional - if not provided, mark all
+            const { entryIds } = body;
 
-            const data = await readData('interest-queue.json');
+            const entries = await InterestQueueStore.getAll();
             let count = 0;
-            
-            data.entries.forEach(entry => {
+
+            for (const entry of entries) {
                 if (!entry.registeredEventId && !entry.notified) {
                     if (!entryIds || entryIds.includes(entry.id)) {
-                        entry.notified = true;
-                        entry.notifiedAt = new Date().toISOString();
+                        await InterestQueueStore.update(entry.id, {
+                            notified: true,
+                            notifiedAt: new Date().toISOString()
+                        });
                         count++;
                     }
                 }
-            });
+            }
 
-            await writeData('interest-queue.json', data);
-
-            return { status: 200, jsonBody: { 
-                message: 'Entries marked as notified',
-                updated: count
-            }};
+            return { status: 200, jsonBody: { message: 'Entries marked as notified', updated: count } };
+        } catch (error) {
+            await logError(context, error);
+            context.error('Error marking as notified:', error);
+            return { status: 500, jsonBody: { error: error.message } };
+        }
+    }
+});
         } catch (error) {
             await logError(context, error);
             context.error('Error marking as notified:', error);

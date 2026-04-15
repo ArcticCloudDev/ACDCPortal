@@ -1,5 +1,7 @@
 // Team Welcome Email - Send welcome email when team member joins
 const Storage = require('./storage');
+const EmailDeliveriesStore = new Storage.Storage('email-deliveries');
+const { v4: uuidv4 } = require('uuid');
 const { logError } = require('./error-log');
 const Email = require('./email');
 const { buildEmailHtml } = require('./email-builder');
@@ -187,12 +189,9 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
                     });
 
                     // Record delivery entries for each campaign in the digest
-                    const { readData, writeData } = require('./storage');
-                    const deliveryData = await readData('email-deliveries.json') || { deliveries: [] };
-                    if (!deliveryData.deliveries) deliveryData.deliveries = [];
                     for (const campaign of sequenceCampaigns) {
-                        deliveryData.deliveries.push({
-                            id: require('uuid').v4(),
+                        await EmailDeliveriesStore.create({
+                            id: uuidv4(),
                             campaignId: campaign.id,
                             email: memberEmail,
                             userId: memberUser?.id || null,
@@ -202,7 +201,6 @@ async function sendTeamWelcomeEmail(memberEmail, eventId, context) {
                             createdAt: new Date().toISOString()
                         });
                     }
-                    await writeData('email-deliveries.json', deliveryData);
 
                     emailsSent++;
                     context.log(`Sent digest of ${sequenceCampaigns.length} sequence emails to ${memberEmail}`);

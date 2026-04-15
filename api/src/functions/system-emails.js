@@ -1,6 +1,7 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { readData, writeData } = require('../shared/storage');
+const Storage = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
 const { uploadFile } = require('../shared/storage');
 const { buildInvitationEmail } = require('../shared/invitation-email');
@@ -159,9 +160,8 @@ app.http('system-emails-test', {
             }
 
             // Load events
-            const eventsData = await readData('events.json');
-            const event = eventsData.find(e => e.id === eventId);
-            
+            const event = await Storage.events.getById(eventId);
+
             if (!event) {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
@@ -255,8 +255,7 @@ app.http('system-emails-preview', {
                 return { status: 404, jsonBody: { error: 'Template not found' } };
             }
 
-            const eventsData = await readData('events.json');
-            const event = eventsData.find(e => e.id === eventId);
+            const event = await Storage.events.getById(eventId);
             if (!event) {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
@@ -326,9 +325,8 @@ app.http('system-emails-send', {
             }
 
             // Load events
-            const eventsData = await readData('events.json');
-            const event = eventsData.find(e => e.id === eventId);
-            
+            const event = await Storage.events.getById(eventId);
+
             if (!event) {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
