@@ -480,7 +480,7 @@
                     // Store JWT session
                     Auth.setSession(result.token, result.user);
 
-                    // Load full user record
+                    // Load full user record (may be null for new invitees — backend will create)
                     try {
                         currentUser = await API.users.getOrNull(invitation.email);
                     } catch (e) {
@@ -488,7 +488,8 @@
                     }
 
                     // OTP verified — now submit everything
-                    await submitAcceptance();
+                    // Pass null userId for new invitees; backend creates the account
+                    await submitAcceptance(result.token);
 
                 } catch (err) {
                     errorDiv.textContent = err.message || 'Verification failed. Please try again.';
@@ -529,22 +530,16 @@
             // ============================================================
             // Submit: Update profile + Accept invitation
             // ============================================================
-            async function submitAcceptance() {
+            async function submitAcceptance(authToken) {
                 try {
-                    if (!currentUser) {
-                        throw new Error('User session not found. Please refresh and try again.');
-                    }
+                    const userId = currentUser ? currentUser.id : null;
 
-                    // Update profile with the data collected in the profile step
-                    await API.users.update(currentUser.id, {
+                    // Accept the invitation — backend creates user if needed
+                    const result = await API.invitations.accept(inviteId, userId, invitation.email, {
                         firstName: pendingProfile.firstName,
                         lastName: pendingProfile.lastName,
-                        phone: pendingProfile.phone,
-                        profileComplete: true
+                        phone: pendingProfile.phone
                     });
-
-                    // Accept the invitation
-                    const result = await API.invitations.accept(inviteId, currentUser.id, invitation.email);
 
                     if (!result.success) {
                         throw new Error('Failed to accept invitation.');

@@ -209,10 +209,10 @@ const API = {
             return API.request(`/invitations/${id}`);
         },
 
-        async accept(id, userId, userEmail) {
+        async accept(id, userId, userEmail, profile) {
             return API.request(`/invitations/${id}/accept`, {
                 method: 'POST',
-                body: JSON.stringify({ userId, userEmail })
+                body: JSON.stringify({ userId, userEmail, profile })
             });
         },
 

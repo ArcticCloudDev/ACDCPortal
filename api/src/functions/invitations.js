@@ -449,10 +449,10 @@ app.http('invitations-accept', {
         try {
             const id = request.params.id;
             const body = await request.json();
-            const { userId, userEmail } = body;
+            const { userId, userEmail, profile } = body;
             
-            if (!userId || !userEmail) {
-                return { status: 400, jsonBody: { error: 'userId and userEmail are required' } };
+            if (!userEmail) {
+                return { status: 400, jsonBody: { error: 'userEmail is required' } };
             }
             
             const invitation = await InvitationsStore.getById(id);
@@ -483,24 +483,47 @@ app.http('invitations-accept', {
                 eventId = team?.eventId;
             }
             
-            // Get user and update atomically
-            const existingUser = await UsersStore.getById(userId);
+            // Get or create user
+            let resolvedUserId = userId;
+            let existingUser = userId ? await UsersStore.getById(userId) : null;
 
             if (!existingUser) {
-                return { status: 404, jsonBody: { error: 'User not found' } };
+                // New invitee — look up by email first, then create if still missing
+                existingUser = await Storage.users.getByEmail(userEmail.toLowerCase());
             }
 
-            const userUpdates = { updatedAt: new Date().toISOString() };
-            if (invitation.teamId && (!invitation.role || invitation.role === 'participant')) {
-                userUpdates.teamId = invitation.teamId;
+            if (!existingUser) {
+                // First-time invitee: create account from invitation data + submitted profile
+                const newId = uuidv4();
+                const now = new Date().toISOString();
+                const newUser = {
+                    id: newId,
+                    email: userEmail.toLowerCase(),
+                    firstName: profile?.firstName || invitation.inviteeFirstName || '',
+                    lastName: profile?.lastName || invitation.inviteeLastName || '',
+                    phone: profile?.phone || '',
+                    profileComplete: true,
+                    roles: ['participant'],
+                    teamId: invitation.teamId || null,
+                    createdAt: now,
+                    updatedAt: now
+                };
+                await Storage.users.create(newUser);
+                existingUser = newUser;
+                resolvedUserId = newId;
+                context.log(`Created new user ${userEmail} from invitation ${id}`);
+            } else {
+                resolvedUserId = existingUser.id;
+                const userUpdates = { updatedAt: new Date().toISOString() };
+                if (profile?.firstName) userUpdates.firstName = profile.firstName;
+                if (profile?.lastName) userUpdates.lastName = profile.lastName;
+                if (profile?.phone) userUpdates.phone = profile.phone;
+                userUpdates.profileComplete = true;
+                if (invitation.teamId && (!invitation.role || invitation.role === 'participant')) {
+                    userUpdates.teamId = invitation.teamId;
+                }
+                await UsersStore.update(resolvedUserId, userUpdates);
             }
-            if (invitation.inviteeFirstName && !existingUser.firstName) {
-                userUpdates.firstName = invitation.inviteeFirstName;
-            }
-            if (invitation.inviteeLastName && !existingUser.lastName) {
-                userUpdates.lastName = invitation.inviteeLastName;
-            }
-            await UsersStore.update(userId, userUpdates);
             
             // Create or update participation for this event (atomic per-row)
             if (eventId) {
@@ -530,7 +553,7 @@ app.http('invitations-accept', {
                         id: uuidv4(),
                         eventId,
                         email: userEmail.toLowerCase(),
-                        userId,
+                        userId: resolvedUserId,
                         roles: [inviteRole],
                         teamId: invitation.teamId || null,
                         isTeamAdmin: false,
@@ -545,7 +568,7 @@ app.http('invitations-accept', {
 
                     const partUpdates = {
                         roles: updatedRoles,
-                        userId: existingParticipation.userId || userId,
+                        userId: existingParticipation.userId || resolvedUserId,
                         email: existingParticipation.email || userEmail.toLowerCase(),
                         updatedAt: new Date().toISOString()
                     };
@@ -567,7 +590,7 @@ app.http('invitations-accept', {
                     await ParticipationsStore.update(existingParticipation.id, partUpdates);
                 }
 
-                triggerSequenceEmailsForInvite(userId, userEmail, eventId, context)
+                triggerSequenceEmailsForInvite(resolvedUserId, userEmail, eventId, context)
                     .catch(err => context.log(`Failed sequence emails for ${userEmail}: ${err.message}`));
             }
 
@@ -575,7 +598,7 @@ app.http('invitations-accept', {
             await InvitationsStore.update(id, {
                 status: 'accepted',
                 acceptedAt: new Date().toISOString(),
-                acceptedBy: userId
+                acceptedBy: resolvedUserId
             });
             
             return { 
