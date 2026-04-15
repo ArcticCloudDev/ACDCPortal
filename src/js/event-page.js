@@ -456,6 +456,37 @@ document.addEventListener('DOMContentLoaded', async () => {
                     await deleteTeam(teamId, teamName);
                 });
             });
+
+            // Add click handlers for pending invitation actions
+            document.querySelectorAll('.resend-invite-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    btn.disabled = true;
+                    btn.textContent = 'Sending...';
+                    try {
+                        await API.invitations.resend(btn.dataset.inviteId);
+                        btn.textContent = '✓ Sent';
+                        setTimeout(() => { btn.disabled = false; btn.textContent = '🔄 Resend'; }, 2000);
+                    } catch (err) {
+                        alert('Failed to resend: ' + err.message);
+                        btn.disabled = false;
+                        btn.textContent = '🔄 Resend';
+                    }
+                });
+            });
+
+            document.querySelectorAll('.cancel-invite-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (!confirm(`Cancel invitation for ${btn.dataset.inviteEmail}?`)) return;
+                    try {
+                        await API.invitations.cancel(btn.dataset.inviteId);
+                        await renderTeams();
+                    } catch (err) {
+                        alert('Failed to cancel: ' + err.message);
+                    }
+                });
+            });
             
             // Add file upload handlers
             setupFileUploadHandlers();
@@ -674,7 +705,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let pendingCardsHtml = '';
         if (pendingInvitations.length > 0) {
             pendingCardsHtml = pendingInvitations.map(inv => `
-                <div class="participant-card pending-card">
+                <div class="participant-card pending-card" data-invite-id="${inv.id}">
                     <div class="pending-icon">✉️</div>
                     <div class="name">Invitation Sent</div>
                     <div class="detail-row email">${escapeHtml(inv.email)}</div>
@@ -682,6 +713,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <span class="role-tag pending">⏳ Pending</span>
                     </div>
                     <div class="pending-date">Sent ${new Date(inv.createdAt).toLocaleDateString()}</div>
+                    ${isAdmin ? `
+                    <div class="pending-actions" style="display:flex;gap:6px;margin-top:10px;justify-content:center;">
+                        <button class="btn btn-small btn-secondary resend-invite-btn" data-invite-id="${inv.id}" style="padding:4px 10px;font-size:0.75rem;">🔄 Resend</button>
+                        <button class="btn btn-small btn-danger cancel-invite-btn" data-invite-id="${inv.id}" data-invite-email="${escapeHtml(inv.email)}" style="padding:4px 10px;font-size:0.75rem;">✕ Cancel</button>
+                    </div>` : ''}
                 </div>
             `).join('');
         }
