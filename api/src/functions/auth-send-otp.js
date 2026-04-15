@@ -3,6 +3,7 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
+const { getPool } = require('../shared/sql');
 const Email = require('../shared/email');
 
 // In-memory rate limiting (resets on function app restart — fine for this scale)
@@ -113,11 +114,20 @@ app.http('auth-send-otp', {
             }
             
             // Anti-enumeration: always return success even if email doesn't exist
-            // But only actually send if user exists
+            // But only actually send if user exists, is allowed, or has a pending invitation
             const user = await Storage.users.getByEmail(normalizedEmail);
             const isAllowed = await Storage.allowedEmails.isAllowed(normalizedEmail);
-            
+
+            let hasPendingInvitation = false;
             if (!user && !isAllowed) {
+                const pool = await getPool();
+                const inviteCheck = await pool.request()
+                    .input('email', normalizedEmail)
+                    .query(`SELECT TOP 1 Id FROM [Invitations] WHERE LOWER(Email) = @email AND Status = 'pending'`);
+                hasPendingInvitation = inviteCheck.recordset.length > 0;
+            }
+
+            if (!user && !isAllowed && !hasPendingInvitation) {
                 // Email not in system — fake success (anti-enumeration)
                 context.log(`OTP requested for unknown email: ${normalizedEmail} (not sending)`);
                 return {
