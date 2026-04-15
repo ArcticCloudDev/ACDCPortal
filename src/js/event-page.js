@@ -849,6 +849,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isCommittee = userRoles.includes('committee');
         const canAward = isJudge || isCommittee;
 
+        // Badge claiming only allowed when event is live
+        const isEventLive = currentEvent.status === 'live';
+
         // Collect badges grouped — exclusive badges go into their own 'exclusive' category
         const grouped = {};
         for (const eb of eventBadges) {
@@ -963,7 +966,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 } else if (claim && claim.status === 'declined') {
                     statusHtml = `<span class="badge-claim-status rejected" title="Rejected">Rejected</span>`;
-                    if (teamId) {
+                    if (teamId && isEventLive) {
                         const safeName = badge.name.replace(/'/g, "\\'");
                         actionHtml = `<button class="btn-badge-claim" onclick="openClaimBadge('${eventBadge.id}', '${teamId}', '${safeName}')">Re-claim</button>`;
                     }
@@ -974,7 +977,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         actionHtml = `<button class="btn-badge-award" onclick="openAwardBadge('${eventBadge.id}', '${safeName}')">Award</button>`;
                     }
                 } else {
-                    if (teamId) {
+                    if (teamId && isEventLive) {
                         const safeName = badge.name.replace(/'/g, "\\'");
                         actionHtml = `<button class="btn-badge-claim" onclick="openClaimBadge('${eventBadge.id}', '${teamId}', '${safeName}')">Claim</button>`;
                     }
@@ -1053,19 +1056,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Build a participant card with full details
     function buildParticipantCard(user, membership, participation, canEdit, teamId) {
-        // Determine hotel status — only shown when hotel is enabled for the event
-        const hotelNights = participation.hotelNights || {};
-        const hasAnyHotel = Object.values(hotelNights).some(v => v === true);
-        let hotelStatusHtml = '';
-        if (currentEvent.hotelEnabled) {
-            hotelStatusHtml = hasAnyHotel
-                ? `<div class="hotel-status ok">🏨 Hotel ✓</div>`
-                : `<div class="hotel-status missing" title="Click to set hotel nights"
-                        onclick="openEditOnHotel('${user.id}', '${participation.id}', '${teamId}')">
-                        ⚠️ Hotel missing
-                   </div>`;
-        }
-
         return `
             <div class="participant-card ${canEdit ? 'editable' : ''}" 
                  data-user-id="${user.id}" 
@@ -1079,7 +1069,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="roles">
                     ${membership.isAdmin ? '<span class="role-tag admin">Admin</span>' : ''}
                     ${membership.isParticipant ? '<span class="role-tag participant">Participant</span>' : ''}
-                    ${hotelStatusHtml}
                 </div>
                 ${canEdit ? '<button class="btn btn-small btn-secondary edit-participant-btn">✏️ Edit</button>' : ''}
             </div>
@@ -1137,7 +1126,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 hotelTabBtn.classList.add('hidden');
             }
-            
+
+            // Reset verification checkbox
+            document.getElementById('edit-data-verified').checked = false;
+
             // Show modal
             modal.classList.add('active');
             
@@ -1217,7 +1209,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentEvent.hotelEnabled) {
             buildHotelCalendar(currentParticipation?.hotelNights || {});
         }
-        
+
+        // Reset verification checkbox
+        document.getElementById('edit-data-verified').checked = false;
+
         // Clear any old messages
         document.getElementById('edit-participant-error').classList.add('hidden');
         document.getElementById('edit-participant-success').classList.add('hidden');
@@ -1601,6 +1596,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             else                         document.getElementById('edit-phone').focus();
             return;
         }
+
+        // Require data verification checkbox
+        if (!document.getElementById('edit-data-verified').checked) {
+            document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector('.modal-tab[data-tab="tab-personal"]').classList.add('active');
+            document.getElementById('tab-personal').classList.add('active');
+            errorDiv.textContent = 'Please verify that your information is correct before saving.';
+            errorDiv.classList.remove('hidden');
+            document.getElementById('edit-data-verified').focus();
+            return;
+        }
         
         saveBtn.disabled = true;
         saveBtn.querySelector('.btn-text').classList.add('hidden');
@@ -1612,7 +1619,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Update user data
             await API.users.update(userId, userData);
             
-            // Update hotel nights (dynamic from checkboxes)
+            // Update hotel nights (dynamic from checkboxes) and mark as acknowledged
             const hotelNights = {};
             document.querySelectorAll('.hotel-calendar input[type="checkbox"]').forEach(cb => {
                 const nightId = cb.dataset.nightId;
@@ -1620,7 +1627,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     hotelNights[nightId] = cb.checked;
                 }
             });
-            await API.participations.updateHotel(participationId, hotelNights);
+            await API.participations.updateHotel(participationId, hotelNights, true);
             
             // Update roles if roles tab is visible (user is admin)
             const rolesTab = document.getElementById('tab-roles-btn');
