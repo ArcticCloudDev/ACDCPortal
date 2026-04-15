@@ -356,9 +356,9 @@ const API = {
             });
         },
 
-        async updateHotel(participationId, hotelNights, hotelAcknowledged) {
+        async updateHotel(participationId, hotelNights, profileVerification) {
             const body = { hotelNights };
-            if (hotelAcknowledged !== undefined) body.hotelAcknowledged = hotelAcknowledged;
+            if (profileVerification !== undefined) body.profileVerification = profileVerification;
             return API.request(`/participations/${participationId}/hotel`, {
                 method: 'PUT',
                 body: JSON.stringify(body)

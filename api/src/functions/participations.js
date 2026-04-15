@@ -675,7 +675,7 @@ app.http('participations-update-hotel', {
         try {
             const id = request.params.id;
             const body = await request.json();
-            const { hotelNights, hotelAcknowledged } = body;
+            const { hotelNights, profileVerification } = body;
 
             const participation = await participationsStorage.getById(id);
             if (!participation) {
@@ -686,11 +686,11 @@ app.http('participations-update-hotel', {
             const changes = { updatedAt };
 
             if (hotelNights !== undefined) changes.hotelNights = hotelNights;
-            if (hotelAcknowledged !== undefined) changes.hotelAcknowledged = hotelAcknowledged;
+            if (profileVerification !== undefined) changes.profileVerification = profileVerification;
 
             await participationsStorage.update(id, changes);
 
-            context.log(`Hotel updated for participation ${id} (acknowledged=${hotelAcknowledged})`);
+            context.log(`Hotel updated for participation ${id} (profileVerification=${profileVerification})`);
             return { status: 200, jsonBody: { ...participation, ...changes } };
         } catch (error) {
             await logError(context, error);

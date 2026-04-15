@@ -1,6 +1,6 @@
 -- Migration: Add hotel configuration fields
 -- Events: HotelEnabled, HotelMandatory
--- Participations: HotelAcknowledged
+-- Participations: ProfileVerification (originally added as HotelAcknowledged, renamed — see migrate-rename-profileverification.sql)
 
 ALTER TABLE [Events]
     ADD [HotelEnabled]  BIT NOT NULL DEFAULT 0;
