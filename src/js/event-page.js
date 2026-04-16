@@ -960,6 +960,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             panelsHtml += `<div class="badge-panel ${ci === 0 ? 'active' : ''}" data-cat="${cat}">`;
 
             // Sort badges: rejected first, then unclaimed, then draft, then pending, then approved last
+            // Secondary sort by name ensures consistent ordering for same-team members
             const statusOrder = { 'declined': 0, undefined: 1, 'draft': 2, 'pending': 3, 'approved': 4 };
             const sortedBadges = [...badges].sort((a, b) => {
                 const claimA = (a.badge.claimType === 'exclusive')
@@ -970,7 +971,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     : teamClaims.find(c => c.eventBadgeId === b.eventBadge.id);
                 const orderA = statusOrder[claimA?.status] ?? 1;
                 const orderB = statusOrder[claimB?.status] ?? 1;
-                return orderA - orderB;
+                if (orderA !== orderB) return orderA - orderB;
+                return a.badge.name.localeCompare(b.badge.name);
             });
 
             for (const { eventBadge, badge } of sortedBadges) {
