@@ -40,7 +40,27 @@ async function getPool() {
         }
     });
 
+    // Run pending schema migrations on first connection
+    await runMigrations(_pool);
+
     return _pool;
+}
+
+// Self-healing schema migrations — safe to run repeatedly (idempotent checks first)
+async function runMigrations(pool) {
+    try {
+        // Migration: rename Participations.HotelAcknowledged -> ProfileVerification
+        const col = await pool.request().query(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Participations' AND COLUMN_NAME='HotelAcknowledged'"
+        );
+        if (col.recordset.length > 0) {
+            await pool.request().query("EXEC sp_rename 'Participations.HotelAcknowledged', 'ProfileVerification', 'COLUMN'");
+            console.log('[sql] Migration applied: HotelAcknowledged -> ProfileVerification');
+        }
+    } catch (e) {
+        // Migrations must never crash the app
+        console.error('[sql] Migration warning:', e.message);
+    }
 }
 
 async function closePool() {
