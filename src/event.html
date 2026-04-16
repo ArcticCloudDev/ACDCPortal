@@ -302,6 +302,18 @@
             color: #92400e;
             border: 1px solid #f59e0b;
         }
+
+        .participant-card .role-tag.verify-needed {
+            background: #fff7ed;
+            color: #c2410c;
+            border-color: #fb923c;
+            animation: pulse-verify 2s ease-in-out 5;
+            cursor: default;
+        }
+        @keyframes pulse-verify {
+            0%, 100% { box-shadow: none; }
+            50% { box-shadow: 0 0 6px rgba(251, 146, 60, 0.6); }
+        }
         .participant-card.pending-card .pending-date {
             font-size: 0.7rem;
             color: #b45309;

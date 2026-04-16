@@ -1105,6 +1105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="roles">
                     ${membership.isAdmin ? '<span class="role-tag admin">Admin</span>' : ''}
                     ${membership.isParticipant ? '<span class="role-tag participant">Participant</span>' : ''}
+                    ${!participation.profileVerification ? '<span class="role-tag verify-needed" title="Please verify your contact information">⚠️ Verify info</span>' : ''}
                 </div>
                 ${canEdit ? '<button class="btn btn-small btn-secondary edit-participant-btn">✏️ Edit</button>' : ''}
             </div>
