@@ -501,9 +501,8 @@ app.http('invitations-accept', {
                     email: userEmail.toLowerCase(),
                     firstName: profile?.firstName || invitation.inviteeFirstName || '',
                     lastName: profile?.lastName || invitation.inviteeLastName || '',
-                    phone: profile?.phone || '',
+                    phone: profile?.phone || null,
                     profileComplete: true,
-                    roles: ['participant'],
                     teamId: invitation.teamId || null,
                     createdAt: now,
                     updatedAt: now
