@@ -225,3 +225,38 @@ app.http('deliveries-retry', {
         }
     }
 });
+
+// DELETE /api/deliveries/recipient - Remove all delivery records for a given email (admin cleanup)
+app.http('deliveries-delete-recipient', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'deliveries/recipient',
+    handler: async (request, context) => {
+        try {
+            const body = await request.json();
+            const { email } = body;
+
+            if (!email) {
+                return { status: 400, jsonBody: { error: 'email is required' } };
+            }
+
+            const normalizedEmail = email.toLowerCase().trim();
+            const all = await deliveriesStorage.getAll();
+            const toDelete = all.filter(d => d.email?.toLowerCase() === normalizedEmail);
+
+            for (const d of toDelete) {
+                await deliveriesStorage.delete(d.id);
+            }
+
+            context.log(`Deleted ${toDelete.length} delivery record(s) for ${normalizedEmail}`);
+            return {
+                status: 200,
+                jsonBody: { message: `Deleted ${toDelete.length} delivery record(s) for ${normalizedEmail}`, count: toDelete.length }
+            };
+        } catch (error) {
+            await logError(context, error);
+            context.error('Error deleting deliveries for recipient:', error);
+            return { status: 500, jsonBody: { error: 'Failed to delete deliveries' } };
+        }
+    }
+});

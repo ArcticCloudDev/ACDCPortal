@@ -1109,6 +1109,24 @@ async function deleteLead(leadId) {
     }
 }
 
+async function clearRecipientDeliveries(email) {
+    if (!confirm(`Clear all sequence delivery records for ${email}?\n\nThis will NOT resend emails. Use this to remove stale records so the recipient shows as fresh.`)) return;
+    try {
+        const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/recipient`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Failed to clear deliveries');
+        alert(`Cleared ${result.count} delivery record(s) for ${email}`);
+        loadRecipientDeliveryOverview();
+    } catch (error) {
+        console.error('Error clearing deliveries:', error);
+        alert('Failed to clear deliveries: ' + error.message);
+    }
+}
+
 async function restartSequence(leadId, userId) {
     if (!confirm('Restart sequence emails for this recipient?\n\nThis will send all unsent sequence emails. Check the browser console for detailed logs.')) return;
 
@@ -1516,9 +1534,12 @@ async function loadRecipientDeliveryOverview() {
                 ${row.statuses.map(s => `<td style="text-align: center; ${s.style}">${s.symbol}</td>`).join('')}
                 <td style="text-align: center; font-weight: 600;">${row.sentCount}/${row.totalCount}</td>
                 <td style="text-align: center;">
+                    <div style="display:flex;gap:4px;justify-content:center;">
                     ${row.leadId 
                         ? `<button class="btn-sm" onclick="restartSequence('${row.leadId}')">🔄 Restart</button>` 
                         : `<button class="btn-sm" onclick="restartSequence(null, '${row.userId}')">🔄 Restart</button>`}
+                    <button class="btn-sm" style="background:var(--admin-danger,#dc2626);color:#fff;" onclick="clearRecipientDeliveries('${row.email}')">🗑 Clear</button>
+                    </div>
                 </td>
             </tr>
         `).join('');
