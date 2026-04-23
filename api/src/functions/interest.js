@@ -516,23 +516,20 @@ app.http('interest-verify', {
             const event = events.find(e => e.id === verifiedLead.eventId);
             context.log(`[SEQUENCE] Event found:`, event ? { id: event.id, name: event.name, sequenceId: event.sequenceId } : 'NOT FOUND');
             
+                // Always send the interest acknowledgment confirmation
+            sendInterestAcknowledgmentEmail(verifiedLead.email, verifiedLead.eventId, context)
+                .then(r => context.log(`[VERIFY] Interest ack sent: ${r?.reason || 'ok'}`))
+                .catch(err => context.error('[VERIFY] Interest ack error:', err));
+
+            // Trigger sequence digest if available
             if (event) {
-                // Trigger sequence emails for this lead using the verified lead object
-                let seqResult = { sent: 0, reason: null };
                 try {
                     context.log('[VERIFY] About to call triggerSequenceEmailsForLead');
-                    seqResult = await triggerSequenceEmailsForLead(verifiedLead, event, context);
+                    const seqResult = await triggerSequenceEmailsForLead(verifiedLead, event, context);
                     context.log('[VERIFY] triggerSequenceEmailsForLead completed successfully');
                 } catch (seqError) {
                     context.error('[VERIFY] ERROR in triggerSequenceEmailsForLead:', seqError);
                     context.error('[VERIFY] Stack:', seqError.stack);
-                }
-
-                // Fallback: if no sequence emails were sent, send the interest acknowledgment template
-                if (seqResult.sent === 0 && seqResult.reason !== 'already-sent') {
-                    sendInterestAcknowledgmentEmail(verifiedLead.email, verifiedLead.eventId, context)
-                        .then(r => context.log(`[VERIFY] Interest ack fallback: ${r?.reason || 'sent'}`))
-                        .catch(err => context.error('[VERIFY] Interest ack fallback error:', err));
                 }
             } else {
                 context.log(`Event ${verifiedLead.eventId} not found, skipping sequence emails`);
@@ -678,20 +675,18 @@ app.http('interest-record', {
                 context.error('Warning: Failed to create interest participation:', partError);
             }
 
-            // Trigger sequence emails
+            // Always send the interest acknowledgment confirmation
+            sendInterestAcknowledgmentEmail(normalizedEmail, eventId, context)
+                .then(r => context.log(`[INTEREST-RECORD] Interest ack sent: ${r?.reason || 'ok'}`))
+                .catch(err => context.error('[INTEREST-RECORD] Interest ack error:', err));
+
+            // Trigger sequence digest if available
             let seqResult = { sent: 0, reason: null };
             try {
                 seqResult = await triggerSequenceEmailsForLead(lead, event, context);
                 context.log(`[INTEREST-RECORD] Sequence result: sent=${seqResult.sent}, reason=${seqResult.reason}, campaigns=${seqResult.totalCampaigns}`);
             } catch (seqError) {
                 context.error('[INTEREST-RECORD] Sequence email error:', seqError);
-            }
-
-            // Fallback: if no sequence emails were sent, send the interest acknowledgment template
-            if (seqResult.sent === 0 && seqResult.reason !== 'already-sent') {
-                sendInterestAcknowledgmentEmail(normalizedEmail, eventId, context)
-                    .then(r => context.log(`[INTEREST-RECORD] Interest ack fallback: ${r?.reason || 'sent'}`))
-                    .catch(err => context.error('[INTEREST-RECORD] Interest ack fallback error:', err));
             }
 
             return {
