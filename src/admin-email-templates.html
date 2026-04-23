@@ -177,10 +177,6 @@
                             <div class="icon">👔</div>
                             <div class="name">Committee Invite</div>
                         </div>
-                        <div class="template-option" data-template="team-registration">
-                            <div class="icon">📋</div>
-                            <div class="name">Registration</div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -335,17 +331,6 @@
                 select.addEventListener('change', (e) => {
                     currentEvent = allEvents.find(ev => ev.id === e.target.value);
                     if (currentEvent) {
-                        // Show/hide the Registration tab based on whether this event uses teams
-                        const isTeamEvent = (currentEvent.registrationType || 'team') === 'team';
-                        const regTab = document.querySelector('.template-option[data-template="team-registration"]');
-                        if (regTab) regTab.style.display = isTeamEvent ? '' : 'none';
-                        // If Registration was selected but now hidden, switch to Welcome
-                        if (!isTeamEvent && currentTemplate === 'team-registration') {
-                            document.querySelectorAll('.template-option').forEach(o => o.classList.remove('selected'));
-                            document.querySelector('.template-option[data-template="welcome"]').classList.add('selected');
-                            currentTemplate = 'welcome';
-                            renderMergeFields();
-                        }
                         loadTemplateForEvent();
                         updatePreview();
                     }
@@ -391,16 +376,6 @@
                                 editableSections: {
                                     body: "<p>Hi {{firstName}},</p><p>You've been invited to join the <strong>organizing committee</strong> for {{eventName}}.</p><p>Please click the button below to accept.</p>",
                                     closing: "<p>We look forward to working with you!</p>"
-                                },
-                                eventThemes: {}
-                            },
-                            "team-registration": {
-                                name: "Team Registration Confirmed",
-                                subject: "Team Registered: {{teamName}} for {{eventName}}",
-                                mergeFields: ["teamName", "fullName", "eventName", "committedParticipants"],
-                                editableSections: {
-                                    body: "<p>Hi {{fullName}},</p><p>Your team <strong>{{teamName}}</strong> has been successfully registered for <strong>{{eventName}}</strong>!</p><p>You can now invite team members and manage your team from the portal.</p>",
-                                    closing: "<p>Good luck in the competition!</p>"
                                 },
                                 eventThemes: {}
                             }

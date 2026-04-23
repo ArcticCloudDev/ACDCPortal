@@ -202,8 +202,10 @@ function systemEmailConfigToJs(rows) {
     const templates = {};
     for (const row of rows) {
         const structural = row.StructuralConfig ? JSON.parse(row.StructuralConfig) : {};
-        // Transparently migrate legacy key 'team-welcome' → 'welcome'
+        // Transparently migrate legacy keys
+        // 'team-welcome' → 'welcome'; 'team-registration' is retired — skip it
         const templateKey = row.TemplateKey === 'team-welcome' ? 'welcome' : row.TemplateKey;
+        if (templateKey === 'team-registration') continue; // retired template
         templates[templateKey] = {
             name: row.Name,
             subject: row.Subject,

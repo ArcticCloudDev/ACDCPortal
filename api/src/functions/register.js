@@ -7,7 +7,6 @@ const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
-const { sendTeamRegistrationEmail } = require('../shared/team-registration');
 const ParticipationsStore = new (Storage.Storage)('participations');
 
 // Phase 1: Start registration - validate captcha, store pending data
@@ -381,19 +380,11 @@ app.http('register-complete', {
                     .catch(err => context.error(`Failed to trigger sequence emails for ${email}:`, err));
             }
 
-            // Send confirmation email:
-            // - Team registration → Registration email (team details, manage team CTA)
-            // - Solo registration → Welcome email (no team fields)
+            // Send Welcome email for all registrations
             if (resolvedEventId) {
-                if (isTeamRegistration && teamName) {
-                    sendTeamRegistrationEmail(email, resolvedEventId, teamName, parseInt(numberOfParticipants), context)
-                        .then(result => { if (result?.success) context.log(`Registration email sent to ${email}`); })
-                        .catch(err => context.error(`Failed to send registration email to ${email}:`, err));
-                } else {
-                    sendWelcomeEmail(email, resolvedEventId, context)
-                        .then(result => { if (result?.success) context.log(`Welcome email sent to ${email}`); })
-                        .catch(err => context.error(`Failed to send welcome email to ${email}:`, err));
-                }
+                sendWelcomeEmail(email, resolvedEventId, context)
+                    .then(result => { if (result?.success) context.log(`Welcome email sent to ${email}`); })
+                    .catch(err => context.error(`Failed to send welcome email to ${email}:`, err));
             }
             
             return {
