@@ -285,7 +285,7 @@ app.http('teams-delete', {
 
             for (const p of allParticipations) {
                 const memberships = p.teamMemberships || [];
-                const hadMembership = memberships.some(m => m.teamId === teamId);
+                const hadMembership = memberships.some(m => m.teamId === teamId) || p.teamId === teamId;
                 
                 if (hadMembership) {
                     // Remove membership for this team
