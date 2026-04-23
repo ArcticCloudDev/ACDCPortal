@@ -102,7 +102,7 @@ app.http('system-emails-config-get', {
     }
 });
 
-const KNOWN_TEMPLATE_KEYS = ['invitation-judge', 'invitation-committee', 'interest-acknowledgment', 'team-welcome', 'team-registration'];
+const KNOWN_TEMPLATE_KEYS = ['invitation-judge', 'invitation-committee', 'interest-acknowledgment', 'welcome', 'team-registration'];
 
 function validateEmailConfig(config) {
     if (!config || typeof config !== 'object' || Array.isArray(config)) return 'Config must be a plain object';

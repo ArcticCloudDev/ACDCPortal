@@ -161,7 +161,7 @@
                 </div>
                 <div class="panel-body padded">
                     <div class="template-selector" id="template-selector">
-                        <div class="template-option selected" data-template="team-welcome">
+                        <div class="template-option selected" data-template="welcome">
                             <div class="icon">👋</div>
                             <div class="name">Welcome</div>
                         </div>
@@ -270,7 +270,7 @@
     <script src="js/permissions.js"></script>
     <script>
         let bodyEditor, closingEditor;
-        let currentTemplate = 'team-welcome';
+        let currentTemplate = 'welcome';
         let currentEvent = null;
         let allEvents = [];
         let templateConfig = null;
@@ -335,6 +335,17 @@
                 select.addEventListener('change', (e) => {
                     currentEvent = allEvents.find(ev => ev.id === e.target.value);
                     if (currentEvent) {
+                        // Show/hide the Registration tab based on whether this event uses teams
+                        const isTeamEvent = (currentEvent.registrationType || 'team') === 'team';
+                        const regTab = document.querySelector('.template-option[data-template="team-registration"]');
+                        if (regTab) regTab.style.display = isTeamEvent ? '' : 'none';
+                        // If Registration was selected but now hidden, switch to Welcome
+                        if (!isTeamEvent && currentTemplate === 'team-registration') {
+                            document.querySelectorAll('.template-option').forEach(o => o.classList.remove('selected'));
+                            document.querySelector('.template-option[data-template="welcome"]').classList.add('selected');
+                            currentTemplate = 'welcome';
+                            renderMergeFields();
+                        }
                         loadTemplateForEvent();
                         updatePreview();
                     }
@@ -353,12 +364,12 @@
                     // Initialize default config
                     templateConfig = {
                         templates: {
-                            "team-welcome": {
-                                name: "Team Welcome Email",
+                            "welcome": {
+                                name: "Welcome Email",
                                 subject: "Welcome to {{eventName}}",
-                                mergeFields: ["teamName", "fullName", "eventName", "teamAdminName"],
+                                mergeFields: ["fullName", "firstName", "eventName", "teamName", "teamAdminName"],
                                 editableSections: {
-                                    body: "<p>Hi {{fullName}},</p><p>We're excited to have you participate in {{eventName}}.</p><p>Your team admin {{teamAdminName}} has added you to {{teamName}}.</p><p>Please complete your profile!</p>",
+                                    body: "<p>Hi {{firstName}},</p><p>We're excited to have you as part of {{eventName}}.</p>",
                                     closing: "<p>Good luck in the competition!</p>"
                                 },
                                 eventThemes: {}

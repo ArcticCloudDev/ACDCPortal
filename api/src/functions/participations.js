@@ -18,7 +18,7 @@ const deliveriesStorage = new Storage('email-deliveries');
 const invitationsStorage = new Storage('invitations');
 const { sendEmail } = require('../shared/mail');
 const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
-const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
+const { sendWelcomeEmail } = require('../shared/welcome-email');
 
 // Valid roles
 const VALID_ROLES = ['interest', 'participant', 'judge', 'committee', 'sponsor'];
@@ -955,12 +955,19 @@ app.http('participations-add-team-membership', {
                 await triggerSequenceEmails(participation.userId, participation.eventId, context);
 
                 if (participation.email) {
+                    // Resolve team name for welcome email context
+                    let teamNameForWelcome = '';
+                    try {
+                        const teamForWelcome = teamId ? await Storage.teams.getById(teamId) : null;
+                        teamNameForWelcome = teamForWelcome?.teamName || '';
+                    } catch (e) { /* non-critical */ }
+
                     // Send team welcome email to new participant
-                    sendTeamWelcomeEmail(participation.email, participation.eventId, context)
+                    sendWelcomeEmail(participation.email, participation.eventId, context, { teamName: teamNameForWelcome })
                         .then(result => {
-                            if (result?.success) context.log(`Team welcome email sent to ${participation.email}: ${result.emailsSent} sent, ${result.emailsFailed} failed`);
+                            if (result?.success) context.log(`Welcome email sent to ${participation.email}`);
                         })
-                        .catch(err => context.error(`Failed team welcome email:`, err));
+                        .catch(err => context.error(`Failed welcome email:`, err));
 
                     sendInterestAcknowledgmentEmail(participation.email, participation.eventId, context)
                         .then(result => { if (result?.success) context.log(`Interest ack sent to ${participation.email}`); })

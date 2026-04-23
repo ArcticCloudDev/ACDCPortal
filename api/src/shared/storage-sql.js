@@ -202,7 +202,9 @@ function systemEmailConfigToJs(rows) {
     const templates = {};
     for (const row of rows) {
         const structural = row.StructuralConfig ? JSON.parse(row.StructuralConfig) : {};
-        templates[row.TemplateKey] = {
+        // Transparently migrate legacy key 'team-welcome' → 'welcome'
+        const templateKey = row.TemplateKey === 'team-welcome' ? 'welcome' : row.TemplateKey;
+        templates[templateKey] = {
             name: row.Name,
             subject: row.Subject,
             mergeFields: row.MergeFields ? JSON.parse(row.MergeFields) : [],

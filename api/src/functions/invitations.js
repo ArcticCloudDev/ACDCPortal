@@ -158,15 +158,15 @@ async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, contex
     }
 }
 
-// Helper to build team welcome email for invited participants using the team-welcome template
+// Helper to build welcome email for invited participants using the welcome template
 async function buildTeamWelcomeEmailForInvitation(invitation, context) {
     try {
         // Load system email config from SQL
         const config = await Storage.readData('system-email-config.json');
-        const template = config.templates['team-welcome'];
+        const template = config.templates['welcome'];
 
         if (!template) {
-            return { success: false, reason: 'team-welcome template not configured' };
+            return { success: false, reason: 'welcome template not configured' };
         }
 
         // Get event for name and theme

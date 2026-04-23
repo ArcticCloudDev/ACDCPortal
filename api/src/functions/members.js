@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 const Email = require('../shared/email');
-const { sendTeamWelcomeEmail } = require('../shared/team-welcome');
+const { sendWelcomeEmail } = require('../shared/welcome-email');
 const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 
 // Add member to team
@@ -77,26 +77,18 @@ app.http('members-add', {
             
             // Send welcome email to new member (async, don't wait)
             if (team.eventId) {
-                sendTeamWelcomeEmail(email, team.eventId, context)
+                sendWelcomeEmail(email, team.eventId, context, { teamName: team.teamName })
                     .then(result => {
-                        if (result.success) {
-                            context.log(`Team welcome email sent to ${email}: ${result.emailsSent} sent, ${result.emailsFailed} failed`);
-                        }
+                        if (result.success) context.log(`Welcome email sent to ${email}`);
                     })
-                    .catch(error => {
-                        context.error(`Failed to send team welcome email to ${email}:`, error);
-                    });
+                    .catch(error => context.error(`Failed to send welcome email to ${email}:`, error));
 
                 // Send interest acknowledgment email if member was a verified interest lead
                 sendInterestAcknowledgmentEmail(email, team.eventId, context)
                     .then(result => {
-                        if (result.success) {
-                            context.log(`Interest acknowledgment email sent to ${email}`);
-                        }
+                        if (result.success) context.log(`Interest acknowledgment email sent to ${email}`);
                     })
-                    .catch(error => {
-                        context.error(`Failed to send interest acknowledgment email to ${email}:`, error);
-                    });
+                    .catch(error => context.error(`Failed to send interest acknowledgment email to ${email}:`, error));
             }
             
             context.log(`Member ${email} added to team ${teamId}`);
