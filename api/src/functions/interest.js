@@ -7,6 +7,8 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const path = require('path');
 
+const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
+
 const leadsStorage = new Storage('interest-leads');
 const eventsStorage = new Storage('events');
 const campaignsStorage = new Storage('email-campaigns');
@@ -516,13 +518,21 @@ app.http('interest-verify', {
             
             if (event) {
                 // Trigger sequence emails for this lead using the verified lead object
+                let seqResult = { sent: 0, reason: null };
                 try {
                     context.log('[VERIFY] About to call triggerSequenceEmailsForLead');
-                    await triggerSequenceEmailsForLead(verifiedLead, event, context);
+                    seqResult = await triggerSequenceEmailsForLead(verifiedLead, event, context);
                     context.log('[VERIFY] triggerSequenceEmailsForLead completed successfully');
                 } catch (seqError) {
                     context.error('[VERIFY] ERROR in triggerSequenceEmailsForLead:', seqError);
                     context.error('[VERIFY] Stack:', seqError.stack);
+                }
+
+                // Fallback: if no sequence emails were sent, send the interest acknowledgment template
+                if (seqResult.sent === 0 && seqResult.reason !== 'already-sent') {
+                    sendInterestAcknowledgmentEmail(verifiedLead.email, verifiedLead.eventId, context)
+                        .then(r => context.log(`[VERIFY] Interest ack fallback: ${r?.reason || 'sent'}`))
+                        .catch(err => context.error('[VERIFY] Interest ack fallback error:', err));
                 }
             } else {
                 context.log(`Event ${verifiedLead.eventId} not found, skipping sequence emails`);
@@ -669,11 +679,19 @@ app.http('interest-record', {
             }
 
             // Trigger sequence emails
+            let seqResult = { sent: 0, reason: null };
             try {
-                const seqResult = await triggerSequenceEmailsForLead(lead, event, context);
+                seqResult = await triggerSequenceEmailsForLead(lead, event, context);
                 context.log(`[INTEREST-RECORD] Sequence result: sent=${seqResult.sent}, reason=${seqResult.reason}, campaigns=${seqResult.totalCampaigns}`);
             } catch (seqError) {
                 context.error('[INTEREST-RECORD] Sequence email error:', seqError);
+            }
+
+            // Fallback: if no sequence emails were sent, send the interest acknowledgment template
+            if (seqResult.sent === 0 && seqResult.reason !== 'already-sent') {
+                sendInterestAcknowledgmentEmail(normalizedEmail, eventId, context)
+                    .then(r => context.log(`[INTEREST-RECORD] Interest ack fallback: ${r?.reason || 'sent'}`))
+                    .catch(err => context.error('[INTEREST-RECORD] Interest ack fallback error:', err));
             }
 
             return {
