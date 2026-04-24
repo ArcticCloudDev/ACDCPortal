@@ -54,13 +54,23 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
 
         // Get event-specific theme or use global defaults
         const eventTheme = template.eventThemes[eventId] || {};
+        const globalDefaults = template.editableSections || {};
+
+        // Resolve body and closing text (same pattern as invitation-email.js)
+        const rawBody = eventTheme.body || globalDefaults.body || '';
+        const rawClosing = eventTheme.closing || globalDefaults.closing || '';
+        const fieldData = { fullName, eventName: event.name };
+        const bodyText = processTemplate(rawBody, fieldData);
+        const closingText = processTemplate(rawClosing, fieldData);
 
         // Build merge data
         const baseUrl = process.env.PORTAL_URL || 'https://your-portal.com';
         const mergeData = {
             fullName: fullName,
             eventName: event.name,
-            portalUrl: `${baseUrl}/event.html?id=${event.id}`
+            portalUrl: `${baseUrl}/event.html?id=${event.id}`,
+            bodyText,
+            closingText
         };
 
         // Build email HTML via shared builder
