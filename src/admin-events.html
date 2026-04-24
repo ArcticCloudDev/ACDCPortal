@@ -591,6 +591,32 @@
             margin-top: 16px;
         }
 
+        .sponsor-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px 16px;
+            margin-bottom: 14px;
+        }
+
+        .sponsor-grid .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .sponsor-status {
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            border-radius: 999px;
+            padding: 3px 10px;
+            display: inline-block;
+        }
+
+        .sponsor-status.reached-out { background: #e0f2fe; color: #0369a1; }
+        .sponsor-status.negotiating { background: #fef3c7; color: #92400e; }
+        .sponsor-status.declined { background: #fee2e2; color: #991b1b; }
+        .sponsor-status.confirmed { background: #dcfce7; color: #166534; }
+
         /* Modal styles */
         .modal {
             display: none;
@@ -793,6 +819,7 @@
                         <button class="tab-btn" data-tab="committee" id="committee-tab-btn">👔 Committee</button>
                         <button class="tab-btn" data-tab="judges" id="judges-tab-btn">⚖️ Judges</button>
                         <button class="tab-btn" data-tab="leads" id="leads-tab-btn">📧 Interest Leads</button>
+                        <button class="tab-btn" data-tab="sponsors" id="sponsors-tab-btn">💼 Sponsors</button>
                         <button class="tab-btn" data-tab="teams" id="teams-tab-btn">👥 Teams</button>
                         <!-- Deliveries tab removed - now integrated into Sequence tab -->
                         <button class="tab-btn" data-tab="sequence" id="sequence-tab-btn">📧 Sequence</button>
@@ -916,21 +943,21 @@
                                                 <div class="form-group">
                                                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                                         <input type="checkbox" id="event-team-registration-email" style="width: auto;">
-                                                        <span>📋 Send Team Registration Confirmation Email</span>
+                                                        <span>📋 Send Registration Confirmation Email</span>
                                                     </label>
                                                     <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                        <strong>Confirmation email for the team admin upon registration.</strong> When enabled, the team admin will receive a confirmation email when a new team is registered.
-                                                        Customize the email in <strong>Email Templates</strong> under Team Registration.
+                                                        <strong>Confirmation email sent when a registration is created.</strong> Supports both solo and team-based registrations.
+                                                        Customize the email in <strong>Email Templates</strong> under Welcome.
                                                     </small>
                                                 </div>
 
                                                 <div class="form-group" style="margin-top: 16px;">
                                                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                                         <input type="checkbox" id="event-team-welcome-email" style="width: auto;">
-                                                        <span>👋 Send Team Welcome Email</span>
+                                                        <span>👋 Send Welcome Email</span>
                                                     </label>
                                                     <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                        <strong>Welcome email for new team members.</strong> When enabled, team members will receive a welcome email when they join a team.
+                                                        <strong>Welcome email for new participants.</strong> When enabled, participants receive a welcome email when they are added or registered.
                                                         Customize the email theme and text in <strong>Email Templates</strong> under Theme section.
                                                     </small>
                                                 </div>
@@ -1159,6 +1186,86 @@
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Teams Tab -->
+                <div class="tab-panel" id="sponsors-panel">
+                    <div class="panel" style="margin-bottom: 16px;">
+                        <div class="panel-body padded">
+                            <h3 style="margin: 0 0 8px 0;">💼 Sponsor Pipeline</h3>
+                            <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 18px;">
+                                Keep sponsor outreach organized for this event. Track contacts, deal amount, status, and notes in one list.
+                            </p>
+
+                            <form id="sponsor-form">
+                                <input type="hidden" id="sponsor-id">
+                                <div class="sponsor-grid">
+                                    <div class="form-group">
+                                        <label for="sponsor-company-name">Company Name *</label>
+                                        <input type="text" id="sponsor-company-name" required placeholder="Contoso">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="sponsor-contact-person">Contact Person</label>
+                                        <input type="text" id="sponsor-contact-person" placeholder="Jane Doe">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="sponsor-phone-number">Phone Number</label>
+                                        <input type="text" id="sponsor-phone-number" placeholder="+47 ...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="sponsor-email">E-mail</label>
+                                        <input type="email" id="sponsor-email" placeholder="sponsor@company.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="sponsor-amount">Amount</label>
+                                        <input type="number" id="sponsor-amount" min="0" step="0.01" placeholder="25000">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="sponsor-status">Status</label>
+                                        <select id="sponsor-status">
+                                            <option value="reached-out">Reached out</option>
+                                            <option value="negotiating">Negotiating</option>
+                                            <option value="declined">Declined</option>
+                                            <option value="confirmed">Confirmed</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group full-width">
+                                        <label for="sponsor-notes">Notes</label>
+                                        <textarea id="sponsor-notes" rows="3" placeholder="Meeting notes, next follow-up, requirements..."></textarea>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <button type="submit" id="save-sponsor-btn" class="btn-sm primary">➕ Add Sponsor</button>
+                                    <button type="button" id="cancel-sponsor-edit-btn" class="btn-sm hidden">Cancel Edit</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-body padded">
+                            <div class="members-list">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Company</th>
+                                            <th>Contact</th>
+                                            <th>Phone</th>
+                                            <th>E-mail</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th>Notes</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sponsors-table-body">
+                                        <tr><td colspan="8" class="empty-state">Save the event first to manage sponsors</td></tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>

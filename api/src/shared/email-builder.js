@@ -44,12 +44,12 @@ function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
 
     // --- Optional blocks ---
 
-    // Team details box (team-registration)
+    // Optional participation details box
     const teamBoxHtml = features.includes('teamBox') ? `
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 0 0 24px 0;">
                         <tr>
                             <td style="padding: 20px; background-color: #f0f9ff; border-radius: 8px; border-left: 4px solid #1a365d;">
-                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Team Details</p>
+                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Participation Details</p>
                                 <p style="margin: 0 0 4px 0; font-size: 18px; font-weight: 600; color: #1e293b;">${mergeData.teamName || ''}</p>
                                 <p style="margin: 0; font-size: 14px; color: #475569;">${mergeData.committedParticipants || ''} committed participants</p>
                             </td>

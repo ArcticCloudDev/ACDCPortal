@@ -211,6 +211,10 @@ function setupEventListeners() {
     // Invitation buttons
     document.getElementById('invite-committee-btn').addEventListener('click', () => sendInvitation('committee'));
     document.getElementById('invite-judge-btn').addEventListener('click', () => sendInvitation('judge'));
+
+    // Sponsor form
+    document.getElementById('sponsor-form').addEventListener('submit', handleSponsorSubmit);
+    document.getElementById('cancel-sponsor-edit-btn').addEventListener('click', resetSponsorForm);
 }
 
 // Status display configuration
@@ -358,6 +362,7 @@ function showForm(event = null) {
     const committeeTab = document.getElementById('committee-tab-btn');
     const judgesTab = document.getElementById('judges-tab-btn');
     const leadsTab = document.getElementById('leads-tab-btn');
+    const sponsorsTab = document.getElementById('sponsors-tab-btn');
     const form = document.getElementById('event-form');
 
     // Disable committee/judges/leads tabs for new events
@@ -365,10 +370,14 @@ function showForm(event = null) {
         committeeTab.disabled = false;
         judgesTab.disabled = false;
         leadsTab.disabled = false;
+        sponsorsTab.disabled = false;
     } else {
         committeeTab.disabled = true;
         judgesTab.disabled = true;
         leadsTab.disabled = true;
+        sponsorsTab.disabled = true;
+        allSponsors = [];
+        resetSponsorForm();
     }
 
     // Reset to General tab
@@ -601,11 +610,12 @@ async function handleFormSubmit(e) {
             currentEvent = savedEvent;
             currentEventId = savedEvent.id;
             
-            // If this is a new event, enable the committee/judges/leads tabs
+            // If this is a new event, enable the related tabs
             if (!eventId) {
                 document.getElementById('committee-tab-btn').disabled = false;
                 document.getElementById('judges-tab-btn').disabled = false;
                 document.getElementById('leads-tab-btn').disabled = false;
+                document.getElementById('sponsors-tab-btn').disabled = false;
                 // Update the hidden event ID field
                 document.getElementById('event-id').value = savedEvent.id;
             }
@@ -676,6 +686,8 @@ function setupTabs() {
                 loadJudgesMembers();
             } else if (targetTab === 'leads') {
                 loadInterestLeads();
+            } else if (targetTab === 'sponsors') {
+                loadEventSponsors();
             } else if (targetTab === 'teams') {
                 loadEventTeams();
             } else if (targetTab === 'deliveries') {
@@ -695,6 +707,7 @@ let currentEvent = null; // Store the full event object
 let allParticipations = [];
 let allUsers = [];
 let allInvitations = [];
+let allSponsors = [];
 
 async function loadCommitteeMembers() {
     if (!currentEventId || !currentEvent) {
@@ -1250,6 +1263,157 @@ function renderTeamsTable() {
             </tr>
         `;
     }).join('');
+}
+
+// ===== Sponsors Management =====
+function formatSponsorAmount(amount) {
+    if (amount === null || amount === undefined || amount === '') return '-';
+    const numeric = Number(amount);
+    if (!Number.isFinite(numeric)) return '-';
+    const currency = (currentEvent && currentEvent.currency) ? currentEvent.currency : 'NOK';
+    return `${numeric.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currency}`;
+}
+
+function resetSponsorForm() {
+    const form = document.getElementById('sponsor-form');
+    if (!form) return;
+
+    form.reset();
+    document.getElementById('sponsor-id').value = '';
+    document.getElementById('sponsor-status').value = 'reached-out';
+    document.getElementById('save-sponsor-btn').textContent = '➕ Add Sponsor';
+    document.getElementById('cancel-sponsor-edit-btn').classList.add('hidden');
+}
+
+async function loadEventSponsors() {
+    const tbody = document.getElementById('sponsors-table-body');
+    if (!currentEventId) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Save the event first to manage sponsors</td></tr>';
+        return;
+    }
+
+    try {
+        allSponsors = await API.events.sponsors.list(currentEventId);
+        renderSponsorsTable();
+    } catch (error) {
+        console.error('Error loading sponsors:', error);
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Error loading sponsors</td></tr>';
+    }
+}
+
+function renderSponsorsTable() {
+    const tbody = document.getElementById('sponsors-table-body');
+    if (!allSponsors || allSponsors.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No sponsors added yet</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = allSponsors.map((sponsor) => {
+        const statusLabelMap = {
+            'reached-out': 'Reached out',
+            negotiating: 'Negotiating',
+            declined: 'Declined',
+            confirmed: 'Confirmed'
+        };
+        const status = sponsor.status || 'reached-out';
+        const statusLabel = statusLabelMap[status] || status;
+        const notesPreview = sponsor.notes && sponsor.notes.length > 90
+            ? `${sponsor.notes.slice(0, 90)}...`
+            : (sponsor.notes || '-');
+
+        return `
+            <tr>
+                <td><strong>${escapeHtml(sponsor.companyName || '')}</strong></td>
+                <td>${escapeHtml(sponsor.contactPerson || '-')}</td>
+                <td>${escapeHtml(sponsor.phoneNumber || '-')}</td>
+                <td>${escapeHtml(sponsor.email || '-')}</td>
+                <td>${escapeHtml(formatSponsorAmount(sponsor.amount))}</td>
+                <td><span class="sponsor-status ${status}">${escapeHtml(statusLabel)}</span></td>
+                <td title="${escapeHtml(sponsor.notes || '')}">${escapeHtml(notesPreview)}</td>
+                <td>
+                    <button class="btn-sm" onclick="startEditSponsor('${sponsor.id}')">✏️ Edit</button>
+                    <button class="btn-sm danger" onclick="deleteSponsor('${sponsor.id}')">🗑️</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function startEditSponsor(sponsorId) {
+    const sponsor = allSponsors.find((item) => item.id === sponsorId);
+    if (!sponsor) return;
+
+    document.getElementById('sponsor-id').value = sponsor.id;
+    document.getElementById('sponsor-company-name').value = sponsor.companyName || '';
+    document.getElementById('sponsor-contact-person').value = sponsor.contactPerson || '';
+    document.getElementById('sponsor-phone-number').value = sponsor.phoneNumber || '';
+    document.getElementById('sponsor-email').value = sponsor.email || '';
+    document.getElementById('sponsor-amount').value = sponsor.amount == null ? '' : sponsor.amount;
+    document.getElementById('sponsor-status').value = sponsor.status || 'reached-out';
+    document.getElementById('sponsor-notes').value = sponsor.notes || '';
+    document.getElementById('save-sponsor-btn').textContent = '💾 Update Sponsor';
+    document.getElementById('cancel-sponsor-edit-btn').classList.remove('hidden');
+    document.getElementById('sponsor-company-name').focus();
+}
+
+async function handleSponsorSubmit(e) {
+    e.preventDefault();
+
+    if (!currentEventId) {
+        alert('Save the event first before adding sponsors.');
+        return;
+    }
+
+    const sponsorId = document.getElementById('sponsor-id').value;
+    const saveBtn = document.getElementById('save-sponsor-btn');
+    saveBtn.disabled = true;
+
+    const payload = {
+        companyName: document.getElementById('sponsor-company-name').value.trim(),
+        contactPerson: document.getElementById('sponsor-contact-person').value.trim(),
+        phoneNumber: document.getElementById('sponsor-phone-number').value.trim(),
+        email: document.getElementById('sponsor-email').value.trim(),
+        amount: document.getElementById('sponsor-amount').value.trim(),
+        status: document.getElementById('sponsor-status').value,
+        notes: document.getElementById('sponsor-notes').value.trim()
+    };
+
+    try {
+        if (!payload.companyName) {
+            alert('Company name is required.');
+            return;
+        }
+
+        if (sponsorId) {
+            await API.events.sponsors.update(currentEventId, sponsorId, payload);
+        } else {
+            await API.events.sponsors.create(currentEventId, payload);
+        }
+
+        await loadEventSponsors();
+        resetSponsorForm();
+    } catch (error) {
+        console.error('Error saving sponsor:', error);
+        alert(`Error saving sponsor: ${error.message}`);
+    } finally {
+        saveBtn.disabled = false;
+    }
+}
+
+async function deleteSponsor(sponsorId) {
+    if (!confirm('Delete this sponsor entry?')) return;
+
+    try {
+        await API.events.sponsors.delete(currentEventId, sponsorId);
+        await loadEventSponsors();
+        const editingId = document.getElementById('sponsor-id').value;
+        if (editingId === sponsorId) {
+            resetSponsorForm();
+        }
+    } catch (error) {
+        console.error('Error deleting sponsor:', error);
+        alert(`Error deleting sponsor: ${error.message}`);
+    }
 }
 
 // ===== Sequence Management =====

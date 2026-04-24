@@ -3,6 +3,7 @@ const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const StorageModule = require('../shared/storage');
 const { Storage } = StorageModule;
+const { getPool, sql } = require('../shared/sql');
 
 const eventsStorage = new Storage('events');
 const teamsStorage = new Storage('teams');
@@ -24,6 +25,96 @@ function isActiveStatus(status) {
 // Helper to check if registration is open based on status
 function isRegistrationOpen(status) {
     return status === 'registration';
+}
+
+function mapSponsorRow(row) {
+    return {
+        id: row.Id,
+        eventId: row.EventId,
+        companyName: row.CompanyName,
+        contactPerson: row.ContactPerson,
+        phoneNumber: row.PhoneNumber,
+        email: row.Email,
+        amount: row.Amount == null ? null : Number(row.Amount),
+        status: row.Status,
+        notes: row.Notes,
+        createdAt: row.CreatedAt instanceof Date ? row.CreatedAt.toISOString() : row.CreatedAt,
+        updatedAt: row.UpdatedAt instanceof Date ? row.UpdatedAt.toISOString() : row.UpdatedAt
+    };
+}
+
+function normalizeSponsorStatus(status) {
+    const validStatuses = new Set(['reached-out', 'negotiating', 'declined', 'confirmed']);
+    const normalized = (status || '').toString().trim().toLowerCase();
+    if (!normalized) return 'reached-out';
+    if (!validStatuses.has(normalized)) {
+        throw new Error('Invalid sponsor status');
+    }
+    return normalized;
+}
+
+function normalizeSponsorPayload(body = {}, { isUpdate = false } = {}) {
+    const payload = {};
+
+    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'companyName')) {
+        const companyName = (body.companyName || '').toString().trim();
+        if (!companyName) throw new Error('companyName is required');
+        payload.companyName = companyName;
+    }
+
+    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'contactPerson')) {
+        payload.contactPerson = body.contactPerson ? body.contactPerson.toString().trim() : null;
+    }
+    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'phoneNumber')) {
+        payload.phoneNumber = body.phoneNumber ? body.phoneNumber.toString().trim() : null;
+    }
+    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'email')) {
+        payload.email = body.email ? body.email.toString().trim().toLowerCase() : null;
+    }
+    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'amount')) {
+        if (body.amount === '' || body.amount === null || body.amount === undefined) {
+            payload.amount = null;
+        } else {
+            const amount = Number(body.amount);
+            if (!Number.isFinite(amount) || amount < 0) {
+                throw new Error('amount must be a non-negative number');
+            }
+            payload.amount = amount;
+        }
+    }
+    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'status')) {
+        payload.status = normalizeSponsorStatus(body.status);
+    }
+    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'notes')) {
+        payload.notes = body.notes ? body.notes.toString().trim() : null;
+    }
+
+    return payload;
+}
+
+async function ensureSponsorsTable(pool) {
+    await pool.request().query(`
+        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'EventSponsors')
+        BEGIN
+            CREATE TABLE EventSponsors (
+                Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+                EventId UNIQUEIDENTIFIER NOT NULL,
+                CompanyName NVARCHAR(200) NOT NULL,
+                ContactPerson NVARCHAR(200) NULL,
+                PhoneNumber NVARCHAR(50) NULL,
+                Email NVARCHAR(320) NULL,
+                Amount DECIMAL(12,2) NULL,
+                Status NVARCHAR(30) NOT NULL DEFAULT 'reached-out',
+                Notes NVARCHAR(MAX) NULL,
+                CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                UpdatedAt DATETIME2 NULL,
+                CONSTRAINT FK_EventSponsors_Events FOREIGN KEY (EventId) REFERENCES Events(Id) ON DELETE CASCADE,
+                CONSTRAINT CK_EventSponsors_Status CHECK (Status IN ('reached-out', 'negotiating', 'declined', 'confirmed'))
+            );
+            CREATE INDEX IX_EventSponsors_EventId ON EventSponsors(EventId);
+            CREATE INDEX IX_EventSponsors_Status ON EventSponsors(Status);
+        END
+    `);
 }
 
 // Helper to generate hotel dates (1 day before start to 1 day after end)
@@ -174,6 +265,213 @@ app.http('events-get', {
             return {
                 status: 500,
                 jsonBody: { error: 'Failed to get event' }
+            };
+        }
+    }
+});
+
+// GET /api/events/{eventId}/sponsors - List event sponsors
+app.http('event-sponsors-list', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/sponsors',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+            const pool = await getPool();
+            await ensureSponsorsTable(pool);
+
+            const result = await pool.request()
+                .input('eventId', sql.UniqueIdentifier, eventId)
+                .query(`
+                    SELECT *
+                    FROM EventSponsors
+                    WHERE EventId = @eventId
+                    ORDER BY
+                        CASE Status
+                            WHEN 'confirmed' THEN 1
+                            WHEN 'negotiating' THEN 2
+                            WHEN 'reached-out' THEN 3
+                            WHEN 'declined' THEN 4
+                            ELSE 5
+                        END,
+                        CompanyName ASC
+                `);
+
+            return {
+                status: 200,
+                jsonBody: result.recordset.map(mapSponsorRow)
+            };
+        } catch (error) {
+            await logError(context, error);
+            context.error('Error listing sponsors:', error);
+            return {
+                status: 500,
+                jsonBody: { error: error.message || 'Failed to list sponsors' }
+            };
+        }
+    }
+});
+
+// POST /api/events/{eventId}/sponsors - Create sponsor
+app.http('event-sponsors-create', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/sponsors',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+            const body = await request.json();
+            const payload = normalizeSponsorPayload(body);
+            const id = generateGuid();
+
+            const pool = await getPool();
+            await ensureSponsorsTable(pool);
+
+            await pool.request()
+                .input('id', sql.UniqueIdentifier, id)
+                .input('eventId', sql.UniqueIdentifier, eventId)
+                .input('companyName', sql.NVarChar(200), payload.companyName)
+                .input('contactPerson', sql.NVarChar(200), payload.contactPerson)
+                .input('phoneNumber', sql.NVarChar(50), payload.phoneNumber)
+                .input('email', sql.NVarChar(320), payload.email)
+                .input('amount', sql.Decimal(12, 2), payload.amount)
+                .input('status', sql.NVarChar(30), payload.status)
+                .input('notes', sql.NVarChar(sql.MAX), payload.notes)
+                .query(`
+                    INSERT INTO EventSponsors
+                    (Id, EventId, CompanyName, ContactPerson, PhoneNumber, Email, Amount, Status, Notes)
+                    VALUES
+                    (@id, @eventId, @companyName, @contactPerson, @phoneNumber, @email, @amount, @status, @notes)
+                `);
+
+            const created = await pool.request()
+                .input('id', sql.UniqueIdentifier, id)
+                .query('SELECT * FROM EventSponsors WHERE Id = @id');
+
+            return {
+                status: 201,
+                jsonBody: mapSponsorRow(created.recordset[0])
+            };
+        } catch (error) {
+            const status = /required|Invalid sponsor status|amount must/i.test(error.message) ? 400 : 500;
+            if (status === 500) {
+                await logError(context, error);
+            }
+            context.error('Error creating sponsor:', error);
+            return {
+                status,
+                jsonBody: { error: error.message || 'Failed to create sponsor' }
+            };
+        }
+    }
+});
+
+// PUT /api/events/{eventId}/sponsors/{sponsorId} - Update sponsor
+app.http('event-sponsors-update', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/sponsors/{sponsorId}',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+            const sponsorId = request.params.sponsorId;
+            const body = await request.json();
+            const payload = normalizeSponsorPayload(body, { isUpdate: true });
+
+            const pool = await getPool();
+            await ensureSponsorsTable(pool);
+
+            const existing = await pool.request()
+                .input('id', sql.UniqueIdentifier, sponsorId)
+                .input('eventId', sql.UniqueIdentifier, eventId)
+                .query('SELECT * FROM EventSponsors WHERE Id = @id AND EventId = @eventId');
+
+            if (existing.recordset.length === 0) {
+                return { status: 404, jsonBody: { error: 'Sponsor not found' } };
+            }
+
+            const merged = {
+                ...mapSponsorRow(existing.recordset[0]),
+                ...payload
+            };
+
+            await pool.request()
+                .input('id', sql.UniqueIdentifier, sponsorId)
+                .input('eventId', sql.UniqueIdentifier, eventId)
+                .input('companyName', sql.NVarChar(200), merged.companyName)
+                .input('contactPerson', sql.NVarChar(200), merged.contactPerson)
+                .input('phoneNumber', sql.NVarChar(50), merged.phoneNumber)
+                .input('email', sql.NVarChar(320), merged.email)
+                .input('amount', sql.Decimal(12, 2), merged.amount)
+                .input('status', sql.NVarChar(30), merged.status)
+                .input('notes', sql.NVarChar(sql.MAX), merged.notes)
+                .query(`
+                    UPDATE EventSponsors
+                    SET CompanyName = @companyName,
+                        ContactPerson = @contactPerson,
+                        PhoneNumber = @phoneNumber,
+                        Email = @email,
+                        Amount = @amount,
+                        Status = @status,
+                        Notes = @notes,
+                        UpdatedAt = SYSUTCDATETIME()
+                    WHERE Id = @id AND EventId = @eventId
+                `);
+
+            const updated = await pool.request()
+                .input('id', sql.UniqueIdentifier, sponsorId)
+                .query('SELECT * FROM EventSponsors WHERE Id = @id');
+
+            return {
+                status: 200,
+                jsonBody: mapSponsorRow(updated.recordset[0])
+            };
+        } catch (error) {
+            const status = /required|Invalid sponsor status|amount must/i.test(error.message) ? 400 : 500;
+            if (status === 500) {
+                await logError(context, error);
+            }
+            context.error('Error updating sponsor:', error);
+            return {
+                status,
+                jsonBody: { error: error.message || 'Failed to update sponsor' }
+            };
+        }
+    }
+});
+
+// DELETE /api/events/{eventId}/sponsors/{sponsorId} - Delete sponsor
+app.http('event-sponsors-delete', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/sponsors/{sponsorId}',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+            const sponsorId = request.params.sponsorId;
+            const pool = await getPool();
+            await ensureSponsorsTable(pool);
+
+            const result = await pool.request()
+                .input('id', sql.UniqueIdentifier, sponsorId)
+                .input('eventId', sql.UniqueIdentifier, eventId)
+                .query('DELETE FROM EventSponsors WHERE Id = @id AND EventId = @eventId');
+
+            if (!result.rowsAffected[0]) {
+                return { status: 404, jsonBody: { error: 'Sponsor not found' } };
+            }
+
+            return {
+                status: 200,
+                jsonBody: { success: true }
+            };
+        } catch (error) {
+            await logError(context, error);
+            context.error('Error deleting sponsor:', error);
+            return {
+                status: 500,
+                jsonBody: { error: error.message || 'Failed to delete sponsor' }
             };
         }
     }

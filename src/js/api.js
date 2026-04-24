@@ -303,6 +303,32 @@ const API = {
             return API.request(`/events/${eventId}`, {
                 method: 'DELETE'
             });
+        },
+
+        sponsors: {
+            async list(eventId) {
+                return API.request(`/events/${eventId}/sponsors`);
+            },
+
+            async create(eventId, data) {
+                return API.request(`/events/${eventId}/sponsors`, {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+            },
+
+            async update(eventId, sponsorId, data) {
+                return API.request(`/events/${eventId}/sponsors/${sponsorId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+            },
+
+            async delete(eventId, sponsorId) {
+                return API.request(`/events/${eventId}/sponsors/${sponsorId}`, {
+                    method: 'DELETE'
+                });
+            }
         }
     },
 

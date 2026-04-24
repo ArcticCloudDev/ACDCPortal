@@ -451,5 +451,28 @@ CREATE TABLE [Errors] (
 );
 GO
 
-PRINT '=== All 24 tables created successfully ===';
+-- 25. EventSponsors
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'EventSponsors')
+BEGIN
+    CREATE TABLE EventSponsors (
+        Id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        EventId       UNIQUEIDENTIFIER NOT NULL,
+        CompanyName   NVARCHAR(200)    NOT NULL,
+        ContactPerson NVARCHAR(200)    NULL,
+        PhoneNumber   NVARCHAR(50)     NULL,
+        Email         NVARCHAR(320)    NULL,
+        Amount        DECIMAL(12,2)    NULL,
+        Status        NVARCHAR(30)     NOT NULL DEFAULT 'reached-out',
+        Notes         NVARCHAR(MAX)    NULL,
+        CreatedAt     DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt     DATETIME2        NULL,
+        CONSTRAINT FK_EventSponsors_Events FOREIGN KEY (EventId) REFERENCES Events(Id) ON DELETE CASCADE,
+        CONSTRAINT CK_EventSponsors_Status CHECK (Status IN ('reached-out', 'negotiating', 'declined', 'confirmed'))
+    );
+    CREATE INDEX IX_EventSponsors_EventId ON EventSponsors(EventId);
+    CREATE INDEX IX_EventSponsors_Status ON EventSponsors(Status);
+END
+GO
+
+PRINT '=== All 25 tables created successfully ===';
 SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME;

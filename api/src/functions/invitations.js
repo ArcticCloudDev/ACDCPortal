@@ -177,7 +177,7 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
         const eventTheme = invitation.eventId ? (template.eventThemes[invitation.eventId] || {}) : {};
         const globalDefaults = template.editableSections;
 
-        // Extract image src from HTML (same as team-welcome.js)
+        // Extract image src from HTML (legacy-compatible behavior)
         const extractImageSrc = (html) => {
             if (!html) return '';
             const match = html.match(/src="([^"]+)"/);
@@ -193,7 +193,7 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
             teamName: invitation.teamName || 'the team',
             fullName: inviteeName || invitation.email.split('@')[0],
             eventName: eventName,
-            teamAdminName: invitation.inviterName || 'Team Admin',
+            teamAdminName: invitation.inviterName || 'Event Organizer',
             portalUrl: acceptUrl
         };
 
@@ -286,7 +286,7 @@ app.http('invitations-create', {
                 eventId: resolvedEventId || null,
                 role: role || null, // 'judge', 'committee', 'sponsor', or null for team participant
                 inviterId,
-                inviterName: inviterName || 'Team Admin',
+                inviterName: inviterName || 'Event Organizer',
                 inviterEmail: inviterEmail || '',
                 message: message || 'Join our team for the Arctic Cloud Developer Challenge!',
                 status: 'pending',
@@ -320,11 +320,11 @@ app.http('invitations-create', {
                     htmlContent = result.htmlContent;
                     emailSubject = result.subject;
                 } else {
-                    // Team/participant invitation — use team-welcome template
+                    // Participant invitation — use the universal welcome template
                     context.log('[DEBUG invitations] Routing to buildTeamWelcomeEmailForInvitation');
                     const result = await buildTeamWelcomeEmailForInvitation(invitation, context);
                     if (!result.success) {
-                        throw new Error(`Team welcome template failed: ${result.reason}`);
+                        throw new Error(`Welcome template failed: ${result.reason}`);
                     }
                     htmlContent = result.htmlContent;
                     emailSubject = result.subject;
@@ -679,10 +679,10 @@ app.http('invitations-resend', {
                 htmlContent = result.htmlContent;
                 emailSubject = `Reminder: ${result.subject}`;
             } else {
-                // Team/participant invitation — use team-welcome template
+                // Participant invitation — use the universal welcome template
                 const result = await buildTeamWelcomeEmailForInvitation(invitationForEmail, context);
                 if (!result.success) {
-                    throw new Error(`Team welcome template failed: ${result.reason}`);
+                    throw new Error(`Welcome template failed: ${result.reason}`);
                 }
                 htmlContent = result.htmlContent;
                 emailSubject = `Reminder: ${result.subject}`;

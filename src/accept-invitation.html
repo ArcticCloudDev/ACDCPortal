@@ -312,7 +312,7 @@
                 }
 
                 if (invitation.isExpired) {
-                    showError('Invitation Expired', 'This invitation has expired. Please ask the team admin to send a new one.');
+                    showError('Invitation Expired', 'This invitation has expired. Please ask the event organizer to send a new one.');
                     return;
                 }
 
@@ -592,7 +592,7 @@
                 clearTimeout(wakeTimer);
                 document.getElementById('step-invite').classList.remove('hidden');
 
-                document.getElementById('invite-inviter-name').textContent = inv.inviterName || 'A team admin';
+                document.getElementById('invite-inviter-name').textContent = inv.inviterName || 'An event organizer';
                 document.getElementById('invite-team-name').textContent = inv.teamName || 'the team';
 
                 const eventLine = document.getElementById('invite-event-line');
