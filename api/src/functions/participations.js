@@ -17,7 +17,6 @@ const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
 const invitationsStorage = new Storage('invitations');
 const { sendEmail } = require('../shared/mail');
-const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
 
 // Valid roles
@@ -543,11 +542,7 @@ app.http('participations-update-roles-v2', {
                 await triggerSequenceEmails(participation.userId, participation.eventId, context);
 
                 if (participation.email) {
-                    sendInterestAcknowledgmentEmail(participation.email, participation.eventId, context)
-                        .then(result => {
-                            if (result?.success) context.log(`Interest acknowledgment sent to ${participation.email}`);
-                        })
-                        .catch(err => context.error(`Failed interest ack to ${participation.email}:`, err));
+                    // Interest acknowledgment is only sent from interest.js when interest is first recorded
                 }
             }
 
@@ -643,11 +638,7 @@ app.http('participations-assign-team', {
                 await triggerSequenceEmails(participation.userId, participation.eventId, context);
 
                 if (participation.email) {
-                    sendInterestAcknowledgmentEmail(participation.email, participation.eventId, context)
-                        .then(result => {
-                            if (result?.success) context.log(`Interest acknowledgment sent to ${participation.email}`);
-                        })
-                        .catch(err => context.error(`Failed interest ack:`, err));
+                    // Interest acknowledgment is only sent from interest.js when interest is first recorded
                 }
             }
 
@@ -950,28 +941,26 @@ app.http('participations-add-team-membership', {
             });
 
             // Side effects
-            if (isParticipant && participation.userId) {
-                await removeFromInterestQueue(participation.userId, participation.eventId, context);
-                await triggerSequenceEmails(participation.userId, participation.eventId, context);
+            if (participation.userId) {
+                if (isParticipant) {
+                    await removeFromInterestQueue(participation.userId, participation.eventId, context);
+                    await triggerSequenceEmails(participation.userId, participation.eventId, context);
+                }
 
+                // Send welcome email to team admin/participant as team registration confirmation
+                // Fires whether or not the admin is also a participant
                 if (participation.email) {
-                    // Resolve team name for welcome email context
                     let teamNameForWelcome = '';
                     try {
                         const teamForWelcome = teamId ? await Storage.teams.getById(teamId) : null;
                         teamNameForWelcome = teamForWelcome?.teamName || '';
                     } catch (e) { /* non-critical */ }
 
-                    // Send team welcome email to new participant
                     sendWelcomeEmail(participation.email, participation.eventId, context, { teamName: teamNameForWelcome })
                         .then(result => {
                             if (result?.success) context.log(`Welcome email sent to ${participation.email}`);
                         })
                         .catch(err => context.error(`Failed welcome email:`, err));
-
-                    sendInterestAcknowledgmentEmail(participation.email, participation.eventId, context)
-                        .then(result => { if (result?.success) context.log(`Interest ack sent to ${participation.email}`); })
-                        .catch(err => context.error(`Failed interest ack:`, err));
                 }
             }
 
@@ -1105,9 +1094,7 @@ app.http('participations-toggle-participant', {
                 await removeFromInterestQueue(participation.userId, participation.eventId, context);
 
                 if (participation.email) {
-                    sendInterestAcknowledgmentEmail(participation.email, participation.eventId, context)
-                        .then(result => { if (result?.success) context.log(`Interest ack sent to ${participation.email}`); })
-                        .catch(err => context.error(`Failed interest ack:`, err));
+                    // Interest acknowledgment is only sent from interest.js when interest is first recorded
                 }
             }
 

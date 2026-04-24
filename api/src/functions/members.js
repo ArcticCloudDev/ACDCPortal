@@ -7,7 +7,6 @@ const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 const Email = require('../shared/email');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
-const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 
 // Add member to team
 app.http('members-add', {
@@ -83,12 +82,7 @@ app.http('members-add', {
                     })
                     .catch(error => context.error(`Failed to send welcome email to ${email}:`, error));
 
-                // Send interest acknowledgment email if member was a verified interest lead
-                sendInterestAcknowledgmentEmail(email, team.eventId, context)
-                    .then(result => {
-                        if (result.success) context.log(`Interest acknowledgment email sent to ${email}`);
-                    })
-                    .catch(error => context.error(`Failed to send interest acknowledgment email to ${email}:`, error));
+                // Interest acknowledgment is only sent from interest.js when interest is first recorded
             }
             
             context.log(`Member ${email} added to team ${teamId}`);

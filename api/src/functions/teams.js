@@ -6,7 +6,6 @@ const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
-const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 
 const eventsStorage = new GenericStorage('events');
 const soloQueueStorage = new GenericStorage('solo-queue');
@@ -140,21 +139,7 @@ app.http('teams-create', {
             // Save team
             const savedTeam = await Storage.teams.create(newTeam);
 
-            // Send welcome email to team admin (async, don't wait)
-            if (adminEmail && newTeam.eventId) {
-                sendWelcomeEmail(adminEmail, newTeam.eventId, context)
-                    .then(result => {
-                        if (result.success) context.log(`Welcome email sent to ${adminEmail}`);
-                    })
-                    .catch(error => context.error(`Failed to send welcome email to ${adminEmail}:`, error));
-
-                // Send interest acknowledgment email if member was a verified interest lead
-                sendInterestAcknowledgmentEmail(adminEmail, newTeam.eventId, context)
-                    .then(result => {
-                        if (result.success) context.log(`Interest acknowledgment email sent to ${adminEmail}`);
-                    })
-                    .catch(error => context.error(`Failed to send interest acknowledgment email to ${adminEmail}:`, error));
-            }
+            // Welcome email is sent by the participations flow when team membership is assigned
             
             // Auto-remove creator from solo queue for this event (if they were in it)
             if (teamData.adminUserId && newTeam.eventId) {
