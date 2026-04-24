@@ -214,7 +214,18 @@ function setupEventListeners() {
 
     // Sponsor form
     document.getElementById('sponsor-form').addEventListener('submit', handleSponsorSubmit);
-    document.getElementById('cancel-sponsor-edit-btn').addEventListener('click', resetSponsorForm);
+    document.getElementById('open-sponsor-modal-btn').addEventListener('click', openSponsorCreateModal);
+    document.getElementById('close-sponsor-modal-btn').addEventListener('click', closeSponsorModal);
+    document.getElementById('sponsor-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'sponsor-modal') {
+            closeSponsorModal();
+        }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('sponsor-modal').classList.contains('active')) {
+            closeSponsorModal();
+        }
+    });
 }
 
 // Status display configuration
@@ -467,6 +478,7 @@ function updateURL() {
 }
 
 function hideForm() {
+    closeSponsorModal();
     document.getElementById('events-list-view').classList.remove('hidden');
     document.getElementById('event-form-view').classList.add('hidden');
     editingEventId = null;
@@ -1281,8 +1293,24 @@ function resetSponsorForm() {
     form.reset();
     document.getElementById('sponsor-id').value = '';
     document.getElementById('sponsor-status').value = 'reached-out';
+    document.getElementById('sponsor-modal-title').textContent = '➕ Add Sponsor';
     document.getElementById('save-sponsor-btn').textContent = '➕ Add Sponsor';
-    document.getElementById('cancel-sponsor-edit-btn').classList.add('hidden');
+}
+
+function openSponsorCreateModal() {
+    if (!currentEventId) {
+        alert('Save the event first before adding sponsors.');
+        return;
+    }
+
+    resetSponsorForm();
+    document.getElementById('sponsor-modal').classList.add('active');
+    document.getElementById('sponsor-company-name').focus();
+}
+
+function closeSponsorModal() {
+    document.getElementById('sponsor-modal').classList.remove('active');
+    resetSponsorForm();
 }
 
 async function loadEventSponsors() {
@@ -1343,6 +1371,7 @@ function startEditSponsor(sponsorId) {
     const sponsor = allSponsors.find((item) => item.id === sponsorId);
     if (!sponsor) return;
 
+    document.getElementById('sponsor-modal-title').textContent = '✏️ Edit Sponsor';
     document.getElementById('sponsor-id').value = sponsor.id;
     document.getElementById('sponsor-company-name').value = sponsor.companyName || '';
     document.getElementById('sponsor-contact-person').value = sponsor.contactPerson || '';
@@ -1352,7 +1381,7 @@ function startEditSponsor(sponsorId) {
     document.getElementById('sponsor-status').value = sponsor.status || 'reached-out';
     document.getElementById('sponsor-notes').value = sponsor.notes || '';
     document.getElementById('save-sponsor-btn').textContent = '💾 Update Sponsor';
-    document.getElementById('cancel-sponsor-edit-btn').classList.remove('hidden');
+    document.getElementById('sponsor-modal').classList.add('active');
     document.getElementById('sponsor-company-name').focus();
 }
 
@@ -1391,7 +1420,7 @@ async function handleSponsorSubmit(e) {
         }
 
         await loadEventSponsors();
-        resetSponsorForm();
+        closeSponsorModal();
     } catch (error) {
         console.error('Error saving sponsor:', error);
         alert(`Error saving sponsor: ${error.message}`);
@@ -1407,8 +1436,9 @@ async function deleteSponsor(sponsorId) {
         await API.events.sponsors.delete(currentEventId, sponsorId);
         await loadEventSponsors();
         const editingId = document.getElementById('sponsor-id').value;
-        if (editingId === sponsorId) {
-            resetSponsorForm();
+        const modal = document.getElementById('sponsor-modal');
+        if (editingId === sponsorId && modal.classList.contains('active')) {
+            closeSponsorModal();
         }
     } catch (error) {
         console.error('Error deleting sponsor:', error);

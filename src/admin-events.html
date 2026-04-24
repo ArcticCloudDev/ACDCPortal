@@ -1193,61 +1193,18 @@
 
                 <!-- Teams Tab -->
                 <div class="tab-panel" id="sponsors-panel">
-                    <div class="panel" style="margin-bottom: 16px;">
-                        <div class="panel-body padded">
-                            <h3 style="margin: 0 0 8px 0;">💼 Sponsor Pipeline</h3>
-                            <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 18px;">
-                                Keep sponsor outreach organized for this event. Track contacts, deal amount, status, and notes in one list.
-                            </p>
-
-                            <form id="sponsor-form">
-                                <input type="hidden" id="sponsor-id">
-                                <div class="sponsor-grid">
-                                    <div class="form-group">
-                                        <label for="sponsor-company-name">Company Name *</label>
-                                        <input type="text" id="sponsor-company-name" required placeholder="Contoso">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="sponsor-contact-person">Contact Person</label>
-                                        <input type="text" id="sponsor-contact-person" placeholder="Jane Doe">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="sponsor-phone-number">Phone Number</label>
-                                        <input type="text" id="sponsor-phone-number" placeholder="+47 ...">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="sponsor-email">E-mail</label>
-                                        <input type="email" id="sponsor-email" placeholder="sponsor@company.com">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="sponsor-amount">Amount</label>
-                                        <input type="number" id="sponsor-amount" min="0" step="0.01" placeholder="25000">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="sponsor-status">Status</label>
-                                        <select id="sponsor-status">
-                                            <option value="reached-out">Reached out</option>
-                                            <option value="negotiating">Negotiating</option>
-                                            <option value="declined">Declined</option>
-                                            <option value="confirmed">Confirmed</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group full-width">
-                                        <label for="sponsor-notes">Notes</label>
-                                        <textarea id="sponsor-notes" rows="3" placeholder="Meeting notes, next follow-up, requirements..."></textarea>
-                                    </div>
-                                </div>
-
-                                <div style="display: flex; gap: 8px; align-items: center;">
-                                    <button type="submit" id="save-sponsor-btn" class="btn-sm primary">➕ Add Sponsor</button>
-                                    <button type="button" id="cancel-sponsor-edit-btn" class="btn-sm hidden">Cancel Edit</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-
                     <div class="panel">
                         <div class="panel-body padded">
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
+                                <div>
+                                    <h3 style="margin: 0 0 6px 0;">💼 Sponsor Pipeline</h3>
+                                    <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin: 0;">
+                                        Keep sponsor outreach organized for this event. Track contacts, deal amount, status, and notes in one list.
+                                    </p>
+                                </div>
+                                <button type="button" id="open-sponsor-modal-btn" class="btn-sm primary">➕ Add New Sponsor</button>
+                            </div>
+
                             <div class="members-list">
                                 <table class="data-table">
                                     <thead>
@@ -1434,6 +1391,59 @@
                 <button class="btn-sm" onclick="closeCreateSequenceModal()">Cancel</button>
                 <button class="btn-sm primary" onclick="confirmCreateSequence()">Create Sequence</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Sponsor Modal -->
+    <div id="sponsor-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="sponsor-modal-title">➕ Add Sponsor</h3>
+            </div>
+            <form id="sponsor-form">
+                <input type="hidden" id="sponsor-id">
+                <div class="modal-body">
+                    <div class="sponsor-grid">
+                        <div class="form-group">
+                            <label for="sponsor-company-name">Company Name *</label>
+                            <input type="text" id="sponsor-company-name" required placeholder="Contoso">
+                        </div>
+                        <div class="form-group">
+                            <label for="sponsor-contact-person">Contact Person</label>
+                            <input type="text" id="sponsor-contact-person" placeholder="Jane Doe">
+                        </div>
+                        <div class="form-group">
+                            <label for="sponsor-phone-number">Phone Number</label>
+                            <input type="text" id="sponsor-phone-number" placeholder="+47 ...">
+                        </div>
+                        <div class="form-group">
+                            <label for="sponsor-email">E-mail</label>
+                            <input type="email" id="sponsor-email" placeholder="sponsor@company.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="sponsor-amount">Amount</label>
+                            <input type="number" id="sponsor-amount" min="0" step="0.01" placeholder="25000">
+                        </div>
+                        <div class="form-group">
+                            <label for="sponsor-status">Status</label>
+                            <select id="sponsor-status">
+                                <option value="reached-out">Reached out</option>
+                                <option value="negotiating">Negotiating</option>
+                                <option value="declined">Declined</option>
+                                <option value="confirmed">Confirmed</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="sponsor-notes">Notes</label>
+                            <textarea id="sponsor-notes" rows="3" placeholder="Meeting notes, next follow-up, requirements..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-sm" id="close-sponsor-modal-btn">Cancel</button>
+                    <button type="submit" id="save-sponsor-btn" class="btn-sm primary">➕ Add Sponsor</button>
+                </div>
+            </form>
         </div>
     </div>
 
