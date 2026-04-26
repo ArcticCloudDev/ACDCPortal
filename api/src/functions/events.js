@@ -4,7 +4,7 @@ const { logError } = require('../shared/error-log');
 const StorageModule = require('../shared/storage');
 const { Storage } = StorageModule;
 const { getPool, sql } = require('../shared/sql');
-const { upsertSponsorRow, listByEvent, createManual, updateManual, updatePaidBy, deleteManual, getSummary, syncParticipationToFinancials } = require('../shared/event-financials');
+const { listByEvent, createManual, updateManual, updatePaidBy, deleteManual, getSummary, syncParticipationToFinancials } = require('../shared/event-financials');
 
 const eventsStorage = new Storage('events');
 const teamsStorage = new Storage('teams');
@@ -27,96 +27,6 @@ function isActiveStatus(status) {
 // Helper to check if registration is open based on status
 function isRegistrationOpen(status) {
     return status === 'registration';
-}
-
-function mapSponsorRow(row) {
-    return {
-        id: row.Id,
-        eventId: row.EventId,
-        companyName: row.CompanyName,
-        contactPerson: row.ContactPerson,
-        phoneNumber: row.PhoneNumber,
-        email: row.Email,
-        amount: row.Amount == null ? null : Number(row.Amount),
-        status: row.Status,
-        notes: row.Notes,
-        createdAt: row.CreatedAt instanceof Date ? row.CreatedAt.toISOString() : row.CreatedAt,
-        updatedAt: row.UpdatedAt instanceof Date ? row.UpdatedAt.toISOString() : row.UpdatedAt
-    };
-}
-
-function normalizeSponsorStatus(status) {
-    const validStatuses = new Set(['reached-out', 'negotiating', 'declined', 'confirmed']);
-    const normalized = (status || '').toString().trim().toLowerCase();
-    if (!normalized) return 'reached-out';
-    if (!validStatuses.has(normalized)) {
-        throw new Error('Invalid sponsor status');
-    }
-    return normalized;
-}
-
-function normalizeSponsorPayload(body = {}, { isUpdate = false } = {}) {
-    const payload = {};
-
-    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'companyName')) {
-        const companyName = (body.companyName || '').toString().trim();
-        if (!companyName) throw new Error('companyName is required');
-        payload.companyName = companyName;
-    }
-
-    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'contactPerson')) {
-        payload.contactPerson = body.contactPerson ? body.contactPerson.toString().trim() : null;
-    }
-    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'phoneNumber')) {
-        payload.phoneNumber = body.phoneNumber ? body.phoneNumber.toString().trim() : null;
-    }
-    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'email')) {
-        payload.email = body.email ? body.email.toString().trim().toLowerCase() : null;
-    }
-    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'amount')) {
-        if (body.amount === '' || body.amount === null || body.amount === undefined) {
-            payload.amount = null;
-        } else {
-            const amount = Number(body.amount);
-            if (!Number.isFinite(amount) || amount < 0) {
-                throw new Error('amount must be a non-negative number');
-            }
-            payload.amount = amount;
-        }
-    }
-    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'status')) {
-        payload.status = normalizeSponsorStatus(body.status);
-    }
-    if (!isUpdate || Object.prototype.hasOwnProperty.call(body, 'notes')) {
-        payload.notes = body.notes ? body.notes.toString().trim() : null;
-    }
-
-    return payload;
-}
-
-async function ensureSponsorsTable(pool) {
-    await pool.request().query(`
-        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'EventSponsors')
-        BEGIN
-            CREATE TABLE EventSponsors (
-                Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-                EventId UNIQUEIDENTIFIER NOT NULL,
-                CompanyName NVARCHAR(200) NOT NULL,
-                ContactPerson NVARCHAR(200) NULL,
-                PhoneNumber NVARCHAR(50) NULL,
-                Email NVARCHAR(320) NULL,
-                Amount DECIMAL(12,2) NULL,
-                Status NVARCHAR(30) NOT NULL DEFAULT 'reached-out',
-                Notes NVARCHAR(MAX) NULL,
-                CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-                UpdatedAt DATETIME2 NULL,
-                CONSTRAINT FK_EventSponsors_Events FOREIGN KEY (EventId) REFERENCES Events(Id) ON DELETE CASCADE,
-                CONSTRAINT CK_EventSponsors_Status CHECK (Status IN ('reached-out', 'negotiating', 'declined', 'confirmed'))
-            );
-            CREATE INDEX IX_EventSponsors_EventId ON EventSponsors(EventId);
-            CREATE INDEX IX_EventSponsors_Status ON EventSponsors(Status);
-        END
-    `);
 }
 
 // Helper to generate hotel dates (1 day before start to 1 day after end)
@@ -272,7 +182,57 @@ app.http('events-get', {
     }
 });
 
-// GET /api/events/{eventId}/sponsors - List event sponsors
+// Sponsor helper: map a sponsorship row from EventFinancials to the API shape
+function mapSponsorFinancial(row) {
+    return {
+        id: row.Id,
+        eventId: row.EventId,
+        companyName: row.Description,
+        contactPerson: row.ContactPerson || null,
+        phoneNumber: row.PhoneNumber || null,
+        email: row.ContactEmail || null,
+        amount: row.Amount == null ? null : Number(row.Amount),
+        sponsorStatus: row.SponsorStatus || 'reached-out',
+        notes: row.Notes || null,
+        paidBy: row.PaidBy,
+        source: row.Source,
+        createdAt: row.CreatedAt instanceof Date ? row.CreatedAt.toISOString() : row.CreatedAt,
+        updatedAt: row.UpdatedAt instanceof Date ? row.UpdatedAt.toISOString() : (row.UpdatedAt || null)
+    };
+}
+
+function normalizeSponsorPayload(body = {}, { isUpdate = false } = {}) {
+    const payload = {};
+    const has = (k) => !isUpdate || Object.prototype.hasOwnProperty.call(body, k);
+
+    if (has('companyName')) {
+        const v = (body.companyName || '').toString().trim();
+        if (!v) throw new Error('companyName is required');
+        payload.description = v;
+    }
+    if (has('contactPerson'))  payload.contactPerson  = body.contactPerson  ? body.contactPerson.toString().trim()                    : null;
+    if (has('phoneNumber'))    payload.phoneNumber    = body.phoneNumber    ? body.phoneNumber.toString().trim()                      : null;
+    if (has('email'))          payload.contactEmail   = body.email          ? body.email.toString().trim().toLowerCase()              : null;
+    if (has('notes'))          payload.notes          = body.notes          ? body.notes.toString().trim()                            : null;
+    if (has('amount')) {
+        const raw = body.amount;
+        if (raw === '' || raw == null) { payload.amount = 0; }
+        else {
+            const n = Number(raw);
+            if (!Number.isFinite(n) || n < 0) throw new Error('amount must be a non-negative number');
+            payload.amount = n;
+        }
+    }
+    if (has('sponsorStatus') || has('status')) {
+        const validStatuses = new Set(['reached-out', 'negotiating', 'declined', 'confirmed']);
+        const s = ((body.sponsorStatus || body.status) || 'reached-out').toString().trim().toLowerCase();
+        if (!validStatuses.has(s)) throw new Error('Invalid sponsor status');
+        payload.sponsorStatus = s;
+    }
+    return payload;
+}
+
+// GET /api/events/{eventId}/sponsors - List event sponsors (filtered view of EventFinancials)
 app.http('event-sponsors-list', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -281,36 +241,19 @@ app.http('event-sponsors-list', {
         try {
             const eventId = request.params.eventId;
             const pool = await getPool();
-            await ensureSponsorsTable(pool);
-
             const result = await pool.request()
                 .input('eventId', sql.UniqueIdentifier, eventId)
                 .query(`
-                    SELECT *
-                    FROM EventSponsors
-                    WHERE EventId = @eventId
+                    SELECT * FROM EventFinancials
+                    WHERE EventId = @eventId AND Category = 'sponsorship'
                     ORDER BY
-                        CASE Status
-                            WHEN 'confirmed' THEN 1
-                            WHEN 'negotiating' THEN 2
-                            WHEN 'reached-out' THEN 3
-                            WHEN 'declined' THEN 4
-                            ELSE 5
-                        END,
-                        CompanyName ASC
+                        CASE SponsorStatus WHEN 'confirmed' THEN 1 WHEN 'negotiating' THEN 2 WHEN 'reached-out' THEN 3 WHEN 'declined' THEN 4 ELSE 5 END,
+                        Description ASC
                 `);
-
-            return {
-                status: 200,
-                jsonBody: result.recordset.map(mapSponsorRow)
-            };
+            return { status: 200, jsonBody: result.recordset.map(mapSponsorFinancial) };
         } catch (error) {
             await logError(context, error);
-            context.error('Error listing sponsors:', error);
-            return {
-                status: 500,
-                jsonBody: { error: error.message || 'Failed to list sponsors' }
-            };
+            return { status: 500, jsonBody: { error: error.message || 'Failed to list sponsors' } };
         }
     }
 });
@@ -326,55 +269,35 @@ app.http('event-sponsors-create', {
             const body = await request.json();
             const payload = normalizeSponsorPayload(body);
             const id = generateGuid();
-
             const pool = await getPool();
-            await ensureSponsorsTable(pool);
 
             await pool.request()
-                .input('id', sql.UniqueIdentifier, id)
-                .input('eventId', sql.UniqueIdentifier, eventId)
-                .input('companyName', sql.NVarChar(200), payload.companyName)
-                .input('contactPerson', sql.NVarChar(200), payload.contactPerson)
-                .input('phoneNumber', sql.NVarChar(50), payload.phoneNumber)
-                .input('email', sql.NVarChar(320), payload.email)
-                .input('amount', sql.Decimal(12, 2), payload.amount)
-                .input('status', sql.NVarChar(30), payload.status)
-                .input('notes', sql.NVarChar(sql.MAX), payload.notes)
+                .input('id',            sql.UniqueIdentifier,  id)
+                .input('eventId',       sql.UniqueIdentifier,  eventId)
+                .input('description',   sql.NVarChar(200),     payload.description)
+                .input('amount',        sql.Decimal(12, 2),    payload.amount ?? 0)
+                .input('contactPerson', sql.NVarChar(200),     payload.contactPerson ?? null)
+                .input('phoneNumber',   sql.NVarChar(50),      payload.phoneNumber   ?? null)
+                .input('contactEmail',  sql.NVarChar(320),     payload.contactEmail  ?? null)
+                .input('sponsorStatus', sql.NVarChar(30),      payload.sponsorStatus ?? 'reached-out')
+                .input('notes',         sql.NVarChar(sql.MAX), payload.notes         ?? null)
                 .query(`
-                    INSERT INTO EventSponsors
-                    (Id, EventId, CompanyName, ContactPerson, PhoneNumber, Email, Amount, Status, Notes)
+                    INSERT INTO EventFinancials
+                      (Id, EventId, Type, Category, Description, Amount, PaidBy, Source,
+                       ContactPerson, PhoneNumber, ContactEmail, SponsorStatus, Notes)
                     VALUES
-                    (@id, @eventId, @companyName, @contactPerson, @phoneNumber, @email, @amount, @status, @notes)
+                      (@id, @eventId, 'income', 'sponsorship', @description, @amount, 'event', 'manual',
+                       @contactPerson, @phoneNumber, @contactEmail, @sponsorStatus, @notes)
                 `);
 
-            const created = await pool.request()
+            const row = await pool.request()
                 .input('id', sql.UniqueIdentifier, id)
-                .query('SELECT * FROM EventSponsors WHERE Id = @id');
-
-            const sponsorRow = mapSponsorRow(created.recordset[0]);
-
-            // Always sync to EventFinancials (all statuses visible in budget)
-            upsertSponsorRow(eventId, id, {
-                companyName: sponsorRow.companyName,
-                amount: sponsorRow.amount,
-                status: sponsorRow.status,
-                active: true
-            }).catch(err => context.error('Failed to create sponsor financial row:', err));
-
-            return {
-                status: 201,
-                jsonBody: sponsorRow
-            };
+                .query('SELECT * FROM EventFinancials WHERE Id = @id');
+            return { status: 201, jsonBody: mapSponsorFinancial(row.recordset[0]) };
         } catch (error) {
-            const status = /required|Invalid sponsor status|amount must/i.test(error.message) ? 400 : 500;
-            if (status === 500) {
-                await logError(context, error);
-            }
-            context.error('Error creating sponsor:', error);
-            return {
-                status,
-                jsonBody: { error: error.message || 'Failed to create sponsor' }
-            };
+            const status = /required|Invalid sponsor|amount must/i.test(error.message) ? 400 : 500;
+            if (status === 500) await logError(context, error);
+            return { status, jsonBody: { error: error.message || 'Failed to create sponsor' } };
         }
     }
 });
@@ -386,79 +309,59 @@ app.http('event-sponsors-update', {
     route: 'events/{eventId}/sponsors/{sponsorId}',
     handler: async (request, context) => {
         try {
-            const eventId = request.params.eventId;
-            const sponsorId = request.params.sponsorId;
+            const { eventId, sponsorId } = request.params;
             const body = await request.json();
             const payload = normalizeSponsorPayload(body, { isUpdate: true });
-
             const pool = await getPool();
-            await ensureSponsorsTable(pool);
 
             const existing = await pool.request()
-                .input('id', sql.UniqueIdentifier, sponsorId)
+                .input('id',      sql.UniqueIdentifier, sponsorId)
                 .input('eventId', sql.UniqueIdentifier, eventId)
-                .query('SELECT * FROM EventSponsors WHERE Id = @id AND EventId = @eventId');
+                .query(`SELECT * FROM EventFinancials WHERE Id = @id AND EventId = @eventId AND Category = 'sponsorship'`);
 
-            if (existing.recordset.length === 0) {
-                return { status: 404, jsonBody: { error: 'Sponsor not found' } };
-            }
+            if (!existing.recordset.length) return { status: 404, jsonBody: { error: 'Sponsor not found' } };
 
+            const cur = mapSponsorFinancial(existing.recordset[0]);
             const merged = {
-                ...mapSponsorRow(existing.recordset[0]),
-                ...payload
+                description:   payload.description   ?? cur.companyName,
+                amount:        payload.amount        ?? cur.amount ?? 0,
+                contactPerson: payload.contactPerson !== undefined ? payload.contactPerson : cur.contactPerson,
+                phoneNumber:   payload.phoneNumber   !== undefined ? payload.phoneNumber   : cur.phoneNumber,
+                contactEmail:  payload.contactEmail  !== undefined ? payload.contactEmail  : cur.email,
+                sponsorStatus: payload.sponsorStatus ?? cur.sponsorStatus ?? 'reached-out',
+                notes:         payload.notes         !== undefined ? payload.notes         : cur.notes
             };
 
             await pool.request()
-                .input('id', sql.UniqueIdentifier, sponsorId)
-                .input('eventId', sql.UniqueIdentifier, eventId)
-                .input('companyName', sql.NVarChar(200), merged.companyName)
-                .input('contactPerson', sql.NVarChar(200), merged.contactPerson)
-                .input('phoneNumber', sql.NVarChar(50), merged.phoneNumber)
-                .input('email', sql.NVarChar(320), merged.email)
-                .input('amount', sql.Decimal(12, 2), merged.amount)
-                .input('status', sql.NVarChar(30), merged.status)
-                .input('notes', sql.NVarChar(sql.MAX), merged.notes)
+                .input('id',            sql.UniqueIdentifier,  sponsorId)
+                .input('description',   sql.NVarChar(200),     merged.description)
+                .input('amount',        sql.Decimal(12, 2),    merged.amount)
+                .input('contactPerson', sql.NVarChar(200),     merged.contactPerson)
+                .input('phoneNumber',   sql.NVarChar(50),      merged.phoneNumber)
+                .input('contactEmail',  sql.NVarChar(320),     merged.contactEmail)
+                .input('sponsorStatus', sql.NVarChar(30),      merged.sponsorStatus)
+                .input('notes',         sql.NVarChar(sql.MAX), merged.notes)
                 .query(`
-                    UPDATE EventSponsors
-                    SET CompanyName = @companyName,
+                    UPDATE EventFinancials SET
+                        Description   = @description,
+                        Amount        = @amount,
                         ContactPerson = @contactPerson,
-                        PhoneNumber = @phoneNumber,
-                        Email = @email,
-                        Amount = @amount,
-                        Status = @status,
-                        Notes = @notes,
-                        UpdatedAt = SYSUTCDATETIME()
-                    WHERE Id = @id AND EventId = @eventId
+                        PhoneNumber   = @phoneNumber,
+                        ContactEmail  = @contactEmail,
+                        SponsorStatus = @sponsorStatus,
+                        Notes         = @notes,
+                        UpdatedAt     = SYSUTCDATETIME()
+                    WHERE Id = @id
                 `);
 
             const updated = await pool.request()
                 .input('id', sql.UniqueIdentifier, sponsorId)
-                .query('SELECT * FROM EventSponsors WHERE Id = @id');
-
-            const updatedRow = mapSponsorRow(updated.recordset[0]);
-
-            // Always sync to EventFinancials (all statuses visible in budget)
-            upsertSponsorRow(eventId, sponsorId, {
-                companyName: updatedRow.companyName,
-                amount: updatedRow.amount,
-                status: updatedRow.status,
-                active: true
-            }).catch(err => context.error('Failed to sync sponsor financial row:', err));
-
-            return {
-                status: 200,
-                jsonBody: updatedRow
-            };
+                .query('SELECT * FROM EventFinancials WHERE Id = @id');
+            return { status: 200, jsonBody: mapSponsorFinancial(updated.recordset[0]) };
         } catch (error) {
-            const status = /required|Invalid sponsor status|amount must/i.test(error.message) ? 400 : 500;
-            if (status === 500) {
-                await logError(context, error);
-            }
-            context.error('Error updating sponsor:', error);
-            return {
-                status,
-                jsonBody: { error: error.message || 'Failed to update sponsor' }
-            };
+            const status = /required|Invalid sponsor|amount must/i.test(error.message) ? 400 : 500;
+            if (status === 500) await logError(context, error);
+            return { status, jsonBody: { error: error.message || 'Failed to update sponsor' } };
         }
     }
 });
@@ -470,35 +373,18 @@ app.http('event-sponsors-delete', {
     route: 'events/{eventId}/sponsors/{sponsorId}',
     handler: async (request, context) => {
         try {
-            const eventId = request.params.eventId;
-            const sponsorId = request.params.sponsorId;
+            const { eventId, sponsorId } = request.params;
             const pool = await getPool();
-            await ensureSponsorsTable(pool);
-
             const result = await pool.request()
-                .input('id', sql.UniqueIdentifier, sponsorId)
+                .input('id',      sql.UniqueIdentifier, sponsorId)
                 .input('eventId', sql.UniqueIdentifier, eventId)
-                .query('DELETE FROM EventSponsors WHERE Id = @id AND EventId = @eventId');
+                .query(`DELETE FROM EventFinancials WHERE Id = @id AND EventId = @eventId AND Category = 'sponsorship'`);
 
-            if (!result.rowsAffected[0]) {
-                return { status: 404, jsonBody: { error: 'Sponsor not found' } };
-            }
-
-            // Clean up auto-generated income row for this sponsor (non-blocking)
-            upsertSponsorRow(eventId, sponsorId, { companyName: '', amount: 0, active: false })
-                .catch(err => context.warn('Financial cleanup after sponsor delete failed:', err?.message));
-
-            return {
-                status: 200,
-                jsonBody: { success: true }
-            };
+            if (!result.rowsAffected[0]) return { status: 404, jsonBody: { error: 'Sponsor not found' } };
+            return { status: 200, jsonBody: { success: true } };
         } catch (error) {
             await logError(context, error);
-            context.error('Error deleting sponsor:', error);
-            return {
-                status: 500,
-                jsonBody: { error: error.message || 'Failed to delete sponsor' }
-            };
+            return { status: 500, jsonBody: { error: error.message || 'Failed to delete sponsor' } };
         }
     }
 });

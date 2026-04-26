@@ -14,7 +14,6 @@ function mapRow(row) {
         id: row.Id,
         eventId: row.EventId,
         participationId: row.ParticipationId || null,
-        sponsorId: row.SponsorId || null,
         type: row.Type,
         category: row.Category,
         description: row.Description,
@@ -24,6 +23,10 @@ function mapRow(row) {
         paidBy: row.PaidBy,
         source: row.Source,
         notes: row.Notes || null,
+        contactPerson: row.ContactPerson || null,
+        phoneNumber: row.PhoneNumber || null,
+        contactEmail: row.ContactEmail || null,
+        sponsorStatus: row.SponsorStatus || null,
         createdAt: row.CreatedAt instanceof Date ? row.CreatedAt.toISOString() : row.CreatedAt,
         updatedAt: row.UpdatedAt instanceof Date ? row.UpdatedAt.toISOString() : (row.UpdatedAt || null)
     };
@@ -37,7 +40,6 @@ async function ensureTable(pool) {
                 Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
                 EventId UNIQUEIDENTIFIER NOT NULL,
                 ParticipationId UNIQUEIDENTIFIER NULL,
-                SponsorId UNIQUEIDENTIFIER NULL,
                 Type NVARCHAR(10) NOT NULL,
                 Category NVARCHAR(30) NOT NULL,
                 Description NVARCHAR(200) NOT NULL,
@@ -47,16 +49,20 @@ async function ensureTable(pool) {
                 PaidBy NVARCHAR(20) NOT NULL DEFAULT 'event',
                 Source NVARCHAR(10) NOT NULL DEFAULT 'manual',
                 Notes NVARCHAR(MAX) NULL,
+                ContactPerson NVARCHAR(200) NULL,
+                PhoneNumber NVARCHAR(50) NULL,
+                ContactEmail NVARCHAR(320) NULL,
+                SponsorStatus NVARCHAR(30) NULL,
                 CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
                 UpdatedAt DATETIME2 NULL,
                 CONSTRAINT FK_EventFinancials_Events FOREIGN KEY (EventId) REFERENCES Events(Id) ON DELETE CASCADE,
                 CONSTRAINT CK_EventFinancials_Type CHECK (Type IN ('income','expense')),
                 CONSTRAINT CK_EventFinancials_PaidBy CHECK (PaidBy IN ('participant','event')),
-                CONSTRAINT CK_EventFinancials_Source CHECK (Source IN ('manual','auto'))
+                CONSTRAINT CK_EventFinancials_Source CHECK (Source IN ('manual','auto')),
+                CONSTRAINT CK_EventFinancials_SponsorStatus CHECK (SponsorStatus IN ('reached-out','negotiating','declined','confirmed'))
             );
             CREATE INDEX IX_EventFinancials_EventId ON EventFinancials(EventId);
             CREATE INDEX IX_EventFinancials_ParticipationId ON EventFinancials(ParticipationId);
-            CREATE INDEX IX_EventFinancials_SponsorId ON EventFinancials(SponsorId);
         END
     `);
 }
@@ -68,17 +74,9 @@ async function listByEvent(eventId) {
     const result = await pool.request()
         .input('eventId', sql.UniqueIdentifier, eventId)
         .query(`
-            SELECT f.*,
-                p.Email  AS ParticipationEmail,  p.Roles AS ParticipationRoles,
-                s.CompanyName   AS SponsorCompanyName,
-                s.ContactPerson AS SponsorContactPerson,
-                s.Email         AS SponsorEmail,
-                s.PhoneNumber   AS SponsorPhoneNumber,
-                s.Status        AS SponsorStatus,
-                s.Notes         AS SponsorNotes
+            SELECT f.*, p.Email AS ParticipationEmail, p.Roles AS ParticipationRoles
             FROM EventFinancials f
             LEFT JOIN Participations p ON p.Id = f.ParticipationId
-            LEFT JOIN EventSponsors  s ON s.Id = f.SponsorId
             WHERE f.EventId = @eventId
             ORDER BY
                 CASE WHEN f.ParticipationId IS NULL THEN 1 ELSE 0 END,
@@ -87,14 +85,8 @@ async function listByEvent(eventId) {
         `);
     return result.recordset.map(row => ({
         ...mapRow(row),
-        participationEmail:    row.ParticipationEmail    || null,
-        participationRoles:    row.ParticipationRoles    || null,
-        sponsorCompanyName:    row.SponsorCompanyName    || null,
-        sponsorContactPerson:  row.SponsorContactPerson  || null,
-        sponsorEmail:          row.SponsorEmail          || null,
-        sponsorPhoneNumber:    row.SponsorPhoneNumber    || null,
-        sponsorStatus:         row.SponsorStatus         || null,
-        sponsorNotes:          row.SponsorNotes          || null
+        participationEmail: row.ParticipationEmail || null,
+        participationRoles: row.ParticipationRoles || null
     }));
 }
 
@@ -269,57 +261,6 @@ async function deleteParticipationRows(participationId) {
         .query(`DELETE FROM EventFinancials WHERE ParticipationId = @participationId AND Source = 'auto'`);
 }
 
-// Upsert sponsor income row (called when sponsor status changes to/from 'confirmed')
-async function upsertSponsorRow(eventId, sponsorId, { companyName, amount, status, active }) {
-    const pool = await getPool();
-    await ensureTable(pool);
-
-    if (!active) {
-        // Sponsor deleted — remove their row
-        await pool.request()
-            .input('sponsorId', sql.UniqueIdentifier, sponsorId)
-            .query(`DELETE FROM EventFinancials WHERE SponsorId = @sponsorId AND Source = 'auto'`);
-        return;
-    }
-
-    // Always upsert for every status so sponsor appears in the budget table.
-    // Description shows status for non-confirmed sponsors.
-    const statusSuffix = status && status !== 'confirmed' ? ` (${status})` : '';
-    const description = `Sponsorship - ${companyName}${statusSuffix}`;
-    const safeAmount = amount != null ? amount : 0;
-
-    const existing = await pool.request()
-        .input('sponsorId', sql.UniqueIdentifier, sponsorId)
-        .query(`SELECT Id FROM EventFinancials WHERE SponsorId = @sponsorId AND Source = 'auto'`);
-
-    if (existing.recordset.length > 0) {
-        await pool.request()
-            .input('id', sql.UniqueIdentifier, existing.recordset[0].Id)
-            .input('description', sql.NVarChar(200), description)
-            .input('amount', sql.Decimal(12, 2), safeAmount)
-            .query(`
-                UPDATE EventFinancials
-                SET Description = @description, Amount = @amount, UpdatedAt = SYSUTCDATETIME()
-                WHERE Id = @id
-            `);
-    } else {
-        const { v4: uuidv4 } = require('uuid');
-        const id = uuidv4();
-        await pool.request()
-            .input('id', sql.UniqueIdentifier, id)
-            .input('eventId', sql.UniqueIdentifier, eventId)
-            .input('sponsorId', sql.UniqueIdentifier, sponsorId)
-            .input('description', sql.NVarChar(200), description)
-            .input('amount', sql.Decimal(12, 2), safeAmount)
-            .query(`
-                INSERT INTO EventFinancials
-                  (Id, EventId, SponsorId, Type, Category, Description, Amount, PaidBy, Source)
-                VALUES
-                  (@id, @eventId, @sponsorId, 'income', 'sponsorship', @description, @amount, 'event', 'auto')
-            `);
-    }
-}
-
 // Update a manual row
 async function updateManual(id, eventId, { type, category, description, amount, paidBy, unitCost, days, notes }) {
     if (type !== undefined && !VALID_TYPES.has(type)) throw new Error(`Invalid type: ${type}`);
@@ -432,6 +373,5 @@ module.exports = {
     upsertParticipationRow,
     deleteParticipationRows,
     syncParticipationToFinancials,
-    upsertSponsorRow,
     getSummary
 };
