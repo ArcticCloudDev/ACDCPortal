@@ -329,7 +329,7 @@ async function getSummary(eventId) {
                 Category,
                 PaidBy,
                 SUM(Amount) AS Total,
-                COUNT(*) AS RowCount
+                COUNT(*) AS RowCnt
             FROM EventFinancials
             WHERE EventId = @eventId
             GROUP BY Type, Category, PaidBy
@@ -349,7 +349,7 @@ async function getSummary(eventId) {
             else totalParticipantExpense += total;
         }
         const key = `${row.Type}:${row.Category}:${row.PaidBy}`;
-        byCategory[key] = { type: row.Type, category: row.Category, paidBy: row.PaidBy, total, rowCount: row.RowCount };
+        byCategory[key] = { type: row.Type, category: row.Category, paidBy: row.PaidBy, total, rowCount: row.RowCnt };
     }
 
     return {
