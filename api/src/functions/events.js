@@ -353,11 +353,13 @@ app.http('event-sponsors-create', {
 
             const sponsorRow = mapSponsorRow(created.recordset[0]);
 
-            // Auto-create income row in EventFinancials when sponsor is confirmed
-            if (sponsorRow.status === 'confirmed' && sponsorRow.amount != null) {
-                upsertSponsorRow(eventId, id, { companyName: sponsorRow.companyName, amount: sponsorRow.amount, active: true })
-                    .catch(err => context.error('Failed to create sponsor financial row:', err));
-            }
+            // Always sync to EventFinancials (all statuses visible in budget)
+            upsertSponsorRow(eventId, id, {
+                companyName: sponsorRow.companyName,
+                amount: sponsorRow.amount,
+                status: sponsorRow.status,
+                active: true
+            }).catch(err => context.error('Failed to create sponsor financial row:', err));
 
             return {
                 status: 201,
@@ -435,11 +437,12 @@ app.http('event-sponsors-update', {
 
             const updatedRow = mapSponsorRow(updated.recordset[0]);
 
-            // Sync income row: upsert if confirmed with amount, remove otherwise
+            // Always sync to EventFinancials (all statuses visible in budget)
             upsertSponsorRow(eventId, sponsorId, {
                 companyName: updatedRow.companyName,
                 amount: updatedRow.amount,
-                active: updatedRow.status === 'confirmed' && updatedRow.amount != null
+                status: updatedRow.status,
+                active: true
             }).catch(err => context.error('Failed to sync sponsor financial row:', err));
 
             return {

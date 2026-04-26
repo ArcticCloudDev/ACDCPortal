@@ -1334,9 +1334,9 @@ async function loadEventSponsors() {
         tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Save the event first to manage sponsors</td></tr>';
         return;
     }
-
     try {
-        allSponsors = await API.events.sponsors.list(currentEventId);
+        // Sponsors are rows in EventFinancials with a SponsorId — share the same list as the Budget tab
+        allFinancials = await API.events.financials.list(currentEventId) || [];
         renderSponsorsTable();
     } catch (error) {
         console.error('Error loading sponsors:', error);
@@ -1346,7 +1346,9 @@ async function loadEventSponsors() {
 
 function renderSponsorsTable() {
     const tbody = document.getElementById('sponsors-table-body');
-    if (!allSponsors || allSponsors.length === 0) {
+    const sponsorRows = (allFinancials || []).filter(r => r.sponsorId != null);
+
+    if (sponsorRows.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No sponsors added yet</td></tr>';
         return;
     }
@@ -1357,35 +1359,35 @@ function renderSponsorsTable() {
         { value: 'confirmed',    label: 'Confirmed' },
         { value: 'declined',     label: 'Declined' }
     ];
+    const currency = currentEvent?.currency || 'NOK';
+    const fmt = (val) => val != null && Number(val) !== 0 ? Number(val).toLocaleString('nb-NO') + ' ' + currency : '—';
 
-    tbody.innerHTML = allSponsors.map((sponsor) => {
-        const status = sponsor.status || 'reached-out';
+    tbody.innerHTML = sponsorRows.map((row) => {
+        const status = row.sponsorStatus || 'reached-out';
 
-        // Combined contact cell
         const parts = [];
-        if (sponsor.contactPerson) parts.push(`<span style="font-weight:600">${escapeHtml(sponsor.contactPerson)}</span>`);
-        if (sponsor.phoneNumber)   parts.push(`<span style="color:var(--admin-text-muted);font-size:0.82rem">📞 ${escapeHtml(sponsor.phoneNumber)}</span>`);
-        if (sponsor.email)         parts.push(`<a href="mailto:${escapeHtml(sponsor.email)}" style="font-size:0.82rem">✉️ ${escapeHtml(sponsor.email)}</a>`);
-        if (sponsor.notes) {
-            const preview = sponsor.notes.length > 80 ? sponsor.notes.slice(0, 80) + '…' : sponsor.notes;
-            parts.push(`<span style="color:var(--admin-text-muted);font-size:0.8rem;font-style:italic" title="${escapeHtml(sponsor.notes)}">${escapeHtml(preview)}</span>`);
+        if (row.sponsorContactPerson) parts.push(`<span style="font-weight:600">${escapeHtml(row.sponsorContactPerson)}</span>`);
+        if (row.sponsorPhoneNumber)   parts.push(`<span style="color:var(--admin-text-muted);font-size:0.82rem">📞 ${escapeHtml(row.sponsorPhoneNumber)}</span>`);
+        if (row.sponsorEmail)         parts.push(`<a href="mailto:${escapeHtml(row.sponsorEmail)}" style="font-size:0.82rem">✉️ ${escapeHtml(row.sponsorEmail)}</a>`);
+        if (row.sponsorNotes) {
+            const preview = row.sponsorNotes.length > 80 ? row.sponsorNotes.slice(0, 80) + '…' : row.sponsorNotes;
+            parts.push(`<span style="color:var(--admin-text-muted);font-size:0.8rem;font-style:italic" title="${escapeHtml(row.sponsorNotes)}">${escapeHtml(preview)}</span>`);
         }
         const contactCell = parts.length ? parts.join('<br>') : '<span style="color:var(--admin-text-muted)">—</span>';
 
-        // Inline status select
-        const statusSelect = `<select class="paidby-select sponsor-status-select ${status}" onchange="saveSponsorStatus('${sponsor.id}', this.value)">
+        const statusSelect = `<select class="paidby-select sponsor-status-select ${status}" onchange="saveSponsorStatus('${row.sponsorId}', this.value)">
             ${statusOptions.map(o => `<option value="${o.value}"${o.value === status ? ' selected' : ''}>${o.label}</option>`).join('')}
         </select>`;
 
         return `
             <tr>
-                <td><strong>${escapeHtml(sponsor.companyName || '')}</strong></td>
+                <td><strong>${escapeHtml(row.sponsorCompanyName || '')}</strong></td>
                 <td>${contactCell}</td>
-                <td>${escapeHtml(formatSponsorAmount(sponsor.amount))}</td>
+                <td>${fmt(row.amount)}</td>
                 <td>${statusSelect}</td>
                 <td style="white-space:nowrap">
-                    <button class="btn-sm" onclick="startEditSponsor('${sponsor.id}')">✏️ Edit</button>
-                    <button class="btn-sm danger" onclick="deleteSponsor('${sponsor.id}')">🗑️</button>
+                    <button class="btn-sm" onclick="startEditSponsor('${row.sponsorId}')">✏️ Edit</button>
+                    <button class="btn-sm danger" onclick="deleteSponsor('${row.sponsorId}')">🗑️</button>
                 </td>
             </tr>
         `;
@@ -1393,18 +1395,19 @@ function renderSponsorsTable() {
 }
 
 function startEditSponsor(sponsorId) {
-    const sponsor = allSponsors.find((item) => item.id === sponsorId);
-    if (!sponsor) return;
+    // Look up sponsor data from the financial rows (contact fields come via JOIN)
+    const row = (allFinancials || []).find(r => r.sponsorId === sponsorId);
+    if (!row) return;
 
     document.getElementById('sponsor-modal-title').textContent = '✏️ Edit Sponsor';
-    document.getElementById('sponsor-id').value = sponsor.id;
-    document.getElementById('sponsor-company-name').value = sponsor.companyName || '';
-    document.getElementById('sponsor-contact-person').value = sponsor.contactPerson || '';
-    document.getElementById('sponsor-phone-number').value = sponsor.phoneNumber || '';
-    document.getElementById('sponsor-email').value = sponsor.email || '';
-    document.getElementById('sponsor-amount').value = sponsor.amount == null ? '' : sponsor.amount;
-    document.getElementById('sponsor-status').value = sponsor.status || 'reached-out';
-    document.getElementById('sponsor-notes').value = sponsor.notes || '';
+    document.getElementById('sponsor-id').value = sponsorId;
+    document.getElementById('sponsor-company-name').value = row.sponsorCompanyName || '';
+    document.getElementById('sponsor-contact-person').value = row.sponsorContactPerson || '';
+    document.getElementById('sponsor-phone-number').value = row.sponsorPhoneNumber || '';
+    document.getElementById('sponsor-email').value = row.sponsorEmail || '';
+    document.getElementById('sponsor-amount').value = row.amount == null || row.amount === 0 ? '' : row.amount;
+    document.getElementById('sponsor-status').value = row.sponsorStatus || 'reached-out';
+    document.getElementById('sponsor-notes').value = row.sponsorNotes || '';
     document.getElementById('save-sponsor-btn').textContent = '💾 Update Sponsor';
     document.getElementById('sponsor-modal').classList.add('active');
     document.getElementById('sponsor-company-name').focus();
@@ -1445,6 +1448,7 @@ async function handleSponsorSubmit(e) {
         }
 
         await loadEventSponsors();
+        renderBudgetTable(); // keep budget tab in sync if it was already open
         closeSponsorModal();
     } catch (error) {
         console.error('Error saving sponsor:', error);
@@ -1460,6 +1464,7 @@ async function deleteSponsor(sponsorId) {
     try {
         await API.events.sponsors.delete(currentEventId, sponsorId);
         await loadEventSponsors();
+        renderBudgetTable(); // keep budget tab in sync
         const editingId = document.getElementById('sponsor-id').value;
         const modal = document.getElementById('sponsor-modal');
         if (editingId === sponsorId && modal.classList.contains('active')) {
@@ -1474,13 +1479,10 @@ async function deleteSponsor(sponsorId) {
 async function saveSponsorStatus(sponsorId, status) {
     try {
         await API.events.sponsors.update(currentEventId, sponsorId, { status });
-        const sponsor = allSponsors.find(s => s.id === sponsorId);
-        if (sponsor) {
-            sponsor.status = status;
-            // Re-apply CSS class on the select element itself for colour feedback
-            const sel = document.querySelector(`.sponsor-status-select[onchange*="${sponsorId}"]`);
-            if (sel) { sel.className = `paidby-select sponsor-status-select ${status}`; }
-        }
+        // Refresh allFinancials so description + status are current in both tabs
+        allFinancials = await API.events.financials.list(currentEventId) || [];
+        renderSponsorsTable();
+        renderBudgetTable();
     } catch (error) {
         console.error('Error updating sponsor status:', error);
         alert(`Error: ${error.message}`);
@@ -2066,6 +2068,12 @@ function renderBudgetTable() {
         let desc = escapeHtml(row.description || '');
         if (row.unitCost != null && row.days != null) {
             desc += `<span style="color:var(--admin-text-muted);font-size:0.75rem;margin-left:6px;">(${fmt(row.unitCost)} × ${row.days})</span>`;
+        }
+        // Show status badge for non-confirmed sponsor rows
+        if (row.sponsorStatus && row.sponsorStatus !== 'confirmed') {
+            const statusColors = { 'reached-out': '#64748b', negotiating: '#d97706', declined: '#dc2626' };
+            const color = statusColors[row.sponsorStatus] || '#64748b';
+            desc += ` <span style="color:${color};font-size:0.75rem;font-style:italic;white-space:nowrap">(${row.sponsorStatus})</span>`;
         }
         return desc;
     };
