@@ -2002,31 +2002,108 @@ function renderBudgetSummary(summary) {
 function renderBudgetTable() {
     const tbody = document.getElementById('budget-table-body');
     if (!allFinancials || allFinancials.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No financial rows yet</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No financial rows yet</td></tr>';
         return;
     }
 
     const fmt = (val) => val != null ? Number(val).toLocaleString('nb-NO') : '—';
+    const currency = currentEvent?.currency || 'NOK';
 
-    tbody.innerHTML = allFinancials.map(row => {
-        const isAuto = row.source === 'auto';
-        const typeLabel = row.type === 'income' ? '💚 Income' : '🔴 Expense';
-        const editBtn = !isAuto
-            ? `<button class="btn-sm" onclick="startEditFinancial('${row.id}')">✏️</button>
-               <button class="btn-sm danger" onclick="deleteFinancialRow('${row.id}')">🗑️</button>`
-            : `<span style="color: var(--admin-text-muted); font-size: 0.78rem;">auto</span>`;
-        return `<tr class="${isAuto ? 'financial-auto-row' : ''}">
-            <td>${typeLabel}</td>
+    const paidBySelect = (row) => {
+        const opts = [
+            `<option value="participant"${row.paidBy === 'participant' ? ' selected' : ''}>Participant pays</option>`,
+            `<option value="event"${row.paidBy === 'event' ? ' selected' : ''}>Event pays</option>`
+        ].join('');
+        return `<select class="paidby-select" onchange="savePaidBy('${row.id}', this.value)">${opts}</select>`;
+    };
+
+    const typeLabel = (row) => row.type === 'income'
+        ? '<span style="color:#166534;font-size:0.75rem;font-weight:700;">INCOME</span>'
+        : '<span style="color:#991b1b;font-size:0.75rem;font-weight:700;">EXPENSE</span>';
+
+    const amountCell = (row) => {
+        const sign = row.type === 'income' ? '+' : '−';
+        const cls = row.type === 'income' ? 'financial-amount-income' : 'financial-amount-expense';
+        return `<span class="${cls}">${sign}${fmt(row.amount)} ${currency}</span>`;
+    };
+
+    const actionCell = (row) => {
+        if (row.source === 'manual') {
+            return `<button class="btn-sm" onclick="startEditFinancial('${row.id}')">✏️</button>
+                    <button class="btn-sm danger" onclick="deleteFinancialRow('${row.id}')">🗑️</button>`;
+        }
+        return `<span style="color:var(--admin-text-muted);font-size:0.75rem;">auto</span>`;
+    };
+
+    const descCell = (row) => {
+        let desc = escapeHtml(row.description || '');
+        if (row.unitCost != null && row.days != null) {
+            desc += `<span style="color:var(--admin-text-muted);font-size:0.75rem;margin-left:6px;">(${fmt(row.unitCost)} × ${row.days})</span>`;
+        }
+        return desc;
+    };
+
+    const dataRow = (row) => `
+        <tr class="${row.source === 'auto' ? 'financial-auto-row' : ''}">
+            <td>${typeLabel(row)}</td>
             <td>${escapeHtml(row.category || '')}</td>
-            <td>${escapeHtml(row.description || '')}</td>
-            <td>${row.unitCost != null ? fmt(row.unitCost) : '—'}</td>
-            <td>${row.days != null ? row.days : '—'}</td>
-            <td><strong>${fmt(row.amount)}</strong></td>
-            <td>${escapeHtml(row.paidBy || '')}</td>
-            <td><span class="badge-${row.source}">${escapeHtml(row.source || '')}</span></td>
-            <td style="white-space: nowrap;">${editBtn}</td>
+            <td>${descCell(row)}</td>
+            <td>${amountCell(row)}</td>
+            <td>${paidBySelect(row)}</td>
+            <td style="white-space:nowrap;">${actionCell(row)}</td>
         </tr>`;
-    }).join('');
+
+    // Split into participant groups and event-level rows
+    const participantMap = new Map(); // participationId -> { email, roles, rows[] }
+    const eventRows = [];
+
+    for (const row of allFinancials) {
+        if (row.participationId) {
+            if (!participantMap.has(row.participationId)) {
+                participantMap.set(row.participationId, {
+                    email: row.participationEmail || row.participationId,
+                    roles: row.participationRoles || '',
+                    rows: []
+                });
+            }
+            participantMap.get(row.participationId).rows.push(row);
+        } else {
+            eventRows.push(row);
+        }
+    }
+
+    const groupTotal = (rows) => {
+        let net = 0;
+        for (const r of rows) net += r.type === 'income' ? r.amount : -r.amount;
+        const cls = net >= 0 ? 'financial-amount-income' : 'financial-amount-expense';
+        const sign = net >= 0 ? '+' : '−';
+        return `<span class="${cls}">${sign}${fmt(Math.abs(net))} ${currency}</span>`;
+    };
+
+    let html = '';
+
+    // Participant groups
+    for (const [, group] of participantMap) {
+        const roleLabel = group.roles ? ` — ${escapeHtml(group.roles)}` : '';
+        html += `<tr class="budget-group-header">
+            <td colspan="6">👤 ${escapeHtml(group.email)}${roleLabel}
+                <span class="budget-group-total">Net: ${groupTotal(group.rows)}</span>
+            </td>
+        </tr>`;
+        html += group.rows.map(dataRow).join('');
+    }
+
+    // Event-level rows (sponsorships, venue, etc.)
+    if (eventRows.length > 0) {
+        html += `<tr class="budget-group-header">
+            <td colspan="6">🏢 Event-level rows
+                <span class="budget-group-total">Net: ${groupTotal(eventRows)}</span>
+            </td>
+        </tr>`;
+        html += eventRows.map(dataRow).join('');
+    }
+
+    tbody.innerHTML = html || '<tr><td colspan="6" class="empty-state">No financial rows yet</td></tr>';
 }
 
 function openFinancialModal() {
@@ -2114,6 +2191,22 @@ async function deleteFinancialRow(rowId) {
     } catch (error) {
         console.error('Error deleting financial row:', error);
         alert(`Error deleting row: ${error.message}`);
+    }
+}
+
+async function savePaidBy(rowId, paidBy) {
+    try {
+        await API.events.financials.patchPaidBy(currentEventId, rowId, paidBy);
+        // Update local cache and re-render summary without full reload
+        const row = allFinancials.find(r => r.id === rowId);
+        if (row) row.paidBy = paidBy;
+        const summary = await API.events.financials.summary(currentEventId);
+        renderBudgetSummary(summary);
+    } catch (error) {
+        console.error('Error updating paidBy:', error);
+        alert(`Error: ${error.message}`);
+        // Re-render to restore original value in the dropdown
+        renderBudgetTable();
     }
 }
 

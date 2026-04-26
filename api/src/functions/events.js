@@ -4,7 +4,7 @@ const { logError } = require('../shared/error-log');
 const StorageModule = require('../shared/storage');
 const { Storage } = StorageModule;
 const { getPool, sql } = require('../shared/sql');
-const { upsertSponsorRow, listByEvent, createManual, updateManual, deleteManual, getSummary, syncParticipationToFinancials } = require('../shared/event-financials');
+const { upsertSponsorRow, listByEvent, createManual, updateManual, updatePaidBy, deleteManual, getSummary, syncParticipationToFinancials } = require('../shared/event-financials');
 
 const eventsStorage = new Storage('events');
 const teamsStorage = new Storage('teams');
@@ -807,6 +807,26 @@ app.http('event-financials-delete', {
         } catch (error) {
             await logError(context, error);
             return { status: 500, jsonBody: { error: error.message || 'Failed to delete financial row' } };
+        }
+    }
+});
+
+// PATCH /api/events/{eventId}/financials/{rowId} - Update paidBy on any row (auto or manual)
+app.http('event-financials-patch', {
+    methods: ['PATCH'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/financials/{rowId}',
+    handler: async (request, context) => {
+        try {
+            const { eventId, rowId } = request.params;
+            const { paidBy } = await request.json();
+            if (!paidBy) return { status: 400, jsonBody: { error: 'paidBy is required' } };
+            await updatePaidBy(rowId, eventId, paidBy);
+            return { status: 200, jsonBody: { success: true } };
+        } catch (error) {
+            const status = /Invalid paidBy|not found/i.test(error.message) ? 400 : 500;
+            if (status === 500) await logError(context, error);
+            return { status, jsonBody: { error: error.message || 'Failed to update row' } };
         }
     }
 });

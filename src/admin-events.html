@@ -636,6 +636,28 @@
         .badge-auto { background: #e0f2fe; color: #0369a1; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
         .badge-manual { background: #fef3c7; color: #92400e; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
 
+        /* Budget grouped rows */
+        .budget-group-header td {
+            background: var(--admin-bg-secondary, #f1f5f9);
+            font-weight: 600;
+            font-size: 0.82rem;
+            color: var(--admin-text-muted, #475569);
+            border-top: 2px solid var(--admin-border, #e2e8f0);
+            padding: 6px 10px;
+        }
+        .budget-group-total { font-size: 0.8rem; color: var(--admin-text-muted); margin-left: 8px; font-weight: 400; }
+        .financial-amount-income { color: #166534; font-weight: 600; }
+        .financial-amount-expense { color: #991b1b; font-weight: 600; }
+        .paidby-select {
+            font-size: 0.78rem;
+            padding: 2px 4px;
+            border: 1px solid var(--admin-border, #e2e8f0);
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            min-width: 100px;
+        }
+
         /* Modal styles */
         .modal {
             display: none;
@@ -1312,16 +1334,13 @@
                                             <th>Type</th>
                                             <th>Category</th>
                                             <th>Description</th>
-                                            <th>Unit Cost</th>
-                                            <th>Days</th>
                                             <th>Amount</th>
                                             <th>Paid By</th>
-                                            <th>Source</th>
                                             <th></th>
                                         </tr>
                                     </thead>
                                     <tbody id="budget-table-body">
-                                        <tr><td colspan="9" class="empty-state">Save the event first to manage budget</td></tr>
+                                        <tr><td colspan="6" class="empty-state">Save the event first to manage budget</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -1572,6 +1591,7 @@
                                 <option value="hotel">Hotel</option>
                                 <option value="activity">Activity</option>
                                 <option value="sponsorship">Sponsorship</option>
+                                <option value="registration">Registration fee</option>
                                 <option value="other">Other</option>
                             </select>
                         </div>

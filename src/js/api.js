@@ -364,6 +364,13 @@ const API = {
                 return API.request(`/events/${eventId}/financials/recalculate`, {
                     method: 'POST'
                 });
+            },
+
+            async patchPaidBy(eventId, rowId, paidBy) {
+                return API.request(`/events/${eventId}/financials/${rowId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ paidBy })
+                });
             }
         }
     },

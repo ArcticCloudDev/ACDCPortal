@@ -6,7 +6,7 @@
 const { getPool, sql } = require('./sql');
 
 const VALID_TYPES = new Set(['income', 'expense']);
-const VALID_CATEGORIES = new Set(['hotel', 'food', 'venue', 'sponsorship', 'activity', 'other']);
+const VALID_CATEGORIES = new Set(['hotel', 'food', 'venue', 'sponsorship', 'activity', 'registration', 'other']);
 const VALID_PAID_BY = new Set(['participant', 'event']);
 
 function mapRow(row) {
@@ -72,7 +72,10 @@ async function listByEvent(eventId) {
             FROM EventFinancials f
             LEFT JOIN Participations p ON p.Id = f.ParticipationId
             WHERE f.EventId = @eventId
-            ORDER BY f.CreatedAt ASC
+            ORDER BY
+                CASE WHEN f.ParticipationId IS NULL THEN 1 ELSE 0 END,
+                f.ParticipationId,
+                f.CreatedAt ASC
         `);
     return result.recordset.map(row => ({
         ...mapRow(row),
@@ -203,6 +206,45 @@ async function syncParticipationToFinancials(event, participation) {
             paidBy
         });
     }
+
+    // Registration fee — income row (participant pays)
+    const regFee = event.costPerParticipant != null ? Number(event.costPerParticipant) : null;
+    if (regFee != null && regFee > 0) {
+        const pool = await getPool();
+        await ensureTable(pool);
+        const existing = await pool.request()
+            .input('participationId', sql.UniqueIdentifier, participation.id)
+            .query(`SELECT Id FROM EventFinancials WHERE ParticipationId = @participationId AND Category = 'registration' AND Source = 'auto'`);
+        if (existing.recordset.length > 0) {
+            await pool.request()
+                .input('id', sql.UniqueIdentifier, existing.recordset[0].Id)
+                .input('amount', sql.Decimal(12, 2), regFee)
+                .query(`UPDATE EventFinancials SET Amount = @amount, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id`);
+        } else {
+            const { v4: uuidv4 } = require('uuid');
+            const id = uuidv4();
+            await pool.request()
+                .input('id', sql.UniqueIdentifier, id)
+                .input('eventId', sql.UniqueIdentifier, participation.eventId)
+                .input('participationId', sql.UniqueIdentifier, participation.id)
+                .input('amount', sql.Decimal(12, 2), regFee)
+                .query(`INSERT INTO EventFinancials (Id, EventId, ParticipationId, Type, Category, Description, Amount, PaidBy, Source)
+                        VALUES (@id, @eventId, @participationId, 'income', 'registration', 'Registration fee', @amount, 'participant', 'auto')`);
+        }
+    }
+}
+
+// Update only the PaidBy field — works on both auto and manual rows
+async function updatePaidBy(id, eventId, paidBy) {
+    if (!VALID_PAID_BY.has(paidBy)) throw new Error(`Invalid paidBy: ${paidBy}`);
+    const pool = await getPool();
+    const result = await pool.request()
+        .input('id', sql.UniqueIdentifier, id)
+        .input('eventId', sql.UniqueIdentifier, eventId)
+        .input('paidBy', sql.NVarChar(20), paidBy)
+        .query(`UPDATE EventFinancials SET PaidBy = @paidBy, UpdatedAt = SYSUTCDATETIME()
+                WHERE Id = @id AND EventId = @eventId`);
+    if (!result.rowsAffected[0]) throw new Error('Financial row not found');
 }
 
 // Remove all auto rows for a participation (called on participation delete)
@@ -365,6 +407,7 @@ module.exports = {
     listByEvent,
     createManual,
     updateManual,
+    updatePaidBy,
     deleteManual,
     upsertParticipationRow,
     deleteParticipationRows,
