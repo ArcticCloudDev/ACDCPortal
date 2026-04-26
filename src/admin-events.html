@@ -617,6 +617,25 @@
         .sponsor-status.declined { background: #fee2e2; color: #991b1b; }
         .sponsor-status.confirmed { background: #dcfce7; color: #166534; }
 
+        /* Budget cards */
+        .budget-card {
+            background: var(--admin-bg-secondary, #f8fafc);
+            border: 1px solid var(--admin-border, #e2e8f0);
+            border-radius: 8px;
+            padding: 16px 20px;
+            text-align: center;
+        }
+        .budget-card-label { font-size: 0.78rem; color: var(--admin-text-muted, #64748b); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+        .budget-card-value { font-size: 1.5rem; font-weight: 700; }
+        .budget-card.income .budget-card-value { color: #166534; }
+        .budget-card.expense .budget-card-value { color: #991b1b; }
+        .budget-card.participant .budget-card-value { color: #92400e; }
+        .budget-card.net.positive .budget-card-value { color: #166534; }
+        .budget-card.net.negative .budget-card-value { color: #991b1b; }
+        .financial-auto-row td { opacity: 0.7; }
+        .badge-auto { background: #e0f2fe; color: #0369a1; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
+        .badge-manual { background: #fef3c7; color: #92400e; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
+
         /* Modal styles */
         .modal {
             display: none;
@@ -820,6 +839,7 @@
                         <button class="tab-btn" data-tab="judges" id="judges-tab-btn">⚖️ Judges</button>
                         <button class="tab-btn" data-tab="leads" id="leads-tab-btn">📧 Interest Leads</button>
                         <button class="tab-btn" data-tab="sponsors" id="sponsors-tab-btn">💼 Sponsors</button>
+                        <button class="tab-btn" data-tab="budget" id="budget-tab-btn">💰 Budget</button>
                         <button class="tab-btn" data-tab="teams" id="teams-tab-btn">👥 Teams</button>
                         <!-- Deliveries tab removed - now integrated into Sequence tab -->
                         <button class="tab-btn" data-tab="sequence" id="sequence-tab-btn">📧 Sequence</button>
@@ -1228,6 +1248,87 @@
                     </div>
                 </div>
 
+                <!-- Budget Tab -->
+                <div class="tab-panel" id="budget-panel">
+                    <div class="panel">
+                        <div class="panel-body padded">
+
+                            <!-- Summary Cards -->
+                            <div id="budget-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px;">
+                                <div class="budget-card income">
+                                    <div class="budget-card-label">Total Income</div>
+                                    <div class="budget-card-value" id="budget-total-income">—</div>
+                                </div>
+                                <div class="budget-card expense">
+                                    <div class="budget-card-label">Org Expenses</div>
+                                    <div class="budget-card-value" id="budget-total-org-expense">—</div>
+                                </div>
+                                <div class="budget-card participant">
+                                    <div class="budget-card-label">Participant Expenses</div>
+                                    <div class="budget-card-value" id="budget-total-participant-expense">—</div>
+                                </div>
+                                <div class="budget-card net" id="budget-net-card">
+                                    <div class="budget-card-label">Net Balance</div>
+                                    <div class="budget-card-value" id="budget-net-balance">—</div>
+                                </div>
+                            </div>
+
+                            <!-- Rates Config -->
+                            <div class="panel" style="margin-bottom: 20px; background: var(--admin-bg-secondary); border: 1px solid var(--admin-border);">
+                                <div class="panel-body padded" style="padding: 16px;">
+                                    <h4 style="margin: 0 0 12px 0;">⚙️ Event Rates</h4>
+                                    <div class="form-row" style="gap: 16px; align-items: flex-end;">
+                                        <div class="form-group" style="margin: 0;">
+                                            <label style="font-size: 0.8rem;">Hotel Rate / Night</label>
+                                            <input type="number" id="budget-hotel-rate" min="0" step="1" placeholder="e.g. 1500" style="width: 140px;">
+                                        </div>
+                                        <div class="form-group" style="margin: 0;">
+                                            <label style="font-size: 0.8rem;">Food Rate / Day</label>
+                                            <input type="number" id="budget-food-rate" min="0" step="1" placeholder="e.g. 800" style="width: 140px;">
+                                        </div>
+                                        <div class="form-group" style="margin: 0;">
+                                            <label style="font-size: 0.8rem;">Food Days</label>
+                                            <input type="number" id="budget-food-days" min="0" step="1" placeholder="e.g. 3" style="width: 80px;">
+                                        </div>
+                                        <button type="button" class="btn-sm primary" onclick="saveEventRates()">💾 Save Rates</button>
+                                    </div>
+                                    <p style="font-size: 0.78rem; color: var(--admin-text-muted); margin: 10px 0 0 0;">Rates are used to auto-calculate per-person hotel and food cost rows when participants are assigned.</p>
+                                </div>
+                            </div>
+
+                            <!-- Manual rows grid -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h3 style="margin: 0;">📋 Financial Rows</h3>
+                                <div style="display: flex; gap: 8px;">
+                                    <button type="button" class="btn-sm" onclick="recalculateFinancials()" id="recalculate-btn" title="Re-generate hotel and food rows for all participants based on current rates">♻️ Recalculate</button>
+                                    <button type="button" class="btn-sm primary" onclick="openFinancialModal()">➕ Add Row</button>
+                                </div>
+                            </div>
+
+                            <div class="members-list">
+                                <table class="data-table" id="budget-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Category</th>
+                                            <th>Description</th>
+                                            <th>Unit Cost</th>
+                                            <th>Days</th>
+                                            <th>Amount</th>
+                                            <th>Paid By</th>
+                                            <th>Source</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="budget-table-body">
+                                        <tr><td colspan="9" class="empty-state">Save the event first to manage budget</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Teams Tab -->
                 <div class="tab-panel" id="teams-panel">
                     <div class="panel">
@@ -1442,6 +1543,70 @@
                 <div class="modal-footer">
                     <button type="button" class="btn-sm" id="close-sponsor-modal-btn">Cancel</button>
                     <button type="submit" id="save-sponsor-btn" class="btn-sm primary">➕ Add Sponsor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="financial-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="financial-modal-title">➕ Add Financial Row</h3>
+            </div>
+            <form id="financial-form">
+                <input type="hidden" id="financial-id">
+                <div class="modal-body">
+                    <div class="sponsor-grid">
+                        <div class="form-group">
+                            <label for="financial-type">Type *</label>
+                            <select id="financial-type" onchange="toggleFinancialPaidBy()">
+                                <option value="expense">Expense</option>
+                                <option value="income">Income</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="financial-category">Category *</label>
+                            <select id="financial-category">
+                                <option value="venue">Venue</option>
+                                <option value="food">Food</option>
+                                <option value="hotel">Hotel</option>
+                                <option value="activity">Activity</option>
+                                <option value="sponsorship">Sponsorship</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="financial-description">Description *</label>
+                            <input type="text" id="financial-description" required placeholder="e.g. Stage rental, Prize money">
+                        </div>
+                        <div class="form-group">
+                            <label for="financial-amount">Amount *</label>
+                            <input type="number" id="financial-amount" required min="0" step="0.01" placeholder="25000">
+                        </div>
+                        <div class="form-group">
+                            <label for="financial-unit-cost">Unit Cost</label>
+                            <input type="number" id="financial-unit-cost" min="0" step="0.01" placeholder="1000">
+                        </div>
+                        <div class="form-group">
+                            <label for="financial-days">Days / Units</label>
+                            <input type="number" id="financial-days" min="0" step="1" placeholder="3">
+                        </div>
+                        <div class="form-group" id="financial-paidby-group">
+                            <label for="financial-paid-by">Paid By</label>
+                            <select id="financial-paid-by">
+                                <option value="event">Event (org cost)</option>
+                                <option value="participant">Participant</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="financial-notes">Notes</label>
+                            <textarea id="financial-notes" rows="2" placeholder="Optional notes..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-sm" onclick="closeFinancialModal()">Cancel</button>
+                    <button type="submit" id="save-financial-btn" class="btn-sm primary">➕ Add Row</button>
                 </div>
             </form>
         </div>

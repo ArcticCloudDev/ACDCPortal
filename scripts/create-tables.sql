@@ -31,6 +31,9 @@ CREATE TABLE Events (
     SharepointUrl               NVARCHAR(2000)   NULL,
     CostPerParticipant          DECIMAL(10,2)    NULL,
     Currency                    NVARCHAR(10)     NULL DEFAULT 'NOK',
+    HotelRatePerNight           DECIMAL(12,2)    NULL,
+    FoodRatePerDay              DECIMAL(12,2)    NULL,
+    FoodDays                    INT              NULL,
     TeamRegistrationTerms       NVARCHAR(MAX)    NULL,
     SoloQueueTerms              NVARCHAR(MAX)    NULL,
     SingleRegistrationTerms     NVARCHAR(MAX)    NULL,
@@ -474,5 +477,35 @@ BEGIN
 END
 GO
 
-PRINT '=== All 25 tables created successfully ===';
+-- 26. EventFinancials
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'EventFinancials')
+BEGIN
+    CREATE TABLE EventFinancials (
+        Id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        EventId         UNIQUEIDENTIFIER NOT NULL,
+        ParticipationId UNIQUEIDENTIFIER NULL,
+        SponsorId       UNIQUEIDENTIFIER NULL,
+        Type            NVARCHAR(10)     NOT NULL,
+        Category        NVARCHAR(30)     NOT NULL,
+        Description     NVARCHAR(200)    NOT NULL,
+        UnitCost        DECIMAL(12,2)    NULL,
+        Days            INT              NULL,
+        Amount          DECIMAL(12,2)    NOT NULL,
+        PaidBy          NVARCHAR(20)     NOT NULL DEFAULT 'event',
+        Source          NVARCHAR(10)     NOT NULL DEFAULT 'manual',
+        Notes           NVARCHAR(MAX)    NULL,
+        CreatedAt       DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt       DATETIME2        NULL,
+        CONSTRAINT FK_EventFinancials_Events FOREIGN KEY (EventId) REFERENCES Events(Id) ON DELETE CASCADE,
+        CONSTRAINT CK_EventFinancials_Type CHECK (Type IN ('income','expense')),
+        CONSTRAINT CK_EventFinancials_PaidBy CHECK (PaidBy IN ('participant','event')),
+        CONSTRAINT CK_EventFinancials_Source CHECK (Source IN ('manual','auto'))
+    );
+    CREATE INDEX IX_EventFinancials_EventId ON EventFinancials(EventId);
+    CREATE INDEX IX_EventFinancials_ParticipationId ON EventFinancials(ParticipationId);
+    CREATE INDEX IX_EventFinancials_SponsorId ON EventFinancials(SponsorId);
+END
+GO
+
+PRINT '=== All 26 tables created successfully ===';
 SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME;

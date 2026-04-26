@@ -329,6 +329,42 @@ const API = {
                     method: 'DELETE'
                 });
             }
+        },
+
+        financials: {
+            async list(eventId) {
+                return API.request(`/events/${eventId}/financials`);
+            },
+
+            async summary(eventId) {
+                return API.request(`/events/${eventId}/financials/summary`);
+            },
+
+            async create(eventId, data) {
+                return API.request(`/events/${eventId}/financials`, {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+            },
+
+            async update(eventId, rowId, data) {
+                return API.request(`/events/${eventId}/financials/${rowId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+            },
+
+            async delete(eventId, rowId) {
+                return API.request(`/events/${eventId}/financials/${rowId}`, {
+                    method: 'DELETE'
+                });
+            },
+
+            async recalculate(eventId) {
+                return API.request(`/events/${eventId}/financials/recalculate`, {
+                    method: 'POST'
+                });
+            }
         }
     },
 

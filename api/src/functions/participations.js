@@ -18,6 +18,7 @@ const deliveriesStorage = new Storage('email-deliveries');
 const invitationsStorage = new Storage('invitations');
 const { sendEmail } = require('../shared/mail');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
+const { upsertParticipationRow, deleteParticipationRows, syncParticipationToFinancials } = require('../shared/event-financials');
 
 // Valid roles
 const VALID_ROLES = ['interest', 'participant', 'judge', 'committee', 'sponsor'];
@@ -30,6 +31,24 @@ function isActiveStatus(status) {
 // Helper to generate ID
 function generateId() {
     return uuidv4();
+}
+
+// ============================================================
+// HELPERS: Financial rows
+// ============================================================
+
+// Sync hotel + food financial rows for a participation.
+// Reads event rates, counts booked hotel nights, then upserts rows.
+// Called after any participation change that affects hotel nights or paidBy.
+async function syncParticipationFinancials(participation, context) {
+    try {
+        const events = await eventsStorage.getAll();
+        const event = events.find(e => e.id === participation.eventId);
+        if (!event) return;
+        await syncParticipationToFinancials(event, participation);
+    } catch (err) {
+        context.error('syncParticipationFinancials failed (non-critical):', err);
+    }
 }
 
 // ============================================================
@@ -474,6 +493,9 @@ app.http('participations-delete', {
             // 3. (sequence-progress table has been removed — no cleanup needed)
 
             context.log(`Deleted participation ${id} (${email}). Cleaned: ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries`);
+
+            // Clean up auto-generated financial rows (non-blocking)
+            deleteParticipationRows(id).catch(err => context.warn('Financial cleanup after participation delete failed:', err?.message));
 
             return { status: 200, jsonBody: { success: true, cleaned } };
         } catch (error) {
@@ -963,6 +985,10 @@ app.http('participations-add-team-membership', {
                         .catch(err => context.error(`Failed welcome email:`, err));
                 }
             }
+
+            // Auto-create/update hotel and food financial rows for this participation
+            // Fires async — non-critical, does not block the response
+            syncParticipationFinancials(participation, context);
 
             context.log(`Legacy team membership added for participation ${id}, team ${teamId}`);
             return { status: 200, jsonBody: participation };

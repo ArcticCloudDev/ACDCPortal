@@ -226,6 +226,15 @@ function setupEventListeners() {
             closeSponsorModal();
         }
     });
+    document.getElementById('financial-form').addEventListener('submit', handleFinancialSubmit);
+    document.getElementById('financial-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'financial-modal') closeFinancialModal();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('financial-modal').classList.contains('active')) {
+            closeFinancialModal();
+        }
+    });
 }
 
 // Status display configuration
@@ -374,6 +383,7 @@ function showForm(event = null) {
     const judgesTab = document.getElementById('judges-tab-btn');
     const leadsTab = document.getElementById('leads-tab-btn');
     const sponsorsTab = document.getElementById('sponsors-tab-btn');
+    const budgetTab = document.getElementById('budget-tab-btn');
     const form = document.getElementById('event-form');
 
     // Disable committee/judges/leads tabs for new events
@@ -382,11 +392,13 @@ function showForm(event = null) {
         judgesTab.disabled = false;
         leadsTab.disabled = false;
         sponsorsTab.disabled = false;
+        budgetTab.disabled = false;
     } else {
         committeeTab.disabled = true;
         judgesTab.disabled = true;
         leadsTab.disabled = true;
         sponsorsTab.disabled = true;
+        budgetTab.disabled = true;
         allSponsors = [];
         resetSponsorForm();
     }
@@ -628,6 +640,7 @@ async function handleFormSubmit(e) {
                 document.getElementById('judges-tab-btn').disabled = false;
                 document.getElementById('leads-tab-btn').disabled = false;
                 document.getElementById('sponsors-tab-btn').disabled = false;
+                document.getElementById('budget-tab-btn').disabled = false;
                 // Update the hidden event ID field
                 document.getElementById('event-id').value = savedEvent.id;
             }
@@ -706,6 +719,8 @@ function setupTabs() {
                 loadDeliveries();
             } else if (targetTab === 'sequence') {
                 loadEventSequence();
+            } else if (targetTab === 'budget') {
+                loadEventBudget();
             }
         });
     });
@@ -1939,3 +1954,213 @@ async function reorderEmail(emailId, direction) {
 }
 
 console.log('Admin Events page loaded');
+
+// ===== Budget / Financials Management =====
+
+let allFinancials = [];
+
+async function loadEventBudget() {
+    const tbody = document.getElementById('budget-table-body');
+    if (!currentEventId) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Save the event first to manage budget</td></tr>';
+        return;
+    }
+
+    // Populate rate fields from currentEvent
+    if (currentEvent) {
+        document.getElementById('budget-hotel-rate').value = currentEvent.hotelRatePerNight ?? '';
+        document.getElementById('budget-food-rate').value = currentEvent.foodRatePerDay ?? '';
+        document.getElementById('budget-food-days').value = currentEvent.foodDays ?? '';
+    }
+
+    try {
+        const [rows, summary] = await Promise.all([
+            API.events.financials.list(currentEventId),
+            API.events.financials.summary(currentEventId)
+        ]);
+        allFinancials = rows || [];
+        renderBudgetSummary(summary);
+        renderBudgetTable();
+    } catch (error) {
+        console.error('Error loading budget:', error);
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Error loading budget</td></tr>';
+    }
+}
+
+function renderBudgetSummary(summary) {
+    const fmt = (val) => val != null ? Number(val).toLocaleString('nb-NO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0';
+    document.getElementById('budget-total-income').textContent = fmt(summary?.totalIncome);
+    document.getElementById('budget-total-org-expense').textContent = fmt(summary?.totalOrgExpense);
+    document.getElementById('budget-total-participant-expense').textContent = fmt(summary?.totalParticipantExpense);
+    const net = summary?.netOrgBalance ?? 0;
+    document.getElementById('budget-net-balance').textContent = fmt(net);
+    const netCard = document.getElementById('budget-net-card');
+    netCard.classList.toggle('positive', net >= 0);
+    netCard.classList.toggle('negative', net < 0);
+}
+
+function renderBudgetTable() {
+    const tbody = document.getElementById('budget-table-body');
+    if (!allFinancials || allFinancials.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No financial rows yet</td></tr>';
+        return;
+    }
+
+    const fmt = (val) => val != null ? Number(val).toLocaleString('nb-NO') : '—';
+
+    tbody.innerHTML = allFinancials.map(row => {
+        const isAuto = row.source === 'auto';
+        const typeLabel = row.type === 'income' ? '💚 Income' : '🔴 Expense';
+        const editBtn = !isAuto
+            ? `<button class="btn-sm" onclick="startEditFinancial('${row.id}')">✏️</button>
+               <button class="btn-sm danger" onclick="deleteFinancialRow('${row.id}')">🗑️</button>`
+            : `<span style="color: var(--admin-text-muted); font-size: 0.78rem;">auto</span>`;
+        return `<tr class="${isAuto ? 'financial-auto-row' : ''}">
+            <td>${typeLabel}</td>
+            <td>${escapeHtml(row.category || '')}</td>
+            <td>${escapeHtml(row.description || '')}</td>
+            <td>${row.unitCost != null ? fmt(row.unitCost) : '—'}</td>
+            <td>${row.days != null ? row.days : '—'}</td>
+            <td><strong>${fmt(row.amount)}</strong></td>
+            <td>${escapeHtml(row.paidBy || '')}</td>
+            <td><span class="badge-${row.source}">${escapeHtml(row.source || '')}</span></td>
+            <td style="white-space: nowrap;">${editBtn}</td>
+        </tr>`;
+    }).join('');
+}
+
+function openFinancialModal() {
+    if (!currentEventId) {
+        alert('Save the event first before adding financial rows.');
+        return;
+    }
+    document.getElementById('financial-modal-title').textContent = '➕ Add Financial Row';
+    document.getElementById('financial-id').value = '';
+    document.getElementById('financial-form').reset();
+    document.getElementById('save-financial-btn').textContent = '➕ Add Row';
+    document.getElementById('financial-modal').classList.add('active');
+    toggleFinancialPaidBy();
+}
+
+function closeFinancialModal() {
+    document.getElementById('financial-modal').classList.remove('active');
+}
+
+function toggleFinancialPaidBy() {
+    const type = document.getElementById('financial-type').value;
+    document.getElementById('financial-paidby-group').style.display = type === 'expense' ? '' : 'none';
+}
+
+function startEditFinancial(rowId) {
+    const row = allFinancials.find(r => r.id === rowId);
+    if (!row) return;
+
+    document.getElementById('financial-modal-title').textContent = '✏️ Edit Financial Row';
+    document.getElementById('financial-id').value = row.id;
+    document.getElementById('financial-type').value = row.type;
+    document.getElementById('financial-category').value = row.category;
+    document.getElementById('financial-description').value = row.description || '';
+    document.getElementById('financial-amount').value = row.amount;
+    document.getElementById('financial-unit-cost').value = row.unitCost ?? '';
+    document.getElementById('financial-days').value = row.days ?? '';
+    document.getElementById('financial-paid-by').value = row.paidBy || 'event';
+    document.getElementById('financial-notes').value = row.notes || '';
+    document.getElementById('save-financial-btn').textContent = '💾 Update Row';
+    document.getElementById('financial-modal').classList.add('active');
+    toggleFinancialPaidBy();
+}
+
+async function handleFinancialSubmit(e) {
+    e.preventDefault();
+    if (!currentEventId) return;
+
+    const rowId = document.getElementById('financial-id').value;
+    const saveBtn = document.getElementById('save-financial-btn');
+    saveBtn.disabled = true;
+
+    const type = document.getElementById('financial-type').value;
+    const payload = {
+        type,
+        category: document.getElementById('financial-category').value,
+        description: document.getElementById('financial-description').value.trim(),
+        amount: parseFloat(document.getElementById('financial-amount').value),
+        paidBy: type === 'income' ? 'event' : (document.getElementById('financial-paid-by').value),
+        unitCost: document.getElementById('financial-unit-cost').value !== '' ? parseFloat(document.getElementById('financial-unit-cost').value) : null,
+        days: document.getElementById('financial-days').value !== '' ? parseInt(document.getElementById('financial-days').value, 10) : null,
+        notes: document.getElementById('financial-notes').value.trim() || null
+    };
+
+    try {
+        if (rowId) {
+            await API.events.financials.update(currentEventId, rowId, payload);
+        } else {
+            await API.events.financials.create(currentEventId, payload);
+        }
+        closeFinancialModal();
+        await loadEventBudget();
+    } catch (error) {
+        console.error('Error saving financial row:', error);
+        alert(`Error saving row: ${error.message}`);
+    } finally {
+        saveBtn.disabled = false;
+    }
+}
+
+async function deleteFinancialRow(rowId) {
+    if (!confirm('Delete this financial row?')) return;
+    try {
+        await API.events.financials.delete(currentEventId, rowId);
+        await loadEventBudget();
+    } catch (error) {
+        console.error('Error deleting financial row:', error);
+        alert(`Error deleting row: ${error.message}`);
+    }
+}
+
+async function recalculateFinancials() {
+    if (!currentEventId) return;
+
+    const btn = document.getElementById('recalculate-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Recalculating...';
+
+    try {
+        const result = await API.events.financials.recalculate(currentEventId);
+        await loadEventBudget();
+
+        const errMsg = result.errors && result.errors.length
+            ? `\n\n${result.errors.length} participant(s) had errors.`
+            : '';
+        alert(`✅ Recalculated ${result.updated} of ${result.total} participants.${errMsg}`);
+    } catch (error) {
+        console.error('Recalculate failed:', error);
+        alert(`Error recalculating: ${error.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '♻️ Recalculate';
+    }
+}
+
+async function saveEventRates() {
+    if (!currentEventId) return;
+    const hotelRate = document.getElementById('budget-hotel-rate').value;
+    const foodRate = document.getElementById('budget-food-rate').value;
+    const foodDays = document.getElementById('budget-food-days').value;
+
+    const payload = {
+        hotelRatePerNight: hotelRate !== '' ? parseFloat(hotelRate) : null,
+        foodRatePerDay: foodRate !== '' ? parseFloat(foodRate) : null,
+        foodDays: foodDays !== '' ? parseInt(foodDays, 10) : null
+    };
+
+    try {
+        const updated = await API.events.update(currentEventId, payload);
+        if (updated) {
+            currentEvent = { ...currentEvent, ...payload };
+        }
+        alert('Rates saved. Auto rows will update on next participation sync.');
+    } catch (error) {
+        console.error('Error saving rates:', error);
+        alert(`Error saving rates: ${error.message}`);
+    }
+}

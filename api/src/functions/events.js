@@ -4,9 +4,11 @@ const { logError } = require('../shared/error-log');
 const StorageModule = require('../shared/storage');
 const { Storage } = StorageModule;
 const { getPool, sql } = require('../shared/sql');
+const { upsertSponsorRow, listByEvent, createManual, updateManual, deleteManual, getSummary, syncParticipationToFinancials } = require('../shared/event-financials');
 
 const eventsStorage = new Storage('events');
 const teamsStorage = new Storage('teams');
+const participationsStorage = new Storage('participations');
 
 // Helper to generate GUID
 function generateGuid() {
@@ -349,9 +351,17 @@ app.http('event-sponsors-create', {
                 .input('id', sql.UniqueIdentifier, id)
                 .query('SELECT * FROM EventSponsors WHERE Id = @id');
 
+            const sponsorRow = mapSponsorRow(created.recordset[0]);
+
+            // Auto-create income row in EventFinancials when sponsor is confirmed
+            if (sponsorRow.status === 'confirmed' && sponsorRow.amount != null) {
+                upsertSponsorRow(eventId, id, { companyName: sponsorRow.companyName, amount: sponsorRow.amount, active: true })
+                    .catch(err => context.error('Failed to create sponsor financial row:', err));
+            }
+
             return {
                 status: 201,
-                jsonBody: mapSponsorRow(created.recordset[0])
+                jsonBody: sponsorRow
             };
         } catch (error) {
             const status = /required|Invalid sponsor status|amount must/i.test(error.message) ? 400 : 500;
@@ -423,9 +433,18 @@ app.http('event-sponsors-update', {
                 .input('id', sql.UniqueIdentifier, sponsorId)
                 .query('SELECT * FROM EventSponsors WHERE Id = @id');
 
+            const updatedRow = mapSponsorRow(updated.recordset[0]);
+
+            // Sync income row: upsert if confirmed with amount, remove otherwise
+            upsertSponsorRow(eventId, sponsorId, {
+                companyName: updatedRow.companyName,
+                amount: updatedRow.amount,
+                active: updatedRow.status === 'confirmed' && updatedRow.amount != null
+            }).catch(err => context.error('Failed to sync sponsor financial row:', err));
+
             return {
                 status: 200,
-                jsonBody: mapSponsorRow(updated.recordset[0])
+                jsonBody: updatedRow
             };
         } catch (error) {
             const status = /required|Invalid sponsor status|amount must/i.test(error.message) ? 400 : 500;
@@ -461,6 +480,10 @@ app.http('event-sponsors-delete', {
             if (!result.rowsAffected[0]) {
                 return { status: 404, jsonBody: { error: 'Sponsor not found' } };
             }
+
+            // Clean up auto-generated income row for this sponsor (non-blocking)
+            upsertSponsorRow(eventId, sponsorId, { companyName: '', amount: 0, active: false })
+                .catch(err => context.warn('Financial cleanup after sponsor delete failed:', err?.message));
 
             return {
                 status: 200,
@@ -693,3 +716,140 @@ app.http('events-delete', {
 });
 
 console.log('Events API loaded');
+
+// ============================================================
+// FINANCIALS ENDPOINTS
+// ============================================================
+
+// GET /api/events/{eventId}/financials - List all financial rows
+app.http('event-financials-list', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/financials',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+            const rows = await listByEvent(eventId);
+            return { status: 200, jsonBody: rows };
+        } catch (error) {
+            await logError(context, error);
+            return { status: 500, jsonBody: { error: error.message || 'Failed to list financials' } };
+        }
+    }
+});
+
+// GET /api/events/{eventId}/financials/summary - Financial totals
+app.http('event-financials-summary', {
+    methods: ['GET'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/financials/summary',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+            const summary = await getSummary(eventId);
+            return { status: 200, jsonBody: summary };
+        } catch (error) {
+            await logError(context, error);
+            return { status: 500, jsonBody: { error: error.message || 'Failed to get financial summary' } };
+        }
+    }
+});
+
+// POST /api/events/{eventId}/financials - Create manual row
+app.http('event-financials-create', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/financials',
+    handler: async (request, context) => {
+        try {
+            const eventId = request.params.eventId;
+            const body = await request.json();
+            const row = await createManual(eventId, body);
+            return { status: 201, jsonBody: row };
+        } catch (error) {
+            const status = /Invalid type|Invalid category|Invalid paidBy|amount must/i.test(error.message) ? 400 : 500;
+            if (status === 500) await logError(context, error);
+            return { status, jsonBody: { error: error.message || 'Failed to create financial row' } };
+        }
+    }
+});
+
+// PUT /api/events/{eventId}/financials/{rowId} - Update manual row
+app.http('event-financials-update', {
+    methods: ['PUT'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/financials/{rowId}',
+    handler: async (request, context) => {
+        try {
+            const { eventId, rowId } = request.params;
+            const body = await request.json();
+            const row = await updateManual(rowId, eventId, body);
+            return { status: 200, jsonBody: row };
+        } catch (error) {
+            const status = /not found|Invalid type|Invalid category|Invalid paidBy|amount must/i.test(error.message) ? 400 : 500;
+            if (status === 500) await logError(context, error);
+            return { status, jsonBody: { error: error.message || 'Failed to update financial row' } };
+        }
+    }
+});
+
+// DELETE /api/events/{eventId}/financials/{rowId} - Delete manual row
+app.http('event-financials-delete', {
+    methods: ['DELETE'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/financials/{rowId}',
+    handler: async (request, context) => {
+        try {
+            const { eventId, rowId } = request.params;
+            const deleted = await deleteManual(rowId, eventId);
+            if (!deleted) return { status: 404, jsonBody: { error: 'Row not found or not deletable' } };
+            return { status: 200, jsonBody: { success: true } };
+        } catch (error) {
+            await logError(context, error);
+            return { status: 500, jsonBody: { error: error.message || 'Failed to delete financial row' } };
+        }
+    }
+});
+
+// POST /api/events/{eventId}/financials/recalculate
+// Rebuilds hotel + food auto rows for every participant in the event.
+app.http('event-financials-recalculate', {
+    methods: ['POST'],
+    authLevel: 'anonymous',
+    route: 'events/{eventId}/financials/recalculate',
+    handler: async (request, context) => {
+        try {
+            const { eventId } = request.params;
+
+            // Load event
+            const events = await eventsStorage.getAll();
+            const event = events.find(e => e.id === eventId);
+            if (!event) return { status: 404, jsonBody: { error: 'Event not found' } };
+
+            // Load all participations for this event
+            const allParticipations = await participationsStorage.getAll();
+            const eventParticipations = allParticipations.filter(p => p.eventId === eventId);
+
+            // Sync hotel + food rows for each participant
+            let updated = 0;
+            const errors = [];
+            for (const participation of eventParticipations) {
+                try {
+                    await syncParticipationToFinancials(event, participation);
+                    updated++;
+                } catch (err) {
+                    errors.push({ participationId: participation.id, error: err.message });
+                    context.warn(`Recalculate: failed for participation ${participation.id}: ${err.message}`);
+                }
+            }
+
+            return {
+                status: 200,
+                jsonBody: { updated, total: eventParticipations.length, errors }
+            };
+        } catch (error) {
+            await logError(context, error);
+            return { status: 500, jsonBody: { error: error.message || 'Failed to recalculate financials' } };
+        }
+    }
+});
