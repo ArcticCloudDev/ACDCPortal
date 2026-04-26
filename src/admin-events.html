@@ -657,6 +657,11 @@
             cursor: pointer;
             min-width: 100px;
         }
+        /* Sponsor inline status colours */
+        .sponsor-status-select.reached-out { background: #f1f5f9; color: #475569; border-color: #94a3b8; }
+        .sponsor-status-select.negotiating  { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+        .sponsor-status-select.confirmed    { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .sponsor-status-select.declined     { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
 
         /* Modal styles */
         .modal {
@@ -1252,17 +1257,14 @@
                                     <thead>
                                         <tr>
                                             <th>Company</th>
-                                            <th>Contact</th>
-                                            <th>Phone</th>
-                                            <th>E-mail</th>
+                                            <th>Contact &amp; Details</th>
                                             <th>Amount</th>
                                             <th>Status</th>
-                                            <th>Notes</th>
                                             <th></th>
                                         </tr>
                                     </thead>
                                     <tbody id="sponsors-table-body">
-                                        <tr><td colspan="8" class="empty-state">Save the event first to manage sponsors</td></tr>
+                                        <tr><td colspan="5" class="empty-state">Save the event first to manage sponsors</td></tr>
                                     </tbody>
                                 </table>
                             </div>

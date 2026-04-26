@@ -1331,7 +1331,7 @@ function closeSponsorModal() {
 async function loadEventSponsors() {
     const tbody = document.getElementById('sponsors-table-body');
     if (!currentEventId) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Save the event first to manage sponsors</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Save the event first to manage sponsors</td></tr>';
         return;
     }
 
@@ -1340,40 +1340,50 @@ async function loadEventSponsors() {
         renderSponsorsTable();
     } catch (error) {
         console.error('Error loading sponsors:', error);
-        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Error loading sponsors</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Error loading sponsors</td></tr>';
     }
 }
 
 function renderSponsorsTable() {
     const tbody = document.getElementById('sponsors-table-body');
     if (!allSponsors || allSponsors.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No sponsors added yet</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No sponsors added yet</td></tr>';
         return;
     }
 
+    const statusOptions = [
+        { value: 'reached-out', label: 'Reached out' },
+        { value: 'negotiating',  label: 'Negotiating' },
+        { value: 'confirmed',    label: 'Confirmed' },
+        { value: 'declined',     label: 'Declined' }
+    ];
+
     tbody.innerHTML = allSponsors.map((sponsor) => {
-        const statusLabelMap = {
-            'reached-out': 'Reached out',
-            negotiating: 'Negotiating',
-            declined: 'Declined',
-            confirmed: 'Confirmed'
-        };
         const status = sponsor.status || 'reached-out';
-        const statusLabel = statusLabelMap[status] || status;
-        const notesPreview = sponsor.notes && sponsor.notes.length > 90
-            ? `${sponsor.notes.slice(0, 90)}...`
-            : (sponsor.notes || '-');
+
+        // Combined contact cell
+        const parts = [];
+        if (sponsor.contactPerson) parts.push(`<span style="font-weight:600">${escapeHtml(sponsor.contactPerson)}</span>`);
+        if (sponsor.phoneNumber)   parts.push(`<span style="color:var(--admin-text-muted);font-size:0.82rem">📞 ${escapeHtml(sponsor.phoneNumber)}</span>`);
+        if (sponsor.email)         parts.push(`<a href="mailto:${escapeHtml(sponsor.email)}" style="font-size:0.82rem">✉️ ${escapeHtml(sponsor.email)}</a>`);
+        if (sponsor.notes) {
+            const preview = sponsor.notes.length > 80 ? sponsor.notes.slice(0, 80) + '…' : sponsor.notes;
+            parts.push(`<span style="color:var(--admin-text-muted);font-size:0.8rem;font-style:italic" title="${escapeHtml(sponsor.notes)}">${escapeHtml(preview)}</span>`);
+        }
+        const contactCell = parts.length ? parts.join('<br>') : '<span style="color:var(--admin-text-muted)">—</span>';
+
+        // Inline status select
+        const statusSelect = `<select class="paidby-select sponsor-status-select ${status}" onchange="saveSponsorStatus('${sponsor.id}', this.value)">
+            ${statusOptions.map(o => `<option value="${o.value}"${o.value === status ? ' selected' : ''}>${o.label}</option>`).join('')}
+        </select>`;
 
         return `
             <tr>
                 <td><strong>${escapeHtml(sponsor.companyName || '')}</strong></td>
-                <td>${escapeHtml(sponsor.contactPerson || '-')}</td>
-                <td>${escapeHtml(sponsor.phoneNumber || '-')}</td>
-                <td>${escapeHtml(sponsor.email || '-')}</td>
+                <td>${contactCell}</td>
                 <td>${escapeHtml(formatSponsorAmount(sponsor.amount))}</td>
-                <td><span class="sponsor-status ${status}">${escapeHtml(statusLabel)}</span></td>
-                <td title="${escapeHtml(sponsor.notes || '')}">${escapeHtml(notesPreview)}</td>
-                <td>
+                <td>${statusSelect}</td>
+                <td style="white-space:nowrap">
                     <button class="btn-sm" onclick="startEditSponsor('${sponsor.id}')">✏️ Edit</button>
                     <button class="btn-sm danger" onclick="deleteSponsor('${sponsor.id}')">🗑️</button>
                 </td>
@@ -1458,6 +1468,23 @@ async function deleteSponsor(sponsorId) {
     } catch (error) {
         console.error('Error deleting sponsor:', error);
         alert(`Error deleting sponsor: ${error.message}`);
+    }
+}
+
+async function saveSponsorStatus(sponsorId, status) {
+    try {
+        await API.events.sponsors.update(currentEventId, sponsorId, { status });
+        const sponsor = allSponsors.find(s => s.id === sponsorId);
+        if (sponsor) {
+            sponsor.status = status;
+            // Re-apply CSS class on the select element itself for colour feedback
+            const sel = document.querySelector(`.sponsor-status-select[onchange*="${sponsorId}"]`);
+            if (sel) { sel.className = `paidby-select sponsor-status-select ${status}`; }
+        }
+    } catch (error) {
+        console.error('Error updating sponsor status:', error);
+        alert(`Error: ${error.message}`);
+        renderSponsorsTable(); // revert
     }
 }
 
