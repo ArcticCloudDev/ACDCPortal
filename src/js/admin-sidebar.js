@@ -25,6 +25,9 @@ const SIDEBAR_NAV_ITEMS = [
 
     { section: 'Theme' },
     { page: 'email-templates', href: 'admin-email-templates.html', icon: '📝', label: 'Email Templates' },
+
+    { section: 'System' },
+    { page: 'settings', href: 'admin-settings.html', icon: '⚙️', label: 'Settings' },
 ];
 
 function renderAdminSidebar(activePage = '', permissions = null) {
@@ -38,7 +41,7 @@ function renderAdminSidebar(activePage = '', permissions = null) {
 
     for (const item of SIDEBAR_NAV_ITEMS) {
         if (item.section) {
-            // Buffer the section header � only render it if at least one item follows
+            // Buffer the section header � only render it if at least one item follows
             pendingSection = `<div class="nav-section">${item.section}</div>`;
             lastSectionHadItems = false;
         } else if (item.page) {

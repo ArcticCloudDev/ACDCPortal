@@ -15,7 +15,8 @@
         "email",
         "campaigns",
         "email-templates",
-        "event-participants"
+        "event-participants",
+        "settings"
       ],
       "eventScoped": false
     },
@@ -57,6 +58,7 @@
     "email": "Quick Email",
     "campaigns": "Sequences",
     "email-templates": "Email Templates",
-    "event-participants": "Event Participants"
+    "event-participants": "Event Participants",
+    "settings": "System Settings"
   }
 }

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Settings - ACDC Committee</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <link rel="stylesheet" href="css/admin-styles.css">
+    <style>
+        .settings-card {
+            background: white;
+            border: 1px solid var(--admin-border);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 24px;
+            max-width: 560px;
+        }
+        .settings-card h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--admin-sidebar);
+            margin: 0 0 16px 0;
+        }
+        .settings-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .settings-row label {
+            min-width: 140px;
+            font-size: 0.875rem;
+            color: var(--admin-text);
+            font-weight: 500;
+        }
+        .settings-row select,
+        .settings-row input {
+            flex: 1;
+        }
+        .settings-hint {
+            font-size: 0.8rem;
+            color: var(--admin-text-muted);
+            margin-top: -8px;
+            margin-bottom: 16px;
+            padding-left: 152px;
+        }
+        .save-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        #settings-status {
+            font-size: 0.875rem;
+        }
+        #settings-status.success { color: var(--admin-success-color, #16a34a); }
+        #settings-status.error   { color: var(--admin-danger-color, #dc2626); }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading-overlay">
+        <div class="loader"></div>
+        <p>Loading settings…</p>
+    </div>
+
+    <div id="not-admin" class="access-denied hidden">
+        <p>🔒 You don't have permission to access this page.</p>
+        <a href="admin-dashboard.html">Back to Dashboard</a>
+    </div>
+
+    <div id="admin-content" class="admin-layout hidden">
+        <div id="sidebar-container"></div>
+
+        <main class="main-content">
+            <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+                <div>
+                    <h1 class="page-title">⚙️ System Settings</h1>
+                    <p class="page-subtitle" style="color:var(--admin-text-muted);font-size:0.875rem;margin-top:4px;">Global configuration that applies across all events.</p>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <h2>💱 Currency & Formatting</h2>
+
+                <div class="settings-row">
+                    <label for="setting-currency">Currency</label>
+                    <select id="setting-currency">
+                        <option value="NOK">NOK — Norwegian krone</option>
+                        <option value="SEK">SEK — Swedish krona</option>
+                        <option value="DKK">DKK — Danish krone</option>
+                        <option value="EUR">EUR — Euro</option>
+                        <option value="GBP">GBP — British pound</option>
+                        <option value="USD">USD — US dollar</option>
+                    </select>
+                </div>
+                <p class="settings-hint">Used on all financial displays, budget tables, and participant cost hints.</p>
+
+                <div class="settings-row">
+                    <label>Number locale</label>
+                    <span id="locale-preview" style="font-size:0.875rem;color:var(--admin-text-muted);"></span>
+                </div>
+                <p class="settings-hint">Derived automatically from the selected currency. Controls decimal and thousands separators.</p>
+
+                <div class="save-row">
+                    <button class="btn btn-primary" id="save-settings-btn" onclick="saveSettings()">Save Settings</button>
+                    <span id="settings-status"></span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin-sidebar.js"></script>
+    <script src="js/permissions.js"></script>
+    <script>
+        const CURRENCY_LOCALES = {
+            NOK: 'nb-NO',
+            SEK: 'sv-SE',
+            DKK: 'da-DK',
+            EUR: 'de-DE',
+            GBP: 'en-GB',
+            USD: 'en-US',
+        };
+
+        const LOCALE_LABELS = {
+            'nb-NO': 'nb-NO (Norwegian)',
+            'sv-SE': 'sv-SE (Swedish)',
+            'da-DK': 'da-DK (Danish)',
+            'de-DE': 'de-DE (German)',
+            'en-GB': 'en-GB (British English)',
+            'en-US': 'en-US (US English)',
+        };
+
+        document.getElementById('setting-currency').addEventListener('change', updateLocalePreview);
+
+        function updateLocalePreview() {
+            const currency = document.getElementById('setting-currency').value;
+            const locale = CURRENCY_LOCALES[currency] || 'en-US';
+            const example = (1234567.5).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('locale-preview').textContent =
+                `${LOCALE_LABELS[locale] || locale} — e.g. ${example}\u00a0${currency}`;
+        }
+
+        async function saveSettings() {
+            const btn = document.getElementById('save-settings-btn');
+            const status = document.getElementById('settings-status');
+            btn.disabled = true;
+            btn.textContent = 'Saving…';
+            status.textContent = '';
+            status.className = '';
+            try {
+                const currency = document.getElementById('setting-currency').value;
+                await API.systemConfig.update({ currency });
+                // Refresh SystemConfig cache
+                SystemConfig._loaded = false;
+                await SystemConfig.load();
+                status.textContent = '✓ Saved';
+                status.className = 'success';
+            } catch (err) {
+                status.textContent = `Error: ${err.message}`;
+                status.className = 'error';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save Settings';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const loadingDiv = document.getElementById('loading');
+            const notAdminDiv = document.getElementById('not-admin');
+            const adminContent = document.getElementById('admin-content');
+
+            const permissions = await Permissions.initAdminPage('settings', {
+                loadingEl: loadingDiv,
+                accessDeniedEl: notAdminDiv,
+                contentEl: adminContent,
+            });
+            if (!permissions) return;
+
+            try {
+                await SystemConfig.load();
+                const currency = SystemConfig.currency;
+                document.getElementById('setting-currency').value = currency;
+                updateLocalePreview();
+            } catch (err) {
+                console.error('Failed to load system config:', err);
+            }
+
+            loadingDiv.classList.add('hidden');
+            adminContent.classList.remove('hidden');
+        });
+    </script>
+</body>
+</html>

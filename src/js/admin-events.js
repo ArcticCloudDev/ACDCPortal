@@ -56,6 +56,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUser = currentPermissions.user;
 
     try {
+        // Load system config (currency etc.) before rendering
+        await SystemConfig.load();
+
         // Load events
         await loadEvents();
 
@@ -423,7 +426,8 @@ function showForm(event = null) {
         document.getElementById('min-team-size').value = event.minTeamSize || 3;
         document.getElementById('max-team-size').value = event.maxTeamSize || 5;
         document.getElementById('event-cost-per-participant').value = event.costPerParticipant != null ? event.costPerParticipant : '';
-        document.getElementById('event-currency').value = event.currency || 'NOK';
+        const currLabel = document.getElementById('cost-currency-label');
+        if (currLabel) currLabel.textContent = SystemConfig.currency;
         document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
         document.getElementById('event-sharepoint-url').value = event.sharepointUrl || '';
         document.getElementById('sharepoint-verify-result').innerHTML = '';
@@ -612,7 +616,6 @@ async function handleFormSubmit(e) {
 
         const costRaw = document.getElementById('event-cost-per-participant').value.trim();
         eventData.costPerParticipant = costRaw !== '' ? parseFloat(costRaw) : null;
-        eventData.currency = document.getElementById('event-currency').value || 'NOK';
 
         const eventId = document.getElementById('event-id').value;
 
@@ -1295,8 +1298,7 @@ function formatSponsorAmount(amount) {
     if (amount === null || amount === undefined || amount === '') return '-';
     const numeric = Number(amount);
     if (!Number.isFinite(numeric)) return '-';
-    const currency = (currentEvent && currentEvent.currency) ? currentEvent.currency : 'NOK';
-    return `${numeric.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currency}`;
+    return SystemConfig.formatAmount(numeric);
 }
 
 function resetSponsorForm() {
@@ -1357,8 +1359,8 @@ function renderSponsorsTable() {
         { value: 'confirmed',    label: 'Confirmed' },
         { value: 'declined',     label: 'Declined' }
     ];
-    const currency = currentEvent?.currency || 'NOK';
-    const fmt = (val) => val != null && Number(val) !== 0 ? Number(val).toLocaleString('nb-NO') + ' ' + currency : '—';
+    const currency = SystemConfig.currency;
+    const fmt = (val) => val != null && Number(val) !== 0 ? Number(val).toLocaleString(SystemConfig.locale) + '\u00a0' + currency : '\u2014';
 
     tbody.innerHTML = sponsorRows.map((row) => {
         const status = row.sponsorStatus || 'reached-out';
@@ -2017,7 +2019,7 @@ async function loadEventBudget() {
 }
 
 function renderBudgetSummary(summary) {
-    const fmt = (val) => val != null ? Number(val).toLocaleString('nb-NO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0';
+    const fmt = (val) => val != null ? Number(val).toLocaleString(SystemConfig.locale, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0';
     document.getElementById('budget-total-income').textContent = fmt(summary?.totalIncome);
     document.getElementById('budget-total-org-expense').textContent = fmt(summary?.totalOrgExpense);
     document.getElementById('budget-total-participant-expense').textContent = fmt(summary?.totalParticipantExpense);
@@ -2035,8 +2037,8 @@ function renderBudgetTable() {
         return;
     }
 
-    const fmt = (val) => val != null ? Number(val).toLocaleString('nb-NO') : '—';
-    const currency = currentEvent?.currency || 'NOK';
+    const currency = SystemConfig.currency;
+    const fmt = (val) => val != null ? Number(val).toLocaleString(SystemConfig.locale) : '\u2014';
 
     const paidBySelect = (row) => {
         const opts = [
@@ -2296,16 +2298,16 @@ async function saveEventRates() {
 }
 
 function updateRatePreview(type) {
-    const currency = currentEvent?.currency || 'NOK';
+    const currency = SystemConfig.currency;
     if (type === 'hotel') {
         const rate = parseFloat(document.getElementById('budget-hotel-rate').value) || 0;
         const nights = parseInt(document.getElementById('budget-hotel-nights').value, 10) || 0;
         const el = document.getElementById('hotel-rate-preview');
-        if (el) el.textContent = rate && nights ? `= ${(rate * nights).toLocaleString('nb-NO')} ${currency}` : '';
+        if (el) el.textContent = rate && nights ? `= ${(rate * nights).toLocaleString(SystemConfig.locale)}\u00a0${currency}` : '';
     } else {
         const rate = parseFloat(document.getElementById('budget-food-rate').value) || 0;
         const days = parseInt(document.getElementById('budget-food-days').value, 10) || 0;
         const el = document.getElementById('food-rate-preview');
-        if (el) el.textContent = rate && days ? `= ${(rate * days).toLocaleString('nb-NO')} ${currency}` : '';
+        if (el) el.textContent = rate && days ? `= ${(rate * days).toLocaleString(SystemConfig.locale)}\u00a0${currency}` : '';
     }
 }

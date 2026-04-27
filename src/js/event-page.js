@@ -92,6 +92,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Load event
         try {
+            // Load system config (currency etc.) in parallel with event data
+            await SystemConfig.load();
             currentEvent = await API.events.get(eventId);
         } catch (error) {
             console.error('Error loading event:', error);
@@ -200,7 +202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const participantSelect = document.getElementById('expectedParticipants');
         const costHint = document.getElementById('cost-hint');
         if (!participantSelect || !costHint) return;
-        const currency = currentEvent.currency || 'NOK';
+        const currency = SystemConfig.currency;
         const costPer = currentEvent.costPerParticipant;
         function updateCostHint() {
             const count = parseInt(participantSelect.value) || 0;
@@ -245,7 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const stripItems = [
                 `<span class="info-item">📅 ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}</span>`,
                 currentEvent.location ? `<span class="info-item">📍 ${escapeHtml(currentEvent.location)}</span>` : '',
-                currentEvent.costPerParticipant != null ? `<span class="info-item">💰 ${currentEvent.costPerParticipant.toLocaleString()} ${currentEvent.currency || 'NOK'} / person</span>` : '',
+                currentEvent.costPerParticipant != null ? `<span class="info-item">💰 ${currentEvent.costPerParticipant.toLocaleString(SystemConfig.locale)}\u00a0${SystemConfig.currency} / person</span>` : '',
                 `<span class="status-chip">${escapeHtml(statusText)}</span>`,
             ].filter(Boolean).join('');
             infoStrip.innerHTML = stripItems;
