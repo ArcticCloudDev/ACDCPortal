@@ -1300,41 +1300,45 @@
                             <!-- Rates Config -->
                             <div class="panel" style="margin-bottom: 20px; background: var(--admin-bg-secondary); border: 1px solid var(--admin-border);">
                                 <div class="panel-body padded" style="padding: 16px 20px;">
-                                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                                         <h4 style="margin:0; font-size:0.9rem; font-weight:600; color:var(--admin-text);">⚙️ Event Rates</h4>
                                         <button type="button" class="btn-sm primary" onclick="saveEventRates()" style="white-space:nowrap;">💾 Save Rates</button>
                                     </div>
-                                    <div style="display:flex; gap:24px; align-items:flex-end; flex-wrap:wrap;">
-                                        <!-- Hotel group -->
-                                        <div style="display:flex; align-items:flex-end; gap:8px; padding:10px 14px; background:var(--admin-bg); border:1px solid var(--admin-border); border-radius:6px;">
-                                            <span style="font-size:1rem; line-height:1; padding-bottom:6px;">🏨</span>
-                                            <div class="form-group" style="margin:0;">
-                                                <label style="font-size:0.75rem; color:var(--admin-text-muted); margin-bottom:3px;">Rate / Night</label>
-                                                <input type="number" id="budget-hotel-rate" min="0" step="1" placeholder="e.g. 1500" style="width:110px;" oninput="updateRatePreview('hotel')">
+                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                                        <!-- Hotel card -->
+                                        <div style="background:var(--admin-bg); border:1px solid var(--admin-border); border-left:3px solid #6c8ebf; border-radius:6px; padding:14px 16px;">
+                                            <div style="font-size:0.8rem; font-weight:700; color:#6c8ebf; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:12px;">🏨 Hotel</div>
+                                            <div style="display:grid; grid-template-columns:1fr auto 80px; gap:8px; align-items:end;">
+                                                <div class="form-group" style="margin:0;">
+                                                    <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Rate per night</label>
+                                                    <input type="number" id="budget-hotel-rate" min="0" step="1" placeholder="e.g. 1500" oninput="updateRatePreview('hotel')">
+                                                </div>
+                                                <span style="padding-bottom:9px; color:var(--admin-text-muted); font-weight:600; font-size:1rem;">×</span>
+                                                <div class="form-group" style="margin:0;">
+                                                    <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Default nights</label>
+                                                    <input type="number" id="budget-hotel-nights" min="0" step="1" placeholder="e.g. 3" oninput="updateRatePreview('hotel')">
+                                                </div>
                                             </div>
-                                            <span style="padding-bottom:7px; color:var(--admin-text-muted); font-weight:600;">×</span>
-                                            <div class="form-group" style="margin:0;">
-                                                <label style="font-size:0.75rem; color:var(--admin-text-muted); margin-bottom:3px;">Nights</label>
-                                                <input type="number" id="budget-hotel-nights" min="0" step="1" placeholder="e.g. 3" style="width:72px;" oninput="updateRatePreview('hotel')">
-                                            </div>
-                                            <div id="hotel-rate-preview" style="padding-bottom:7px; font-size:0.78rem; color:var(--admin-text-muted); white-space:nowrap; min-width:60px;"></div>
+                                            <div id="hotel-rate-preview" style="margin-top:8px; font-size:0.82rem; font-weight:600; color:#6c8ebf; min-height:18px;"></div>
                                         </div>
-                                        <!-- Food group -->
-                                        <div style="display:flex; align-items:flex-end; gap:8px; padding:10px 14px; background:var(--admin-bg); border:1px solid var(--admin-border); border-radius:6px;">
-                                            <span style="font-size:1rem; line-height:1; padding-bottom:6px;">🍽️</span>
-                                            <div class="form-group" style="margin:0;">
-                                                <label style="font-size:0.75rem; color:var(--admin-text-muted); margin-bottom:3px;">Rate / Day</label>
-                                                <input type="number" id="budget-food-rate" min="0" step="1" placeholder="e.g. 800" style="width:110px;" oninput="updateRatePreview('food')">
+                                        <!-- Food card -->
+                                        <div style="background:var(--admin-bg); border:1px solid var(--admin-border); border-left:3px solid #82b97e; border-radius:6px; padding:14px 16px;">
+                                            <div style="font-size:0.8rem; font-weight:700; color:#82b97e; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:12px;">🍽️ Meals</div>
+                                            <div style="display:grid; grid-template-columns:1fr auto 80px; gap:8px; align-items:end;">
+                                                <div class="form-group" style="margin:0;">
+                                                    <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Rate per day</label>
+                                                    <input type="number" id="budget-food-rate" min="0" step="1" placeholder="e.g. 800" oninput="updateRatePreview('food')">
+                                                </div>
+                                                <span style="padding-bottom:9px; color:var(--admin-text-muted); font-weight:600; font-size:1rem;">×</span>
+                                                <div class="form-group" style="margin:0;">
+                                                    <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Days</label>
+                                                    <input type="number" id="budget-food-days" min="0" step="1" placeholder="e.g. 3" oninput="updateRatePreview('food')">
+                                                </div>
                                             </div>
-                                            <span style="padding-bottom:7px; color:var(--admin-text-muted); font-weight:600;">×</span>
-                                            <div class="form-group" style="margin:0;">
-                                                <label style="font-size:0.75rem; color:var(--admin-text-muted); margin-bottom:3px;">Days</label>
-                                                <input type="number" id="budget-food-days" min="0" step="1" placeholder="e.g. 3" style="width:72px;" oninput="updateRatePreview('food')">
-                                            </div>
-                                            <div id="food-rate-preview" style="padding-bottom:7px; font-size:0.78rem; color:var(--admin-text-muted); white-space:nowrap; min-width:60px;"></div>
+                                            <div id="food-rate-preview" style="margin-top:8px; font-size:0.82rem; font-weight:600; color:#82b97e; min-height:18px;"></div>
                                         </div>
                                     </div>
-                                    <p style="font-size:0.75rem; color:var(--admin-text-muted); margin:10px 0 0 0;">Rates auto-calculate per-person hotel and food rows when participants are assigned. Hotel nights default to this count when a participant has no individual night selections.</p>
+                                    <p style="font-size:0.75rem; color:var(--admin-text-muted); margin:12px 0 0 0;">Rates auto-calculate per-person hotel and food rows when participants are assigned. Hotel nights default to this count when a participant has no individual night selections.</p>
                                 </div>
                             </div>
 

@@ -2303,11 +2303,11 @@ function updateRatePreview(type) {
         const rate = parseFloat(document.getElementById('budget-hotel-rate').value) || 0;
         const nights = parseInt(document.getElementById('budget-hotel-nights').value, 10) || 0;
         const el = document.getElementById('hotel-rate-preview');
-        if (el) el.textContent = rate && nights ? `= ${(rate * nights).toLocaleString(locale)}\u00a0${currency}` : '';
+        if (el) el.textContent = rate && nights ? `${(rate * nights).toLocaleString(locale)}\u00a0${currency || ''} per person` : '';
     } else {
         const rate = parseFloat(document.getElementById('budget-food-rate').value) || 0;
         const days = parseInt(document.getElementById('budget-food-days').value, 10) || 0;
         const el = document.getElementById('food-rate-preview');
-        if (el) el.textContent = rate && days ? `= ${(rate * days).toLocaleString(locale)}\u00a0${currency}` : '';
+        if (el) el.textContent = rate && days ? `${(rate * days).toLocaleString(locale)}\u00a0${currency || ''} per person` : '';
     }
 }
