@@ -972,9 +972,16 @@
                                             <label>💰 Cost Per Participant</label>
                                             <div style="display: flex; gap: 8px; align-items: center;">
                                                 <input type="number" id="event-cost-per-participant" min="0" step="1" placeholder="e.g. 2500" style="flex: 1;">
-                                                <span id="cost-currency-label" style="font-size:0.9rem;color:var(--admin-text-muted);white-space:nowrap;"></span>
+                                                <select id="event-currency" style="width: 90px;">
+                                                    <option value="NOK">NOK</option>
+                                                    <option value="EUR">EUR</option>
+                                                    <option value="USD">USD</option>
+                                                    <option value="GBP">GBP</option>
+                                                    <option value="SEK">SEK</option>
+                                                    <option value="DKK">DKK</option>
+                                                </select>
                                             </div>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Leave blank if participation is free. Shown to participants when they register a team. Currency is set system-wide in <a href="admin-settings.html">Settings</a>.</small>
+                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Leave blank if participation is free. Shown to participants when they register a team.</small>
                                         </div>
 
                                         <details class="collapsible-section" style="margin-top: 16px;">

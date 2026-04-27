@@ -92,8 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Load event
         try {
-            // Load system config (currency etc.) in parallel with event data
-            await SystemConfig.load();
+            // Load event data
             currentEvent = await API.events.get(eventId);
         } catch (error) {
             console.error('Error loading event:', error);
@@ -202,15 +201,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const participantSelect = document.getElementById('expectedParticipants');
         const costHint = document.getElementById('cost-hint');
         if (!participantSelect || !costHint) return;
-        const currency = SystemConfig.currency;
+        const currency = currentEvent.currency;
+        const locale = currencyLocale(currency);
         const costPer = currentEvent.costPerParticipant;
         function updateCostHint() {
             const count = parseInt(participantSelect.value) || 0;
             if (count > 0) {
-                const total = (count * costPer).toLocaleString();
-                costHint.innerHTML = `Total commitment: <strong>${total}\u00a0${currency}</strong> (${count}\u00a0\u00d7\u00a0${costPer.toLocaleString()}\u00a0${currency})`;
+                const total = (count * costPer).toLocaleString(locale);
+                costHint.innerHTML = `Total commitment: <strong>${total}\u00a0${currency}</strong> (${count}\u00a0\u00d7\u00a0${costPer.toLocaleString(locale)}\u00a0${currency})`;
             } else {
-                costHint.textContent = `${costPer.toLocaleString()}\u00a0${currency} per participant \u2014 select a count to see total.`;
+                costHint.textContent = `${costPer.toLocaleString(locale)}\u00a0${currency} per participant \u2014 select a count to see total.`;
             }
         }
         participantSelect.addEventListener('change', updateCostHint);
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const stripItems = [
                 `<span class="info-item">📅 ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}</span>`,
                 currentEvent.location ? `<span class="info-item">📍 ${escapeHtml(currentEvent.location)}</span>` : '',
-                currentEvent.costPerParticipant != null ? `<span class="info-item">💰 ${currentEvent.costPerParticipant.toLocaleString(SystemConfig.locale)}\u00a0${SystemConfig.currency} / person</span>` : '',
+                currentEvent.costPerParticipant != null ? `<span class="info-item">💰 ${currentEvent.costPerParticipant.toLocaleString(currencyLocale(currentEvent.currency))}\u00a0${currentEvent.currency || ''} / person</span>` : '',
                 `<span class="status-chip">${escapeHtml(statusText)}</span>`,
             ].filter(Boolean).join('');
             infoStrip.innerHTML = stripItems;

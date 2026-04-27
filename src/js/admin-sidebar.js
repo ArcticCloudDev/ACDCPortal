@@ -25,9 +25,6 @@ const SIDEBAR_NAV_ITEMS = [
 
     { section: 'Theme' },
     { page: 'email-templates', href: 'admin-email-templates.html', icon: '📝', label: 'Email Templates' },
-
-    { section: 'System' },
-    { page: 'settings', href: 'admin-settings.html', icon: '⚙️', label: 'Settings' },
 ];
 
 function renderAdminSidebar(activePage = '', permissions = null) {

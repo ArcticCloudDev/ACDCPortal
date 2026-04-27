@@ -712,19 +712,6 @@ const API = {
                 body: JSON.stringify(data)
             });
         }
-    },
-
-    // System config endpoints
-    systemConfig: {
-        async get() {
-            return API.request('/system/config');
-        },
-        async update(data) {
-            return API.request('/system/config', {
-                method: 'PUT',
-                body: JSON.stringify(data)
-            });
-        }
     }
 };
 
