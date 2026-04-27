@@ -1189,26 +1189,38 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         if (!currentEvent?.hotelDates || currentEvent.hotelDates.length === 0) return;
-        
+
+        const isAdmin = currentUser?.isPortalAdmin || (currentParticipation?.roles || []).includes('committee');
         const hotelNights = currentParticipation?.hotelNights || {};
         const hasAnyNight = Object.values(hotelNights).some(v => v === true);
+
         if (!hasAnyNight) {
-            hotelAlert.innerHTML = `
-                <div class="hotel-urgency-alert">
-                    <div class="alert-icon">🏨</div>
-                    <div class="alert-title">Hotel Booking Needed!</div>
-                    <div class="alert-message">
-                        Please select your hotel nights as soon as possible so we can finalize room reservations.
-                        <br>Rooms fill up quickly — don't miss out!
+            if (isAdmin) {
+                hotelAlert.innerHTML = `
+                    <div class="hotel-urgency-alert">
+                        <div class="alert-icon">🏨</div>
+                        <div class="alert-title">Hotel Booking Needed!</div>
+                        <div class="alert-message">
+                            Please select your hotel nights as soon as possible so we can finalize room reservations.
+                            <br>Rooms fill up quickly — don't miss out!
+                        </div>
+                        <button onclick="openSelfEditHotel()">🛏️ Select Hotel Nights Now</button>
                     </div>
-                    <button onclick="openSelfEditHotel()">🛏️ Select Hotel Nights Now</button>
-                </div>
-            `;
+                `;
+            } else {
+                hotelAlert.innerHTML = `
+                    <div class="hotel-urgency-alert">
+                        <div class="alert-icon">🏨</div>
+                        <div class="alert-title">Hotel Not Yet Assigned</div>
+                        <div class="alert-message">Your hotel nights will be arranged by the event organizers. No action needed.</div>
+                    </div>
+                `;
+            }
         } else {
             const nightCount = Object.values(hotelNights).filter(v => v === true).length;
             hotelAlert.innerHTML = `
                 <div class="hotel-ok-badge">
-                    ✅ Hotel: ${nightCount} night${nightCount !== 1 ? 's' : ''} selected
+                    ✅ Hotel: ${nightCount} night${nightCount !== 1 ? 's' : ''} booked
                 </div>
             `;
         }
@@ -1541,6 +1553,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isMandatory = currentEvent.hotelMandatory || false;
         const isAdmin = currentUser?.isPortalAdmin || (currentParticipation?.roles || []).includes('committee');
 
+        // Non-admins get a read-only view — hotel nights are managed by organizers
+        const readOnly = !isAdmin;
+
+        // Update the tab description to reflect the mode
+        const desc = document.getElementById('hotel-tab-description');
+        if (desc) {
+            desc.textContent = readOnly
+                ? 'Your hotel accommodation is arranged by the event organizers. The nights below show your current booking.'
+                : 'Configure the hotel nights for this participant. Check the nights they will be staying.';
+        }
+
         // If no nights have been saved yet (all false), seed from event defaults.
         const hasAnySaved = Object.values(savedNights).some(v => v === true);
 
@@ -1563,18 +1586,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const isLocked = isMandatory && isDefaultNight && !isAdmin;
 
                 // Determine initial checked state:
-                //  - locked (mandatory) nights → always on
+                //  - read-only or locked (mandatory) nights → always reflect saved/default
                 //  - nights explicitly saved as true → on
                 //  - no nights saved yet → default nights are on as starting point
                 const isChecked = isLocked
                     || (savedNights[nightId] === true)
                     || (!hasAnySaved && isDefaultNight);
 
+                // All nights are disabled for non-admins; admins only lock mandatory defaults
+                const isDisabled = readOnly || isLocked;
+                const disabledAttr = isDisabled ? ' disabled' : '';
+                const titleAttr = isLocked ? ' title="Mandatory night — cannot be changed"' : (readOnly ? ' title="Hotel nights are managed by the organizers"' : '');
+
                 html += `
                     <div class="hotel-night">
                         <input type="checkbox" id="edit-hotel-${nightId}" data-night-id="${nightId}"
-                               ${isChecked ? 'checked' : ''}
-                               ${isLocked ? ' disabled title="Mandatory night — cannot be changed"' : ''}>
+                               ${isChecked ? 'checked' : ''}${disabledAttr}${titleAttr}>
                         <label for="edit-hotel-${nightId}" class="night-checkbox">
                             <span class="night-icon">🌙</span>
                             ${isLocked ? '<span class="lock-badge">🔒</span>' : ''}
@@ -1586,9 +1613,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         container.innerHTML = html;
 
-        container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-            cb.addEventListener('change', updateHotelNightsCount);
-        });
+        // Only wire up change events for admins (read-only has no interactive checkboxes)
+        if (!readOnly) {
+            container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', updateHotelNightsCount);
+            });
+        }
 
         updateHotelNightsCount();
     }
@@ -1660,14 +1690,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Update user data
             await API.users.update(userId, userData);
             
-            // Update hotel nights (dynamic from checkboxes) and mark as acknowledged
-            const hotelNights = {};
-            document.querySelectorAll('.hotel-calendar input[type="checkbox"]').forEach(cb => {
-                const nightId = cb.dataset.nightId;
-                if (nightId) {
-                    hotelNights[nightId] = cb.checked;
-                }
-            });
+            // Update hotel nights — only admins/committee can change nights.
+            // Participants still call updateHotel to set the profileVerification flag,
+            // but we send back the existing nights unchanged.
+            const isAdminSave = currentUser?.isPortalAdmin || (currentParticipation?.roles || []).includes('committee');
+            let hotelNights;
+            if (isAdminSave) {
+                hotelNights = {};
+                document.querySelectorAll('.hotel-calendar input[type="checkbox"]').forEach(cb => {
+                    const nightId = cb.dataset.nightId;
+                    if (nightId) hotelNights[nightId] = cb.checked;
+                });
+            } else {
+                // Preserve existing nights — read-only for participants
+                hotelNights = currentParticipation?.hotelNights || {};
+            }
             await API.participations.updateHotel(participationId, hotelNights, true);
             
             // Update roles if roles tab is visible (user is admin)

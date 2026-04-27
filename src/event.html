@@ -603,22 +603,39 @@
             background: #1976d2;
         }
         
-        /* ── LOCKED (disabled + mandatory) state: same blue as checked ── */
-        .hotel-night input[type="checkbox"]:disabled + .night-checkbox {
+        /* ── DISABLED + CHECKED: booked night (read-only or mandatory) — blue ── */
+        .hotel-night input[type="checkbox"]:disabled:checked + .night-checkbox {
             background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
             border: 2.5px solid #1565c0;
             box-shadow: 0 3px 10px rgba(25, 118, 210, 0.35);
             cursor: not-allowed;
         }
         
-        .hotel-night input[type="checkbox"]:disabled + .night-checkbox .night-icon {
+        .hotel-night input[type="checkbox"]:disabled:checked + .night-checkbox .night-icon {
             opacity: 1;
             filter: brightness(0) invert(1);
         }
         
-        .hotel-night input[type="checkbox"]:disabled + .night-checkbox::before,
-        .hotel-night input[type="checkbox"]:disabled + .night-checkbox::after {
+        .hotel-night input[type="checkbox"]:disabled:checked + .night-checkbox::before,
+        .hotel-night input[type="checkbox"]:disabled:checked + .night-checkbox::after {
             background: #1976d2;
+        }
+
+        /* ── DISABLED + UNCHECKED: not booked, read-only — muted grey ── */
+        .hotel-night input[type="checkbox"]:disabled:not(:checked) + .night-checkbox {
+            background: #f5f5f5;
+            border: 2px dashed #ccc;
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .hotel-night input[type="checkbox"]:disabled:not(:checked) + .night-checkbox .night-icon {
+            opacity: 0.15;
+        }
+
+        .hotel-night input[type="checkbox"]:disabled:not(:checked) + .night-checkbox::before,
+        .hotel-night input[type="checkbox"]:disabled:not(:checked) + .night-checkbox::after {
+            background: #ddd;
         }
         
         .hotel-summary {
@@ -2315,7 +2332,7 @@
                 
                 <!-- Hotel Tab -->
                 <div class="tab-content" id="tab-hotel">
-                    <p class="tab-description">Select which nights you need hotel accommodation. Check the boxes between the days you'll be staying.</p>
+                    <p class="tab-description" id="hotel-tab-description">Select which nights you need hotel accommodation. Check the boxes between the days you'll be staying.</p>
                     
                     <div class="hotel-calendar" id="hotel-calendar-container">
                         <!-- Dynamic calendar will be generated from event data -->
