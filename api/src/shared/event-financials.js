@@ -180,24 +180,26 @@ async function syncParticipationToFinancials(event, participation) {
     const hotelRate = event.hotelRatePerNight != null ? Number(event.hotelRatePerNight) : null;
     const foodRate  = event.foodRatePerDay    != null ? Number(event.foodRatePerDay)    : null;
     const foodDays  = event.foodDays          != null ? Number(event.foodDays)          : null;
+    const eventHotelNights = event.hotelNights != null ? Number(event.hotelNights) : null;
 
     const paidBy = (participation.hotelPaidBy === 'team' || participation.hotelPaidBy === 'committee')
         ? 'event' : 'participant';
 
     const nights = participation.hotelNights || {};
     const nightCount = Object.values(nights).filter(Boolean).length;
+    // Use per-participant selection if available, otherwise fall back to event-level default
+    const effectiveNights = nightCount > 0 ? nightCount : (eventHotelNights ?? 0);
 
-    if (hotelRate != null && nightCount > 0) {
-        const nightLabels = Object.entries(nights)
-            .filter(([, v]) => v)
-            .map(([k]) => k)
-            .join(', ');
+    if (hotelRate != null && effectiveNights > 0) {
+        const description = nightCount > 0
+            ? `Hotel - ${Object.entries(nights).filter(([, v]) => v).map(([k]) => k).join(', ')}`
+            : `Hotel - ${effectiveNights} night${effectiveNights !== 1 ? 's' : ''}`;
         await upsertParticipationRow(participation.eventId, participation.id, {
             category: 'hotel',
-            description: `Hotel - ${nightLabels}`,
+            description,
             unitCost: hotelRate,
-            days: nightCount,
-            amount: hotelRate * nightCount,
+            days: effectiveNights,
+            amount: hotelRate * effectiveNights,
             paidBy
         });
     }

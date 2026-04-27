@@ -1995,8 +1995,11 @@ async function loadEventBudget() {
     // Populate rate fields from currentEvent
     if (currentEvent) {
         document.getElementById('budget-hotel-rate').value = currentEvent.hotelRatePerNight ?? '';
+        document.getElementById('budget-hotel-nights').value = currentEvent.hotelNights ?? '';
         document.getElementById('budget-food-rate').value = currentEvent.foodRatePerDay ?? '';
         document.getElementById('budget-food-days').value = currentEvent.foodDays ?? '';
+        updateRatePreview('hotel');
+        updateRatePreview('food');
     }
 
     try {
@@ -2268,14 +2271,16 @@ async function recalculateFinancials() {
 
 async function saveEventRates() {
     if (!currentEventId) return;
-    const hotelRate = document.getElementById('budget-hotel-rate').value;
-    const foodRate = document.getElementById('budget-food-rate').value;
-    const foodDays = document.getElementById('budget-food-days').value;
+    const hotelRate   = document.getElementById('budget-hotel-rate').value;
+    const hotelNights = document.getElementById('budget-hotel-nights').value;
+    const foodRate    = document.getElementById('budget-food-rate').value;
+    const foodDays    = document.getElementById('budget-food-days').value;
 
     const payload = {
-        hotelRatePerNight: hotelRate !== '' ? parseFloat(hotelRate) : null,
-        foodRatePerDay: foodRate !== '' ? parseFloat(foodRate) : null,
-        foodDays: foodDays !== '' ? parseInt(foodDays, 10) : null
+        hotelRatePerNight: hotelRate   !== '' ? parseFloat(hotelRate)   : null,
+        hotelNights:       hotelNights !== '' ? parseInt(hotelNights, 10) : null,
+        foodRatePerDay:    foodRate    !== '' ? parseFloat(foodRate)    : null,
+        foodDays:          foodDays    !== '' ? parseInt(foodDays, 10)  : null
     };
 
     try {
@@ -2287,5 +2292,20 @@ async function saveEventRates() {
     } catch (error) {
         console.error('Error saving rates:', error);
         alert(`Error saving rates: ${error.message}`);
+    }
+}
+
+function updateRatePreview(type) {
+    const currency = currentEvent?.currency || 'NOK';
+    if (type === 'hotel') {
+        const rate = parseFloat(document.getElementById('budget-hotel-rate').value) || 0;
+        const nights = parseInt(document.getElementById('budget-hotel-nights').value, 10) || 0;
+        const el = document.getElementById('hotel-rate-preview');
+        if (el) el.textContent = rate && nights ? `= ${(rate * nights).toLocaleString('nb-NO')} ${currency}` : '';
+    } else {
+        const rate = parseFloat(document.getElementById('budget-food-rate').value) || 0;
+        const days = parseInt(document.getElementById('budget-food-days').value, 10) || 0;
+        const el = document.getElementById('food-rate-preview');
+        if (el) el.textContent = rate && days ? `= ${(rate * days).toLocaleString('nb-NO')} ${currency}` : '';
     }
 }
