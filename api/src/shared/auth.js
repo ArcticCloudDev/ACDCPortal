@@ -1,5 +1,17 @@
 const jwt = require('jsonwebtoken');
 const os = require('os');
+const crypto = require('crypto');
+
+function authDiag() {
+    const secret = process.env.JWT_SECRET || '';
+    const hash = secret ? crypto.createHash('sha256').update(secret).digest('hex').slice(0, 12) : null;
+    return {
+        host: os.hostname(),
+        keyVaultUrlSet: !!process.env.KEY_VAULT_URL,
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        jwtHash: hash
+    };
+}
 
 // IMPORTANT: do NOT cache this in a module-level constant. Key Vault secrets are
 // loaded asynchronously via a preInvocation hook (see functions/startup.js), which
@@ -76,7 +88,7 @@ function requireAuth(request, context, options = {}) {
             status: 401,
             // Reason is safe to expose: it's a jsonwebtoken error class/message
             // (e.g. "TokenExpiredError: jwt expired"), never the secret or payload.
-            jsonBody: { message: 'Invalid or expired session', reason: result.reason }
+            jsonBody: { message: 'Invalid or expired session', reason: result.reason, diag: authDiag() }
         };
     }
     const payload = result.payload;
