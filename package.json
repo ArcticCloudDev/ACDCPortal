@@ -4,7 +4,9 @@
   "description": "ACDC Team Registration Portal",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
+    "dev": "concurrently -n API,WEB -c yellow,cyan \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm --prefix api start",
+    "dev:web": "node server.js",
     "build": "echo 'No build step required - static files'",
     "test": "echo 'No tests configured yet'"
   },
@@ -13,6 +15,10 @@
   "license": "ISC",
   "dependencies": {
     "express": "^5.0.0",
+    "http-proxy-middleware": "^3.0.5",
     "uuid": "^11.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

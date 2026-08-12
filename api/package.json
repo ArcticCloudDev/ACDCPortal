@@ -4,7 +4,7 @@
   "description": "ACDC Portal API - Azure Functions v4",
   "main": "src/functions/*.js",
   "scripts": {
-    "start": "func start",
+    "start": "func start --javascript",
     "test": "echo \"No tests yet\""
   },
   "engines": {
