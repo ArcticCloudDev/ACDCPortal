@@ -1,16 +1,22 @@
 // ACDC Portal - File Upload API (SharePoint)
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
+const { requireAuth } = require('../shared/auth');
 const SharePointStorage = require('../shared/sharepoint');
 const multipart = require('parse-multipart-data');
 
 // POST /api/files/upload - Upload a file
 app.http('files-upload', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'files/upload',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             // Check if SharePoint is configured
             if (!SharePointStorage.isConfigured()) {
                 return { 
@@ -110,10 +116,15 @@ app.http('files-upload', {
 // GET /api/files/list - List files for a team
 app.http('files-list', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'files/list',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             if (!SharePointStorage.isConfigured()) {
                 return { 
                     status: 503, 
@@ -158,10 +169,15 @@ app.http('files-list', {
 // GET /api/files/download - Get download URL for a file
 app.http('files-download', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'files/download',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             if (!SharePointStorage.isConfigured()) {
                 return { 
                     status: 503, 
@@ -203,10 +219,15 @@ app.http('files-download', {
 // DELETE /api/files/delete - Delete a file
 app.http('files-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'files/delete',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             if (!SharePointStorage.isConfigured()) {
                 return { 
                     status: 503, 
@@ -246,10 +267,15 @@ app.http('files-delete', {
 // POST /api/files/setup-columns - Admin: ensure FileCategory choice column exists on the document library
 app.http('files-setup-columns', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'files/setup-columns',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             if (!SharePointStorage.isConfigured()) {
                 return {
                     status: 503,

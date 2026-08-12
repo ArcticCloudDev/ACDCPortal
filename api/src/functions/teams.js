@@ -2,6 +2,7 @@
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
+const { requireAuth } = require('../shared/auth');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
@@ -25,10 +26,18 @@ async function getActiveEventId() {
 // List all teams (optionally filtered by eventId)
 app.http('teams-list', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'teams',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const eventId = request.query.get('eventId');
             
             let teams = await Storage.teams.getAll();
@@ -57,10 +66,18 @@ app.http('teams-list', {
 // Get team by ID
 app.http('teams-get', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'teams/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const teamId = request.params.id;
             
             if (!teamId) {
@@ -98,10 +115,18 @@ app.http('teams-get', {
 // Create team
 app.http('teams-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'teams',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const teamData = await request.json();
             
             if (!teamData.teamName) {
@@ -175,10 +200,18 @@ app.http('teams-create', {
 // Update team
 app.http('teams-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'teams/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const teamId = request.params.id;
             const updateData = await request.json();
             
@@ -230,10 +263,18 @@ app.http('teams-update', {
 // Delete team (cascade: clean up participations, badge claims, invitations)
 app.http('teams-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'teams/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const teamId = request.params.id;
 
             if (!teamId) {
@@ -394,10 +435,15 @@ app.http('teams-delete', {
 // Get team members
 app.http('teams-members', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'teams/{id}/members',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const teamId = request.params.id;
             
             if (!teamId) {

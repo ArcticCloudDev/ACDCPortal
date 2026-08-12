@@ -1,5 +1,6 @@
 // ACDC Portal - Events API
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const StorageModule = require('../shared/storage');
 const { Storage } = StorageModule;
@@ -235,10 +236,15 @@ function normalizeSponsorPayload(body = {}, { isUpdate = false } = {}) {
 // GET /api/events/{eventId}/sponsors - List event sponsors (filtered view of EventFinancials)
 app.http('event-sponsors-list', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/sponsors',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
             const pool = await getPool();
             const result = await pool.request()
@@ -261,10 +267,15 @@ app.http('event-sponsors-list', {
 // POST /api/events/{eventId}/sponsors - Create sponsor
 app.http('event-sponsors-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/sponsors',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
             const body = await request.json();
             const payload = normalizeSponsorPayload(body);
@@ -305,10 +316,15 @@ app.http('event-sponsors-create', {
 // PUT /api/events/{eventId}/sponsors/{sponsorId} - Update sponsor
 app.http('event-sponsors-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/sponsors/{sponsorId}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { eventId, sponsorId } = request.params;
             const body = await request.json();
             const payload = normalizeSponsorPayload(body, { isUpdate: true });
@@ -369,10 +385,15 @@ app.http('event-sponsors-update', {
 // DELETE /api/events/{eventId}/sponsors/{sponsorId} - Delete sponsor
 app.http('event-sponsors-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/sponsors/{sponsorId}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { eventId, sponsorId } = request.params;
             const pool = await getPool();
             const result = await pool.request()
@@ -392,10 +413,15 @@ app.http('event-sponsors-delete', {
 // POST /api/events - Create new event
 app.http('events-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             
             if (!body.name || !body.startDate || !body.endDate) {
@@ -479,10 +505,15 @@ app.http('events-create', {
 // PUT /api/events/:id - Update event
 app.http('events-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const body = await request.json();
 
@@ -568,10 +599,15 @@ app.http('events-update', {
 // DELETE /api/events/:id - Delete event
 app.http('events-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             
             const events = await eventsStorage.getAll();
@@ -613,10 +649,15 @@ console.log('Events API loaded');
 // GET /api/events/{eventId}/financials - List all financial rows
 app.http('event-financials-list', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/financials',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
             const rows = await listByEvent(eventId);
             return { status: 200, jsonBody: rows };
@@ -630,10 +671,15 @@ app.http('event-financials-list', {
 // GET /api/events/{eventId}/financials/summary - Financial totals
 app.http('event-financials-summary', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/financials/summary',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
             const summary = await getSummary(eventId);
             return { status: 200, jsonBody: summary };
@@ -647,10 +693,15 @@ app.http('event-financials-summary', {
 // POST /api/events/{eventId}/financials - Create manual row
 app.http('event-financials-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/financials',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
             const body = await request.json();
             const row = await createManual(eventId, body);
@@ -666,10 +717,15 @@ app.http('event-financials-create', {
 // PUT /api/events/{eventId}/financials/{rowId} - Update manual row
 app.http('event-financials-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/financials/{rowId}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { eventId, rowId } = request.params;
             const body = await request.json();
             const row = await updateManual(rowId, eventId, body);
@@ -685,10 +741,15 @@ app.http('event-financials-update', {
 // DELETE /api/events/{eventId}/financials/{rowId} - Delete manual row
 app.http('event-financials-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/financials/{rowId}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { eventId, rowId } = request.params;
             const deleted = await deleteManual(rowId, eventId);
             if (!deleted) return { status: 404, jsonBody: { error: 'Row not found or not deletable' } };
@@ -703,10 +764,15 @@ app.http('event-financials-delete', {
 // PATCH /api/events/{eventId}/financials/{rowId} - Update paidBy on any row (auto or manual)
 app.http('event-financials-patch', {
     methods: ['PATCH'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/financials/{rowId}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { eventId, rowId } = request.params;
             const { paidBy } = await request.json();
             if (!paidBy) return { status: 400, jsonBody: { error: 'paidBy is required' } };
@@ -724,10 +790,15 @@ app.http('event-financials-patch', {
 // Rebuilds hotel + food auto rows for every participant in the event.
 app.http('event-financials-recalculate', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/financials/recalculate',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { eventId } = request.params;
 
             // Load event

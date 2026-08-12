@@ -1,5 +1,6 @@
 // ACDC Portal - Email Deliveries API
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
@@ -15,10 +16,15 @@ const runsStorage = new Storage('scheduled-runs');
 // GET /api/deliveries/scheduled-runs - Get recent scheduled email runs
 app.http('deliveries-scheduled-runs', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'deliveries/scheduled-runs',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const allRuns = await runsStorage.getAll();
             const recentRuns = allRuns
                 .sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
@@ -42,10 +48,15 @@ app.http('deliveries-scheduled-runs', {
 // GET /api/deliveries/event/:eventId - Get all deliveries for an event's sequence
 app.http('deliveries-event', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'deliveries/event/{eventId}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
 
             // Get event to find its sequence
@@ -139,10 +150,15 @@ app.http('deliveries-event', {
 // POST /api/deliveries/retry - Retry a failed delivery
 app.http('deliveries-retry', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'deliveries/retry',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { deliveryId } = body;
 
@@ -229,10 +245,15 @@ app.http('deliveries-retry', {
 // DELETE /api/deliveries/recipient - Remove all delivery records for a given email (admin cleanup)
 app.http('deliveries-delete-recipient', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'deliveries/recipient',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { email } = body;
 

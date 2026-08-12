@@ -1,5 +1,6 @@
 // Sequences API - Manage email sequences (one per event)
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { v4: uuidv4 } = require('uuid');
@@ -11,10 +12,15 @@ const deliveriesStorage = new Storage('email-deliveries');
 // GET /api/sequences - List all sequences
 app.http('sequences-list', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'sequences',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             let sequences = await sequencesStorage.getAll();
             
             // Add email counts and stats to each sequence
@@ -49,10 +55,15 @@ app.http('sequences-list', {
 // GET /api/sequences/:id - Get sequence with emails
 app.http('sequences-get', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'sequences/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const sequenceId = request.params.id;
             
             const sequence = await sequencesStorage.getById(sequenceId);
@@ -100,10 +111,15 @@ app.http('sequences-get', {
 // POST /api/sequences - Create sequence
 app.http('sequences-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'sequences',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { name, description } = body;
             
@@ -133,10 +149,15 @@ app.http('sequences-create', {
 // PUT /api/sequences/:id - Update sequence
 app.http('sequences-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'sequences/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const sequenceId = request.params.id;
             const body = await request.json();
             const { name, description } = body;
@@ -167,10 +188,15 @@ app.http('sequences-update', {
 // DELETE /api/sequences/:id - Delete sequence and all its emails
 app.http('sequences-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'sequences/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const sequenceId = request.params.id;
             
             // Delete sequence
@@ -196,10 +222,15 @@ app.http('sequences-delete', {
 // POST /api/sequences/:id/copy - Duplicate sequence (creates a copy)
 app.http('sequences-copy', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'sequences/{id}/copy',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const sourceId = request.params.id;
             
             // Get source sequence

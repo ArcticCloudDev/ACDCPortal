@@ -6,13 +6,22 @@ const API = {
     // Helper to make API calls
     async request(endpoint, options = {}) {
         const url = `${this.baseUrl}${endpoint}`;
+        const token = typeof Auth !== 'undefined' ? Auth.getToken() : null;
         const defaultOptions = {
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
             }
         };
 
-        const response = await fetch(url, { ...defaultOptions, ...options });
+        const response = await fetch(url, {
+            ...defaultOptions,
+            ...options,
+            headers: {
+                ...defaultOptions.headers,
+                ...(options.headers || {})
+            }
+        });
         
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: 'Request failed' }));

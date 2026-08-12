@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const { Storage: GenericStorage } = require('../shared/storage');
@@ -38,10 +39,15 @@ async function markRegisteredInInterestQueue(userId, eventId, context) {
 // GET /api/solo-queue - Get solo queue entries (optionally by eventId or userId)
 app.http('solo-queue-get', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'solo-queue',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.query.get('eventId');
             const userId = request.query.get('userId');
             
@@ -75,10 +81,15 @@ app.http('solo-queue-get', {
 // POST /api/solo-queue - Join solo queue
 app.http('solo-queue-join', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'solo-queue',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { userId, eventId, note } = body;
             
@@ -138,10 +149,15 @@ app.http('solo-queue-join', {
 // DELETE /api/solo-queue/:id - Leave solo queue
 app.http('solo-queue-leave', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'solo-queue/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             
             const queue = await soloQueueStorage.getAll();
@@ -175,10 +191,15 @@ app.http('solo-queue-leave', {
 // GET /api/solo-queue/position/:eventId/:userId - Get user's position in queue
 app.http('solo-queue-position', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'solo-queue/position/{eventId}/{userId}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { eventId, userId } = request.params;
             
             const queue = await soloQueueStorage.getAll();

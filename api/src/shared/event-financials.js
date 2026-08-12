@@ -361,7 +361,7 @@ async function getSummary(eventId) {
         totalIncome,
         totalOrgExpense,
         totalParticipantExpense,
-        netOrgBalance: totalIncome - totalOrgExpense,
+        netBalance: totalIncome - totalOrgExpense - totalParticipantExpense,
         byCategory: Object.values(byCategory)
     };
 }

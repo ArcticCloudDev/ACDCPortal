@@ -1,6 +1,7 @@
 // Email Campaigns API
 // Stores email templates once, tracks deliveries per recipient
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
@@ -23,10 +24,15 @@ function generateDeliveryId() {
 // GET /api/email/campaigns - List campaigns for an event
 app.http('email-campaigns-list', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/campaigns',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.query.get('eventId');
             let campaigns = await campaignsStorage.getAll();
 
@@ -64,10 +70,15 @@ app.http('email-campaigns-list', {
 // GET /api/campaigns/:id - Get campaign by ID (short route)
 app.http('campaigns-get', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'campaigns/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const campaignId = request.params.id;
             const campaign = await campaignsStorage.getById(campaignId);
 
@@ -87,10 +98,15 @@ app.http('campaigns-get', {
 // GET /api/email/campaigns/:id - Get campaign with deliveries
 app.http('email-campaigns-get', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/campaigns/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const campaignId = request.params.id;
             const campaign = await campaignsStorage.getById(campaignId);
 
@@ -137,10 +153,15 @@ app.http('email-campaigns-get', {
 // POST /api/campaigns - Create campaign (short route)
 app.http('campaigns-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'campaigns',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { sequenceId, subject, content, ctaUrl, ctaText, type, sequenceOrder, status, scheduledSendTime } = body;
 
@@ -176,10 +197,15 @@ app.http('campaigns-create', {
 // POST /api/email/campaigns - Create a new campaign
 app.http('email-campaigns-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/campaigns',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { sequenceId, subject, content, ctaUrl, ctaText, createdBy, status, scheduledSendTime } = body;
 
@@ -221,10 +247,15 @@ app.http('email-campaigns-create', {
 // PUT /api/campaigns/:id - Update campaign (short route)
 app.http('campaigns-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'campaigns/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const campaignId = request.params.id;
             const body = await request.json();
 
@@ -258,10 +289,15 @@ app.http('campaigns-update', {
 // PUT /api/email/campaigns/:id - Update campaign
 app.http('email-campaigns-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/campaigns/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const campaignId = request.params.id;
             const body = await request.json();
 
@@ -295,10 +331,15 @@ app.http('email-campaigns-update', {
 // DELETE /api/campaigns/:id - Delete campaign (short route)
 app.http('campaigns-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'campaigns/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const campaignId = request.params.id;
 
             const exists = await campaignsStorage.getById(campaignId);
@@ -324,10 +365,15 @@ app.http('campaigns-delete', {
 // DELETE /api/email/campaigns/:id - Delete campaign and its deliveries
 app.http('email-campaigns-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/campaigns/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const campaignId = request.params.id;
 
             const existsEmail = await campaignsStorage.getById(campaignId);
@@ -353,10 +399,15 @@ app.http('email-campaigns-delete', {
 // POST /api/email/campaigns/:id/send - Send campaign to recipients
 app.http('email-campaigns-send', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/campaigns/{id}/send',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const campaignId = request.params.id;
             const body = await request.json();
             const { recipients } = body; // Array of { email, userId?, firstName? }
@@ -435,10 +486,15 @@ app.http('email-campaigns-send', {
 // Called when user joins an event
 app.http('email-trigger-sequence', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/trigger-sequence',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { userId, eventId } = body;
 
@@ -525,10 +581,15 @@ app.http('email-trigger-sequence', {
 // GET /api/email/campaigns/:id/deliveries - Get deliveries for a campaign
 app.http('email-campaigns-deliveries', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/campaigns/{id}/deliveries',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const campaignId = request.params.id;
             const allDeliveriesById = await deliveriesStorage.getAll();
             const deliveries = allDeliveriesById

@@ -1,9 +1,9 @@
 // ACDC Portal - Auth Module (Custom OTP + JWT)
-// No external auth provider — uses our own OTP verification + JWT sessions
+// No external auth provider ï¿½ uses our own OTP verification + JWT sessions
 // Maintains the same interface as the old MSAL wrapper for compatibility
 
 const Auth = {
-    // Initialize — load session from localStorage
+    // Initialize ï¿½ load session from localStorage
     init() {
         // Check if token is expired
         const token = this._getToken();
@@ -11,6 +11,7 @@ const Auth = {
             console.log('JWT expired, clearing session');
             this._clearSession();
         }
+        this._installFetchWrapper();
         console.log('Auth initialized (Custom OTP + JWT)');
     },
 
@@ -39,7 +40,7 @@ const Auth = {
         }
     },
 
-    // "Login" — redirect to unified register/sign-in page
+    // "Login" ï¿½ redirect to unified register/sign-in page
     // Pages that need auth call Auth.login() which sends the user to
     // register.html where the email check routes to OTP (known) or registration (new).
     login(loginHint) {
@@ -55,15 +56,15 @@ const Auth = {
         localStorage.setItem(CONFIG.auth.userKey, JSON.stringify(user));
     },
 
-    // Logout — clear session and redirect to home
+    // Logout ï¿½ clear session and redirect to home
     logout() {
         this._clearSession();
         window.location.href = '/events.html';
     },
 
-    // Handle redirect — kept for compatibility
+    // Handle redirect ï¿½ kept for compatibility
     // Old code calls `await Auth.handleRedirect()` on page load.
-    // With JWT, there's no redirect to handle — just return null.
+    // With JWT, there's no redirect to handle ï¿½ just return null.
     async handleRedirect() {
         // No-op: JWT auth doesn't use redirects
         return null;
@@ -73,6 +74,30 @@ const Auth = {
     getToken() {
         if (!this.isLoggedIn()) return null;
         return this._getToken();
+    },
+
+    _installFetchWrapper() {
+        if (window.__acdcFetchPatched) return;
+
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = async (input, init = {}) => {
+            const url = typeof input === 'string' ? input : input?.url || '';
+            const isApiRequest = typeof url === 'string' && url.includes('/api/');
+            const token = this.getToken();
+
+            // Always attach the Bearer token to API requests when logged in.
+            // Endpoints that are intentionally public (login/registration/invite
+            // flows) don't check the Authorization header, so this is harmless.
+            if (isApiRequest && token) {
+                const headers = new Headers(init.headers || {});
+                headers.set('Authorization', `Bearer ${token}`);
+                init = { ...init, headers };
+            }
+
+            return originalFetch(input, init);
+        };
+
+        window.__acdcFetchPatched = true;
     },
 
     // --- Private helpers ---

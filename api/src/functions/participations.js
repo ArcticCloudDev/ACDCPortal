@@ -4,6 +4,7 @@
 // Email is the anchor identity (present before userId)
 
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const { Storage } = require('../shared/storage');
@@ -230,10 +231,15 @@ async function removeFromInterestQueue(userId, eventId, context) {
 // GET /api/participations/all - Get all participations (admin)
 app.http('participations-get-all', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/all',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const participations = await participationsStorage.getAll();
             // Migration: ensure roles array exists on all records
             participations.forEach(p => {
@@ -251,10 +257,15 @@ app.http('participations-get-all', {
 // GET /api/participations - Get participation for user/email in event
 app.http('participations-get', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const userId = request.query.get('userId');
             const email = request.query.get('email');
             const eventId = request.query.get('eventId');
@@ -299,10 +310,15 @@ app.http('participations-get', {
 // POST /api/participations - Create or update participation
 app.http('participations-upsert', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { userId, email, eventId, hotelNights, roles } = body;
 
@@ -393,10 +409,15 @@ app.http('participations-upsert', {
 // PUT /api/participations/:id - Update participation fields
 app.http('participations-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const body = await request.json();
 
@@ -445,10 +466,15 @@ app.http('participations-update', {
 // DELETE /api/participations/:id - Delete a participation
 app.http('participations-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const participations = await participationsStorage.getAll();
             const index = participations.findIndex(p => p.id === id);
@@ -514,10 +540,15 @@ app.http('participations-delete', {
 // PUT /api/participations/:id/roles - Add or remove roles
 app.http('participations-update-roles-v2', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/{id}/roles',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const body = await request.json();
             const { add, remove, set } = body;
@@ -593,10 +624,15 @@ app.http('participations-update-roles-v2', {
 // PUT /api/participations/:id/team - Assign to a team
 app.http('participations-assign-team', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/{id}/team',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const body = await request.json();
             const { teamId, isTeamAdmin } = body;
@@ -682,10 +718,15 @@ app.http('participations-assign-team', {
 // PUT /api/participations/:id/hotel - Update hotel nights
 app.http('participations-update-hotel', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/{id}/hotel',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const body = await request.json();
             const { hotelNights, profileVerification } = body;
@@ -721,10 +762,15 @@ app.http('participations-update-hotel', {
 // GET /api/participations/event/:eventId - All participations for an event (with optional role filter)
 app.http('participations-by-event', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/event/{eventId}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
             const role = request.query.get('role'); // Optional: filter by role
 
@@ -754,10 +800,15 @@ app.http('participations-by-event', {
 // GET /api/participations/person/:email - All participations for a person across events
 app.http('participations-by-person', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/person/{email}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const email = decodeURIComponent(request.params.email);
 
             const participations = await participationsStorage.getAll();
@@ -800,10 +851,15 @@ app.http('participations-by-person', {
 // GET /api/participations/team/:teamId - Get all participations for a team
 app.http('participations-by-team', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/team/{teamId}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const teamId = request.params.teamId;
             const participations = await participationsStorage.getAll();
 
@@ -835,10 +891,15 @@ app.http('participations-by-team', {
 // GET /api/participations/team/:teamId/count - Get participant count for a team
 app.http('participations-team-count', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/team/{teamId}/count',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const teamId = request.params.teamId;
             const participations = await participationsStorage.getAll();
 
@@ -881,10 +942,15 @@ app.http('participations-team-count', {
 // POST /api/participations/:id/team-membership - Legacy: add team membership
 app.http('participations-add-team-membership', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/{id}/team-membership',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const body = await request.json();
             const { teamId, isAdmin, isParticipant } = body;
@@ -1003,10 +1069,15 @@ app.http('participations-add-team-membership', {
 // DELETE /api/participations/:id/team-membership/:teamId - Legacy: remove team membership
 app.http('participations-remove-team-membership', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/{id}/team-membership/{teamId}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const teamId = request.params.teamId;
 
@@ -1070,10 +1141,15 @@ app.http('participations-remove-team-membership', {
 // PUT /api/participations/:id/team-membership/:teamId/participant - Legacy: toggle participant
 app.http('participations-toggle-participant', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/{id}/team-membership/{teamId}/participant',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const teamId = request.params.teamId;
             const body = await request.json();
@@ -1137,10 +1213,15 @@ app.http('participations-toggle-participant', {
 // PUT /api/participations/:id/team-membership/:teamId/roles - Legacy: update roles on team membership
 app.http('participations-update-team-roles', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'participations/{id}/team-membership/{teamId}/roles',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const teamId = request.params.teamId;
             const body = await request.json();

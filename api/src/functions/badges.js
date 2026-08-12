@@ -2,6 +2,7 @@
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
+const { requireAuth } = require('../shared/auth');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 
@@ -84,10 +85,15 @@ app.http('badges-get', {
 // POST /api/badges - Create a new master badge
 app.http('badges-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'badges',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
 
             if (!body.name) {
@@ -134,10 +140,15 @@ app.http('badges-create', {
 // PUT /api/badges/:id - Update a master badge
 app.http('badges-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'badges/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const body = await request.json();
 
@@ -186,10 +197,15 @@ app.http('badges-update', {
 // DELETE /api/badges/:id - Delete a master badge
 app.http('badges-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'badges/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
 
             const badge = await badgesStorage.getById(id);
@@ -268,10 +284,15 @@ app.http('event-badges-list', {
 // POST /api/events/:eventId/badges - Add badge(s) to event
 app.http('event-badges-add', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/badges',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
             const body = await request.json();
 
@@ -338,10 +359,15 @@ app.http('event-badges-add', {
 // PUT /api/events/:eventId/badges/:id - Update event-badge (assign judge, toggle active)
 app.http('event-badges-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/badges/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { eventId, id } = request.params;
             const body = await request.json();
 
@@ -370,10 +396,15 @@ app.http('event-badges-update', {
 // DELETE /api/events/:eventId/badges/:id - Remove badge from event
 app.http('event-badges-remove', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/badges/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { eventId, id } = request.params;
 
             const eventBadge = await eventBadgesStorage.getById(id);
@@ -405,10 +436,15 @@ app.http('event-badges-remove', {
 // POST /api/events/:eventId/badges/bulk - Bulk add/remove badges for an event
 app.http('event-badges-bulk', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'events/{eventId}/badges/bulk',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
             const body = await request.json();
             const { selectedBadgeIds } = body; // Array of badge IDs that should be assigned
@@ -484,10 +520,15 @@ app.http('event-badges-bulk', {
 // GET /api/badge-claims - List claims (filterable by eventId, teamId, status)
 app.http('badge-claims-list', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'badge-claims',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.query.get('eventId');
             const teamId = request.query.get('teamId');
             const status = request.query.get('status');
@@ -525,10 +566,15 @@ app.http('badge-claims-list', {
 // POST /api/badge-claims - Team claims a badge
 app.http('badge-claims-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'badge-claims',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
 
             if (!body.eventBadgeId || !body.teamId) {
@@ -623,10 +669,15 @@ app.http('badge-claims-create', {
 // PUT /api/badge-claims/:id/review - Judge reviews a claim (approve/decline)
 app.http('badge-claims-review', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'badge-claims/{id}/review',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const body = await request.json();
 
@@ -664,10 +715,15 @@ app.http('badge-claims-review', {
 // PUT /api/badge-claims/:id - Update a claim (e.g. update evidence)
 app.http('badge-claims-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'badge-claims/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const body = await request.json();
 
@@ -703,10 +759,15 @@ app.http('badge-claims-update', {
 // DELETE /api/badge-claims/:id - Delete a claim
 app.http('badge-claims-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'badge-claims/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
 
             const claim = await badgeClaimsStorage.getById(id);
@@ -730,10 +791,15 @@ app.http('badge-claims-delete', {
 // POST /api/badge-claims/award - Judge awards an exclusive badge to a team (no blog URL required)
 app.http('badge-claims-award', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'badge-claims/award',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
 
             if (!body.eventBadgeId || !body.teamId) {
@@ -796,10 +862,15 @@ app.http('badge-claims-award', {
 // PUT /api/badge-claims/assign - Assign a team member to a badge (creates draft claim if none exists)
 app.http('badge-claims-assign', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'badge-claims/assign',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
 
             if (!body.eventBadgeId || !body.teamId) {

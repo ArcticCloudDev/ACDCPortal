@@ -2022,7 +2022,7 @@ function renderBudgetSummary(summary) {
     document.getElementById('budget-total-income').textContent = fmt(summary?.totalIncome);
     document.getElementById('budget-total-org-expense').textContent = fmt(summary?.totalOrgExpense);
     document.getElementById('budget-total-participant-expense').textContent = fmt(summary?.totalParticipantExpense);
-    const net = summary?.netOrgBalance ?? 0;
+    const net = summary?.netBalance ?? 0;
     document.getElementById('budget-net-balance').textContent = fmt(net);
     const netCard = document.getElementById('budget-net-card');
     netCard.classList.toggle('positive', net >= 0);
@@ -2174,8 +2174,6 @@ function startEditFinancial(rowId) {
     document.getElementById('financial-category').value = row.category;
     document.getElementById('financial-description').value = row.description || '';
     document.getElementById('financial-amount').value = row.amount;
-    document.getElementById('financial-unit-cost').value = row.unitCost ?? '';
-    document.getElementById('financial-days').value = row.days ?? '';
     document.getElementById('financial-paid-by').value = row.paidBy || 'event';
     document.getElementById('financial-notes').value = row.notes || '';
     document.getElementById('save-financial-btn').textContent = '💾 Update Row';
@@ -2198,8 +2196,8 @@ async function handleFinancialSubmit(e) {
         description: document.getElementById('financial-description').value.trim(),
         amount: parseFloat(document.getElementById('financial-amount').value),
         paidBy: type === 'income' ? 'event' : (document.getElementById('financial-paid-by').value),
-        unitCost: document.getElementById('financial-unit-cost').value !== '' ? parseFloat(document.getElementById('financial-unit-cost').value) : null,
-        days: document.getElementById('financial-days').value !== '' ? parseInt(document.getElementById('financial-days').value, 10) : null,
+        unitCost: null,
+        days: null,
         notes: document.getElementById('financial-notes').value.trim() || null
     };
 

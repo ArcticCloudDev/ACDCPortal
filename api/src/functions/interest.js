@@ -1,5 +1,6 @@
 // ACDC Portal - Interest Registration API
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
@@ -712,10 +713,15 @@ app.http('interest-record', {
 // GET /api/interest/leads?eventId=xxx - List leads for an event (admin)
 app.http('interest-list', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest/leads',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.query.get('eventId');
 
             let leads = await leadsStorage.getAll();
@@ -755,10 +761,15 @@ app.http('interest-list', {
 // DELETE /api/interest/leads/:id - Delete a lead (admin)
 app.http('interest-delete', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest/leads/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
 
             const lead = await leadsStorage.getById(id);
@@ -818,10 +829,15 @@ app.http('interest-delete', {
 // POST /api/interest/restart-sequence - Manually trigger sequence for a recipient (lead or user)
 app.http('interest-restart-sequence', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest/restart-sequence',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { leadId, userId, eventId } = body;
 

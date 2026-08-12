@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { readData, writeData } = require('../shared/storage');
 const Storage = require('../shared/storage');
@@ -36,10 +37,15 @@ function extractImageSrc(html) {
 // POST /api/system-emails/upload-theme - Upload theme image
 app.http('system-emails-upload-theme', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'system-emails/upload-theme',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const formData = await request.formData();
             const imageFile = formData.get('image');
             const eventId = formData.get('eventId');
@@ -88,10 +94,15 @@ app.http('system-emails-upload-theme', {
 // GET /api/system-emails/config - Get template configuration
 app.http('system-emails-config-get', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'system-emails/config',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const config = await readData('system-email-config.json');
             return { status: 200, jsonBody: config };
         } catch (error) {
@@ -123,10 +134,15 @@ function validateEmailConfig(config) {
 // PUT /api/system-emails/config - Save template configuration
 app.http('system-emails-config-put', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'system-emails/config',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const config = await request.json();
             const validationError = validateEmailConfig(config);
             if (validationError) {
@@ -145,10 +161,15 @@ app.http('system-emails-config-put', {
 // POST /api/system-emails/test - Send test email
 app.http('system-emails-test', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'system-emails/test',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { templateType, eventId, testEmail, data } = await request.json();
             
             // Load config
@@ -243,10 +264,15 @@ app.http('system-emails-test', {
 // POST /api/system-emails/preview - Render a template with sample data and return HTML
 app.http('system-emails-preview', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'system-emails/preview',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { templateType, eventId, bodyText, closingText } = await request.json();
 
             const config = await readData('system-email-config.json');
@@ -310,10 +336,15 @@ app.http('system-emails-preview', {
 // POST /api/system-emails/send - Send system email (called by team creation, etc.)
 app.http('system-emails-send', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'system-emails/send',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const { templateType, eventId, to, data } = await request.json();
             
             // Load config

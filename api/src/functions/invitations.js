@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { sendEmail, processTemplate } = require('../shared/mail');
 const { buildInvitationEmail } = require('../shared/invitation-email');
@@ -218,10 +219,15 @@ async function buildTeamWelcomeEmailForInvitation(invitation, context) {
 // Create invitation
 app.http('invitations-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'invitations',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { email, teamId, eventId, role, inviterId, inviterName, inviterEmail, message, inviteeFirstName, inviteeLastName } = body;
             
@@ -355,10 +361,15 @@ app.http('invitations-create', {
 // List invitations (for a team or by email)
 app.http('invitations-list', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'invitations',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const teamId = request.query.get('teamId');
             const email = request.query.get('email');
             
@@ -621,10 +632,15 @@ app.http('invitations-accept', {
 // Cancel/revoke invitation
 app.http('invitations-cancel', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'invitations/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const existing = await InvitationsStore.getById(id);
 
@@ -649,10 +665,15 @@ app.http('invitations-cancel', {
 // Resend invitation email
 app.http('invitations-resend', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'invitations/{id}/resend',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const invitation = await InvitationsStore.getById(id);
 

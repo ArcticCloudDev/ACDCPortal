@@ -627,6 +627,7 @@
         }
         .budget-card-label { font-size: 0.78rem; color: var(--admin-text-muted, #64748b); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
         .budget-card-value { font-size: 1.5rem; font-weight: 700; }
+        .budget-card-hint { font-size: 0.72rem; color: var(--admin-text-muted, #94a3b8); margin-top: 4px; }
         .budget-card.income .budget-card-value { color: #166534; }
         .budget-card.expense .budget-card-value { color: #991b1b; }
         .budget-card.participant .budget-card-value { color: #92400e; }
@@ -1282,18 +1283,22 @@
                                 <div class="budget-card income">
                                     <div class="budget-card-label">Total Income</div>
                                     <div class="budget-card-value" id="budget-total-income">—</div>
+                                    <div class="budget-card-hint">Sponsorships + registrations</div>
                                 </div>
                                 <div class="budget-card expense">
                                     <div class="budget-card-label">Org Expenses</div>
                                     <div class="budget-card-value" id="budget-total-org-expense">—</div>
+                                    <div class="budget-card-hint">Venue, activities, shared costs</div>
                                 </div>
                                 <div class="budget-card participant">
                                     <div class="budget-card-label">Participant Expenses</div>
                                     <div class="budget-card-value" id="budget-total-participant-expense">—</div>
+                                    <div class="budget-card-hint">Hotel + food across all participants</div>
                                 </div>
                                 <div class="budget-card net" id="budget-net-card">
                                     <div class="budget-card-label">Net Balance</div>
                                     <div class="budget-card-value" id="budget-net-balance">—</div>
+                                    <div class="budget-card-hint">Income − all expenses</div>
                                 </div>
                             </div>
 
@@ -1626,14 +1631,6 @@
                         <div class="form-group">
                             <label for="financial-amount">Amount *</label>
                             <input type="number" id="financial-amount" required min="0" step="0.01" placeholder="25000">
-                        </div>
-                        <div class="form-group">
-                            <label for="financial-unit-cost">Unit Cost</label>
-                            <input type="number" id="financial-unit-cost" min="0" step="0.01" placeholder="1000">
-                        </div>
-                        <div class="form-group">
-                            <label for="financial-days">Days / Units</label>
-                            <input type="number" id="financial-days" min="0" step="1" placeholder="3">
                         </div>
                         <div class="form-group" id="financial-paidby-group">
                             <label for="financial-paid-by">Paid By</label>

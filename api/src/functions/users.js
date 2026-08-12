@@ -2,15 +2,24 @@
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
+const { requireAuth } = require('../shared/auth');
 const Storage = require('../shared/storage');
 
 // Get all users (for admin dashboard)
 app.http('users-get-all', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'users/all',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context, { requireAdmin: true });
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const users = await Storage.users.getAll();
             return {
                 status: 200,
@@ -30,10 +39,18 @@ app.http('users-get-all', {
 // Get user by email (query param)
 app.http('users-get', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'users',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const email = request.query.get('email');
             
             if (email) {
@@ -69,10 +86,18 @@ app.http('users-get', {
 // Get user by ID
 app.http('users-get-by-id', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'users/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const userId = request.params.id;
             
             const user = await Storage.users.getById(userId);
@@ -102,10 +127,18 @@ app.http('users-get-by-id', {
 // Update user by ID
 app.http('users-update', {
     methods: ['PUT'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'users/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const userId = request.params.id;
             
             if (!userId) {
@@ -160,10 +193,15 @@ app.http('users-update', {
 // Create new user
 app.http('users-create', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'users',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const userData = await request.json();
             
             if (!userData.email) {

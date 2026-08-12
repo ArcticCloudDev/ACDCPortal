@@ -2,6 +2,7 @@
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
+const { requireAuth } = require('../shared/auth');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
@@ -11,10 +12,18 @@ const { sendWelcomeEmail } = require('../shared/welcome-email');
 // Add member to team
 app.http('members-add', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'members',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const body = await request.json();
             const { teamId, email } = body;
             
@@ -108,10 +117,18 @@ app.http('members-add', {
 // Remove member from team
 app.http('members-remove', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'members/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return {
+                    status: auth.status,
+                    jsonBody: auth.jsonBody
+                };
+            }
+
             const memberId = request.params.id;
             let teamId = null;
 

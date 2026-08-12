@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
 const { v4: uuidv4 } = require('uuid');
@@ -8,10 +9,15 @@ const InterestQueueStore = new Storage.Storage('interest-queue');
 // Get all interest queue entries (admin)
 app.http('interest-queue-list', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest-queue',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const entries = await InterestQueueStore.getAll();
             entries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             return { status: 200, jsonBody: entries };
@@ -26,10 +32,15 @@ app.http('interest-queue-list', {
 // Add to interest queue (public)
 app.http('interest-queue-add', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest-queue',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { email, firstName, lastName, phone, company, source } = body;
 
@@ -75,10 +86,15 @@ app.http('interest-queue-add', {
 // Check if email is in interest queue (public)
 app.http('interest-queue-check', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest-queue/check/{email}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const email = decodeURIComponent(request.params.email);
             const entries = await InterestQueueStore.getAll();
             const entry = entries.find(e =>
@@ -99,10 +115,15 @@ app.http('interest-queue-check', {
 // Remove from interest queue (by id or email)
 app.http('interest-queue-remove', {
     methods: ['DELETE'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest-queue/{identifier}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const identifier = decodeURIComponent(request.params.identifier);
             let entry = await InterestQueueStore.getById(identifier);
             if (!entry) {
@@ -126,10 +147,15 @@ app.http('interest-queue-remove', {
 // Mark as registered (called when someone registers for an event)
 app.http('interest-queue-mark-registered', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest-queue/mark-registered',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { email, eventId } = body;
 
@@ -165,10 +191,15 @@ app.http('interest-queue-mark-registered', {
 // Get stats for interest queue (admin)
 app.http('interest-queue-stats', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest-queue/stats',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const entries = await InterestQueueStore.getAll();
             const stats = {
                 total: entries.length,
@@ -189,10 +220,15 @@ app.http('interest-queue-stats', {
 // Mark entries as notified (admin - after sending registration open email)
 app.http('interest-queue-mark-notified', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest-queue/mark-notified',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { entryIds } = body;
 

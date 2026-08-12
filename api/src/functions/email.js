@@ -1,4 +1,5 @@
 const { app } = require('@azure/functions');
+const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
 const ParticipationsStore = new Storage.Storage('participations');
@@ -24,10 +25,15 @@ async function getTemplate(templateName) {
 // List available templates
 app.http('email-templates', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/templates',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const templatesDir = path.join(__dirname, '../../data/email-templates');
             const files = await fs.readdir(templatesDir);
             const templates = files
@@ -49,10 +55,15 @@ app.http('email-templates', {
 // Get template content
 app.http('email-template-get', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/templates/{id}',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const template = await getTemplate(id);
             return { status: 200, jsonBody: { id, content: template } };
@@ -67,10 +78,15 @@ app.http('email-template-get', {
 // Preview email (apply template with data)
 app.http('email-preview', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/preview',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { templateId, data } = body;
             
@@ -103,10 +119,15 @@ app.http('email-preview', {
 // Get recipients by filter (event-based)
 app.http('email-recipients', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/recipients',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.query.get('eventId');
             const filter = request.query.get('filter') || 'all-participants';
             
@@ -196,10 +217,15 @@ app.http('email-recipients', {
 // Send email
 app.http('email-send', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/send',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { 
                 templateId, 
@@ -276,10 +302,15 @@ app.http('email-send', {
 // Get email history
 app.http('email-history', {
     methods: ['GET'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'email/history',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const allEmails = await EmailLogStore.getAll();
             // Return most recent first
             const emails = allEmails.sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
