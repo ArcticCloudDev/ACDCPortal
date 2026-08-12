@@ -39,13 +39,18 @@ function getTokenFromRequest(request) {
     const headers = request?.headers;
     if (!headers) return null;
 
+    // Prefer the app-specific header first. In SWA/Function proxy flows,
+    // Authorization can be rewritten by platform auth/function-key plumbing.
+    const customToken = typeof headers.get === 'function' ? headers.get('x-acdc-token') : headers['x-acdc-token'];
+    if (customToken && customToken.trim()) return customToken.trim();
+
     const authorization = typeof headers.get === 'function' ? headers.get('authorization') : headers.authorization;
     if (authorization) {
         const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
         if (match) return match[1];
     }
 
-    return typeof headers.get === 'function' ? headers.get('x-acdc-token') : headers['x-acdc-token'] || null;
+    return null;
 }
 
 function verifyToken(token) {

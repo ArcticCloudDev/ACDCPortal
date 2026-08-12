@@ -144,6 +144,7 @@ const Auth = {
             if (isApiRequest && token) {
                 const headers = new Headers(init.headers || {});
                 headers.set('Authorization', `Bearer ${token}`);
+                headers.set('x-acdc-token', token);
                 init = { ...init, headers };
             }
 
