@@ -14,6 +14,11 @@ const API = {
             }
         };
 
+        // TEMP VERBOSE DEBUG — logs every API call automatically so we can
+        // diagnose auth issues from a plain console screenshot. Remove once
+        // the login/401 investigation is closed out.
+        console.log('[ACDC API DEBUG] →', options.method || 'GET', url, { hasToken: !!token });
+
         const response = await fetch(url, {
             ...defaultOptions,
             ...options,
@@ -22,7 +27,10 @@ const API = {
                 ...(options.headers || {})
             }
         });
-        
+
+        const bodyClone = await response.clone().text().catch(() => '(unreadable)');
+        console.log('[ACDC API DEBUG] ←', response.status, url, bodyClone);
+
         if (!response.ok) {
             if (response.status === 401 && typeof Auth !== 'undefined') {
                 Auth.handleUnauthorized();
@@ -118,9 +126,11 @@ const API = {
         // Returns null if user not found (instead of throwing)
         async getOrNull(email) {
             const url = `${API.baseUrl}/users?email=${encodeURIComponent(email)}`;
+            console.log('[ACDC API DEBUG] getOrNull →', url);
             const response = await fetch(url, {
                 headers: { 'Content-Type': 'application/json' }
             });
+            console.log('[ACDC API DEBUG] getOrNull ←', response.status, url);
             if (response.status === 404) {
                 return null;
             }
