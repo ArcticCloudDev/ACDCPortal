@@ -4,7 +4,8 @@
   "description": "ACDC Team Registration Portal",
   "scripts": {
     "start": "node server.js",
-    "dev": "concurrently -n API,WEB -c yellow,cyan \"npm run dev:api\" \"npm run dev:web\"",
+    "dev": "concurrently -n STORAGE,API,WEB -c magenta,yellow,cyan \"npm run dev:storage\" \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:storage": "azurite --silent --location .azurite --disableTelemetry",
     "dev:api": "npm --prefix api start",
     "dev:web": "node server.js",
     "build": "echo 'No build step required - static files'",
@@ -19,6 +20,7 @@
     "uuid": "^11.0.0"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "azurite": "^3.35.0"
   }
 }

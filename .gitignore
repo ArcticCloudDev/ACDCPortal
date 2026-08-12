@@ -27,3 +27,5 @@ Thumbs.db
 # Azure Functions
 bin/
 obj/
+
+.azurite/
