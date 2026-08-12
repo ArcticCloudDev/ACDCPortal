@@ -2,7 +2,7 @@
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { requireAuth } = require('../shared/auth');
+const { requireAuth, isTeamAuthorized } = require('../shared/auth');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
@@ -152,12 +152,14 @@ app.http('teams-create', {
             // Extract adminEmail separately — not a DB column, used only for email sending
             const adminEmail = teamData.adminEmail;
 
+            // adminUserId must always be the caller's own ID, not a client-supplied value —
+            // otherwise anyone could create a team "owned" by another user's account.
             const newTeam = {
                 id: teamId,
                 eventId: eventId,
                 teamName: teamData.teamName,
                 numberOfParticipants: teamData.committedParticipants,
-                adminUserId: teamData.adminUserId,
+                adminUserId: auth.user.userId,
                 createdAt: new Date().toISOString()
             };
 
@@ -230,6 +232,14 @@ app.http('teams-update', {
                     jsonBody: { message: 'Team not found' }
                 };
             }
+
+            const participations = await new GenericStorage('participations').getAll();
+            if (!isTeamAuthorized(auth.user, team, participations)) {
+                return {
+                    status: 403,
+                    jsonBody: { message: 'You do not have permission to modify this team' }
+                };
+            }
             
             // Update allowed fields
             const allowedFields = ['teamName', 'numberOfParticipants', 'committedParticipants', 'presentationFile', 'deliveryVideo'];
@@ -298,6 +308,13 @@ app.http('teams-delete', {
             // 1. Clean up participations: remove teamMembership entries for this team
             const participationsStorage = new GenericStorage('participations');
             const allParticipations = await participationsStorage.getAll();
+
+            if (!isTeamAuthorized(auth.user, team, allParticipations)) {
+                return {
+                    status: 403,
+                    jsonBody: { message: 'You do not have permission to delete this team' }
+                };
+            }
             let participationsChanged = 0;
             const noRemainingTeamEmails = []; // emails of participants who end up with no team
 

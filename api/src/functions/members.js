@@ -2,7 +2,7 @@
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { requireAuth } = require('../shared/auth');
+const { requireAuth, isTeamAuthorized } = require('../shared/auth');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
@@ -40,6 +40,14 @@ app.http('members-add', {
                 return {
                     status: 404,
                     jsonBody: { message: 'Team not found' }
+                };
+            }
+
+            const teamParticipations = await new GenericStorage('participations').getAll();
+            if (!isTeamAuthorized(auth.user, team, teamParticipations)) {
+                return {
+                    status: 403,
+                    jsonBody: { message: 'You do not have permission to add members to this team' }
                 };
             }
             
@@ -155,9 +163,6 @@ app.http('members-remove', {
                 };
             }
             
-            // Note: Team admin status should be checked via participations.teamMemberships[].isAdmin
-            // For now, allow removal (TODO: add proper team admin check)
-
             // Resolve team/event context for cleanup.
             let team = null;
             if (teamId) {
@@ -167,16 +172,26 @@ app.http('members-remove', {
                 teamId = user.teamId;
             }
 
+            // Authorization: allowed if caller is a portal/team admin for this team,
+            // OR the caller is removing themselves (self-service "leave team").
+            const participationsStorage = new GenericStorage('participations');
+            const allParticipations = await participationsStorage.getAll();
+            const isSelfRemoval = auth.user.userId && auth.user.userId === memberId;
+            if (!isSelfRemoval && team && !isTeamAuthorized(auth.user, team, allParticipations)) {
+                return {
+                    status: 403,
+                    jsonBody: { message: 'You do not have permission to remove this member' }
+                };
+            }
+
             const eventId = team?.eventId || null;
 
             // Remove related participation(s) for this user in the same team/event context.
-            const participationsStorage = new GenericStorage('participations');
             const invitationsStorage = new GenericStorage('invitations');
             const deliveriesStorage = new GenericStorage('email-deliveries');
             const sequenceProgressStorage = new GenericStorage('sequence-progress');
             const interestLeadsStorage = new GenericStorage('interest-leads');
 
-            const allParticipations = await participationsStorage.getAll();
             const matchedParticipations = allParticipations.filter(p => {
                 // Match by userId if set; fall back to email match for leads registered
                 // before the user had a system account (userId was null on those rows).

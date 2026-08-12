@@ -62,9 +62,25 @@ function requireAuth(request, context, options = {}) {
     };
 }
 
+// Object-level authorization check: is this caller allowed to manage a given team?
+// True if they are a portal admin, the team's recorded adminUserId, or hold an
+// isTeamAdmin membership for this team in the participations dataset.
+function isTeamAuthorized(user, team, participations = []) {
+    if (!user || !team) return false;
+    if (user.isPortalAdmin) return true;
+    if (team.adminUserId && user.userId && team.adminUserId === user.userId) return true;
+
+    return participations.some(p => {
+        if (p.userId !== user.userId) return false;
+        if (p.teamId === team.id && p.isTeamAdmin) return true;
+        return (p.teamMemberships || []).some(m => m.teamId === team.id && m.isTeamAdmin);
+    });
+}
+
 module.exports = {
     JWT_SECRET,
     getTokenFromRequest,
     verifyToken,
-    requireAuth
+    requireAuth,
+    isTeamAuthorized
 };
