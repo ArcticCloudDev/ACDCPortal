@@ -7,7 +7,7 @@ let secretsLoaded = false;
 
 app.hook.preInvocation(async () => {
     if (!secretsLoaded) {
-        await loadSecrets();
-        secretsLoaded = true;
+        const ready = await loadSecrets();
+        secretsLoaded = !!ready;
     }
 });

@@ -26,13 +26,14 @@ const SECRET_MAP = {
 let _loaded = false;
 
 async function loadSecrets() {
-    if (_loaded) return;
+    if (_loaded && process.env.JWT_SECRET) return true;
 
     const kvUrl = process.env.KEY_VAULT_URL;
     if (!kvUrl) {
         // No Key Vault configured — fall back to env vars (e.g. local.settings.json)
         console.log('[KeyVault] KEY_VAULT_URL not set, using environment variables directly');
-        return;
+        _loaded = true;
+        return true;
     }
 
     try {
@@ -54,16 +55,22 @@ async function loadSecrets() {
         const loaded = results.filter(r => r.status === 'fulfilled' && r.value?.loaded).length;
         const skipped = results.filter(r => r.status === 'fulfilled' && r.value?.skipped).length;
         const failed = results.filter(r => r.status === 'rejected');
+        const jwtReady = !!process.env.JWT_SECRET;
 
         console.log(`[KeyVault] ${loaded} secrets loaded, ${skipped} skipped (already set)`);
         if (failed.length > 0) {
             failed.forEach(f => console.warn('[KeyVault] Failed to load:', f.reason?.message));
         }
+        if (!jwtReady) {
+            console.warn('[KeyVault] JWT_SECRET is still missing after load attempt; will retry next invocation');
+        }
 
-        _loaded = true;
+        _loaded = jwtReady && failed.length === 0;
+        return jwtReady;
     } catch (err) {
         console.error('[KeyVault] Failed to connect:', err.message);
-        console.error('[KeyVault] Falling back to environment variables');
+        console.error('[KeyVault] Will retry on next invocation');
+        return false;
     }
 }
 

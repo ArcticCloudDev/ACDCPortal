@@ -10,7 +10,17 @@ const os = require('os');
 // on different scaled-out instances to silently use different secrets (intermittent
 // 401s). Always read it lazily, at call time, after the hook has populated it.
 function getJwtSecret() {
-    return process.env.JWT_SECRET || 'acdc-dev-secret-change-in-production-' + os.hostname();
+    if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+
+    // If Key Vault is configured but the secret isn't loaded yet, fail closed.
+    // Returning a per-instance fallback here causes cross-instance signature
+    // mismatches (one instance signs, another verifies) and intermittent 401s.
+    if (process.env.KEY_VAULT_URL) {
+        throw new Error('ServerAuthConfigError: JWT secret unavailable');
+    }
+
+    // Local/dev fallback when Key Vault is not configured.
+    return 'acdc-dev-secret-change-in-production-local-only';
 }
 
 function getTokenFromRequest(request) {
@@ -51,6 +61,14 @@ function requireAuth(request, context, options = {}) {
     }
 
     const result = verifyToken(token);
+    if (!result.valid && String(result.reason || '').includes('ServerAuthConfigError: JWT secret unavailable')) {
+        context?.warn?.('Auth temporarily unavailable: JWT secret not loaded yet');
+        return {
+            authorized: false,
+            status: 503,
+            jsonBody: { message: 'Authentication temporarily unavailable. Please retry in a moment.' }
+        };
+    }
     if (!result.valid) {
         context?.warn?.(`Auth required but token verification failed: ${result.reason}`);
         return {
