@@ -41,6 +41,9 @@ app.http('diag-secret-status', {
             const selfToken = jwt.sign({ test: true }, getJwtSecret(), { expiresIn: '1m', issuer: 'acdc-portal' });
             const verified = jwt.verify(selfToken, getJwtSecret(), { issuer: 'acdc-portal' });
             result.selfTest = { signed: true, verified: !!verified };
+            if (url.searchParams.get('includeTestToken') === '1') {
+                result.testToken = selfToken;
+            }
         } catch (e) {
             result.selfTest = { error: e.message };
         }
