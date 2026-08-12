@@ -32,11 +32,22 @@ From the repository root:
 npm run dev
 ```
 
-This starts:
+This starts all three local services together:
 
-- Frontend server at `http://localhost:4280`
+- Azurite local storage emulator in `.azurite/`
 - Azure Functions API host at `http://localhost:7071`
+- Frontend server at `http://localhost:4280`
 - Frontend `/api/*` requests are proxied to the Functions host
+
+The root `dev` script runs:
+
+```bash
+npm run dev:storage
+npm run dev:api
+npm run dev:web
+```
+
+`dev:storage` launches Azurite and keeps the local Azure Storage emulator data under `.azurite/` in the repo root.
 
 ### Start services separately
 
@@ -58,18 +69,31 @@ Or API directly from the `api` folder:
 npm run start
 ```
 
-## Troubleshooting
+### Azure SQL local configuration
 
-If you see `func: not found`, install Azure Functions Core Tools v4 and restart your terminal.
-
-If you see `Worker runtime cannot be 'None'`, ensure `api/local.settings.json` exists with:
+The Azure Functions app uses Entra ID authentication for Azure SQL. In `api/local.settings.json`, include the Azure SQL connection values:
 
 ```json
 {
-	"IsEncrypted": false,
-	"Values": {
-		"FUNCTIONS_WORKER_RUNTIME": "node",
-		"AzureWebJobsStorage": "UseDevelopmentStorage=true"
-	}
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AZURE_SQL_SERVER": "<your-server>.database.windows.net",
+    "AZURE_SQL_DATABASE": "<your-database>"
+  }
 }
 ```
+
+For local development, SQL access uses `DefaultAzureCredential`, so sign in with:
+
+```bash
+az login
+```
+
+Your Azure identity must be able to authenticate to the database through Microsoft Entra ID. In practice, this means:
+
+- your developer machine IP must be allowed through the Azure SQL firewall
+- your Entra user or group must have database access on the target Azure SQL database
+
+If you see `Worker runtime cannot be 'None'`, ensure `api/local.settings.json` exists with the values above and that the Functions runtime is set to `node`.
