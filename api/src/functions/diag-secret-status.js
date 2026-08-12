@@ -5,6 +5,8 @@
 const { app } = require('@azure/functions');
 const crypto = require('crypto');
 const os = require('os');
+const jwt = require('jsonwebtoken');
+const { getJwtSecret } = require('../shared/auth');
 
 function fingerprint(value) {
     if (!value) return null;
@@ -23,14 +25,54 @@ app.http('diag-secret-status', {
             return { status: 401, jsonBody: { error: 'Unauthorized' } };
         }
 
+        const url = new URL(request.url);
+        const tokenToCheck = url.searchParams.get('token');
+
+        const result = {
+            hostname: os.hostname(),
+            keyVaultUrlSet: !!process.env.KEY_VAULT_URL,
+            jwtSecret: fingerprint(process.env.JWT_SECRET),
+            now: new Date().toISOString()
+        };
+
+        // Self-test: sign + verify a throwaway token using the exact same
+        // functions production code uses, all within this one instance.
+        try {
+            const selfToken = jwt.sign({ test: true }, getJwtSecret(), { expiresIn: '1m', issuer: 'acdc-portal' });
+            const verified = jwt.verify(selfToken, getJwtSecret(), { issuer: 'acdc-portal' });
+            result.selfTest = { signed: true, verified: !!verified };
+        } catch (e) {
+            result.selfTest = { error: e.message };
+        }
+
+        // If the caller supplied a real user token, analyze exactly why it
+        // does or doesn't verify, without ever echoing the secret itself.
+        if (tokenToCheck) {
+            const decoded = jwt.decode(tokenToCheck, { complete: true });
+            result.suppliedToken = {
+                decodedHeader: decoded?.header || null,
+                decodedPayload: decoded ? {
+                    email: decoded.payload.email,
+                    iss: decoded.payload.iss,
+                    iat: decoded.payload.iat,
+                    exp: decoded.payload.exp,
+                    expIso: decoded.payload.exp ? new Date(decoded.payload.exp * 1000).toISOString() : null,
+                    nowIso: new Date().toISOString(),
+                    isExpiredByClock: decoded.payload.exp ? (decoded.payload.exp * 1000 < Date.now()) : null
+                } : null
+            };
+            try {
+                jwt.verify(tokenToCheck, getJwtSecret(), { issuer: 'acdc-portal' });
+                result.suppliedToken.verifyResult = 'OK';
+            } catch (e) {
+                result.suppliedToken.verifyResult = 'FAILED';
+                result.suppliedToken.verifyError = e.name + ': ' + e.message;
+            }
+        }
+
         return {
             status: 200,
-            jsonBody: {
-                hostname: os.hostname(),
-                keyVaultUrlSet: !!process.env.KEY_VAULT_URL,
-                jwtSecret: fingerprint(process.env.JWT_SECRET),
-                now: new Date().toISOString()
-            }
+            jsonBody: result
         };
     }
 });
