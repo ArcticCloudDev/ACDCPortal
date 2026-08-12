@@ -1,7 +1,17 @@
 const jwt = require('jsonwebtoken');
 const os = require('os');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'acdc-dev-secret-change-in-production-' + os.hostname();
+// IMPORTANT: do NOT cache this in a module-level constant. Key Vault secrets are
+// loaded asynchronously via a preInvocation hook (see functions/startup.js), which
+// runs AFTER all function files are `require`'d at cold start. A top-level
+// `const JWT_SECRET = process.env.JWT_SECRET || fallback` would freeze at the
+// insecure per-instance hostname fallback for that worker's entire lifetime, even
+// though the real secret gets loaded moments later — causing tokens signed/verified
+// on different scaled-out instances to silently use different secrets (intermittent
+// 401s). Always read it lazily, at call time, after the hook has populated it.
+function getJwtSecret() {
+    return process.env.JWT_SECRET || 'acdc-dev-secret-change-in-production-' + os.hostname();
+}
 
 function getTokenFromRequest(request) {
     const headers = request?.headers;
@@ -20,7 +30,7 @@ function verifyToken(token) {
     if (!token) return null;
 
     try {
-        return jwt.verify(token, JWT_SECRET, { issuer: 'acdc-portal' });
+        return jwt.verify(token, getJwtSecret(), { issuer: 'acdc-portal' });
     } catch (error) {
         return null;
     }
@@ -137,7 +147,7 @@ function hasEventRole(user, eventId, role, participations = []) {
 }
 
 module.exports = {
-    JWT_SECRET,
+    getJwtSecret,
     getTokenFromRequest,
     verifyToken,
     requireAuth,

@@ -5,9 +5,12 @@ const { logError } = require('../shared/error-log');
 const jwt = require('jsonwebtoken');
 const Storage = require('../shared/storage');
 const Email = require('../shared/email');
+const { getJwtSecret } = require('../shared/auth');
 
 // JWT configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'acdc-dev-secret-change-in-production-' + require('os').hostname();
+// NOTE: JWT_SECRET is intentionally NOT cached as a module-level constant here —
+// see the comment on getJwtSecret() in shared/auth.js for why that caused
+// intermittent 401s across scaled-out Function App instances.
 const JWT_EXPIRY = '24h';
 
 // In-memory rate limiter for verify attempts by IP
@@ -122,7 +125,7 @@ app.http('auth-verify-otp', {
             };
             
             // Sign JWT
-            const token = jwt.sign(tokenPayload, JWT_SECRET, { 
+            const token = jwt.sign(tokenPayload, getJwtSecret(), { 
                 expiresIn: JWT_EXPIRY,
                 issuer: 'acdc-portal'
             });
@@ -157,5 +160,3 @@ app.http('auth-verify-otp', {
     }
 });
 
-// Export JWT_SECRET for use in auth middleware
-module.exports = { JWT_SECRET };
