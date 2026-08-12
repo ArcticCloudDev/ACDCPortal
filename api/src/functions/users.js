@@ -10,7 +10,7 @@ const participationsStorage = new GenericStorage('participations');
 // Get all users (for admin dashboard)
 app.http('users-get-all', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'users/all',
     handler: async (request, context) => {
         try {
@@ -41,7 +41,7 @@ app.http('users-get-all', {
 // Get user by email (query param)
 app.http('users-get', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'users',
     handler: async (request, context) => {
         try {
@@ -96,7 +96,7 @@ app.http('users-get', {
 // Get user by ID
 app.http('users-get-by-id', {
     methods: ['GET'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'users/{id}',
     handler: async (request, context) => {
         try {
@@ -145,7 +145,7 @@ app.http('users-get-by-id', {
 // Update user by ID
 app.http('users-update', {
     methods: ['PUT'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'users/{id}',
     handler: async (request, context) => {
         try {
@@ -223,7 +223,7 @@ app.http('users-update', {
 // Create new user
 app.http('users-create', {
     methods: ['POST'],
-    authLevel: 'function',
+    authLevel: 'anonymous',
     route: 'users',
     handler: async (request, context) => {
         try {
