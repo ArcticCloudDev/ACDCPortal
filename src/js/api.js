@@ -2,6 +2,17 @@
 
 const API = {
     baseUrl: CONFIG.api.baseUrl,
+    _debugStoreKey: 'acdc_debug_log',
+
+    _pushDebug(entry) {
+        try {
+            const existing = JSON.parse(sessionStorage.getItem(this._debugStoreKey) || '[]');
+            existing.push({ ts: new Date().toISOString(), ...entry });
+            sessionStorage.setItem(this._debugStoreKey, JSON.stringify(existing.slice(-120)));
+        } catch {
+            // Best-effort diagnostics only.
+        }
+    },
 
     // Helper to make API calls
     async request(endpoint, options = {}) {
@@ -17,7 +28,9 @@ const API = {
         // TEMP VERBOSE DEBUG — logs every API call automatically so we can
         // diagnose auth issues from a plain console screenshot. Remove once
         // the login/401 investigation is closed out.
-        console.log('[ACDC API DEBUG] →', options.method || 'GET', url, { hasToken: !!token });
+        const method = options.method || 'GET';
+        console.log('[ACDC API DEBUG] →', method, url, { hasToken: !!token });
+        this._pushDebug({ type: 'api-request', method, url, hasToken: !!token });
 
         const response = await fetch(url, {
             ...defaultOptions,
@@ -30,6 +43,13 @@ const API = {
 
         const bodyClone = await response.clone().text().catch(() => '(unreadable)');
         console.log('[ACDC API DEBUG] ←', response.status, url, bodyClone);
+        this._pushDebug({
+            type: 'api-response',
+            method,
+            url,
+            status: response.status,
+            body: bodyClone
+        });
 
         if (!response.ok) {
             if (response.status === 401 && typeof Auth !== 'undefined') {
@@ -127,10 +147,12 @@ const API = {
         async getOrNull(email) {
             const url = `${API.baseUrl}/users?email=${encodeURIComponent(email)}`;
             console.log('[ACDC API DEBUG] getOrNull →', url);
+            API._pushDebug({ type: 'api-request', method: 'GET', url, hasToken: !!(typeof Auth !== 'undefined' && Auth.getToken()) });
             const response = await fetch(url, {
                 headers: { 'Content-Type': 'application/json' }
             });
             console.log('[ACDC API DEBUG] getOrNull ←', response.status, url);
+            API._pushDebug({ type: 'api-response', method: 'GET', url, status: response.status, body: '(via getOrNull)' });
             if (response.status === 404) {
                 return null;
             }

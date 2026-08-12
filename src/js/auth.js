@@ -3,8 +3,36 @@
 // Maintains the same interface as the old MSAL wrapper for compatibility
 
 const Auth = {
+    _debugStoreKey: 'acdc_debug_log',
+
+    _pushDebug(entry) {
+        try {
+            const existing = JSON.parse(sessionStorage.getItem(this._debugStoreKey) || '[]');
+            existing.push({ ts: new Date().toISOString(), ...entry });
+            // Keep only the latest entries to avoid unbounded growth.
+            sessionStorage.setItem(this._debugStoreKey, JSON.stringify(existing.slice(-120)));
+        } catch {
+            // Best-effort diagnostics only.
+        }
+    },
+
+    _dumpDebugToConsoleOnce() {
+        if (window.__acdcDebugDumped) return;
+        window.__acdcDebugDumped = true;
+        try {
+            const logs = JSON.parse(sessionStorage.getItem(this._debugStoreKey) || '[]');
+            if (!Array.isArray(logs) || logs.length === 0) return;
+            console.groupCollapsed(`[ACDC DEBUG TRACE] ${logs.length} entries (persisted across redirects)`);
+            logs.forEach((item) => console.log(item));
+            console.groupEnd();
+        } catch {
+            // Ignore malformed diagnostic payloads.
+        }
+    },
+
     // Initialize � load session from localStorage
     init() {
+        this._dumpDebugToConsoleOnce();
         // Check if token is expired
         const token = this._getToken();
         if (token && this._isTokenExpired(token)) {
@@ -54,6 +82,7 @@ const Auth = {
     setSession(token, user) {
         localStorage.setItem(CONFIG.auth.tokenKey, token);
         localStorage.setItem(CONFIG.auth.userKey, JSON.stringify(user));
+        this._pushDebug({ type: 'setSession', email: user?.email || null, hasToken: !!token });
     },
 
     // Logout � clear session and redirect to home
@@ -169,6 +198,7 @@ const Auth = {
     },
 
     _clearSession() {
+        this._pushDebug({ type: 'clearSession' });
         localStorage.removeItem(CONFIG.auth.tokenKey);
         localStorage.removeItem(CONFIG.auth.userKey);
     }
