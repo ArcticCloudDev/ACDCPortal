@@ -161,6 +161,7 @@ const Auth = {
                 try { bodyText = await response.clone().text(); } catch { /* ignore */ }
                 let decodedPayload = null;
                 try { decodedPayload = JSON.parse(atob(token.split('.')[1])); } catch { /* ignore */ }
+                const summary = `401 ${url} :: ${bodyText}`;
                 console.error('[ACDC AUTH DEBUG] 401 from', url, {
                     tokenPreview: token.slice(0, 16) + '...' + token.slice(-8),
                     tokenPayload: decodedPayload,
@@ -169,6 +170,16 @@ const Auth = {
                     clientSideExpired: this._isTokenExpired(token),
                     responseStatus: response.status,
                     responseBody: bodyText
+                });
+                this._pushDebug({
+                    type: 'auth-401',
+                    url,
+                    summary,
+                    responseBody: bodyText,
+                    tokenExp: decodedPayload?.exp || null,
+                    tokenExpIso: decodedPayload?.exp ? new Date(decodedPayload.exp * 1000).toISOString() : null,
+                    nowIso: new Date().toISOString(),
+                    clientSideExpired: this._isTokenExpired(token)
                 });
 
                 this.handleUnauthorized();
