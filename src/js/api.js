@@ -5,14 +5,16 @@ const API = {
 
     // Helper to make API calls
     async request(endpoint, options = {}) {
-        const url = `${this.baseUrl}${endpoint}`;
-        const defaultOptions = {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        };
+        const token = Auth.getToken?.();
 
-        const response = await fetch(url, { ...defaultOptions, ...options });
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token && { Authorization: `Bearer ${token}` }),
+                ...options.headers
+            }
+        });
         
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: 'Request failed' }));
@@ -105,19 +107,12 @@ const API = {
 
         // Returns null if user not found (instead of throwing)
         async getOrNull(email) {
-            const url = `${API.baseUrl}/users?email=${encodeURIComponent(email)}`;
-            const response = await fetch(url, {
-                headers: { 'Content-Type': 'application/json' }
-            });
-            if (response.status === 404) {
-                return null;
+            try {
+                return await API.request(`/users?email=${encodeURIComponent(email)}`);
+            } catch (error) {
+                if (error.status === 404) return null;
+                throw error;
             }
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            const text = await response.text();
-            if (!text) return null;
-            try { return JSON.parse(text) || null; } catch { return null; }
         },
 
         async create(data) {
@@ -389,20 +384,14 @@ const API = {
 
         // Returns null if not found (instead of throwing)
         async getOrNull(userId, eventId = null) {
-            let url = `${API.baseUrl}/participations?userId=${userId}`;
+            let url = `/participations?userId=${userId}`;
             if (eventId) url += `&eventId=${eventId}`;
-            const response = await fetch(url, {
-                headers: { 'Content-Type': 'application/json' }
-            });
-            if (response.status === 404) {
-                return null;
+            try {
+                return await API.request(url);
+            } catch (error) {
+                if (error.status === 404) return null;
+                throw error;
             }
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            const text = await response.text();
-            if (!text) return null;
-            try { return JSON.parse(text) || null; } catch { return null; }
         },
 
         async upsert(data) {
