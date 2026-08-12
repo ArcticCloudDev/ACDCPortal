@@ -3,36 +3,8 @@
 // Maintains the same interface as the old MSAL wrapper for compatibility
 
 const Auth = {
-    _debugStoreKey: 'acdc_debug_log',
-
-    _pushDebug(entry) {
-        try {
-            const existing = JSON.parse(sessionStorage.getItem(this._debugStoreKey) || '[]');
-            existing.push({ ts: new Date().toISOString(), ...entry });
-            // Keep only the latest entries to avoid unbounded growth.
-            sessionStorage.setItem(this._debugStoreKey, JSON.stringify(existing.slice(-120)));
-        } catch {
-            // Best-effort diagnostics only.
-        }
-    },
-
-    _dumpDebugToConsoleOnce() {
-        if (window.__acdcDebugDumped) return;
-        window.__acdcDebugDumped = true;
-        try {
-            const logs = JSON.parse(sessionStorage.getItem(this._debugStoreKey) || '[]');
-            if (!Array.isArray(logs) || logs.length === 0) return;
-            console.groupCollapsed(`[ACDC DEBUG TRACE] ${logs.length} entries (persisted across redirects)`);
-            logs.forEach((item) => console.log(item));
-            console.groupEnd();
-        } catch {
-            // Ignore malformed diagnostic payloads.
-        }
-    },
-
     // Initialize � load session from localStorage
     init() {
-        this._dumpDebugToConsoleOnce();
         // Check if token is expired
         const token = this._getToken();
         if (token && this._isTokenExpired(token)) {
@@ -82,7 +54,6 @@ const Auth = {
     setSession(token, user) {
         localStorage.setItem(CONFIG.auth.tokenKey, token);
         localStorage.setItem(CONFIG.auth.userKey, JSON.stringify(user));
-        this._pushDebug({ type: 'setSession', email: user?.email || null, hasToken: !!token });
     },
 
     // Logout � clear session and redirect to home
@@ -154,35 +125,6 @@ const Auth = {
             // local session so the user isn't left silently "half logged-in" with
             // every subsequent API call failing the same way.
             if (isApiRequest && token && response.status === 401) {
-                // Verbose debug dump — log everything needed to diagnose the 401
-                // BEFORE the session gets cleared below, so it's all in one place
-                // in the console (Network tab entries get wiped on reload, this
-                // doesn't).
-                let bodyText = '(could not read body)';
-                try { bodyText = await response.clone().text(); } catch { /* ignore */ }
-                let decodedPayload = null;
-                try { decodedPayload = JSON.parse(atob(token.split('.')[1])); } catch { /* ignore */ }
-                const summary = `401 ${url} :: ${bodyText}`;
-                console.error('[ACDC AUTH DEBUG] 401 from', url, {
-                    tokenPreview: token.slice(0, 16) + '...' + token.slice(-8),
-                    tokenPayload: decodedPayload,
-                    tokenExpIso: decodedPayload?.exp ? new Date(decodedPayload.exp * 1000).toISOString() : null,
-                    nowIso: new Date().toISOString(),
-                    clientSideExpired: this._isTokenExpired(token),
-                    responseStatus: response.status,
-                    responseBody: bodyText
-                });
-                this._pushDebug({
-                    type: 'auth-401',
-                    url,
-                    summary,
-                    responseBody: bodyText,
-                    tokenExp: decodedPayload?.exp || null,
-                    tokenExpIso: decodedPayload?.exp ? new Date(decodedPayload.exp * 1000).toISOString() : null,
-                    nowIso: new Date().toISOString(),
-                    clientSideExpired: this._isTokenExpired(token)
-                });
-
                 this.handleUnauthorized();
             }
 
@@ -210,7 +152,6 @@ const Auth = {
     },
 
     _clearSession() {
-        this._pushDebug({ type: 'clearSession' });
         localStorage.removeItem(CONFIG.auth.tokenKey);
         localStorage.removeItem(CONFIG.auth.userKey);
     }
