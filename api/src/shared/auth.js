@@ -27,12 +27,15 @@ function getTokenFromRequest(request) {
 }
 
 function verifyToken(token) {
-    if (!token) return null;
+    if (!token) return { valid: false, reason: 'no-token' };
 
     try {
-        return jwt.verify(token, getJwtSecret(), { issuer: 'acdc-portal' });
+        const payload = jwt.verify(token, getJwtSecret(), { issuer: 'acdc-portal' });
+        return { valid: true, payload };
     } catch (error) {
-        return null;
+        // error.name is one of: TokenExpiredError, JsonWebTokenError (bad
+        // signature / malformed / wrong issuer), NotBeforeError.
+        return { valid: false, reason: error.name + ': ' + error.message };
     }
 }
 
@@ -47,15 +50,18 @@ function requireAuth(request, context, options = {}) {
         };
     }
 
-    const payload = verifyToken(token);
-    if (!payload) {
-        context?.warn?.('Auth required but token verification failed');
+    const result = verifyToken(token);
+    if (!result.valid) {
+        context?.warn?.(`Auth required but token verification failed: ${result.reason}`);
         return {
             authorized: false,
             status: 401,
-            jsonBody: { message: 'Invalid or expired session' }
+            // Reason is safe to expose: it's a jsonwebtoken error class/message
+            // (e.g. "TokenExpiredError: jwt expired"), never the secret or payload.
+            jsonBody: { message: 'Invalid or expired session', reason: result.reason }
         };
     }
+    const payload = result.payload;
 
     if (options.requireAdmin && !payload.isPortalAdmin) {
         context?.warn?.(`Admin access denied for ${payload.email || 'unknown user'}`);

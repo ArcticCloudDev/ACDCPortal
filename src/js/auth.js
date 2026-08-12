@@ -124,6 +124,24 @@ const Auth = {
             // local session so the user isn't left silently "half logged-in" with
             // every subsequent API call failing the same way.
             if (isApiRequest && token && response.status === 401) {
+                // Verbose debug dump — log everything needed to diagnose the 401
+                // BEFORE the session gets cleared below, so it's all in one place
+                // in the console (Network tab entries get wiped on reload, this
+                // doesn't).
+                let bodyText = '(could not read body)';
+                try { bodyText = await response.clone().text(); } catch { /* ignore */ }
+                let decodedPayload = null;
+                try { decodedPayload = JSON.parse(atob(token.split('.')[1])); } catch { /* ignore */ }
+                console.error('[ACDC AUTH DEBUG] 401 from', url, {
+                    tokenPreview: token.slice(0, 16) + '...' + token.slice(-8),
+                    tokenPayload: decodedPayload,
+                    tokenExpIso: decodedPayload?.exp ? new Date(decodedPayload.exp * 1000).toISOString() : null,
+                    nowIso: new Date().toISOString(),
+                    clientSideExpired: this._isTokenExpired(token),
+                    responseStatus: response.status,
+                    responseBody: bodyText
+                });
+
                 this.handleUnauthorized();
             }
 
