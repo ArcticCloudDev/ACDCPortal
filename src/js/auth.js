@@ -76,6 +76,16 @@ const Auth = {
         return this._getToken();
     },
 
+    // Called when the server rejects our token (401) even though the client
+    // thought it was still valid (e.g. clock skew, server-side invalidation).
+    // Clears the stale session so the user isn't left in a broken half-logged-in
+    // state where every API call silently fails.
+    handleUnauthorized() {
+        if (!this._getToken()) return; // already logged out, nothing to do
+        console.warn('Session rejected by server (401) — clearing local session');
+        this._clearSession();
+    },
+
     _installFetchWrapper() {
         if (window.__acdcFetchPatched) return;
 
@@ -94,7 +104,16 @@ const Auth = {
                 init = { ...init, headers };
             }
 
-            return originalFetch(input, init);
+            const response = await originalFetch(input, init);
+
+            // If the server rejects our token (expired/invalid), clear the stale
+            // local session so the user isn't left silently "half logged-in" with
+            // every subsequent API call failing the same way.
+            if (isApiRequest && token && response.status === 401) {
+                this.handleUnauthorized();
+            }
+
+            return response;
         };
 
         window.__acdcFetchPatched = true;

@@ -24,6 +24,9 @@ const API = {
         });
         
         if (!response.ok) {
+            if (response.status === 401 && typeof Auth !== 'undefined') {
+                Auth.handleUnauthorized();
+            }
             const errorData = await response.json().catch(() => ({ message: 'Request failed' }));
             // Create an error object with all the response data attached
             const error = new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
@@ -119,6 +122,10 @@ const API = {
                 headers: { 'Content-Type': 'application/json' }
             });
             if (response.status === 404) {
+                return null;
+            }
+            if (response.status === 401 && typeof Auth !== 'undefined') {
+                Auth.handleUnauthorized();
                 return null;
             }
             if (!response.ok) {
