@@ -80,10 +80,24 @@ const Auth = {
     // thought it was still valid (e.g. clock skew, server-side invalidation).
     // Clears the stale session so the user isn't left in a broken half-logged-in
     // state where every API call silently fails.
+    //
+    // Also forces a page reload: pages read `Auth.getUser()`/`Auth.isLoggedIn()`
+    // once near the top of their init logic and use that snapshot (e.g. `authUser`)
+    // for the rest of the page load, including subsequent header/UI updates. If we
+    // only clear localStorage here, those already-captured variables stay "truthy"
+    // for the remainder of the page's lifetime, leaving the header showing a logged
+    // -in Profile menu while the actual profile data fails to load (empty modal).
+    // Reloading makes every page immediately and consistently reflect the real
+    // (logged-out) state. The guard flag prevents multiple concurrent 401s from
+    // triggering more than one reload.
     handleUnauthorized() {
         if (!this._getToken()) return; // already logged out, nothing to do
         console.warn('Session rejected by server (401) — clearing local session');
         this._clearSession();
+        if (!window.__acdcReloadingAfterAuthClear) {
+            window.__acdcReloadingAfterAuthClear = true;
+            window.location.reload();
+        }
     },
 
     _installFetchWrapper() {
