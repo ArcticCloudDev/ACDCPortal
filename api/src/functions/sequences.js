@@ -16,7 +16,7 @@ app.http('sequences-list', {
     route: 'sequences',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -59,7 +59,7 @@ app.http('sequences-get', {
     route: 'sequences/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -115,7 +115,7 @@ app.http('sequences-create', {
     route: 'sequences',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -153,7 +153,7 @@ app.http('sequences-update', {
     route: 'sequences/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -192,7 +192,7 @@ app.http('sequences-delete', {
     route: 'sequences/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -226,7 +226,7 @@ app.http('sequences-copy', {
     route: 'sequences/{id}/copy',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

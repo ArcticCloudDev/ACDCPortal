@@ -1,9 +1,17 @@
 // ACDC Portal - File Upload API (SharePoint)
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { requireAuth } = require('../shared/auth');
+const { requireAuth, isTeamMember } = require('../shared/auth');
 const SharePointStorage = require('../shared/sharepoint');
+const { Storage } = require('../shared/storage');
+const participationsStorage = new Storage('participations');
 const multipart = require('parse-multipart-data');
+
+// Extract {eventId, teamId} from a SharePoint folder/file path like "Events/{eventId}/{teamId}/..."
+function parseTeamPathSegments(filePath) {
+    const match = /Events\/([^/]+)\/([^/]+)/i.exec(filePath || '');
+    return match ? { eventId: match[1], teamId: match[2] } : null;
+}
 
 // POST /api/files/upload - Upload a file
 app.http('files-upload', {
@@ -35,6 +43,11 @@ app.http('files-upload', {
                     status: 400, 
                     jsonBody: { error: 'eventId and teamId are required' } 
                 };
+            }
+            
+            const uploadParticipations = await participationsStorage.getAll();
+            if (!isTeamMember(auth.user, teamId, uploadParticipations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to upload files for this team' } };
             }
             
             // Parse multipart form data
@@ -143,6 +156,11 @@ app.http('files-list', {
                 };
             }
             
+            const listParticipations = await participationsStorage.getAll();
+            if (!isTeamMember(auth.user, teamId, listParticipations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to view files for this team' } };
+            }
+            
             // Build folder path
             const folderPath = `Events/${eventId}/${teamId}`;
             
@@ -192,6 +210,15 @@ app.http('files-download', {
                     status: 400, 
                     jsonBody: { error: 'File path is required' } 
                 };
+            }
+            
+            const downloadSegments = parseTeamPathSegments(filePath);
+            if (!downloadSegments) {
+                return { status: 400, jsonBody: { error: 'Invalid file path' } };
+            }
+            const downloadParticipations = await participationsStorage.getAll();
+            if (!isTeamMember(auth.user, downloadSegments.teamId, downloadParticipations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to access this file' } };
             }
             
             const file = await SharePointStorage.getFile(filePath);
@@ -244,6 +271,15 @@ app.http('files-delete', {
                 };
             }
             
+            const deleteSegments = parseTeamPathSegments(filePath);
+            if (!deleteSegments) {
+                return { status: 400, jsonBody: { error: 'Invalid file path' } };
+            }
+            const deleteParticipations = await participationsStorage.getAll();
+            if (!isTeamMember(auth.user, deleteSegments.teamId, deleteParticipations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to delete this file' } };
+            }
+            
             await SharePointStorage.deleteFile(filePath);
             
             context.log(`File deleted: ${filePath}`);
@@ -271,7 +307,7 @@ app.http('files-setup-columns', {
     route: 'files/setup-columns',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

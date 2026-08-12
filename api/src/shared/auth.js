@@ -62,9 +62,22 @@ function requireAuth(request, context, options = {}) {
     };
 }
 
+// Resolve the set of teamIds a participation row grants (accounting for the legacy
+// single-team fields vs. the newer teamMemberships[] array). Membership items use
+// the `isAdmin` field name (not `isTeamAdmin` — that's only the legacy row-level field).
+function membershipsFor(participation) {
+    if (participation.teamMemberships && participation.teamMemberships.length > 0) {
+        return participation.teamMemberships;
+    }
+    if (participation.teamId) {
+        return [{ teamId: participation.teamId, isAdmin: participation.isTeamAdmin || false }];
+    }
+    return [];
+}
+
 // Object-level authorization check: is this caller allowed to manage a given team?
 // True if they are a portal admin, the team's recorded adminUserId, or hold an
-// isTeamAdmin membership for this team in the participations dataset.
+// isAdmin membership for this team in the participations dataset.
 function isTeamAuthorized(user, team, participations = []) {
     if (!user || !team) return false;
     if (user.isPortalAdmin) return true;
@@ -72,9 +85,55 @@ function isTeamAuthorized(user, team, participations = []) {
 
     return participations.some(p => {
         if (p.userId !== user.userId) return false;
-        if (p.teamId === team.id && p.isTeamAdmin) return true;
-        return (p.teamMemberships || []).some(m => m.teamId === team.id && m.isTeamAdmin);
+        return membershipsFor(p).some(m => m.teamId === team.id && m.isAdmin);
     });
+}
+
+// Object-level authorization check: is this caller allowed to view/manage another
+// user's profile? True for the user themselves, portal admins, or a team admin who
+// shares a team with the target user.
+function canManageUser(callerUser, targetUserId, participations = []) {
+    if (!callerUser) return false;
+    if (callerUser.userId && callerUser.userId === targetUserId) return true;
+    if (callerUser.isPortalAdmin) return true;
+
+    const adminTeamIds = new Set();
+    const targetTeamIds = new Set();
+    for (const p of participations) {
+        const memberships = membershipsFor(p);
+        if (p.userId === callerUser.userId) {
+            for (const m of memberships) if (m.isAdmin) adminTeamIds.add(m.teamId);
+        }
+        if (p.userId === targetUserId) {
+            for (const m of memberships) targetTeamIds.add(m.teamId);
+        }
+    }
+    for (const teamId of adminTeamIds) {
+        if (targetTeamIds.has(teamId)) return true;
+    }
+    return false;
+}
+
+// True if the caller is a member (any role) of the given team, a portal admin, or
+// that team's admin. Used for actions any team member may perform (e.g. claiming a
+// badge for their own team), as opposed to isTeamAuthorized which is admin-only.
+function isTeamMember(user, teamId, participations = []) {
+    if (!user) return false;
+    if (user.isPortalAdmin) return true;
+    return participations.some(p => {
+        if (p.userId !== user.userId) return false;
+        return membershipsFor(p).some(m => m.teamId === teamId);
+    });
+}
+
+// True if the caller is a portal admin or holds the given role (e.g. 'judge',
+// 'committee') on their participation record for the given event.
+function hasEventRole(user, eventId, role, participations = []) {
+    if (!user) return false;
+    if (user.isPortalAdmin) return true;
+    return participations.some(p =>
+        p.userId === user.userId && p.eventId === eventId && (p.roles || []).includes(role)
+    );
 }
 
 module.exports = {
@@ -82,5 +141,8 @@ module.exports = {
     getTokenFromRequest,
     verifyToken,
     requireAuth,
-    isTeamAuthorized
+    isTeamAuthorized,
+    canManageUser,
+    isTeamMember,
+    hasEventRole
 };

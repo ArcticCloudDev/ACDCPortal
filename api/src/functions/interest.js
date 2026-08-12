@@ -717,7 +717,7 @@ app.http('interest-list', {
     route: 'interest/leads',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -765,7 +765,7 @@ app.http('interest-delete', {
     route: 'interest/leads/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -833,7 +833,7 @@ app.http('interest-restart-sequence', {
     route: 'interest/restart-sequence',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

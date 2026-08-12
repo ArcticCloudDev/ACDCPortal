@@ -4,7 +4,7 @@
 // Email is the anchor identity (present before userId)
 
 const { app } = require('@azure/functions');
-const { requireAuth } = require('../shared/auth');
+const { requireAuth, canManageUser } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const { Storage } = require('../shared/storage');
@@ -235,7 +235,7 @@ app.http('participations-get-all', {
     route: 'participations/all',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -327,6 +327,13 @@ app.http('participations-upsert', {
             }
             if (!userId && !email) {
                 return { status: 400, jsonBody: { error: 'userId or email is required' } };
+            }
+
+            // Ownership check: caller may only upsert their own participation unless admin
+            const isSelfById = userId && userId === auth.user.userId;
+            const isSelfByEmail = email && auth.user.email && email.toLowerCase() === auth.user.email.toLowerCase();
+            if (!isSelfById && !isSelfByEmail && !auth.user.isPortalAdmin) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
             // Resolve email from userId if not provided
@@ -429,6 +436,11 @@ app.http('participations-update', {
             }
 
             const existing = participations[index];
+
+            if (!canManageUser(auth.user, existing.userId, participations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
+            }
+
             const updated = {
                 ...existing,
                 ...(body.hotelNights !== undefined && { hotelNights: body.hotelNights }),
@@ -484,6 +496,11 @@ app.http('participations-delete', {
             }
 
             const participation = participations[index];
+
+            if (!canManageUser(auth.user, participation.userId, participations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to delete this participation' } };
+            }
+
             const email = participation.email;
             const userId = participation.userId;
             const eventId = participation.eventId;
@@ -561,6 +578,19 @@ app.http('participations-update-roles-v2', {
             }
 
             const participation = participations[index];
+
+            if (!canManageUser(auth.user, participation.userId, participations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
+            }
+
+            // Privileged roles (judge/committee) may only be granted by portal admins —
+            // prevents a team admin or self-service caller from self-escalating.
+            const requestedRoles = [...(set || []), ...(add || [])];
+            const grantsPrivilegedRole = requestedRoles.some(r => ['judge', 'committee'].includes(r));
+            if (grantsPrivilegedRole && !auth.user.isPortalAdmin) {
+                return { status: 403, jsonBody: { error: 'Only portal admins can grant judge or committee roles' } };
+            }
+
             let roles = participation.roles || migrateRoles(participation);
 
             // 'set' replaces the entire roles array
@@ -645,6 +675,10 @@ app.http('participations-assign-team', {
             }
 
             const participation = participations[index];
+
+            if (!canManageUser(auth.user, participation.userId, participations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
+            }
 
             if (teamId) {
                 // Validate team exists
@@ -734,6 +768,11 @@ app.http('participations-update-hotel', {
             const participation = await participationsStorage.getById(id);
             if (!participation) {
                 return { status: 404, jsonBody: { error: 'Participation not found' } };
+            }
+
+            const hotelParticipations = await participationsStorage.getAll();
+            if (!canManageUser(auth.user, participation.userId, hotelParticipations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
             const updatedAt = new Date().toISOString();
@@ -968,6 +1007,10 @@ app.http('participations-add-team-membership', {
 
             const participation = participations[index];
 
+            if (!canManageUser(auth.user, participation.userId, participations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
+            }
+
             // Check participant constraints
             if (isParticipant) {
                 if (participation.teamId && participation.teamId !== teamId && participation.roles?.includes('participant')) {
@@ -1090,6 +1133,10 @@ app.http('participations-remove-team-membership', {
 
             const participation = participations[index];
 
+            if (!canManageUser(auth.user, participation.userId, participations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
+            }
+
             // Clear from new model
             if (participation.teamId === teamId) {
                 participation.teamId = null;
@@ -1164,6 +1211,10 @@ app.http('participations-toggle-participant', {
 
             const participation = participations[index];
 
+            if (!canManageUser(auth.user, participation.userId, participations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
+            }
+
             // Update new model
             if (!participation.roles) participation.roles = [];
             if (isParticipant) {
@@ -1235,6 +1286,10 @@ app.http('participations-update-team-roles', {
             }
 
             const participation = participations[index];
+
+            if (!canManageUser(auth.user, participation.userId, participations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
+            }
 
             // Check participant constraints
             if (isParticipant && !participation.roles?.includes('participant')) {

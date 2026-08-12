@@ -100,6 +100,10 @@ app.http('solo-queue-join', {
                 };
             }
             
+            if (userId !== auth.user.userId && !auth.user.isPortalAdmin) {
+                return { status: 403, jsonBody: { error: 'You can only join the solo queue for yourself' } };
+            }
+            
             const queue = await soloQueueStorage.getAll();
             
             // Check if already in queue
@@ -168,6 +172,11 @@ app.http('solo-queue-leave', {
                     status: 404,
                     jsonBody: { error: 'Queue entry not found' }
                 };
+            }
+            
+            const entryToRemove = queue[index];
+            if (entryToRemove.userId !== auth.user.userId && !auth.user.isPortalAdmin) {
+                return { status: 403, jsonBody: { error: 'You can only remove your own solo queue entry' } };
             }
             
             await soloQueueStorage.delete(id);

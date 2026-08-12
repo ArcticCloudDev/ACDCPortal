@@ -20,7 +20,7 @@ app.http('deliveries-scheduled-runs', {
     route: 'deliveries/scheduled-runs',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -52,7 +52,7 @@ app.http('deliveries-event', {
     route: 'deliveries/event/{eventId}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -154,7 +154,7 @@ app.http('deliveries-retry', {
     route: 'deliveries/retry',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -249,7 +249,7 @@ app.http('deliveries-delete-recipient', {
     route: 'deliveries/recipient',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

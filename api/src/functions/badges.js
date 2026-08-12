@@ -2,7 +2,7 @@
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { requireAuth } = require('../shared/auth');
+const { requireAuth, isTeamMember, hasEventRole } = require('../shared/auth');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 
@@ -10,6 +10,7 @@ const badgesStorage = new GenericStorage('badges');
 const eventBadgesStorage = new GenericStorage('event-badges');
 const badgeClaimsStorage = new GenericStorage('badge-claims');
 const eventsStorage = new GenericStorage('events');
+const participationsStorage = new GenericStorage('participations');
 
 // Helper to generate GUID
 function generateGuid() {
@@ -89,7 +90,7 @@ app.http('badges-create', {
     route: 'badges',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -144,7 +145,7 @@ app.http('badges-update', {
     route: 'badges/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -201,7 +202,7 @@ app.http('badges-delete', {
     route: 'badges/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -288,7 +289,7 @@ app.http('event-badges-add', {
     route: 'events/{eventId}/badges',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -363,7 +364,7 @@ app.http('event-badges-update', {
     route: 'events/{eventId}/badges/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -400,7 +401,7 @@ app.http('event-badges-remove', {
     route: 'events/{eventId}/badges/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -440,7 +441,7 @@ app.http('event-badges-bulk', {
     route: 'events/{eventId}/badges/bulk',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -581,6 +582,11 @@ app.http('badge-claims-create', {
                 return { status: 400, jsonBody: { error: 'eventBadgeId and teamId are required' } };
             }
 
+            const claimParticipations = await participationsStorage.getAll();
+            if (!isTeamMember(auth.user, body.teamId, claimParticipations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to claim badges for this team' } };
+            }
+
             // Validate event-badge assignment exists and is active
             const eventBadges = await eventBadgesStorage.getAll();
             const eventBadge = eventBadges.find(eb => eb.id === body.eventBadgeId && eb.isActive);
@@ -695,6 +701,11 @@ app.http('badge-claims-review', {
                 return { status: 404, jsonBody: { error: 'Badge claim not found' } };
             }
 
+            const reviewParticipations = await participationsStorage.getAll();
+            if (!hasEventRole(auth.user, claim.eventId, 'judge', reviewParticipations) && !auth.user.isPortalAdmin) {
+                return { status: 403, jsonBody: { error: 'Only judges or admins can review badge claims' } };
+            }
+
             const updated = await badgeClaimsStorage.update(id, {
                 status: body.status,
                 declineReason: body.status === 'declined' ? body.declineReason : null,
@@ -738,6 +749,11 @@ app.http('badge-claims-update', {
                 return { status: 400, jsonBody: { error: 'Cannot modify an approved claim' } };
             }
 
+            const updateParticipations = await participationsStorage.getAll();
+            if (!isTeamMember(auth.user, claim.teamId, updateParticipations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to modify this claim' } };
+            }
+
             const updated = await badgeClaimsStorage.update(id, {
                 evidence: body.evidence !== undefined ? body.evidence : claim.evidence,
                 blogUrl: body.blogUrl !== undefined ? body.blogUrl : (claim.blogUrl || ''),
@@ -776,6 +792,11 @@ app.http('badge-claims-delete', {
                 return { status: 404, jsonBody: { error: 'Badge claim not found' } };
             }
 
+            const deleteParticipations = await participationsStorage.getAll();
+            if (!hasEventRole(auth.user, claim.eventId, 'judge', deleteParticipations) && !auth.user.isPortalAdmin) {
+                return { status: 403, jsonBody: { error: 'Only judges or admins can delete badge claims' } };
+            }
+
             await badgeClaimsStorage.delete(id);
 
             context.log(`Badge claim ${id} deleted`);
@@ -811,6 +832,11 @@ app.http('badge-claims-award', {
             const eventBadge = eventBadges.find(eb => eb.id === body.eventBadgeId && eb.isActive);
             if (!eventBadge) {
                 return { status: 404, jsonBody: { error: 'Event-badge assignment not found or inactive' } };
+            }
+
+            const awardParticipations = await participationsStorage.getAll();
+            if (!hasEventRole(auth.user, eventBadge.eventId, 'judge', awardParticipations) && !auth.user.isPortalAdmin) {
+                return { status: 403, jsonBody: { error: 'Only judges or admins can award badges' } };
             }
 
             // Validate badge is exclusive type
@@ -875,6 +901,11 @@ app.http('badge-claims-assign', {
 
             if (!body.eventBadgeId || !body.teamId) {
                 return { status: 400, jsonBody: { error: 'eventBadgeId and teamId are required' } };
+            }
+
+            const assignParticipations = await participationsStorage.getAll();
+            if (!isTeamMember(auth.user, body.teamId, assignParticipations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to assign badges for this team' } };
             }
 
             // Validate event-badge exists

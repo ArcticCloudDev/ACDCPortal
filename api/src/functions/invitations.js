@@ -1,5 +1,5 @@
 const { app } = require('@azure/functions');
-const { requireAuth } = require('../shared/auth');
+const { requireAuth, isTeamAuthorized } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { sendEmail, processTemplate } = require('../shared/mail');
 const { buildInvitationEmail } = require('../shared/invitation-email');
@@ -15,6 +15,20 @@ const ParticipationsStore = new Storage.Storage('participations');
 const UsersStore = new Storage.Storage('users');
 const EmailDeliveriesStore = new Storage.Storage('email-deliveries');
 const EmailCampaignsStore = new Storage.Storage('email-campaigns');
+
+// Authorization for mutating an existing invitation: team invites require team-admin/
+// portal-admin; privileged role invites (judge/committee/sponsor) require portal admin.
+async function isInvitationAuthorized(user, invitation) {
+    if (!user) return false;
+    if (user.isPortalAdmin) return true;
+    if (invitation.teamId) {
+        const team = await Storage.teams.getById(invitation.teamId);
+        if (!team) return false;
+        const participations = await ParticipationsStore.getAll();
+        return isTeamAuthorized(user, team, participations);
+    }
+    return false;
+}
 
 /**
  * Trigger sequence emails for a user after accepting invitation.
@@ -229,7 +243,9 @@ app.http('invitations-create', {
             }
 
             const body = await request.json();
-            const { email, teamId, eventId, role, inviterId, inviterName, inviterEmail, message, inviteeFirstName, inviteeLastName } = body;
+            const { email, teamId, eventId, role, inviterName, inviterEmail, message, inviteeFirstName, inviteeLastName } = body;
+            // inviterId is always the caller's own ID — never trust a client-supplied value here.
+            const inviterId = auth.user.userId;
             
             // Role-based invites (judge/committee) need eventId; team invites need teamId
             if (!email || !inviterId) {
@@ -237,6 +253,23 @@ app.http('invitations-create', {
             }
             if (!teamId && !eventId) {
                 return { status: 400, jsonBody: { error: 'teamId or eventId is required' } };
+            }
+
+            // Authorization: team invites require team-admin/portal-admin; privileged role
+            // invites (judge/committee/sponsor) require portal admin.
+            if (teamId) {
+                const team = await Storage.teams.getById(teamId);
+                if (!team) {
+                    return { status: 404, jsonBody: { error: 'Team not found' } };
+                }
+                const participations = await ParticipationsStore.getAll();
+                if (!isTeamAuthorized(auth.user, team, participations)) {
+                    return { status: 403, jsonBody: { error: 'You do not have permission to invite members to this team' } };
+                }
+            } else if (role && role !== 'participant') {
+                if (!auth.user.isPortalAdmin) {
+                    return { status: 403, jsonBody: { error: 'Only portal admins can send judge/committee/sponsor invitations' } };
+                }
             }
             
             let teamName = null;
@@ -372,6 +405,26 @@ app.http('invitations-list', {
 
             const teamId = request.query.get('teamId');
             const email = request.query.get('email');
+
+            // Authorization: team-scoped and email-scoped lookups are checked against the
+            // caller's own identity/team; an unfiltered "list everything" is admin-only.
+            if (teamId) {
+                const team = await Storage.teams.getById(teamId);
+                if (!team) {
+                    return { status: 404, jsonBody: { error: 'Team not found' } };
+                }
+                const teamParticipations = await ParticipationsStore.getAll();
+                if (!isTeamAuthorized(auth.user, team, teamParticipations)) {
+                    return { status: 403, jsonBody: { error: 'You do not have permission to view this team\'s invitations' } };
+                }
+            } else if (email) {
+                const isSelf = auth.user.email && auth.user.email.toLowerCase() === email.toLowerCase();
+                if (!isSelf && !auth.user.isPortalAdmin) {
+                    return { status: 403, jsonBody: { error: 'You do not have permission to view these invitations' } };
+                }
+            } else if (!auth.user.isPortalAdmin) {
+                return { status: 403, jsonBody: { error: 'Admin access required to list all invitations' } };
+            }
             
             let invitations = await InvitationsStore.getAll();
 
@@ -648,6 +701,10 @@ app.http('invitations-cancel', {
                 return { status: 404, jsonBody: { error: 'Invitation not found' } };
             }
 
+            if (!(await isInvitationAuthorized(auth.user, existing))) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to cancel this invitation' } };
+            }
+
             await InvitationsStore.update(id, {
                 status: 'cancelled',
                 cancelledAt: new Date().toISOString()
@@ -679,6 +736,10 @@ app.http('invitations-resend', {
 
             if (!invitation) {
                 return { status: 404, jsonBody: { error: 'Invitation not found' } };
+            }
+
+            if (!(await isInvitationAuthorized(auth.user, invitation))) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to resend this invitation' } };
             }
 
             if (invitation.status !== 'pending') {

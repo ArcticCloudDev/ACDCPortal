@@ -2,8 +2,10 @@
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { requireAuth } = require('../shared/auth');
+const { requireAuth, canManageUser } = require('../shared/auth');
 const Storage = require('../shared/storage');
+const { Storage: GenericStorage } = require('../shared/storage');
+const participationsStorage = new GenericStorage('participations');
 
 // Get all users (for admin dashboard)
 app.http('users-get-all', {
@@ -54,6 +56,14 @@ app.http('users-get', {
             const email = request.query.get('email');
             
             if (email) {
+                const isSelf = auth.user.email && auth.user.email.toLowerCase() === email.toLowerCase();
+                if (!isSelf && !auth.user.isPortalAdmin) {
+                    return {
+                        status: 403,
+                        jsonBody: { message: 'You do not have permission to view this profile' }
+                    };
+                }
+
                 const user = await Storage.users.getByEmail(email);
                 if (!user) {
                     return {
@@ -99,6 +109,14 @@ app.http('users-get-by-id', {
             }
 
             const userId = request.params.id;
+
+            const participations = await participationsStorage.getAll();
+            if (!canManageUser(auth.user, userId, participations)) {
+                return {
+                    status: 403,
+                    jsonBody: { message: 'You do not have permission to view this profile' }
+                };
+            }
             
             const user = await Storage.users.getById(userId);
             if (!user) {
@@ -150,9 +168,13 @@ app.http('users-update', {
             
             const updates = await request.json();
             
-            // Don't allow updating certain fields
+            // Don't allow updating certain fields. isPortalAdmin can never be set through
+            // this client-facing endpoint — that would let any user grant themselves (or
+            // anyone else) admin rights. Admin promotion must happen through a separate,
+            // admin-only path.
             delete updates.id;
             delete updates.createdAt;
+            delete updates.isPortalAdmin;
             
             // Get existing user to check if TBD
             const existingUser = await Storage.users.getById(userId);
@@ -160,6 +182,14 @@ app.http('users-update', {
                 return {
                     status: 404,
                     jsonBody: { message: 'User not found' }
+                };
+            }
+
+            const participations = await participationsStorage.getAll();
+            if (!canManageUser(auth.user, userId, participations)) {
+                return {
+                    status: 403,
+                    jsonBody: { message: 'You do not have permission to modify this profile' }
                 };
             }
             
@@ -208,6 +238,20 @@ app.http('users-create', {
                 return {
                     status: 400,
                     jsonBody: { message: 'Email is required' }
+                };
+            }
+
+            // isPortalAdmin can never be set through this client-facing endpoint — see
+            // the same guard in users-update for why.
+            delete userData.isPortalAdmin;
+
+            // Only allow self-registration (own email) unless the caller is already a
+            // portal admin creating a record on someone else's behalf.
+            const isSelf = auth.user.email && auth.user.email.toLowerCase() === userData.email.toLowerCase();
+            if (!isSelf && !auth.user.isPortalAdmin) {
+                return {
+                    status: 403,
+                    jsonBody: { message: 'You can only create your own user record' }
                 };
             }
             
