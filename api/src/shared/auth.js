@@ -82,13 +82,21 @@ function requireAuth(request, context, options = {}) {
         };
     }
     if (!result.valid) {
+        const tokenMeta = token
+            ? {
+                length: token.length,
+                dotCount: (token.match(/\./g) || []).length,
+                startsWith: token.slice(0, 20),
+                endsWith: token.slice(-12)
+            }
+            : null;
         context?.warn?.(`Auth required but token verification failed: ${result.reason}`);
         return {
             authorized: false,
             status: 401,
             // Reason is safe to expose: it's a jsonwebtoken error class/message
             // (e.g. "TokenExpiredError: jwt expired"), never the secret or payload.
-            jsonBody: { message: 'Invalid or expired session', reason: result.reason, diag: authDiag() }
+            jsonBody: { message: 'Invalid or expired session', reason: result.reason, diag: authDiag(), tokenMeta }
         };
     }
     const payload = result.payload;
