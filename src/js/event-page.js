@@ -60,25 +60,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!currentUser.profileComplete) {
                 let hasExistingRelationship = false;
                 try {
-                    // Check for existing participation (team member, judge, committee, etc.)
+                    // Participation records also mirror verified interest registrations.
                     const participation = await API.participations.getOrNull(currentUser.id, eventId);
                     if (participation) {
                         hasExistingRelationship = true;
                     }
                 } catch (e) { /* ignore */ }
-                if (!hasExistingRelationship) {
-                    try {
-                        const resp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
-                        if (resp.ok) {
-                            const data = await resp.json();
-                            const leads = Array.isArray(data) ? data : (data.leads || []);
-                            hasExistingRelationship = leads.some(l => 
-                                l.email.toLowerCase() === currentUser.email.toLowerCase() && 
-                                l.eventId === eventId
-                            );
-                        }
-                    } catch (e) { /* ignore */ }
-                }
                 if (!hasExistingRelationship) {
                     window.location.href = 'complete-registration.html';
                     return;
@@ -112,30 +99,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // Sync interest role with verified interest leads
-        try {
-            const resp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
-            if (resp.ok) {
-                const data = await resp.json();
-                const leads = Array.isArray(data) ? data : (data.leads || []);
-                const hasInterestLead = leads.some(l =>
-                    l.email.toLowerCase() === currentUser.email.toLowerCase() &&
-                    l.eventId === eventId
-                );
-                const hasInterestRole = currentParticipation.roles?.includes('interest');
-                if (hasInterestLead && !hasInterestRole) {
-                    await API.participations.addRoles(currentParticipation.id, ['interest']);
-                    if (!currentParticipation.roles) currentParticipation.roles = [];
-                    currentParticipation.roles.push('interest');
-                } else if (!hasInterestLead && hasInterestRole) {
-                    await API.participations.removeRoles(currentParticipation.id, ['interest']);
-                    currentParticipation.roles = currentParticipation.roles.filter(r => r !== 'interest');
-                }
-            }
-        } catch (e) {
-            console.error('Failed to sync interest role:', e);
-        }
-        
         // Load teams for this event
         await loadEventTeams();
         

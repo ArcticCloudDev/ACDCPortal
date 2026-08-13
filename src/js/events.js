@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentUser = null;
     let allEvents = [];
     let userParticipations = [];
-    let userInterestLeads = [];
 
     // Initialize Auth
     Auth.init();
@@ -41,23 +40,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.log('New user, redirecting to complete registration...');
                     window.location.href = 'complete-registration.html';
                     return;
-                }
-                
-                if (!currentUser.profileComplete) {
-                    // Allow interest-only users through — check interest leads by email
-                    let hasInterest = false;
-                    try {
-                        const resp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
-                        if (resp.ok) {
-                            const data = await resp.json();
-                            const leads = Array.isArray(data) ? data : (data.leads || []);
-                            hasInterest = leads.some(l => l.email.toLowerCase() === currentUser.email.toLowerCase());
-                        }
-                    } catch (e) { /* ignore */ }
-                    if (!hasInterest) {
-                        window.location.href = 'complete-registration.html';
-                        return;
-                    }
                 }
                 
                 // Show admin link if user is portal admin (immediate)
@@ -92,18 +74,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.warn('Could not load participations:', error);
                 userParticipations = [];
             }
-            
-            // Load interest leads for this user's email
-            try {
-                const response = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const leads = Array.isArray(data) ? data : (data.leads || []);
-                    userInterestLeads = leads.filter(l => l.email.toLowerCase() === currentUser.email.toLowerCase());
-                }
-            } catch (error) {
-                console.warn('Could not load interest leads:', error);
-                userInterestLeads = [];
+
+            const hasVerifiedInterest = userParticipations.some(participation =>
+                (participation.roles || []).includes('interest')
+            );
+            if (!currentUser.profileComplete && !hasVerifiedInterest) {
+                window.location.href = 'complete-registration.html';
+                return;
             }
             
             // Populate profile form
@@ -369,8 +346,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const participation = userParticipations.find(p => p.eventId === event.id);
         const hasTeam = participation && (participation.teamMemberships || []).length > 0;
         
-        // Check if user registered interest for this event
-        const hasInterest = userInterestLeads.some(l => l.eventId === event.id);
+        // Verified interest is mirrored into the participation role by the API.
+        const hasInterest = participation && (participation.roles || []).includes('interest');
         
         return { status, participation, hasTeam, hasInterest };
     }

@@ -193,7 +193,6 @@
             let authUser = null;
             let currentUser = null;
             let participationByEventId = new Map();
-            let interestLeadEventIds = new Set();
             let isAdmin = false;
             
             // Start the SQL wake-up timer immediately so it shows even while auth/user calls are pending
@@ -252,18 +251,6 @@
                             console.log('Could not load participations for event status badges:', e);
                         }
 
-                        try {
-                            const leadsResp = await fetch(`${API.baseUrl}/interest/leads?verified=true`);
-                            if (leadsResp.ok) {
-                                const leadsData = await leadsResp.json();
-                                const leads = Array.isArray(leadsData) ? leadsData : (leadsData.leads || []);
-                                leads
-                                    .filter(lead => lead.email?.toLowerCase() === currentUser.email.toLowerCase())
-                                    .forEach(lead => interestLeadEventIds.add(lead.eventId));
-                            }
-                        } catch (e) {
-                            console.log('Could not load interest leads for badges:', e);
-                        }
                     }
 
                     SiteHeader.update({ authUser, user: currentUser, isAdmin });
@@ -436,7 +423,7 @@
                     section.innerHTML = '<div class="events-grid">' + activeEvents.map(event => {
                         const participation = participationByEventId.get(event.id) || null;
                         const roles = participation?.roles || [];
-                        const isInterestRegistered = roles.includes('interest') || interestLeadEventIds.has(event.id);
+                        const isInterestRegistered = roles.includes('interest');
                         const isJudge = roles.includes('judge');
                         const isCommittee = roles.includes('committee');
                         const hasTeam = !!participation?.teamId;

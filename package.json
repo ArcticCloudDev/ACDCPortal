@@ -6,7 +6,7 @@
     "start": "node server.js",
     "dev": "node server.js",
     "build": "echo 'No build step required - static files'",
-    "test": "node tests/auth-session.test.js && node tests/server-auth-transport.test.js && node tests/event-badges-policy.test.js"
+    "test": "node tests/auth-session.test.js && node tests/server-auth-transport.test.js && node tests/event-badges-policy.test.js && node tests/participant-interest-access.test.js"
   },
   "keywords": ["azure", "static-web-apps", "entra", "otp"],
   "author": "",
