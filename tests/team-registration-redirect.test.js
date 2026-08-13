@@ -21,6 +21,7 @@ assert.match(eventPage, /complete-registration\.html\?redirect=/);
 assert.doesNotMatch(eventPage, /API\.participations\.assignTeam\(/);
 assert.doesNotMatch(eventPage, /API\.participations\.addTeamMembership\(/);
 assert.match(eventPage, /creatorParticipates: creatorParticipates/);
+assert.match(eventPage, /\$\{currentEvent\.name\} - \$\{currentTeam\.teamName\}/);
 
 const apiClient = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'js', 'api.js'),
@@ -36,6 +37,12 @@ assert.match(teamsApi, /Participation not found for team creator/);
 assert.match(teamsApi, /await Storage\.teams\.delete\(teamId\)/);
 assert.match(teamsApi, /teamId,\s*isTeamAdmin: true/);
 assert.match(teamsApi, /profileVerification: true/);
+
+const eventMarkup = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'event.html'),
+    'utf8'
+);
+assert.match(eventMarkup, /creatorParticipates" value="no" checked/);
 
 const completeRegistration = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'complete-registration.html'),

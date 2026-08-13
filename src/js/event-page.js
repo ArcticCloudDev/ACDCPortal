@@ -200,6 +200,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Populate event banner using shared SiteHeader component
     function populateEventBanner() {
+        const currentTeam = eventTeams.find(team => team.id === currentParticipation?.teamId);
+        const headerTitle = currentTeam
+            ? `${currentEvent.name} - ${currentTeam.teamName}`
+            : currentEvent.name;
+
         // Determine status display
         const status = currentEvent.status || 'draft';
         let statusText = 'Coming Soon';
@@ -209,7 +214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         else if (status === 'completed') statusText = '✓ Completed';
 
         SiteHeader.render({
-            title: currentEvent.name,
+            title: headerTitle,
             subtitle: null,
             infoBadges: [],
             showSignIn: false,
