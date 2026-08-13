@@ -291,16 +291,43 @@ app.http('invitations-create', {
                 // lead can maintain the contact record before first login.
                 if (!role || role === 'participant') {
                     const existingUser = await Storage.users.getByEmail(email);
-                    if (existingUser && existingUser.teamId) {
+                    if (existingUser && existingUser.teamId && existingUser.teamId !== teamId) {
                         return { status: 400, jsonBody: { error: `${email} is already on a team` } };
                     }
+                    if (existingUser && existingUser.teamId === teamId && !existingUser.invitationPending) {
+                        return { status: 400, jsonBody: { error: `${email} is already on this team` } };
+                    }
                     const allParticipations = await ParticipationsStore.getAll();
-                    const belongsToAnotherTeam = allParticipations.some(participation => {
+                    const matchingParticipations = allParticipations.filter(participation => {
                         if (participation.email?.toLowerCase() !== email.toLowerCase()) return false;
                         return participation.teamId || (participation.teamMemberships || []).some(membership => membership.teamId);
                     });
+                    const belongsToAnotherTeam = matchingParticipations.some(participation => {
+                        const memberships = participation.teamMemberships || [];
+                        return (participation.teamId && participation.teamId !== teamId)
+                            || memberships.some(membership => membership.teamId !== teamId);
+                    });
                     if (belongsToAnotherTeam) {
                         return { status: 400, jsonBody: { error: `${email} is already on a team` } };
+                    }
+
+                    // A user can be deleted through an admin path that predates
+                    // pending contacts, leaving an invisible participation row.
+                    // Remove only that orphaned record in this target team so the
+                    // team lead can invite the contact again; never touch another
+                    // team's membership.
+                    if (!existingUser && matchingParticipations.length > 0) {
+                        for (const participation of matchingParticipations) {
+                            await ParticipationsStore.delete(participation.id);
+                        }
+                        const invitations = await InvitationsStore.getAll();
+                        for (const staleInvitation of invitations) {
+                            if (staleInvitation.status === 'pending'
+                                && staleInvitation.teamId === teamId
+                                && staleInvitation.email?.toLowerCase() === email.toLowerCase()) {
+                                await InvitationsStore.delete(staleInvitation.id);
+                            }
+                        }
                     }
                 }
             }
