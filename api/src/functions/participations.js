@@ -677,7 +677,7 @@ app.http('participations-assign-team', {
 
             const id = request.params.id;
             const body = await request.json();
-            const { teamId, isTeamAdmin } = body;
+            const { teamId, isTeamAdmin, isParticipant = true } = body;
 
             const participations = await participationsStorage.getAll();
             const index = participations.findIndex(p => p.id === id);
@@ -700,26 +700,25 @@ app.http('participations-assign-team', {
                     return { status: 404, jsonBody: { error: 'Team not found' } };
                 }
 
-                // Check max team size
-                const events = await eventsStorage.getAll();
-                const event = events.find(e => e.id === participation.eventId);
-                const maxSize = event?.maxTeamSize || 5;
-
-                const currentCount = participations.filter(p =>
-                    p.teamId === teamId && p.roles?.includes('participant') && p.id !== id
-                ).length;
-
-                if (currentCount >= maxSize) {
-                    return {
-                        status: 400,
-                        jsonBody: { error: `Team has reached maximum of ${maxSize} participants`, currentCount }
-                    };
-                }
-
-                // Auto-add 'participant' role if not present
                 if (!participation.roles) participation.roles = [];
-                if (!participation.roles.includes('participant')) {
-                    participation.roles.push('participant');
+                if (isParticipant) {
+                    // Check max team size only when this person is competing.
+                    const events = await eventsStorage.getAll();
+                    const event = events.find(e => e.id === participation.eventId);
+                    const maxSize = event?.maxTeamSize || 5;
+                    const currentCount = participations.filter(p =>
+                        p.teamId === teamId && p.roles?.includes('participant') && p.id !== id
+                    ).length;
+
+                    if (currentCount >= maxSize) {
+                        return {
+                            status: 400,
+                            jsonBody: { error: `Team has reached maximum of ${maxSize} participants`, currentCount }
+                        };
+                    }
+                    if (!participation.roles.includes('participant')) participation.roles.push('participant');
+                } else {
+                    participation.roles = participation.roles.filter(role => role !== 'participant');
                 }
             }
 

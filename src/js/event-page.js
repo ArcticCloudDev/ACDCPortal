@@ -2421,12 +2421,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 eventId: eventId
             });
             
-            // Add team membership for current user (always admin, optionally participant)
-            await API.participations.addTeamMembership(
+            // Assign the creator through the supported participation team route.
+            // The legacy team-membership endpoint is not deployed in production.
+            await API.participations.assignTeam(
                 currentParticipation.id,
                 newTeam.id,
-                true, // isAdmin
-                creatorParticipates  // isParticipant - based on user choice
+                true,
+                creatorParticipates
             );
             
             // Update local data

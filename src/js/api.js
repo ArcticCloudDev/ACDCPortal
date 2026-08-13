@@ -473,10 +473,10 @@ const API = {
         },
 
         // Team assignment (v2)
-        async assignTeam(participationId, teamId, isTeamAdmin = false) {
+        async assignTeam(participationId, teamId, isTeamAdmin = false, isParticipant = true) {
             return API.request(`/participations/${participationId}/team`, {
                 method: 'PUT',
-                body: JSON.stringify({ teamId, isTeamAdmin })
+                body: JSON.stringify({ teamId, isTeamAdmin, isParticipant })
             });
         },
 
