@@ -2417,18 +2417,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 teamName: teamName,
                 committedParticipants: committedCount, // number they committed to
                 adminEmail: currentUser.email,
-                adminUserId: currentUser.id,
+                creatorParticipates: creatorParticipates,
                 eventId: eventId
             });
-            
-            // Assign the creator through the supported participation team route.
-            // The legacy team-membership endpoint is not deployed in production.
-            await API.participations.assignTeam(
-                currentParticipation.id,
-                newTeam.id,
-                true,
-                creatorParticipates
-            );
             
             // Update local data
             if (!currentParticipation.teamMemberships) {

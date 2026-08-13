@@ -18,14 +18,23 @@ assert.match(registerPage, /flowMode === 'team-login'/);
 assert.match(eventPage, /get\('action'\) === 'create-team'/);
 assert.match(eventPage, /create-team-btn'\)\.click\(\)/);
 assert.match(eventPage, /complete-registration\.html\?redirect=/);
-assert.match(eventPage, /API\.participations\.assignTeam\(/);
+assert.doesNotMatch(eventPage, /API\.participations\.assignTeam\(/);
 assert.doesNotMatch(eventPage, /API\.participations\.addTeamMembership\(/);
+assert.match(eventPage, /creatorParticipates: creatorParticipates/);
 
 const apiClient = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'js', 'api.js'),
     'utf8'
 );
 assert.match(apiClient, /assignTeam\(participationId, teamId, isTeamAdmin = false, isParticipant = true\)/);
+
+const teamsApi = fs.readFileSync(
+    path.join(__dirname, '..', 'api', 'src', 'functions', 'teams.js'),
+    'utf8'
+);
+assert.match(teamsApi, /Participation not found for team creator/);
+assert.match(teamsApi, /await Storage\.teams\.delete\(teamId\)/);
+assert.match(teamsApi, /teamId,\s*isTeamAdmin: true/);
 
 const completeRegistration = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'complete-registration.html'),
