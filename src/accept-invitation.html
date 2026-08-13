@@ -194,6 +194,18 @@
                         </div>
 
                         <div class="form-group">
+                            <label for="profile-gamertag">Gamertag</label>
+                            <input type="text" id="profile-gamertag" name="gamertag"
+                                   placeholder="Optional">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="profile-allergies">Allergies / Dietary Requirements</label>
+                            <textarea id="profile-allergies" name="allergies" rows="3" maxlength="500"
+                                      placeholder="Optional"></textarea>
+                        </div>
+
+                        <div class="form-group">
                             <label for="profile-email">Email</label>
                             <input type="email" id="profile-email" readonly class="readonly">
                         </div>
@@ -355,6 +367,8 @@
                 const firstNameField = document.getElementById('profile-firstName');
                 const lastNameField = document.getElementById('profile-lastName');
                 const phoneField = document.getElementById('profile-phone');
+                const gamertagField = document.getElementById('profile-gamertag');
+                const allergiesField = document.getElementById('profile-allergies');
                 const emailField = document.getElementById('profile-email');
 
                 const sessionEmail = Auth.getUser()?.email || '';
@@ -366,10 +380,15 @@
                 if (currentUser) {
                     firstNameField.value = currentUser.firstName || invitation.inviteeFirstName || '';
                     lastNameField.value = currentUser.lastName || invitation.inviteeLastName || '';
-                    phoneField.value = currentUser.phone || '';
+                    phoneField.value = currentUser.phone || invitation.inviteePhone || '';
+                    gamertagField.value = currentUser.gamertag || invitation.inviteeGamertag || '';
+                    allergiesField.value = currentUser.allergies || invitation.inviteeAllergies || '';
                 } else {
                     firstNameField.value = invitation.inviteeFirstName || '';
                     lastNameField.value = invitation.inviteeLastName || '';
+                    phoneField.value = invitation.inviteePhone || '';
+                    gamertagField.value = invitation.inviteeGamertag || '';
+                    allergiesField.value = invitation.inviteeAllergies || '';
                 }
 
                 firstNameField.focus();
@@ -394,6 +413,8 @@
                 const firstName = document.getElementById('profile-firstName').value.trim();
                 const lastName = document.getElementById('profile-lastName').value.trim();
                 const phone = document.getElementById('profile-phone').value.trim();
+                const gamertag = document.getElementById('profile-gamertag').value.trim();
+                const allergies = document.getElementById('profile-allergies').value.trim();
 
                 if (!firstName || !lastName || !phone) {
                     errorDiv.textContent = 'Please fill in all required fields.';
@@ -411,7 +432,7 @@
                 }
 
                 // Store profile data — we'll submit it after OTP verification
-                pendingProfile = { firstName, lastName, phone };
+                pendingProfile = { firstName, lastName, phone, gamertag, allergies };
                 pendingProfile.email = email;
 
                 // If already logged in with a matching session, skip OTP entirely.
@@ -504,8 +525,13 @@
                         console.log('Could not load user:', e);
                     }
 
-                    // OTP verified — now submit everything
-                    await submitAcceptance(result.token);
+                    // OTP verified. Reload the pending contact record so the
+                    // invitee can review the details entered by their team lead
+                    // before confirming the invitation.
+                    alreadyLoggedIn = true;
+                    initProfileForm();
+                    document.getElementById('step-verify').classList.add('hidden');
+                    document.getElementById('step-profile').classList.remove('hidden');
 
                 } catch (err) {
                     errorDiv.textContent = err.message || 'Verification failed. Please try again.';
@@ -523,7 +549,7 @@
                 link.textContent = 'Sending...';
                 link.style.pointerEvents = 'none';
                 try {
-                    await API.auth.sendOtp(invitation.email);
+                    await API.auth.sendOtp(document.getElementById('profile-email').value.trim());
                     link.textContent = '✓ Code sent!';
                     setTimeout(() => {
                         link.textContent = 'Resend code';
@@ -556,7 +582,9 @@
                     const result = await API.invitations.accept(inviteId, userId, pendingProfile.email, {
                         firstName: pendingProfile.firstName,
                         lastName: pendingProfile.lastName,
-                        phone: pendingProfile.phone
+                        phone: pendingProfile.phone,
+                        gamertag: pendingProfile.gamertag,
+                        allergies: pendingProfile.allergies
                     });
 
                     if (!result.success) {

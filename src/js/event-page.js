@@ -659,8 +659,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error('Error loading invitations for team:', err);
         }
         
-        // Calculate empty committed slots (show as + buttons), accounting for pending invites
-        const filledOrPendingCount = realParticipantCount + pendingInvitations.length;
+        // A newly invited person already has a pending contact card. Keep only
+        // legacy invitations without a contact in the separate invitation list.
+        const contactEmails = new Set(
+            allParticipantCards
+                .filter(participant => participant !== null)
+                .map(participant => participant.user.email?.toLowerCase())
+                .filter(Boolean)
+        );
+        const legacyPendingInvitations = pendingInvitations.filter(invitation =>
+            !contactEmails.has(invitation.email?.toLowerCase())
+        );
+
+        // Calculate empty committed slots (show as + buttons).
+        const filledOrPendingCount = realParticipantCount + legacyPendingInvitations.length;
         const emptyCommittedSlots = Math.max(0, committedParticipants - filledOrPendingCount);
         
         // Calculate unlock slots (slots beyond committed count)
@@ -668,8 +680,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Build pending invitation cards
         let pendingCardsHtml = '';
-        if (pendingInvitations.length > 0) {
-            pendingCardsHtml = pendingInvitations.map(inv => `
+        if (legacyPendingInvitations.length > 0) {
+            pendingCardsHtml = legacyPendingInvitations.map(inv => `
                 <div class="participant-card pending-card" data-invite-id="${inv.id}">
                     <div class="pending-icon">✉️</div>
                     <div class="name">Invitation Sent</div>
@@ -730,7 +742,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="team-card-body">
                     <div class="team-stats">
                         <span>👥 ${realParticipantCount}/${committedParticipants} committed</span>
-                        ${pendingInvitations.length > 0 ? `<span>✉️ ${pendingInvitations.length} pending</span>` : ''}
+                        ${legacyPendingInvitations.length > 0 ? `<span>✉️ ${legacyPendingInvitations.length} pending</span>` : ''}
                         <span>${emptyCommittedSlots > 0 ? `📋 ${emptyCommittedSlots} open` : '✓ Full'}</span>
                     </div>
                     <div class="participants-grid">
@@ -1072,7 +1084,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="roles">
                     ${membership.isAdmin ? '<span class="role-tag admin">Admin</span>' : ''}
                     ${membership.isParticipant ? '<span class="role-tag participant">Participant</span>' : ''}
-                    ${!participation.profileVerification ? '<span class="role-tag verify-needed" title="Please verify your contact information">⚠️ Verify info</span>' : ''}
+                    ${!participation.profileVerification ? '<span class="role-tag verify-needed" title="This contact must confirm their information at first login">⏳ Pending confirmation</span>' : ''}
                 </div>
                 ${canEdit ? '<button class="btn btn-small btn-secondary edit-participant-btn">✏️ Edit</button>' : ''}
             </div>
@@ -1728,6 +1740,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('invite-firstName').value = '';
         document.getElementById('invite-lastName').value = '';
         document.getElementById('invite-email').value = '';
+        document.getElementById('invite-phone').value = '';
+        document.getElementById('invite-gamertag').value = '';
+        document.getElementById('invite-allergies').value = '';
         document.getElementById('invite-error').classList.add('hidden');
         document.getElementById('invite-success').classList.add('hidden');
         
@@ -1744,6 +1759,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const firstName = document.getElementById('invite-firstName').value.trim();
         const lastName = document.getElementById('invite-lastName').value.trim();
         const email = document.getElementById('invite-email').value.trim().toLowerCase();
+        const phone = document.getElementById('invite-phone').value.trim();
+        const gamertag = document.getElementById('invite-gamertag').value.trim();
+        const allergies = document.getElementById('invite-allergies').value.trim();
         
         if (!firstName || !lastName || !email) {
             errorDiv.textContent = 'Please fill in first name, last name, and email.';
@@ -1764,17 +1782,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 email: email,
                 inviteeFirstName: firstName,
                 inviteeLastName: lastName,
+                inviteePhone: phone,
+                inviteeGamertag: gamertag,
+                inviteeAllergies: allergies,
                 inviterId: currentUser.id,
                 inviterName: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'Team Admin',
                 inviterEmail: currentUser.email
             });
             
-            successDiv.textContent = `Invitation sent to ${firstName} ${lastName} (${email})`;
+            successDiv.textContent = `${firstName} ${lastName} is now a pending team contact. An invitation was sent to ${email}.`;
             successDiv.classList.remove('hidden');
             
             document.getElementById('invite-firstName').value = '';
             document.getElementById('invite-lastName').value = '';
             document.getElementById('invite-email').value = '';
+            document.getElementById('invite-phone').value = '';
+            document.getElementById('invite-gamertag').value = '';
+            document.getElementById('invite-allergies').value = '';
             
             // Reload team cards to show pending invitation
             await loadEventTeams();

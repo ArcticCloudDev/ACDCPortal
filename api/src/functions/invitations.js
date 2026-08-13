@@ -243,7 +243,10 @@ app.http('invitations-create', {
             }
 
             const body = await request.json();
-            const { email, teamId, eventId, role, inviterName, inviterEmail, message, inviteeFirstName, inviteeLastName } = body;
+            const {
+                email, teamId, eventId, role, inviterName, inviterEmail, message,
+                inviteeFirstName, inviteeLastName, inviteePhone, inviteeGamertag, inviteeAllergies
+            } = body;
             // inviterId is always the caller's own ID — never trust a client-supplied value here.
             const inviterId = auth.user.userId;
             
@@ -284,10 +287,19 @@ app.http('invitations-create', {
                 teamName = team.teamName || team.name;
                 resolvedEventId = resolvedEventId || team.eventId;
 
-                // Check if user already on a team (only for participant invites)
+                // Pending contacts join the team at invitation time so their team
+                // lead can maintain the contact record before first login.
                 if (!role || role === 'participant') {
                     const existingUser = await Storage.users.getByEmail(email);
                     if (existingUser && existingUser.teamId) {
+                        return { status: 400, jsonBody: { error: `${email} is already on a team` } };
+                    }
+                    const allParticipations = await ParticipationsStore.getAll();
+                    const belongsToAnotherTeam = allParticipations.some(participation => {
+                        if (participation.email?.toLowerCase() !== email.toLowerCase()) return false;
+                        return participation.teamId || (participation.teamMemberships || []).some(membership => membership.teamId);
+                    });
+                    if (belongsToAnotherTeam) {
                         return { status: 400, jsonBody: { error: `${email} is already on a team` } };
                     }
                 }
@@ -320,6 +332,9 @@ app.http('invitations-create', {
                 email: email.toLowerCase(),
                 inviteeFirstName: inviteeFirstName || null,
                 inviteeLastName: inviteeLastName || null,
+                inviteePhone: inviteePhone || null,
+                inviteeGamertag: inviteeGamertag || null,
+                inviteeAllergies: inviteeAllergies || null,
                 teamId: teamId || null,
                 teamName: teamName,
                 eventId: resolvedEventId || null,
@@ -332,6 +347,64 @@ app.http('invitations-create', {
                 createdAt: new Date().toISOString(),
                 expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
             };
+
+            if (teamId && (!role || role === 'participant')) {
+                const now = new Date().toISOString();
+                let contact = await Storage.users.getByEmail(invitation.email);
+
+                if (!contact) {
+                    contact = await UsersStore.create({
+                        id: uuidv4(),
+                        email: invitation.email,
+                        firstName: invitation.inviteeFirstName || '',
+                        lastName: invitation.inviteeLastName || '',
+                        phone: invitation.inviteePhone || null,
+                        gamertag: invitation.inviteeGamertag || '',
+                        allergies: invitation.inviteeAllergies || '',
+                        profileComplete: false,
+                        invitationPending: true,
+                        teamId,
+                        createdAt: now,
+                        updatedAt: now
+                    });
+                }
+
+                const participations = await ParticipationsStore.getAll();
+                const existingParticipation = participations.find(participation =>
+                    participation.eventId === resolvedEventId
+                    && (participation.userId === contact.id
+                        || participation.email?.toLowerCase() === invitation.email)
+                );
+                const membership = { teamId, isAdmin: false, isParticipant: true };
+
+                if (existingParticipation) {
+                    const memberships = existingParticipation.teamMemberships || [];
+                    if (!memberships.some(existing => existing.teamId === teamId)) memberships.push(membership);
+                    await ParticipationsStore.update(existingParticipation.id, {
+                        userId: contact.id,
+                        email: invitation.email,
+                        teamId,
+                        teamMemberships: memberships,
+                        profileVerification: false,
+                        updatedAt: now
+                    });
+                } else if (resolvedEventId) {
+                    await ParticipationsStore.create({
+                        id: uuidv4(),
+                        eventId: resolvedEventId,
+                        email: invitation.email,
+                        userId: contact.id,
+                        roles: ['participant'],
+                        teamId,
+                        teamMemberships: [membership],
+                        isTeamAdmin: false,
+                        profileVerification: false,
+                        hotelNights: {},
+                        createdAt: now,
+                        updatedAt: now
+                    });
+                }
+            }
             
             await InvitationsStore.create(invitation);
             
@@ -587,8 +660,11 @@ app.http('invitations-accept', {
                     email: userEmail.toLowerCase(),
                     firstName: profile?.firstName || invitation.inviteeFirstName || '',
                     lastName: profile?.lastName || invitation.inviteeLastName || '',
-                    phone: profile?.phone || null,
+                    phone: profile?.phone || invitation.inviteePhone || null,
+                    gamertag: profile?.gamertag || invitation.inviteeGamertag || '',
+                    allergies: profile?.allergies || invitation.inviteeAllergies || '',
                     profileComplete: true,
+                    invitationPending: false,
                     teamId: invitation.teamId || null,
                     createdAt: now,
                     updatedAt: now
@@ -603,7 +679,10 @@ app.http('invitations-accept', {
                 if (profile?.firstName) userUpdates.firstName = profile.firstName;
                 if (profile?.lastName) userUpdates.lastName = profile.lastName;
                 if (profile?.phone) userUpdates.phone = profile.phone;
+                if (profile?.gamertag !== undefined) userUpdates.gamertag = profile.gamertag;
+                if (profile?.allergies !== undefined) userUpdates.allergies = profile.allergies;
                 userUpdates.profileComplete = true;
+                userUpdates.invitationPending = false;
                 if (invitation.teamId && (!invitation.role || invitation.role === 'participant')) {
                     userUpdates.teamId = invitation.teamId;
                 }
@@ -642,6 +721,7 @@ app.http('invitations-accept', {
                         roles: [inviteRole],
                         teamId: invitation.teamId || null,
                         isTeamAdmin: false,
+                        profileVerification: true,
                         hotelNights: defaultHotelNights,
                         hotelPaidBy: initialHotelPaidBy,
                         createdAt: new Date().toISOString(),
@@ -655,6 +735,7 @@ app.http('invitations-accept', {
                         roles: updatedRoles,
                         userId: existingParticipation.userId || resolvedUserId,
                         email: existingParticipation.email || userEmail.toLowerCase(),
+                        profileVerification: true,
                         updatedAt: new Date().toISOString()
                     };
 

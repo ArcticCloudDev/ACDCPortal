@@ -2203,6 +2203,24 @@
                     <input type="email" id="invite-email" name="email" required 
                            placeholder="Enter email address">
                 </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="invite-phone">Phone</label>
+                        <input type="tel" id="invite-phone" name="phone" placeholder="Phone number">
+                    </div>
+                    <div class="form-group">
+                        <label for="invite-gamertag">Gamertag</label>
+                        <input type="text" id="invite-gamertag" name="gamertag" placeholder="Optional">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="invite-allergies">Allergies / Dietary Requirements</label>
+                    <textarea id="invite-allergies" name="allergies" rows="3" maxlength="500" placeholder="Optional"></textarea>
+                </div>
+
+                <p class="form-hint">This creates an editable pending contact in your team. They will confirm these details when they first sign in.</p>
                 
                 <div id="invite-error" class="error-message hidden"></div>
                 <div id="invite-success" class="success-message hidden"></div>

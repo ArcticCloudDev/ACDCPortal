@@ -492,6 +492,14 @@ app.http('teams-members', {
                     jsonBody: { message: 'Team not found' }
                 };
             }
+
+            const participations = await new GenericStorage('participations').getAll();
+            if (!isTeamMember(auth.user, teamId, participations)) {
+                return {
+                    status: 403,
+                    jsonBody: { message: 'You do not have permission to view this team\'s members' }
+                };
+            }
             
             const members = await Storage.users.getByTeamId(teamId);
             
