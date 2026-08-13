@@ -35,6 +35,7 @@ const teamsApi = fs.readFileSync(
 assert.match(teamsApi, /Participation not found for team creator/);
 assert.match(teamsApi, /await Storage\.teams\.delete\(teamId\)/);
 assert.match(teamsApi, /teamId,\s*isTeamAdmin: true/);
+assert.match(teamsApi, /profileVerification: true/);
 
 const completeRegistration = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'complete-registration.html'),

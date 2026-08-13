@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentSoloQueueEntry = null;
     let eventBadges = [];      // enriched event-badge assignments
     let badgeClaims = [];      // all claims for this event
+    let profileConfirmationRequired = false;
 
     // Get event ID from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -112,6 +113,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         populateEventBanner();
         setupCostHint();
         await renderTeams();
+
+        const isTeamLeader = currentParticipation.isTeamAdmin
+            || (currentParticipation.teamMemberships || []).some(membership => membership.isAdmin);
+        if (currentParticipation.teamId && !isTeamLeader && !currentParticipation.profileVerification) {
+            await openParticipantEdit(
+                currentUser.id,
+                currentParticipation.id,
+                currentParticipation.teamId,
+                true
+            );
+        }
         
         // Render badges section and show nav tabs only for team participants
         renderBadgesSection();
@@ -1090,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="roles">
                     ${membership.isAdmin ? '<span class="role-tag admin">Admin</span>' : ''}
                     ${membership.isParticipant ? '<span class="role-tag participant">Participant</span>' : ''}
-                    ${!participation.profileVerification ? '<span class="role-tag verify-needed" title="This contact must confirm their information at first login">⏳ Pending confirmation</span>' : ''}
+                    ${!participation.profileVerification ? '<span class="role-tag verify-needed" title="Confirm your information to continue">Confirm information</span>' : ''}
                 </div>
                 ${canEdit ? '<button class="btn btn-small btn-secondary edit-participant-btn">✏️ Edit</button>' : ''}
             </div>
@@ -1098,10 +1110,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Open participant edit modal
-    async function openParticipantEdit(userId, participationId, teamId) {
+    async function openParticipantEdit(userId, participationId, teamId, requireConfirmation = false) {
         const modal = document.getElementById('edit-participant-modal');
         const form = document.getElementById('edit-participant-form');
         const rolesTab = document.getElementById('tab-roles-btn');
+        profileConfirmationRequired = requireConfirmation;
         
         // Reset to first tab
         document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
@@ -1698,6 +1711,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             successDiv.textContent = 'Saved!';
             successDiv.classList.remove('hidden');
+            profileConfirmationRequired = false;
             
             // Update currentUser in memory if editing self
             if (userId === currentUser.id) {
@@ -2211,7 +2225,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Edit participant modal
         document.getElementById('close-edit-participant').addEventListener('click', () => {
-            document.getElementById('edit-participant-modal').classList.remove('active');
+            if (!profileConfirmationRequired) {
+                document.getElementById('edit-participant-modal').classList.remove('active');
+            }
         });
         
         // Tab navigation in edit participant modal
@@ -2235,7 +2251,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Close modals on overlay click
         document.querySelectorAll('.modal-overlay').forEach(overlay => {
             overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
+                if (e.target === overlay && !(profileConfirmationRequired && overlay.id === 'edit-participant-modal')) {
                     overlay.classList.remove('active');
                 }
             });
@@ -2244,7 +2260,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Close modals on Escape key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+                document.querySelectorAll('.modal-overlay.active').forEach(modal => {
+                    if (!(profileConfirmationRequired && modal.id === 'edit-participant-modal')) {
+                        modal.classList.remove('active');
+                    }
+                });
             }
         });
         

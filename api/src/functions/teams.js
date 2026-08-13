@@ -200,6 +200,7 @@ app.http('teams-create', {
                     teamId,
                     isTeamAdmin: true,
                     roles,
+                    profileVerification: true,
                     updatedAt: new Date().toISOString()
                 });
             } catch (assignmentError) {

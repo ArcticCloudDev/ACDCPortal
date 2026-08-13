@@ -23,7 +23,10 @@ assert.match(invitations, /triggerSequenceEmailsForInvite\(resolvedUserId, userE
 assert.match(invitations, /profileVerification:\s*true/);
 assert.match(teams, /isTeamMember\(auth\.user, teamId, participations\)/);
 assert.match(eventPage, /legacyPendingInvitations/);
-assert.match(eventPage, /Pending confirmation/);
+assert.match(eventPage, /Confirm information/);
+assert.match(eventPage, /!isTeamLeader && !currentParticipation\.profileVerification/);
+assert.match(eventPage, /openParticipantEdit\([\s\S]*?true/);
+assert.match(eventPage, /profileConfirmationRequired = false/);
 assert.match(invitations, /inviteePhone: inviteePhone \|\| null/);
 assert.match(invitations, /inviteeGamertag: inviteeGamertag \|\| null/);
 assert.match(invitations, /inviteeAllergies: inviteeAllergies \|\| null/);
