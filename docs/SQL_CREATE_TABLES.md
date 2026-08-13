@@ -263,6 +263,9 @@ CREATE TABLE Invitations (
     Email           NVARCHAR(320)    NOT NULL,
     InviteeFirstName NVARCHAR(100)   NULL,
     InviteeLastName  NVARCHAR(100)   NULL,
+    InviteePhone     NVARCHAR(50)    NULL,
+    InviteeGamertag  NVARCHAR(100)   NULL,
+    InviteeAllergies NVARCHAR(MAX)   NULL,
     TeamId          UNIQUEIDENTIFIER NULL,
         -- NULL for role-based invitations (judge/committee)
     TeamName        NVARCHAR(200)    NULL,

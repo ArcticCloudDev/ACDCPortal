@@ -233,7 +233,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 message: message || 'Join our team for the Arctic Cloud Developer Challenge!'
             });
             
-            successDiv.textContent = `Invitation sent to ${email}! They'll receive an email with a link to join.`;
+            successDiv.textContent = `${email} is registered as a pending team member and will receive a confirmation link.`;
             successDiv.classList.remove('hidden');
             
             document.getElementById('inviteEmail').value = '';

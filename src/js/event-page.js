@@ -1755,7 +1755,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('invite-member-modal').classList.add('active');
     }
     
-    // Send invitation
+    // Register a pending team contact and email them a confirmation link.
     async function sendInvitation() {
         const sendBtn = document.getElementById('send-invite-btn');
         const errorDiv = document.getElementById('invite-error');
@@ -1796,7 +1796,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 inviterEmail: currentUser.email
             });
             
-            successDiv.textContent = `${firstName} ${lastName} is now a pending team contact. An invitation was sent to ${email}.`;
+            successDiv.textContent = `${firstName} ${lastName} is now a pending team member. A confirmation link was sent to ${email}.`;
             successDiv.classList.remove('hidden');
             
             document.getElementById('invite-firstName').value = '';

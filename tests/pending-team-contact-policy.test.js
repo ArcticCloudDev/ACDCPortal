@@ -24,5 +24,8 @@ assert.match(invitations, /profileVerification:\s*true/);
 assert.match(teams, /isTeamMember\(auth\.user, teamId, participations\)/);
 assert.match(eventPage, /legacyPendingInvitations/);
 assert.match(eventPage, /Pending confirmation/);
+assert.match(invitations, /inviteePhone: inviteePhone \|\| null/);
+assert.match(invitations, /inviteeGamertag: inviteeGamertag \|\| null/);
+assert.match(invitations, /inviteeAllergies: inviteeAllergies \|\| null/);
 
 console.log('PASS: Team invitations create a single pending contact, defer sequences until confirmation, and enforce team-scoped access');
