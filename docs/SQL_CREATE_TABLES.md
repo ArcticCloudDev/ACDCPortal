@@ -116,6 +116,7 @@ CREATE TABLE Users (
     Allergies       NVARCHAR(MAX)    NULL,
     IsPortalAdmin   BIT              NOT NULL DEFAULT 0,
     ProfileComplete BIT              NOT NULL DEFAULT 0,
+    InvitationPending BIT            NOT NULL DEFAULT 0,
     TeamId          UNIQUEIDENTIFIER NULL,
         -- LEGACY field, being moved to participations. Kept for backward compat.
     CreatedAt       DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),

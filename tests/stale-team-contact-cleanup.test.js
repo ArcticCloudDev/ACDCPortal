@@ -20,5 +20,6 @@ const invitations = fs.readFileSync(
     'utf8'
 );
 assert.match(invitations, /teamId,\s*invitationPending:\s*true/);
+assert.doesNotMatch(invitations, /existingUser\.teamId/);
 
 console.log('PASS: Stale target-team contacts can be cleaned and reattached while other-team memberships remain blocked');

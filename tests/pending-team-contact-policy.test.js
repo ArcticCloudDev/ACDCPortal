@@ -16,7 +16,7 @@ const eventPage = fs.readFileSync(
 );
 
 assert.match(invitations, /invitationPending:\s*true/);
-assert.match(invitations, /teamMemberships:\s*\[membership\]/);
+assert.match(invitations, /teamId,\s*isTeamAdmin:\s*false/);
 assert.match(invitations, /profileVerification:\s*false/);
 assert.match(invitations, /profileComplete:\s*false/);
 assert.match(invitations, /triggerSequenceEmailsForInvite\(resolvedUserId, userEmail, eventId, context\)/);

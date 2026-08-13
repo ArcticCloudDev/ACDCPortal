@@ -291,12 +291,6 @@ app.http('invitations-create', {
                 // lead can maintain the contact record before first login.
                 if (!role || role === 'participant') {
                     const existingUser = await Storage.users.getByEmail(email);
-                    if (existingUser && existingUser.teamId && existingUser.teamId !== teamId) {
-                        return { status: 400, jsonBody: { error: `${email} is already on a team` } };
-                    }
-                    if (existingUser && existingUser.teamId === teamId && !existingUser.invitationPending) {
-                        return { status: 400, jsonBody: { error: `${email} is already on this team` } };
-                    }
                     const allParticipations = await ParticipationsStore.getAll();
                     const matchingParticipations = allParticipations.filter(participation => {
                         if (participation.email?.toLowerCase() !== email.toLowerCase()) return false;
@@ -309,6 +303,16 @@ app.http('invitations-create', {
                     });
                     if (belongsToAnotherTeam) {
                         return { status: 400, jsonBody: { error: `${email} is already on a team` } };
+                    }
+                    const isConfirmedMemberOfTargetTeam = existingUser
+                        && !existingUser.invitationPending
+                        && matchingParticipations.some(participation => {
+                            const memberships = participation.teamMemberships || [];
+                            return participation.teamId === teamId
+                                || memberships.some(membership => membership.teamId === teamId);
+                        });
+                    if (isConfirmedMemberOfTargetTeam) {
+                        return { status: 400, jsonBody: { error: `${email} is already on this team` } };
                     }
 
                     // A user can be deleted through an admin path that predates
@@ -415,16 +419,13 @@ app.http('invitations-create', {
                     && (participation.userId === contact.id
                         || participation.email?.toLowerCase() === invitation.email)
                 );
-                const membership = { teamId, isAdmin: false, isParticipant: true };
 
                 if (existingParticipation) {
-                    const memberships = existingParticipation.teamMemberships || [];
-                    if (!memberships.some(existing => existing.teamId === teamId)) memberships.push(membership);
                     await ParticipationsStore.update(existingParticipation.id, {
                         userId: contact.id,
                         email: invitation.email,
                         teamId,
-                        teamMemberships: memberships,
+                        isTeamAdmin: false,
                         profileVerification: false,
                         updatedAt: now
                     });
@@ -436,7 +437,6 @@ app.http('invitations-create', {
                         userId: contact.id,
                         roles: ['participant'],
                         teamId,
-                        teamMemberships: [membership],
                         isTeamAdmin: false,
                         profileVerification: false,
                         hotelNights: {},

@@ -164,6 +164,15 @@ function participationRowToJs(row) {
     } else if (!obj.roles) {
         obj.roles = [];
     }
+    // Production stores the current team relationship in TeamId. Expose the
+    // normalized membership view expected by authorization and event UI code.
+    if (obj.teamId && !obj.teamMemberships) {
+        obj.teamMemberships = [{
+            teamId: obj.teamId,
+            isAdmin: !!obj.isTeamAdmin,
+            isParticipant: true
+        }];
+    }
     // Assemble hotelNights object from BIT columns
     obj.hotelNights = {
         'mon-tue': !!row.HotelNight_MonTue,
