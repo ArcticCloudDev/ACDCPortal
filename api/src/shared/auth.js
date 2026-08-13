@@ -26,14 +26,19 @@ function getTokenFromRequest(request) {
     const headers = request?.headers;
     if (!headers) return null;
 
-    // Authorization is the canonical bearer header. We use one credential path
-    // consistently across the client and server to avoid ambiguity and to keep
-    // the request shape simple and reviewable.
+    // Authorization is the canonical bearer header. Some Azure Static Web Apps /
+    // Function proxy setups can forward the app token via x-acdc-token instead,
+    // so we accept that only as a compatibility path when it is present. The
+    // browser still sends exactly one token in the standard Authorization header,
+    // which avoids duplicate token leakage in devtools.
     const authorization = typeof headers.get === 'function' ? headers.get('authorization') : headers.authorization;
     if (authorization) {
         const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
         if (match) return match[1];
     }
+
+    const legacyToken = typeof headers.get === 'function' ? headers.get('x-acdc-token') : headers['x-acdc-token'];
+    if (legacyToken && legacyToken.trim()) return legacyToken.trim();
 
     return null;
 }
