@@ -255,10 +255,15 @@ app.http('event-badges-list', {
 
             const eventId = request.params.eventId;
             const participations = await participationsStorage.getAll();
-            if (!auth.user.isPortalAdmin
-                && !hasEventRole(auth.user, eventId, 'judge', participations)
-                && !hasEventRole(auth.user, eventId, 'committee', participations)) {
-                return { status: 403, jsonBody: { error: 'You do not have permission to view event badge assignments' } };
+            const canManageAssignments = auth.user.isPortalAdmin
+                || hasEventRole(auth.user, eventId, 'judge', participations)
+                || hasEventRole(auth.user, eventId, 'committee', participations);
+            const isEventParticipant = participations.some(p =>
+                p.userId === auth.user.userId && p.eventId === eventId
+            );
+
+            if (!canManageAssignments && !isEventParticipant) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to view badges for this event' } };
             }
 
             const eventBadges = await eventBadgesStorage.getAll();
@@ -285,7 +290,24 @@ app.http('event-badges-list', {
                 return a.badge.name.localeCompare(b.badge.name);
             });
 
-            return { status: 200, jsonBody: enriched };
+            if (canManageAssignments) {
+                return { status: 200, jsonBody: enriched };
+            }
+
+            // Participants only need the available badge visuals. Do not expose
+            // the staff-only judge assignment fields in the participant view.
+            return {
+                status: 200,
+                jsonBody: enriched
+                    .filter(assignment => assignment.isActive)
+                    .map(({ id, eventId: assignedEventId, badgeId, isActive, badge }) => ({
+                        id,
+                        eventId: assignedEventId,
+                        badgeId,
+                        isActive,
+                        badge
+                    }))
+            };
         } catch (error) {
             await logError(context, error);
             context.error('Event badges LIST error:', error);
