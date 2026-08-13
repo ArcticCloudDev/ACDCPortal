@@ -394,6 +394,19 @@ app.http('invitations-create', {
                         createdAt: now,
                         updatedAt: now
                     });
+                } else {
+                    const contactUpdates = {
+                        teamId,
+                        invitationPending: true,
+                        updatedAt: now
+                    };
+                    if (invitation.inviteeFirstName) contactUpdates.firstName = invitation.inviteeFirstName;
+                    if (invitation.inviteeLastName) contactUpdates.lastName = invitation.inviteeLastName;
+                    if (invitation.inviteePhone) contactUpdates.phone = invitation.inviteePhone;
+                    if (invitation.inviteeGamertag) contactUpdates.gamertag = invitation.inviteeGamertag;
+                    if (invitation.inviteeAllergies) contactUpdates.allergies = invitation.inviteeAllergies;
+                    await UsersStore.update(contact.id, contactUpdates);
+                    contact = { ...contact, ...contactUpdates };
                 }
 
                 const participations = await ParticipationsStore.getAll();

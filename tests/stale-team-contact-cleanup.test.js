@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 function classifyMembership(teamId, participations) {
     return participations.some(participation => {
@@ -13,4 +15,10 @@ assert.equal(classifyMembership('team-a', [{ teamMemberships: [{ teamId: 'team-a
 assert.equal(classifyMembership('team-a', [{ teamId: 'team-b' }]), true);
 assert.equal(classifyMembership('team-a', [{ teamMemberships: [{ teamId: 'team-b' }] }]), true);
 
-console.log('PASS: Stale target-team contacts can be cleaned while other-team memberships remain blocked');
+const invitations = fs.readFileSync(
+    path.join(__dirname, '..', 'api', 'src', 'functions', 'invitations.js'),
+    'utf8'
+);
+assert.match(invitations, /teamId,\s*invitationPending:\s*true/);
+
+console.log('PASS: Stale target-team contacts can be cleaned and reattached while other-team memberships remain blocked');
