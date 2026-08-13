@@ -112,13 +112,12 @@ const Auth = {
             const isApiRequest = typeof url === 'string' && url.includes('/api/');
             const token = this.getToken();
 
-            // Always attach the Bearer token to API requests when logged in.
-            // Endpoints that are intentionally public (login/registration/invite
-            // flows) don't check the Authorization header, so this is harmless.
+            // Use a single canonical bearer token in the request. There is no
+            // legacy fallback; the browser sends exactly one JWT in the standard
+            // Authorization header for every API call.
             if (isApiRequest && token) {
                 const headers = new Headers(init.headers || {});
                 headers.set('Authorization', `Bearer ${token}`);
-                headers.set('x-acdc-token', token);
                 init = { ...init, headers };
             }
 
