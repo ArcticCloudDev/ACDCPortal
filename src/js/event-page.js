@@ -87,6 +87,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                    <a href="events.html" class="btn btn-primary">Back to Events</a>`;
             return;
         }
+
+        if (urlParams.get('action') === 'create-team') {
+            document.getElementById('create-team-btn').click();
+            window.history.replaceState({}, '', `event.html?id=${encodeURIComponent(eventId)}`);
+        }
         
         // Load or create participation
         currentParticipation = await API.participations.getOrNull(currentUser.id, eventId);

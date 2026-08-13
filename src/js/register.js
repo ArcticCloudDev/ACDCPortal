@@ -58,6 +58,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
+    // Team creation belongs to the authenticated event flow. Sending a signed-in
+    // user back to the event list loses the team intent and creates a redirect
+    // loop from the Register Team button.
+    if (Auth.isLoggedIn() && isTeamIntent) {
+        window.location.href = `/event.html?id=${encodeURIComponent(eventId)}&action=create-team`;
+        return;
+    }
+
     // If already logged in (no interest intent), go to events
     if (Auth.isLoggedIn()) {
         window.location.href = '/events.html';
