@@ -63,7 +63,7 @@ function Get-AuthHeaders([string]$Jwt) {
         return @{}
     }
 
-    return @{ Authorization = "Bearer $Jwt"; 'x-acdc-token' = $Jwt }
+    return @{ 'x-acdc-token' = $Jwt }
 }
 
 $tests = @(

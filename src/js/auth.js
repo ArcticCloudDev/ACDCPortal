@@ -112,12 +112,13 @@ const Auth = {
             const isApiRequest = typeof url === 'string' && url.includes('/api/');
             const token = this.getToken();
 
-            // Use a single canonical bearer token in the request. There is no
-            // legacy fallback; the browser sends exactly one JWT in the standard
-            // Authorization header for every API call.
+            // Azure Static Web Apps can rewrite Authorization before the request
+            // reaches the managed Function. Send exactly one app-specific token
+            // header so the API receives the JWT unchanged.
             if (isApiRequest && token) {
                 const headers = new Headers(init.headers || {});
-                headers.set('Authorization', `Bearer ${token}`);
+                headers.delete('Authorization');
+                headers.set('x-acdc-token', token);
                 init = { ...init, headers };
             }
 
@@ -145,7 +146,15 @@ const Auth = {
     _isTokenExpired(token) {
         try {
             // JWT structure: header.payload.signature
-            const payload = JSON.parse(atob(token.split('.')[1]));
+            // The payload is Base64URL-encoded, not standard Base64. Using atob()
+            // directly on the raw segment will fail for '-' and '_' characters and
+            // incorrectly mark otherwise valid tokens as expired. We convert to the
+            // standard Base64 form before decoding.
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+            const payload = JSON.parse(atob(padded));
+
             // exp is in seconds, Date.now() is in ms
             return payload.exp * 1000 < Date.now();
         } catch {

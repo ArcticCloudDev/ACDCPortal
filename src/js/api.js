@@ -6,11 +6,9 @@ const API = {
     // Helper to make API calls
     async request(endpoint, options = {}) {
         const url = `${this.baseUrl}${endpoint}`;
-        const token = typeof Auth !== 'undefined' ? Auth.getToken() : null;
         const defaultOptions = {
             headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { Authorization: `Bearer ${token}` } : {})
+                'Content-Type': 'application/json'
             }
         };
 
