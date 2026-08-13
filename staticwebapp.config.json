@@ -23,6 +23,9 @@
       }
     }
   ],
+  "globalHeaders": {
+    "Content-Security-Policy-Report-Only": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';"
+  },
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": ["/css/*", "/js/*", "/api/*", "/data/*", "*.html"]

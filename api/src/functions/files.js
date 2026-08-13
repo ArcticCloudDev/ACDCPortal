@@ -120,7 +120,7 @@ app.http('files-upload', {
             context.error('File upload error:', error);
             return { 
                 status: 500, 
-                jsonBody: { error: 'Failed to upload file', details: error.message } 
+                jsonBody: { error: 'Failed to upload file' } 
             };
         }
     }
@@ -345,7 +345,7 @@ app.http('files-setup-columns', {
             context.error('Setup columns error:', error);
             return {
                 status: 500,
-                jsonBody: { error: 'Failed to set up columns', details: error.message }
+                jsonBody: { error: 'Failed to set up columns' }
             };
         }
     }

@@ -252,7 +252,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
     } catch (error) {
         await logError(context, error);
         // Don't fail the main operation if this fails
-        context.log(`[SEQUENCE] WARNING: Failed to trigger sequence emails: ${error.message}`);
+        context.log('[SEQUENCE] WARNING: Failed to trigger sequence emails');
         context.error(error);
         return {
             sent: 0,
@@ -260,7 +260,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
             eligible: 0,
             totalCampaigns: 0,
             reason: 'trigger-error',
-            error: error.message
+            error: 'Internal server error'
         };
     }
 }
@@ -926,7 +926,7 @@ app.http('interest-restart-sequence', {
         } catch (error) {
             await logError(context, error);
             context.error('Error restarting sequence:', error);
-            return { status: 500, jsonBody: { error: 'Failed to restart sequence: ' + error.message } };
+            return { status: 500, jsonBody: { error: 'Failed to restart sequence' } };
         }
     }
 });

@@ -2279,14 +2279,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function checkSoloQueueStatus() {
         try {
             const result = await API.soloQueue.getPosition(eventId, currentUser.id);
-            
-            if (result.inQueue) {
-                currentSoloQueueEntry = result.entry;
-                showSoloQueueStatus(result.position, result.totalInQueue);
-            } else {
-                currentSoloQueueEntry = null;
-                hideSoloQueueStatus();
+
+            if (result && result.inQueue) {
+                currentSoloQueueEntry = result.entry || null;
+                showSoloQueueStatus(result.position, result.totalInQueue ?? result.totalCount);
+                return;
             }
+
+            if (result && typeof result.position !== 'undefined' && result.position !== null) {
+                currentSoloQueueEntry = null;
+                showSoloQueueStatus(result.position, result.totalInQueue ?? result.totalCount);
+                return;
+            }
+
+            currentSoloQueueEntry = null;
+            hideSoloQueueStatus();
         } catch (error) {
             // Not in queue
             currentSoloQueueEntry = null;

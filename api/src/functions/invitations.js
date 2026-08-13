@@ -386,7 +386,7 @@ app.http('invitations-create', {
         } catch (error) {
             await logError(context, error);
             context.error('Error creating invitation:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -451,7 +451,7 @@ app.http('invitations-list', {
         } catch (error) {
             await logError(context, error);
             context.error('Error listing invitations:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -492,14 +492,29 @@ app.http('invitations-get', {
                 }
             }
             
-            return { 
-                status: 200, 
-                jsonBody: { ...invitation, isExpired, eventName, eventStartDate, eventEndDate, eventLocation } 
+            return {
+                status: 200,
+                jsonBody: {
+                    id: invitation.id,
+                    role: invitation.role,
+                    teamId: invitation.teamId,
+                    teamName: invitation.teamName || null,
+                    status: invitation.status,
+                    expiresAt: invitation.expiresAt,
+                    isExpired,
+                    emailHint: invitation.email
+                        ? invitation.email.replace(/^(.).*(@.*)$/, '$1***$2')
+                        : null,
+                    eventName,
+                    eventStartDate,
+                    eventEndDate,
+                    eventLocation
+                }
             };
         } catch (error) {
             await logError(context, error);
             context.error('Error getting invitation:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -511,12 +526,19 @@ app.http('invitations-accept', {
     route: 'invitations/{id}/accept',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const id = request.params.id;
             const body = await request.json();
-            const { userId, userEmail, profile } = body;
+            const { profile } = body;
+            const userEmail = auth.user.email?.toLowerCase();
+            const userId = auth.user.userId;
             
             if (!userEmail) {
-                return { status: 400, jsonBody: { error: 'userEmail is required' } };
+                return { status: 400, jsonBody: { error: 'Authenticated email is required' } };
             }
             
             const invitation = await InvitationsStore.getById(id);
@@ -525,7 +547,7 @@ app.http('invitations-accept', {
                 return { status: 404, jsonBody: { error: 'Invitation not found' } };
             }
 
-            // Verify email matches
+            // Verify email matches the authenticated session, not a client-supplied value.
             if (invitation.email.toLowerCase() !== userEmail.toLowerCase()) {
                 return { status: 403, jsonBody: { error: 'Email does not match invitation' } };
             }
@@ -677,7 +699,7 @@ app.http('invitations-accept', {
         } catch (error) {
             await logError(context, error);
             context.error('Error accepting invitation:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -714,7 +736,7 @@ app.http('invitations-cancel', {
         } catch (error) {
             await logError(context, error);
             context.error('Error cancelling invitation:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -782,7 +804,7 @@ app.http('invitations-resend', {
         } catch (error) {
             await logError(context, error);
             context.error('Error resending invitation:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });

@@ -3,6 +3,7 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
+const { rateLimits, checkRateLimit } = require('./auth-send-otp');
 
 app.http('auth-check-email', {
     methods: ['POST'],
@@ -21,12 +22,32 @@ app.http('auth-check-email', {
                     jsonBody: { message: 'Email is required' }
                 };
             }
+
+            const normalizedEmail = email.toLowerCase().trim();
+            const clientIp = request.headers.get('x-forwarded-for') ||
+                request.headers.get('x-client-ip') || 'unknown';
+
+            const ipCheck = checkRateLimit(rateLimits.byIp, clientIp, 10);
+            if (!ipCheck.allowed) {
+                return {
+                    status: 429,
+                    jsonBody: { message: 'Too many requests. Please try again later.' }
+                };
+            }
+
+            const emailCheck = checkRateLimit(rateLimits.byEmail, normalizedEmail, 10);
+            if (!emailCheck.allowed) {
+                return {
+                    status: 429,
+                    jsonBody: { message: 'Too many requests. Please try again later.' }
+                };
+            }
             
             // Check if user already exists in our system (SQL Users table)
-            const existingUser = await Storage.users.getByEmail(email);
+            const existingUser = await Storage.users.getByEmail(normalizedEmail);
             
             // Also check the allowed-emails list
-            const isAllowed = await Storage.allowedEmails.isAllowed(email);
+            const isAllowed = await Storage.allowedEmails.isAllowed(normalizedEmail);
             
             if (existingUser) {
                 // User exists → they should sign in, not register

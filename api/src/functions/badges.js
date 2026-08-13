@@ -248,7 +248,19 @@ app.http('event-badges-list', {
     route: 'events/{eventId}/badges',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
+            const participations = await participationsStorage.getAll();
+            if (!auth.user.isPortalAdmin
+                && !hasEventRole(auth.user, eventId, 'judge', participations)
+                && !hasEventRole(auth.user, eventId, 'committee', participations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to view event badge assignments' } };
+            }
+
             const eventBadges = await eventBadgesStorage.getAll();
             const badges = await badgesStorage.getAll();
 
@@ -541,6 +553,18 @@ app.http('badge-claims-list', {
             if (teamId) claims = claims.filter(c => c.teamId === teamId);
             if (status) claims = claims.filter(c => c.status === status);
             if (badgeId) claims = claims.filter(c => c.badgeId === badgeId);
+
+            // Object-level authorization: restrict to claims the caller may see.
+            if (!auth.user.isPortalAdmin) {
+                const participations = await participationsStorage.getAll();
+                claims = claims.filter(c => {
+                    if (c.eventId && (hasEventRole(auth.user, c.eventId, 'judge', participations)
+                        || hasEventRole(auth.user, c.eventId, 'committee', participations))) {
+                        return true;
+                    }
+                    return c.teamId && isTeamMember(auth.user, c.teamId, participations);
+                });
+            }
 
             // Enrich with badge details
             const badges = await badgesStorage.getAll();
@@ -961,7 +985,18 @@ app.http('event-badge-summary', {
     route: 'events/{eventId}/badge-summary',
     handler: async (request, context) => {
         try {
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const eventId = request.params.eventId;
+            const participations = await participationsStorage.getAll();
+            if (!auth.user.isPortalAdmin
+                && !hasEventRole(auth.user, eventId, 'judge', participations)
+                && !hasEventRole(auth.user, eventId, 'committee', participations)) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to view this badge summary' } };
+            }
 
             const claims = await badgeClaimsStorage.getAll();
             const badges = await badgesStorage.getAll();

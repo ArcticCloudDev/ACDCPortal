@@ -2,7 +2,7 @@
 // Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { requireAuth, isTeamAuthorized } = require('../shared/auth');
+const { requireAuth, isTeamAuthorized, isTeamMember } = require('../shared/auth');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
@@ -45,6 +45,12 @@ app.http('teams-list', {
             // Filter by eventId if provided
             if (eventId) {
                 teams = teams.filter(t => t.eventId === eventId);
+            }
+
+            // Object-level authorization: non-admins only see teams they belong to.
+            if (!auth.user.isPortalAdmin) {
+                const participations = await new GenericStorage('participations').getAll();
+                teams = teams.filter(t => isTeamMember(auth.user, t.id, participations));
             }
             
             return {
@@ -93,6 +99,14 @@ app.http('teams-get', {
                 return {
                     status: 404,
                     jsonBody: { message: 'Team not found' }
+                };
+            }
+
+            const participations = await new GenericStorage('participations').getAll();
+            if (!isTeamMember(auth.user, teamId, participations)) {
+                return {
+                    status: 403,
+                    jsonBody: { message: 'You do not have permission to view this team' }
                 };
             }
             

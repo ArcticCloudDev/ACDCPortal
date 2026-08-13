@@ -44,6 +44,14 @@ function checkRateLimit(map, key, max) {
     return { allowed: true };
 }
 
+module.exports = {
+    rateLimits,
+    RATE_LIMITS,
+    checkCooldown,
+    checkRateLimit,
+    markSent
+};
+
 // Mark the time an OTP was actually sent (call AFTER successful send)
 function markSent(email) {
     const entry = rateLimits.byEmail.get(email);

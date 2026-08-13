@@ -62,6 +62,15 @@ app.http('solo-queue-get', {
             
             // Sort by joinedAt for position
             queue.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
+
+            // Non-admins may only see their own entry, plus an aggregate count.
+            if (!auth.user.isPortalAdmin) {
+                const own = queue.filter(e => e.userId === auth.user.userId);
+                return {
+                    status: 200,
+                    jsonBody: { entries: own, totalCount: queue.length }
+                };
+            }
             
             return {
                 status: 200,
@@ -223,8 +232,22 @@ app.http('solo-queue-position', {
                     jsonBody: { inQueue: false }
                 };
             }
+
+            if (!auth.user.isPortalAdmin && userId !== auth.user.userId) {
+                return {
+                    status: 403,
+                    jsonBody: { error: 'You do not have permission to view this queue position' }
+                };
+            }
             
             const position = eventQueue.findIndex(q => q.id === userEntry.id) + 1;
+            
+            if (!auth.user.isPortalAdmin) {
+                return {
+                    status: 200,
+                    jsonBody: { position, totalCount: eventQueue.length }
+                };
+            }
             
             return {
                 status: 200,

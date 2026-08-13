@@ -330,10 +330,12 @@
                 return;
             }
 
-            // Check if user is already logged in with matching email
+            // Check if user is already logged in with a matching email for this invite.
+            // The raw invite email is intentionally not returned from the server, so we
+            // compare only against the authenticated session and the email the user verifies.
             if (Auth.isLoggedIn()) {
                 const authUser = Auth.getUser();
-                if (authUser?.email?.toLowerCase() === invitation.email.toLowerCase()) {
+                if (authUser?.email) {
                     alreadyLoggedIn = true;
                     try {
                         currentUser = await API.users.getOrNull(authUser.email);
@@ -355,7 +357,10 @@
                 const phoneField = document.getElementById('profile-phone');
                 const emailField = document.getElementById('profile-email');
 
-                emailField.value = invitation.email;
+                const sessionEmail = Auth.getUser()?.email || '';
+                emailField.value = sessionEmail;
+                emailField.readOnly = false;
+                emailField.required = true;
 
                 // Pre-fill from existing user record, else from invitation data
                 if (currentUser) {
@@ -398,11 +403,19 @@
 
                 errorDiv.classList.add('hidden');
 
+                const email = document.getElementById('profile-email').value.trim();
+                if (!email) {
+                    errorDiv.textContent = 'Please enter your email address.';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+
                 // Store profile data — we'll submit it after OTP verification
                 pendingProfile = { firstName, lastName, phone };
+                pendingProfile.email = email;
 
-                // If already logged in with matching email, skip OTP entirely
-                if (alreadyLoggedIn) {
+                // If already logged in with a matching session, skip OTP entirely.
+                if (alreadyLoggedIn && Auth.getUser()?.email?.toLowerCase() === email.toLowerCase()) {
                     await submitAcceptance();
                     return;
                 }
@@ -410,7 +423,7 @@
                 // Advance to OTP verification screen
                 document.getElementById('step-profile').classList.add('hidden');
                 document.getElementById('step-verify').classList.remove('hidden');
-                document.getElementById('email-display').textContent = invitation.email;
+                document.getElementById('email-display').textContent = email;
             });
 
             // ============================================================
@@ -427,13 +440,15 @@
                 btn.querySelector('.btn-loading').classList.remove('hidden');
                 errorDiv.classList.add('hidden');
 
+                const email = document.getElementById('profile-email').value.trim();
+
                 try {
-                    await API.auth.sendOtp(invitation.email);
+                    await API.auth.sendOtp(email);
 
                     // Move to OTP entry
                     document.getElementById('substep-email').classList.add('hidden');
                     document.getElementById('substep-otp').classList.remove('hidden');
-                    document.getElementById('otp-email-display').textContent = invitation.email;
+                    document.getElementById('otp-email-display').textContent = email;
                     document.getElementById('otp-code').value = '';
                     document.getElementById('otp-code').focus();
 
@@ -441,7 +456,7 @@
                     // If cooldown, still show OTP step (code may already be pending)
                     document.getElementById('substep-email').classList.add('hidden');
                     document.getElementById('substep-otp').classList.remove('hidden');
-                    document.getElementById('otp-email-display').textContent = invitation.email;
+                    document.getElementById('otp-email-display').textContent = email;
                     const otpError = document.getElementById('otp-error');
                     otpError.textContent = (err.message || 'Failed to send code.') + ' You may already have a pending code.';
                     otpError.classList.remove('hidden');
@@ -470,8 +485,10 @@
                 btn.querySelector('.btn-loading').classList.remove('hidden');
                 errorDiv.classList.add('hidden');
 
+                const email = document.getElementById('profile-email').value.trim();
+
                 try {
-                    const result = await API.auth.verifyOtp(invitation.email, code);
+                    const result = await API.auth.verifyOtp(email, code);
 
                     if (!result.success) {
                         throw new Error(result.message || 'Invalid code.');
@@ -482,13 +499,12 @@
 
                     // Load full user record (may be null for new invitees — backend will create)
                     try {
-                        currentUser = await API.users.getOrNull(invitation.email);
+                        currentUser = await API.users.getOrNull(email);
                     } catch (e) {
                         console.log('Could not load user:', e);
                     }
 
                     // OTP verified — now submit everything
-                    // Pass null userId for new invitees; backend creates the account
                     await submitAcceptance(result.token);
 
                 } catch (err) {
@@ -534,8 +550,10 @@
                 try {
                     const userId = currentUser ? currentUser.id : null;
 
-                    // Accept the invitation — backend creates user if needed
-                    const result = await API.invitations.accept(inviteId, userId, invitation.email, {
+                    // Accept the invitation using the authenticated session. The server matches
+                    // the session email against the invitation and ignores any client-supplied
+                    // email/userId payload values.
+                    const result = await API.invitations.accept(inviteId, userId, pendingProfile.email, {
                         firstName: pendingProfile.firstName,
                         lastName: pendingProfile.lastName,
                         phone: pendingProfile.phone

@@ -259,7 +259,7 @@ app.http('event-sponsors-list', {
             return { status: 200, jsonBody: result.recordset.map(mapSponsorFinancial) };
         } catch (error) {
             await logError(context, error);
-            return { status: 500, jsonBody: { error: error.message || 'Failed to list sponsors' } };
+            return { status: 500, jsonBody: { error: 'Failed to list sponsors' } };
         }
     }
 });
@@ -308,7 +308,7 @@ app.http('event-sponsors-create', {
         } catch (error) {
             const status = /required|Invalid sponsor|amount must/i.test(error.message) ? 400 : 500;
             if (status === 500) await logError(context, error);
-            return { status, jsonBody: { error: error.message || 'Failed to create sponsor' } };
+            return { status, jsonBody: { error: status === 400 ? error.message : 'Failed to create sponsor' } };
         }
     }
 });
@@ -377,7 +377,7 @@ app.http('event-sponsors-update', {
         } catch (error) {
             const status = /required|Invalid sponsor|amount must/i.test(error.message) ? 400 : 500;
             if (status === 500) await logError(context, error);
-            return { status, jsonBody: { error: error.message || 'Failed to update sponsor' } };
+            return { status, jsonBody: { error: status === 400 ? error.message : 'Failed to update sponsor' } };
         }
     }
 });
@@ -405,7 +405,7 @@ app.http('event-sponsors-delete', {
             return { status: 200, jsonBody: { success: true } };
         } catch (error) {
             await logError(context, error);
-            return { status: 500, jsonBody: { error: error.message || 'Failed to delete sponsor' } };
+            return { status: 500, jsonBody: { error: 'Failed to delete sponsor' } };
         }
     }
 });
@@ -663,7 +663,7 @@ app.http('event-financials-list', {
             return { status: 200, jsonBody: rows };
         } catch (error) {
             await logError(context, error);
-            return { status: 500, jsonBody: { error: error.message || 'Failed to list financials' } };
+            return { status: 500, jsonBody: { error: 'Failed to list financials' } };
         }
     }
 });
@@ -685,7 +685,7 @@ app.http('event-financials-summary', {
             return { status: 200, jsonBody: summary };
         } catch (error) {
             await logError(context, error);
-            return { status: 500, jsonBody: { error: error.message || 'Failed to get financial summary' } };
+            return { status: 500, jsonBody: { error: 'Failed to get financial summary' } };
         }
     }
 });
@@ -709,7 +709,7 @@ app.http('event-financials-create', {
         } catch (error) {
             const status = /Invalid type|Invalid category|Invalid paidBy|amount must/i.test(error.message) ? 400 : 500;
             if (status === 500) await logError(context, error);
-            return { status, jsonBody: { error: error.message || 'Failed to create financial row' } };
+            return { status, jsonBody: { error: status === 400 ? error.message : 'Failed to create financial row' } };
         }
     }
 });
@@ -733,7 +733,7 @@ app.http('event-financials-update', {
         } catch (error) {
             const status = /not found|Invalid type|Invalid category|Invalid paidBy|amount must/i.test(error.message) ? 400 : 500;
             if (status === 500) await logError(context, error);
-            return { status, jsonBody: { error: error.message || 'Failed to update financial row' } };
+            return { status, jsonBody: { error: status === 400 ? error.message : 'Failed to update financial row' } };
         }
     }
 });
@@ -756,7 +756,7 @@ app.http('event-financials-delete', {
             return { status: 200, jsonBody: { success: true } };
         } catch (error) {
             await logError(context, error);
-            return { status: 500, jsonBody: { error: error.message || 'Failed to delete financial row' } };
+            return { status: 500, jsonBody: { error: 'Failed to delete financial row' } };
         }
     }
 });
@@ -781,7 +781,7 @@ app.http('event-financials-patch', {
         } catch (error) {
             const status = /Invalid paidBy|not found/i.test(error.message) ? 400 : 500;
             if (status === 500) await logError(context, error);
-            return { status, jsonBody: { error: error.message || 'Failed to update row' } };
+            return { status, jsonBody: { error: status === 400 ? error.message : 'Failed to update row' } };
         }
     }
 });
@@ -829,7 +829,7 @@ app.http('event-financials-recalculate', {
             };
         } catch (error) {
             await logError(context, error);
-            return { status: 500, jsonBody: { error: error.message || 'Failed to recalculate financials' } };
+            return { status: 500, jsonBody: { error: 'Failed to recalculate financials' } };
         }
     }
 });

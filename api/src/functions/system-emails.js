@@ -86,7 +86,7 @@ app.http('system-emails-upload-theme', {
         } catch (error) {
             await logError(context, error);
             context.error('Error uploading theme:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -108,7 +108,7 @@ app.http('system-emails-config-get', {
         } catch (error) {
             await logError(context, error);
             context.error('Error loading config:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -153,7 +153,7 @@ app.http('system-emails-config-put', {
         } catch (error) {
             await logError(context, error);
             context.error('Error saving config:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -256,7 +256,7 @@ app.http('system-emails-test', {
         } catch (error) {
             await logError(context, error);
             context.error('Error sending test email:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -328,7 +328,7 @@ app.http('system-emails-preview', {
         } catch (error) {
             await logError(context, error);
             context.error('Error rendering preview:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -395,7 +395,7 @@ app.http('system-emails-send', {
         } catch (error) {
             await logError(context, error);
             context.error('Error sending email:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });

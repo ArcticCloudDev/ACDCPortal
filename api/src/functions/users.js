@@ -10,6 +10,8 @@ const participationsStorage = new GenericStorage('participations');
 // Get all users (for admin dashboard)
 app.http('users-get-all', {
     methods: ['GET'],
+    // Handler enforces JWT internally via requireAuth; this remains anonymous so Azure
+    // host-level auth does not accidentally become the app's only security boundary.
     authLevel: 'anonymous',
     route: 'users/all',
     handler: async (request, context) => {
@@ -41,6 +43,9 @@ app.http('users-get-all', {
 // Get user by email (query param)
 app.http('users-get', {
     methods: ['GET'],
+    // Handler enforces JWT internally via requireAuth; this remains anonymous so Azure
+    // host-level auth does not accidentally become the app's only security boundary.
+    // This route must keep requireAuth at the top of the handler; do not remove it.
     authLevel: 'anonymous',
     route: 'users',
     handler: async (request, context) => {
@@ -96,6 +101,9 @@ app.http('users-get', {
 // Get user by ID
 app.http('users-get-by-id', {
     methods: ['GET'],
+    // Handler enforces JWT internally via requireAuth; this remains anonymous so Azure
+    // host-level auth does not accidentally become the app's only security boundary.
+    // This route must keep requireAuth at the top of the handler; do not remove it.
     authLevel: 'anonymous',
     route: 'users/{id}',
     handler: async (request, context) => {
@@ -145,6 +153,9 @@ app.http('users-get-by-id', {
 // Update user by ID
 app.http('users-update', {
     methods: ['PUT'],
+    // Handler enforces JWT internally via requireAuth; this remains anonymous so Azure
+    // host-level auth does not accidentally become the app's only security boundary.
+    // This route must keep requireAuth at the top of the handler; do not remove it.
     authLevel: 'anonymous',
     route: 'users/{id}',
     handler: async (request, context) => {
@@ -223,6 +234,9 @@ app.http('users-update', {
 // Create new user
 app.http('users-create', {
     methods: ['POST'],
+    // Handler enforces JWT internally via requireAuth; this remains anonymous so Azure
+    // host-level auth does not accidentally become the app's only security boundary.
+    // This route must keep requireAuth at the top of the handler; do not remove it.
     authLevel: 'anonymous',
     route: 'users',
     handler: async (request, context) => {

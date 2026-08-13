@@ -1,10 +1,19 @@
 // Scheduled Emails
 // HTTP endpoint for manual/automated triggering
 // When deployed to Azure, can be called by Azure Logic Apps, Power Automate, or an external timer
+const crypto = require('crypto');
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
+
+function safeEqual(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') return false;
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+}
 
 const campaignsStorage = new Storage('email-campaigns');
 const leadsStorage = new Storage('interest-leads');
@@ -33,7 +42,7 @@ app.http('scheduled-emails-run', {
         const expectedSecret = process.env.SCHEDULER_SECRET;
         if (expectedSecret) {
             const provided = request.headers.get('x-scheduler-secret');
-            if (!provided || provided !== expectedSecret) {
+            if (!provided || !safeEqual(provided, expectedSecret)) {
                 context.warn('[SCHEDULED] Unauthorized call - bad or missing secret');
                 return { status: 401, jsonBody: { error: 'Unauthorized' } };
             }

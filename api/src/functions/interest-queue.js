@@ -24,7 +24,7 @@ app.http('interest-queue-list', {
         } catch (error) {
             await logError(context, error);
             context.error('Error listing interest queue:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -78,7 +78,7 @@ app.http('interest-queue-add', {
         } catch (error) {
             await logError(context, error);
             context.error('Error adding to interest queue:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -107,7 +107,7 @@ app.http('interest-queue-check', {
         } catch (error) {
             await logError(context, error);
             context.error('Error checking interest queue:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -139,7 +139,7 @@ app.http('interest-queue-remove', {
         } catch (error) {
             await logError(context, error);
             context.error('Error removing from interest queue:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -183,7 +183,7 @@ app.http('interest-queue-mark-registered', {
         } catch (error) {
             await logError(context, error);
             context.error('Error marking as registered:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -212,7 +212,7 @@ app.http('interest-queue-stats', {
         } catch (error) {
             await logError(context, error);
             context.error('Error getting interest queue stats:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -251,7 +251,7 @@ app.http('interest-queue-mark-notified', {
         } catch (error) {
             await logError(context, error);
             context.error('Error marking as notified:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });

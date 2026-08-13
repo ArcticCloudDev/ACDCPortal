@@ -294,6 +294,18 @@ app.http('participations-get', {
                 return { status: 200, jsonBody: null };
             }
 
+            const isSelf =
+                (participation.userId && participation.userId === auth.user.userId) ||
+                (participation.email && auth.user.email &&
+                    participation.email.toLowerCase() === auth.user.email.toLowerCase());
+
+            if (!isSelf && !canManageUser(auth.user, participation.userId, participations)) {
+                return {
+                    status: 403,
+                    jsonBody: { error: 'You do not have permission to view this participation' }
+                };
+            }
+
             // Migration support
             if (!participation.roles) participation.roles = migrateRoles(participation);
             if (!participation.teamMemberships) participation.teamMemberships = buildLegacyTeamMemberships(participation);

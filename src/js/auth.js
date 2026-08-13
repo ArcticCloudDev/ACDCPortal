@@ -50,7 +50,10 @@ const Auth = {
         window.location.href = `/register.html?${params.toString()}`;
     },
 
-    // Store session after successful OTP verification
+    // Store session after successful OTP verification.
+    // NOTE: this token is currently stored in localStorage, which is readable by any
+    // XSS execution in the app. The safer design is to move this into a Secure;
+    // HttpOnly; SameSite=Strict cookie and keep the browser-only token in-memory only.
     setSession(token, user) {
         localStorage.setItem(CONFIG.auth.tokenKey, token);
         localStorage.setItem(CONFIG.auth.userKey, JSON.stringify(user));

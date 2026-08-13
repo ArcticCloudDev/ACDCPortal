@@ -47,7 +47,7 @@ app.http('email-templates', {
         } catch (error) {
             await logError(context, error);
             context.error('Error listing templates:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -70,7 +70,7 @@ app.http('email-template-get', {
         } catch (error) {
             await logError(context, error);
             context.error('Error getting template:', error);
-            return { status: 404, jsonBody: { error: error.message } };
+            return { status: 404, jsonBody: { error: 'Template not found' } };
         }
     }
 });
@@ -111,7 +111,7 @@ app.http('email-preview', {
         } catch (error) {
             await logError(context, error);
             context.error('Error previewing email:', error);
-            return { status: 500, jsonBody: { error: error.message, stack: error.stack } };
+            return { status: 500, jsonBody: { error: 'Failed to generate preview' } };
         }
     }
 });
@@ -209,7 +209,7 @@ app.http('email-recipients', {
         } catch (error) {
             await logError(context, error);
             context.error('Error getting recipients:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { message: 'Internal server error' } };
         }
     }
 });
@@ -294,7 +294,7 @@ app.http('email-send', {
         } catch (error) {
             await logError(context, error);
             context.error('Error sending email:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { error: 'Internal server error' } };
         }
     }
 });
@@ -318,7 +318,7 @@ app.http('email-history', {
         } catch (error) {
             await logError(context, error);
             context.error('Error getting email history:', error);
-            return { status: 500, jsonBody: { error: error.message } };
+            return { status: 500, jsonBody: { error: 'Internal server error' } };
         }
     }
 });

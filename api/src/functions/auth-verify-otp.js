@@ -11,7 +11,8 @@ const { getJwtSecret } = require('../shared/auth');
 // NOTE: JWT_SECRET is intentionally NOT cached as a module-level constant here —
 // see the comment on getJwtSecret() in shared/auth.js for why that caused
 // intermittent 401s across scaled-out Function App instances.
-const JWT_EXPIRY = '24h';
+// Keep the lifetime short to reduce impact if a token is stolen or exposed.
+const JWT_EXPIRY = '8h';
 
 // In-memory rate limiter for verify attempts by IP
 const verifyRateLimits = new Map(); // ip → { count, resetAt }
