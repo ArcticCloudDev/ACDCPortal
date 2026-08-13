@@ -88,6 +88,7 @@
             const form = document.getElementById('complete-registration-form');
             
             let currentUser = null;
+            const redirect = new URLSearchParams(window.location.search).get('redirect') || 'events.html';
 
             // Initialize Auth
             Auth.init();
@@ -106,9 +107,9 @@
                 try {
                     currentUser = await API.users.get(authUser.email);
                     
-                    // If profile is already complete, redirect to events list
+                    // If profile is already complete, continue the originating flow.
                     if (currentUser.profileComplete) {
-                        window.location.href = 'events.html';
+                        window.location.href = redirect;
                         return;
                     }
                 } catch (error) {
@@ -226,8 +227,8 @@
                         profileComplete: true
                     });
                     
-                    // Redirect to events list
-                    window.location.href = 'events.html';
+                    // Continue the flow that required profile completion.
+                    window.location.href = redirect;
                     
                 } catch (error) {
                     errorDiv.textContent = error.message || 'Registration failed. Please try again.';

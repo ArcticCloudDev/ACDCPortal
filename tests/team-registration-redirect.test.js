@@ -17,5 +17,13 @@ assert.match(registerPage, /isTeamIntent \? 'team-login' : 'login'/);
 assert.match(registerPage, /flowMode === 'team-login'/);
 assert.match(eventPage, /get\('action'\) === 'create-team'/);
 assert.match(eventPage, /create-team-btn'\)\.click\(\)/);
+assert.match(eventPage, /complete-registration\.html\?redirect=/);
+
+const completeRegistration = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'complete-registration.html'),
+    'utf8'
+);
+assert.match(completeRegistration, /get\('redirect'\) \|\| 'events\.html'/);
+assert.match(completeRegistration, /window\.location\.href = redirect/);
 
 console.log('PASS: Signed-in Register Team requests open the event team-creation flow');

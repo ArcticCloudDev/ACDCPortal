@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Get event ID from URL
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('id');
+    const completeProfileUrl = `complete-registration.html?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
     
     if (!eventId) {
         window.location.href = 'events.html';
@@ -52,7 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentUser = await API.users.getOrNull(authUser.email);
             
             if (!currentUser) {
-                window.location.href = 'complete-registration.html';
+                window.location.href = completeProfileUrl;
                 return;
             }
             
@@ -67,13 +68,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 } catch (e) { /* ignore */ }
                 if (!hasExistingRelationship) {
-                    window.location.href = 'complete-registration.html';
+                    window.location.href = completeProfileUrl;
                     return;
                 }
             }
         } catch (error) {
             console.error('Error loading user:', error);
-            window.location.href = 'complete-registration.html';
+            window.location.href = completeProfileUrl;
             return;
         }
         
