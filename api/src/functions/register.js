@@ -7,6 +7,7 @@ const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
+const { requireAuth } = require('../shared/auth');
 const ParticipationsStore = new (Storage.Storage)('participations');
 
 // Phase 1: Start registration - validate captcha, store pending data
@@ -244,6 +245,13 @@ app.http('register-complete', {
         context.log('Register complete called');
         
         try {
+            // A pending registration is not proof of mailbox ownership. Only the
+            // JWT issued by auth/verify-otp can complete it.
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
             const body = await request.json();
             const { email } = body;
             
@@ -254,8 +262,16 @@ app.http('register-complete', {
                 };
             }
             
+            const normalizedEmail = email.toLowerCase().trim();
+            if (auth.user.email?.toLowerCase() !== normalizedEmail) {
+                return {
+                    status: 403,
+                    jsonBody: { message: 'Authenticated email does not match registration' }
+                };
+            }
+
             // Check if already fully registered
-            const existingUser = await Storage.users.getByEmail(email);
+            const existingUser = await Storage.users.getByEmail(normalizedEmail);
             if (existingUser) {
                 // Already done — could be a double-submit. Just return success.
                 return {
@@ -269,7 +285,7 @@ app.http('register-complete', {
             }
             
             // Retrieve pending registration data from server storage
-            const pending = await Storage.pendingRegistrations.getByEmail(email);
+            const pending = await Storage.pendingRegistrations.getByEmail(normalizedEmail);
             if (!pending) {
                 return {
                     status: 400,
@@ -296,7 +312,7 @@ app.http('register-complete', {
             
             const user = {
                 id: userId,
-                email: email.toLowerCase().trim(),
+                email: normalizedEmail,
                 firstName,
                 lastName,
                 phone: phone || null,
@@ -308,7 +324,7 @@ app.http('register-complete', {
             };
             
             await Storage.users.create(user);
-            await Storage.allowedEmails.add(email, null);
+            await Storage.allowedEmails.add(normalizedEmail, null);
             
             // Create team only for team registrations
             let teamId = null;
@@ -357,7 +373,7 @@ app.http('register-complete', {
                 const participation = {
                     id: uuidv4(),
                     userId: userId,
-                    email: email.toLowerCase().trim(),
+                    email: normalizedEmail,
                     eventId: resolvedEventId,
                     roles: roles,
                     teamId: teamId,
