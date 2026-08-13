@@ -13,6 +13,8 @@ const eventPage = fs.readFileSync(
 
 assert.match(registerPage, /Auth\.isLoggedIn\(\) && isTeamIntent/);
 assert.match(registerPage, /event\.html\?id=\$\{encodeURIComponent\(eventId\)\}&action=create-team/);
+assert.match(registerPage, /isTeamIntent \? 'team-login' : 'login'/);
+assert.match(registerPage, /flowMode === 'team-login'/);
 assert.match(eventPage, /get\('action'\) === 'create-team'/);
 assert.match(eventPage, /create-team-btn'\)\.click\(\)/);
 

@@ -21,7 +21,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Store form data between steps
     let pendingFormData = null;
-    // Track flow: 'login', 'register-profile', 'register-team', 'interest-login', 'interest-register'
+    // Track flow: 'login', 'team-login', 'register-profile', 'register-team',
+    // 'interest-login', 'interest-register'
     let flowMode = null;
     // Store the email being used
     let currentEmail = '';
@@ -96,7 +97,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (result.allowed && !result.isNewUser) {
                 // Known user → LOGIN flow: auto-send OTP
-                flowMode = isInterestIntent ? 'interest-login' : 'login';
+                flowMode = isInterestIntent
+                    ? 'interest-login'
+                    : (isTeamIntent ? 'team-login' : 'login');
 
                 // Try to auto-send OTP immediately
                 let sendError = null;
@@ -246,7 +249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         errorDiv.classList.add('hidden');
 
         try {
-            const isLoginFlow = flowMode === 'login' || flowMode === 'interest-login';
+            const isLoginFlow = flowMode === 'login' || flowMode === 'team-login' || flowMode === 'interest-login';
             const emailToVerify = isLoginFlow ? currentEmail : pendingFormData.email;
 
             // Verify the OTP code � returns JWT + user data
@@ -267,6 +270,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (flowMode === 'interest-login') {
                 // Known user + interest: record interest, show success
                 await recordInterestAndShow();
+            } else if (flowMode === 'team-login') {
+                // Known user requested team registration before signing in.
+                window.location.href = `/event.html?id=${encodeURIComponent(eventId)}&action=create-team`;
             } else if (flowMode === 'login') {
                 // LOGIN flow: JWT set → redirect immediately
                 const redirect = urlParams.get('redirect') || '/events.html';
@@ -430,7 +436,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
 
             case 'otp':
-                if (flowMode === 'login' || flowMode === 'interest-login') {
+                if (flowMode === 'login' || flowMode === 'team-login' || flowMode === 'interest-login') {
                     updateProgress(2); // Login: Email(1) → Verify(2)
                     welcomeBack.classList.remove('hidden');
                     document.getElementById('verify-btn-text').textContent = 'Verify & Sign In →';
