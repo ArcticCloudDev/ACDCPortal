@@ -170,7 +170,7 @@ function participationRowToJs(row) {
         obj.teamMemberships = [{
             teamId: obj.teamId,
             isAdmin: !!obj.isTeamAdmin,
-            isParticipant: true
+            isParticipant: obj.roles.includes('participant')
         }];
     }
     // Assemble hotelNights object from BIT columns

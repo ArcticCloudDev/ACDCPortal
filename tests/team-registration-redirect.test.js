@@ -38,6 +38,12 @@ assert.match(teamsApi, /await Storage\.teams\.delete\(teamId\)/);
 assert.match(teamsApi, /teamId,\s*isTeamAdmin: true/);
 assert.match(teamsApi, /profileVerification: true/);
 
+const storage = fs.readFileSync(
+    path.join(__dirname, '..', 'api', 'src', 'shared', 'storage-sql.js'),
+    'utf8'
+);
+assert.match(storage, /isParticipant: obj\.roles\.includes\('participant'\)/);
+
 const eventMarkup = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'event.html'),
     'utf8'
