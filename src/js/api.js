@@ -501,10 +501,10 @@ const API = {
             });
         },
 
-        async updateRoles(participationId, teamId, isAdmin, isParticipant) {
+        async updateRoles(participationId, teamId, isAdmin, isParticipant, confirmCommitmentIncrease = false) {
             return API.request(`/participations/${participationId}/team-membership/${teamId}/roles`, {
                 method: 'PUT',
-                body: JSON.stringify({ isAdmin, isParticipant })
+                body: JSON.stringify({ isAdmin, isParticipant, confirmCommitmentIncrease })
             });
         },
 

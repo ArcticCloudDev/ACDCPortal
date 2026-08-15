@@ -1711,7 +1711,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!rolesTab.classList.contains('hidden')) {
                 const isAdmin = document.getElementById('edit-isAdmin').checked;
                 const isParticipant = document.getElementById('edit-isParticipant').checked;
-                await API.participations.updateRoles(participationId, teamId, isAdmin, isParticipant);
+                try {
+                    await API.participations.updateRoles(participationId, teamId, isAdmin, isParticipant);
+                } catch (roleError) {
+                    if (!roleError.requiresCommitmentIncrease) throw roleError;
+
+                    const confirmed = confirm(
+                        `${roleError.message}\n\nDo you want to commit to ${roleError.newCommittedParticipants} participant places?`
+                    );
+                    if (!confirmed) throw new Error('Participant role was not added.');
+
+                    await API.participations.updateRoles(
+                        participationId,
+                        teamId,
+                        isAdmin,
+                        isParticipant,
+                        true
+                    );
+                }
             }
             
             successDiv.textContent = 'Saved!';

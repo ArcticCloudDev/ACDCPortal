@@ -34,6 +34,52 @@ function generateId() {
     return uuidv4();
 }
 
+async function enforceParticipantCapacity(participation, teamId, participations, confirmCommitmentIncrease = false) {
+    if (!teamId || participation.roles?.includes('participant')) return null;
+
+    const teams = await teamsStorage.getAll();
+    const team = teams.find(candidate => candidate.id === teamId);
+    if (!team) return { status: 404, jsonBody: { error: 'Team not found' } };
+
+    const events = await eventsStorage.getAll();
+    const event = events.find(candidate => candidate.id === participation.eventId);
+    const maxSize = event?.maxTeamSize || 5;
+    const currentCount = participations.filter(candidate =>
+        candidate.teamId === teamId
+        && candidate.roles?.includes('participant')
+        && candidate.id !== participation.id
+    ).length;
+
+    if (currentCount >= maxSize) {
+        return {
+            status: 400,
+            jsonBody: { error: `Team has reached maximum of ${maxSize} participants`, currentCount }
+        };
+    }
+
+    const committedParticipants = team.numberOfParticipants || event?.minTeamSize || 3;
+    if (currentCount < committedParticipants) return null;
+
+    const newCommittedParticipants = currentCount + 1;
+    if (!confirmCommitmentIncrease) {
+        return {
+            status: 409,
+            jsonBody: {
+                error: `All ${committedParticipants} committed participant places are filled. Adding this person increases the commitment to ${newCommittedParticipants}.`,
+                requiresCommitmentIncrease: true,
+                currentCommittedParticipants: committedParticipants,
+                newCommittedParticipants
+            }
+        };
+    }
+
+    await teamsStorage.update(teamId, {
+        numberOfParticipants: newCommittedParticipants,
+        updatedAt: new Date().toISOString()
+    });
+    return null;
+}
+
 // ============================================================
 // HELPERS: Financial rows
 // ============================================================
@@ -580,7 +626,7 @@ app.http('participations-update-roles-v2', {
 
             const id = request.params.id;
             const body = await request.json();
-            const { add, remove, set } = body;
+            const { add, remove, set, confirmCommitmentIncrease = false } = body;
 
             const participations = await participationsStorage.getAll();
             const index = participations.findIndex(p => p.id === id);
@@ -625,6 +671,16 @@ app.http('participations-update-roles-v2', {
                 if (remove && Array.isArray(remove)) {
                     roles = roles.filter(r => !remove.includes(r));
                 }
+            }
+
+            if (roles.includes('participant') && !participation.roles?.includes('participant') && participation.teamId) {
+                const capacityError = await enforceParticipantCapacity(
+                    participation,
+                    participation.teamId,
+                    participations,
+                    confirmCommitmentIncrease
+                );
+                if (capacityError) return capacityError;
             }
 
             participation.roles = roles;
@@ -677,7 +733,7 @@ app.http('participations-assign-team', {
 
             const id = request.params.id;
             const body = await request.json();
-            const { teamId, isTeamAdmin, isParticipant = true } = body;
+            const { teamId, isTeamAdmin, isParticipant = true, confirmCommitmentIncrease = false } = body;
 
             const participations = await participationsStorage.getAll();
             const index = participations.findIndex(p => p.id === id);
@@ -702,20 +758,10 @@ app.http('participations-assign-team', {
 
                 if (!participation.roles) participation.roles = [];
                 if (isParticipant) {
-                    // Check max team size only when this person is competing.
-                    const events = await eventsStorage.getAll();
-                    const event = events.find(e => e.id === participation.eventId);
-                    const maxSize = event?.maxTeamSize || 5;
-                    const currentCount = participations.filter(p =>
-                        p.teamId === teamId && p.roles?.includes('participant') && p.id !== id
-                    ).length;
-
-                    if (currentCount >= maxSize) {
-                        return {
-                            status: 400,
-                            jsonBody: { error: `Team has reached maximum of ${maxSize} participants`, currentCount }
-                        };
-                    }
+                    const capacityError = await enforceParticipantCapacity(
+                        participation, teamId, participations, confirmCommitmentIncrease
+                    );
+                    if (capacityError) return capacityError;
                     if (!participation.roles.includes('participant')) participation.roles.push('participant');
                 } else {
                     participation.roles = participation.roles.filter(role => role !== 'participant');
@@ -1003,7 +1049,7 @@ app.http('participations-add-team-membership', {
 
             const id = request.params.id;
             const body = await request.json();
-            const { teamId, isAdmin, isParticipant } = body;
+            const { teamId, isAdmin, isParticipant, confirmCommitmentIncrease = false } = body;
 
             if (!teamId) {
                 return { status: 400, jsonBody: { error: 'teamId is required' } };
@@ -1031,20 +1077,10 @@ app.http('participations-add-team-membership', {
                     };
                 }
 
-                const events = await eventsStorage.getAll();
-                const event = events.find(e => e.id === participation.eventId);
-                const maxSize = event?.maxTeamSize || 5;
-
-                const currentCount = participations.filter(p =>
-                    p.teamId === teamId && p.roles?.includes('participant') && p.id !== id
-                ).length;
-
-                if (currentCount >= maxSize) {
-                    return {
-                        status: 400,
-                        jsonBody: { error: `Team has reached maximum of ${maxSize} participants`, currentCount }
-                    };
-                }
+                const capacityError = await enforceParticipantCapacity(
+                    participation, teamId, participations, confirmCommitmentIncrease
+                );
+                if (capacityError) return capacityError;
             }
 
             // Update new model
@@ -1211,7 +1247,7 @@ app.http('participations-toggle-participant', {
             const id = request.params.id;
             const teamId = request.params.teamId;
             const body = await request.json();
-            const { isParticipant } = body;
+            const { isParticipant, confirmCommitmentIncrease = false } = body;
 
             const participations = await participationsStorage.getAll();
             const index = participations.findIndex(p => p.id === id);
@@ -1229,6 +1265,10 @@ app.http('participations-toggle-participant', {
             // Update new model
             if (!participation.roles) participation.roles = [];
             if (isParticipant) {
+                const capacityError = await enforceParticipantCapacity(
+                    participation, teamId, participations, confirmCommitmentIncrease
+                );
+                if (capacityError) return capacityError;
                 if (!participation.roles.includes('participant')) participation.roles.push('participant');
                 participation.teamId = teamId;
             } else {
@@ -1287,7 +1327,7 @@ app.http('participations-update-team-roles', {
             const id = request.params.id;
             const teamId = request.params.teamId;
             const body = await request.json();
-            const { isAdmin, isParticipant } = body;
+            const { isAdmin, isParticipant, confirmCommitmentIncrease = false } = body;
 
             const participations = await participationsStorage.getAll();
             const index = participations.findIndex(p => p.id === id);
@@ -1311,20 +1351,10 @@ app.http('participations-update-team-roles', {
                     };
                 }
 
-                const events = await eventsStorage.getAll();
-                const event = events.find(e => e.id === participation.eventId);
-                const maxSize = event?.maxTeamSize || 5;
-
-                const currentCount = participations.filter(p =>
-                    p.teamId === teamId && p.roles?.includes('participant') && p.id !== id
-                ).length;
-
-                if (currentCount >= maxSize) {
-                    return {
-                        status: 400,
-                        jsonBody: { error: `Team has reached maximum of ${maxSize} participants`, currentCount }
-                    };
-                }
+                const capacityError = await enforceParticipantCapacity(
+                    participation, teamId, participations, confirmCommitmentIncrease
+                );
+                if (capacityError) return capacityError;
             }
 
             // Update new model
