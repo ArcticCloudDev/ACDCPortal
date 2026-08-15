@@ -3,7 +3,14 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
-const { rateLimits, checkRateLimit } = require('./auth-send-otp');
+const { checkRateLimit } = require('./auth-send-otp');
+
+// Email routing checks are not OTP deliveries. Keep their counters separate so
+// a normal check → send → retry journey does not exhaust the OTP send quota.
+const checkRateLimits = {
+    byEmail: new Map(),
+    byIp: new Map()
+};
 
 app.http('auth-check-email', {
     methods: ['POST'],
@@ -27,7 +34,7 @@ app.http('auth-check-email', {
             const clientIp = request.headers.get('x-forwarded-for') ||
                 request.headers.get('x-client-ip') || 'unknown';
 
-            const ipCheck = checkRateLimit(rateLimits.byIp, clientIp, 10);
+            const ipCheck = checkRateLimit(checkRateLimits.byIp, clientIp, 20);
             if (!ipCheck.allowed) {
                 return {
                     status: 429,
@@ -35,7 +42,7 @@ app.http('auth-check-email', {
                 };
             }
 
-            const emailCheck = checkRateLimit(rateLimits.byEmail, normalizedEmail, 10);
+            const emailCheck = checkRateLimit(checkRateLimits.byEmail, normalizedEmail, 20);
             if (!emailCheck.allowed) {
                 return {
                     status: 429,
