@@ -62,33 +62,6 @@ app.http('email-campaigns-list', {
     }
 });
 
-app.http('campaigns-get', {
-    methods: ['GET'],
-    authLevel: 'function',
-    route: 'campaigns/{id}',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const campaignId = request.params.id;
-            const campaign = await campaignsStorage.getById(campaignId);
-
-            if (!campaign) {
-                return { status: 404, jsonBody: { error: 'Campaign not found' } };
-            }
-
-            return { status: 200, jsonBody: campaign };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Campaign get error:', error);
-            return { status: 500, jsonBody: { error: 'Failed to get campaign' } };
-        }
-    }
-});
-
 app.http('email-campaigns-get', {
     methods: ['GET'],
     authLevel: 'function',
@@ -141,49 +114,6 @@ app.http('email-campaigns-get', {
     }
 });
 
-app.http('campaigns-create', {
-    methods: ['POST'],
-    authLevel: 'function',
-    route: 'campaigns',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const body = await request.json();
-            const { sequenceId, subject, content, ctaUrl, ctaText, type, sequenceOrder, status, scheduledSendTime } = body;
-
-            if (!subject || !content) {
-                return { status: 400, jsonBody: { error: 'subject and content are required' } };
-            }
-
-            const campaign = {
-                id: generateId(),
-                sequenceId: sequenceId || null,
-                subject,
-                content,
-                ctaUrl: ctaUrl || null,
-                ctaText: ctaText || null,
-                type: type || 'sequence',
-                sequenceOrder: sequenceOrder || null,
-                status: status || 'draft',
-                scheduledSendTime: scheduledSendTime || null,
-                createdAt: new Date().toISOString()
-            };
-
-            await campaignsStorage.create(campaign);
-
-            return { status: 201, jsonBody: campaign };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Campaign create error:', error);
-            return { status: 500, jsonBody: { error: 'Failed to create campaign' } };
-        }
-    }
-});
-
 app.http('email-campaigns-create', {
     methods: ['POST'],
     authLevel: 'function',
@@ -232,47 +162,6 @@ app.http('email-campaigns-create', {
     }
 });
 
-app.http('campaigns-update', {
-    methods: ['PUT'],
-    authLevel: 'function',
-    route: 'campaigns/{id}',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const campaignId = request.params.id;
-            const body = await request.json();
-
-            const campaign = await campaignsStorage.getById(campaignId);
-            if (!campaign) {
-                return { status: 404, jsonBody: { error: 'Campaign not found' } };
-            }
-
-            const updates = {};
-            if (body.subject !== undefined) updates.subject = body.subject;
-            if (body.content !== undefined) updates.content = body.content;
-            if (body.ctaUrl !== undefined) updates.ctaUrl = body.ctaUrl;
-            if (body.ctaText !== undefined) updates.ctaText = body.ctaText;
-            if (body.type !== undefined) updates.type = body.type;
-            if (body.sequenceOrder !== undefined) updates.sequenceOrder = body.sequenceOrder;
-            if (body.status !== undefined) updates.status = body.status;
-            if (body.scheduledSendTime !== undefined) updates.scheduledSendTime = body.scheduledSendTime;
-            updates.updatedAt = new Date().toISOString();
-
-            const updated = await campaignsStorage.update(campaignId, updates);
-
-            return { status: 200, jsonBody: updated };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Campaign update error:', error);
-            return { status: 500, jsonBody: { error: 'Failed to update campaign' } };
-        }
-    }
-});
-
 app.http('email-campaigns-update', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -309,39 +198,6 @@ app.http('email-campaigns-update', {
             await logError(context, error);
             context.error('Campaign update error:', error);
             return { status: 500, jsonBody: { error: 'Failed to update campaign' } };
-        }
-    }
-});
-
-app.http('campaigns-delete', {
-    methods: ['DELETE'],
-    authLevel: 'function',
-    route: 'campaigns/{id}',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const campaignId = request.params.id;
-
-            const exists = await campaignsStorage.getById(campaignId);
-            if (!exists) {
-                return { status: 404, jsonBody: { error: 'Campaign not found' } };
-            }
-            await campaignsStorage.delete(campaignId);
-
-            const allDeliveriesForCampaign = await deliveriesStorage.getAll();
-            for (const d of allDeliveriesForCampaign.filter(d => d.campaignId === campaignId)) {
-                await deliveriesStorage.delete(d.id);
-            }
-
-            return { status: 200, jsonBody: { message: 'Campaign deleted' } };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Campaign delete error:', error);
-            return { status: 500, jsonBody: { error: 'Failed to delete campaign' } };
         }
     }
 });

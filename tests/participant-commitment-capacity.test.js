@@ -19,8 +19,8 @@ assert.match(participations, /requiresCommitmentIncrease:\s*true/);
 assert.match(participations, /status:\s*409/);
 assert.match(participations, /numberOfParticipants:\s*newCommittedParticipants/);
 assert.ok(
-    (participations.match(/enforceParticipantCapacity\(/g) || []).length >= 6,
-    'every participant-promotion endpoint must use the shared capacity guard'
+    (participations.match(/await enforceParticipantCapacity\(/g) || []).length >= 3,
+    'every participant-promotion endpoint (update-roles-v2, assign-team, update-team-roles) must use the shared capacity guard'
 );
 assert.match(eventPage, /Do you want to commit to \$\{roleError\.newCommittedParticipants\} participant places/);
 assert.match(apiClient, /confirmCommitmentIncrease = false/);

@@ -47,20 +47,6 @@ const API = {
                 method: 'POST',
                 body: JSON.stringify(data)
             });
-        },
-
-        async initiate(data) {
-            return API.request('/register/initiate', {
-                method: 'POST',
-                body: JSON.stringify(data)
-            });
-        },
-
-        async verify(data) {
-            return API.request('/register/verify', {
-                method: 'POST',
-                body: JSON.stringify(data)
-            });
         }
     },
 
@@ -175,13 +161,6 @@ const API = {
     },
 
     members: {
-        async add(teamId, email) {
-            return API.request('/members', {
-                method: 'POST',
-                body: JSON.stringify({ teamId, email })
-            });
-        },
-
         async remove(teamId, userId) {
             return API.request(`/members/${userId}`, {
                 method: 'DELETE',
@@ -457,26 +436,6 @@ const API = {
             return API.request(`/participations/${participationId}/team`, {
                 method: 'PUT',
                 body: JSON.stringify({ teamId, isTeamAdmin, isParticipant })
-            });
-        },
-
-        async addTeamMembership(participationId, teamId, isAdmin, isParticipant) {
-            return API.request(`/participations/${participationId}/team-membership`, {
-                method: 'POST',
-                body: JSON.stringify({ teamId, isAdmin, isParticipant })
-            });
-        },
-
-        async removeTeamMembership(participationId, teamId) {
-            return API.request(`/participations/${participationId}/team-membership/${teamId}`, {
-                method: 'DELETE'
-            });
-        },
-
-        async toggleParticipant(participationId, teamId, isParticipant) {
-            return API.request(`/participations/${participationId}/team-membership/${teamId}/participant`, {
-                method: 'PUT',
-                body: JSON.stringify({ isParticipant })
             });
         },
 

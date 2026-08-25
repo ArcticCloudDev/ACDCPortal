@@ -8,12 +8,11 @@ const Storage = require('../shared/storage');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const path = require('path');
+const { sendSequenceDigest } = require('../shared/sequence-digest');
 
 const InvitationsStore = new Storage.Storage('invitations');
 const ParticipationsStore = new Storage.Storage('participations');
 const UsersStore = new Storage.Storage('users');
-const EmailDeliveriesStore = new Storage.Storage('email-deliveries');
-const EmailCampaignsStore = new Storage.Storage('email-campaigns');
 
 async function isInvitationAuthorized(user, invitation) {
     if (!user) return false;
@@ -28,139 +27,13 @@ async function isInvitationAuthorized(user, invitation) {
 }
 
 async function triggerSequenceEmailsForInvite(userId, userEmail, eventId, context) {
-    try {
-        const user = await Storage.users.getById(userId);
-        const email = user?.email || userEmail;
-        const firstName = user?.firstName || 'Participant';
-
-        if (!email) {
-            context.log(`No email found for sequence emails: ${userId}`);
-            return;
-        }
-
-        const event = await Storage.events.getById(eventId);
-        if (!event || !event.sequenceEnabled || !event.sequenceId) {
-            context.log(`Event ${eventId} not found or sequence not enabled`);
-            return;
-        }
-
-        const campaigns = await EmailCampaignsStore.getAll();
-        const sequenceCampaigns = campaigns
-            .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence' && c.status === 'live')
-            .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
-
-        if (sequenceCampaigns.length === 0) {
-            context.log(`No sequence campaigns for sequence ${event.sequenceId} (event ${eventId})`);
-            return;
-        }
-
-        const allDeliveries = await EmailDeliveriesStore.getAll();
-        const userDeliveries = new Set(
-            allDeliveries
-                .filter(d => d.email.toLowerCase() === email.toLowerCase() && d.status === 'sent')
-                .map(d => d.campaignId)
-        );
-
-        const campaignsToSend = sequenceCampaigns.filter(c => !userDeliveries.has(c.id));
-        if (campaignsToSend.length === 0) {
-            context.log(`All sequence emails already sent to ${email}`);
-            return;
-        }
-
-        const messageBlocks = campaignsToSend.map((campaign, index) => `
-            <tr>
-                <td style="padding: 0;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                        <tr>
-                            <td style="background-color: #1e293b; padding: 14px 40px;">
-                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                                    <tr>
-                                        <td>
-                                            <span style="color: #ffffff; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">UPDATE ${index + 1} OF ${campaignsToSend.length}</span>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding-top: 4px;">
-                                            <span style="color: #ffffff; font-size: 18px; font-weight: 700;">${campaign.subject}</span>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 28px 40px 8px 40px; color: #334155; font-size: 15px; line-height: 1.75;">
-                                ${campaign.content}
-                            </td>
-                        </tr>
-                        ${campaign.ctaUrl ? `
-                        <tr>
-                            <td style="padding: 0 40px 32px 40px; text-align: center;">
-                                <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
-                                    <tr>
-                                        <td align="center" bgcolor="#1d4ed8" style="background-color: #1d4ed8; border-radius: 8px; padding: 14px 36px;">
-                                            <a href="${campaign.ctaUrl}" style="display: block; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; line-height: 1.2;">
-                                                ${campaign.ctaText || 'Learn More'}
-                                            </a>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </td>
-                        </tr>
-                        ` : `<tr><td style="padding-bottom: 32px;"></td></tr>`}
-                    </table>
-                </td>
-            </tr>
-        `).join('');
-
-        const digestTemplatePath = path.join(__dirname, '../../data/email-templates/sequence-digest.html');
-        const digestTemplate = await fs.readFile(digestTemplatePath, 'utf-8');
-        const digestHtml = processTemplate(digestTemplate, {
-            eventName: event.name,
-            firstName: firstName,
-            digestCount: campaignsToSend.length.toString(),
-            digestContent: messageBlocks,
-            year: new Date().getFullYear().toString()
-        });
-
-        try {
-            await sendEmail({
-                to: email,
-                subject: `${event.name} - Important Updates`,
-                htmlContent: digestHtml
-            });
-
-            for (const campaign of campaignsToSend) {
-                await EmailDeliveriesStore.create({
-                    id: uuidv4(),
-                    campaignId: campaign.id,
-                    email: email,
-                    userId: userId,
-                    status: 'sent',
-                    sentAt: new Date().toISOString(),
-                    sentVia: 'digest',
-                    createdAt: new Date().toISOString()
-                });
-            }
-            context.log(`Sent digest of ${campaignsToSend.length} sequence emails to ${email} for event ${eventId}`);
-        } catch (err) {
-            await logError(context, err);
-            for (const campaign of campaignsToSend) {
-                await EmailDeliveriesStore.create({
-                    id: uuidv4(),
-                    campaignId: campaign.id,
-                    email: email,
-                    userId: userId,
-                    status: 'failed',
-                    error: err.message,
-                    createdAt: new Date().toISOString()
-                });
-            }
-            context.log(`Failed to send digest to ${email}: ${err.message}`);
-        }
-    } catch (error) {
-        await logError(context, error);
-        context.log(`Warning: Failed to trigger sequence emails: ${error.message}`);
-    }
+    const user = await Storage.users.getById(userId);
+    return sendSequenceDigest({
+        eventId,
+        email: user?.email || userEmail,
+        firstName: user?.firstName || 'Participant',
+        userId
+    }, context);
 }
 
 async function buildTeamWelcomeEmailForInvitation(invitation, context) {

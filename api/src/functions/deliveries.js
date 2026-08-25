@@ -10,38 +10,6 @@ const campaignsStorage = new Storage('email-campaigns');
 const eventsStorage = new Storage('events');
 const usersStorage = new Storage('users');
 const participationsStorage = new Storage('participations');
-const runsStorage = new Storage('scheduled-runs');
-
-app.http('deliveries-scheduled-runs', {
-    methods: ['GET'],
-    authLevel: 'function',
-    route: 'deliveries/scheduled-runs',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const allRuns = await runsStorage.getAll();
-            const recentRuns = allRuns
-                .sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
-                .slice(0, 10);
-
-            return {
-                status: 200,
-                jsonBody: { runs: recentRuns }
-            };
-        } catch (err) {
-            await logError(context, err);
-            context.error('Failed to get scheduled runs:', err);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to get scheduled runs' }
-            };
-        }
-    }
-});
 
 app.http('deliveries-event', {
     methods: ['GET'],
