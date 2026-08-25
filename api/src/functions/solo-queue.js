@@ -208,6 +208,10 @@ app.http('solo-queue-position', {
 
             const { eventId, userId } = request.params;
 
+            if (userId !== auth.user.userId && !auth.user.isPortalAdmin) {
+                return { status: 403, jsonBody: { error: 'You can only check your own queue position' } };
+            }
+
             const queue = await soloQueueStorage.getAll();
             const eventQueue = queue.filter(q => q.eventId === eventId && q.status === 'waiting');
             eventQueue.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));

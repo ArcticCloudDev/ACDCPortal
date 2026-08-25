@@ -1,5 +1,5 @@
 const { app } = require('@azure/functions');
-const { requireAuth, canManageUser } = require('../shared/auth');
+const { requireAuth, canManageUser, hasEventRole } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { v4: uuidv4 } = require('uuid');
 const { Storage } = require('../shared/storage');
@@ -662,6 +662,32 @@ app.http('participations-by-event', {
                 results = results.filter(p => p.roles.includes(role));
             }
 
+            const isStaff = auth.user.isPortalAdmin
+                || hasEventRole(auth.user, eventId, 'judge', participations)
+                || hasEventRole(auth.user, eventId, 'committee', participations);
+
+            if (!isStaff) {
+                const callerTeamIds = new Set(
+                    results
+                        .filter(p => p.userId === auth.user.userId)
+                        .flatMap(p => (p.teamMemberships || []).map(m => m.teamId))
+                );
+                // Regular participants only get membership data, never other people's contact or hotel details.
+                results = results.map(p => {
+                    const sharesTeam = (p.teamMemberships || []).some(m => callerTeamIds.has(m.teamId));
+                    return {
+                        id: p.id,
+                        userId: p.userId,
+                        eventId: p.eventId,
+                        teamId: p.teamId,
+                        isTeamAdmin: p.isTeamAdmin,
+                        roles: p.roles,
+                        teamMemberships: p.teamMemberships,
+                        ...(sharesTeam ? { hotelNights: p.hotelNights } : {})
+                    };
+                });
+            }
+
             return { status: 200, jsonBody: results };
         } catch (error) {
             await logError(context, error);
@@ -683,6 +709,11 @@ app.http('participations-by-person', {
             }
 
             const email = decodeURIComponent(request.params.email);
+
+            const isSelf = auth.user.email && email.toLowerCase() === auth.user.email.toLowerCase();
+            if (!isSelf && !auth.user.isPortalAdmin) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to view these participations' } };
+            }
 
             const participations = await participationsStorage.getAll();
             const personParticipations = participations.filter(p =>
@@ -713,42 +744,6 @@ app.http('participations-by-person', {
         } catch (error) {
             await logError(context, error);
             context.error('Error getting participations by person:', error);
-            return { status: 500, jsonBody: { error: 'Failed to get participations' } };
-        }
-    }
-});
-
-app.http('participations-by-team', {
-    methods: ['GET'],
-    authLevel: 'function',
-    route: 'participations/team/{teamId}',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context);
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const teamId = request.params.teamId;
-            const participations = await participationsStorage.getAll();
-
-            let teamParticipations = participations.filter(p => p.teamId === teamId);
-
-            if (teamParticipations.length === 0) {
-                teamParticipations = participations.filter(p => {
-                    const memberships = p.teamMemberships || [];
-                    return memberships.some(m => m.teamId === teamId);
-                });
-            }
-
-            teamParticipations.forEach(p => {
-                if (!p.roles) p.roles = migrateRoles(p);
-            });
-
-            return { status: 200, jsonBody: teamParticipations };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Error getting participations by team:', error);
             return { status: 500, jsonBody: { error: 'Failed to get participations' } };
         }
     }

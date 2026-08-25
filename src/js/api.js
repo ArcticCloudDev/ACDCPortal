@@ -456,10 +456,6 @@ const API = {
             return API.request(url);
         },
 
-        async getByTeam(teamId) {
-            return API.request(`/participations/team/${teamId}`);
-        },
-
         async getByPerson(email) {
             return API.request(`/participations/person/${encodeURIComponent(email)}`);
         },
