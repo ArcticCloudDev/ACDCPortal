@@ -32,12 +32,14 @@ app.http('scheduled-emails-run', {
     route: 'scheduled-emails/run',
     handler: async (request, context) => {
         const expectedSecret = process.env.SCHEDULER_SECRET;
-        if (expectedSecret) {
-            const provided = request.headers.get('x-scheduler-secret');
-            if (!provided || !safeEqual(provided, expectedSecret)) {
-                context.warn('[SCHEDULED] Unauthorized call - bad or missing secret');
-                return { status: 401, jsonBody: { error: 'Unauthorized' } };
-            }
+        if (!expectedSecret) {
+            context.error('[SCHEDULED] SCHEDULER_SECRET is not configured');
+            return { status: 503, jsonBody: { error: 'Scheduler unavailable' } };
+        }
+        const provided = request.headers.get('x-scheduler-secret');
+        if (!provided || !safeEqual(provided, expectedSecret)) {
+            context.warn('[SCHEDULED] Unauthorized call - bad or missing secret');
+            return { status: 401, jsonBody: { error: 'Unauthorized' } };
         }
         context.log('[MANUAL] Triggering scheduled email check');
         const result = await processScheduledEmails(context);
