@@ -6,9 +6,7 @@
     <title>People - ACDC Committee</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <style>
-        /* ── Toolbar ────────────────────────────────────────────── */
-        .toolbar {
+    <style>        .toolbar {
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
@@ -61,7 +59,6 @@
 
         .toolbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 
-        /* ── Stats ─────────────────────────────────────────────── */
         .stats-row {
             display: flex;
             flex-wrap: wrap;
@@ -102,7 +99,6 @@
         .stat-info .value { font-size: 1.4rem; font-weight: 700; color: var(--admin-sidebar); line-height: 1; }
         .stat-info .label { font-size: 0.72rem; color: var(--admin-text-muted); margin-top: 2px; }
 
-        /* ── Panel ─────────────────────────────────────────────── */
         .panel {
             background: white;
             border-radius: 8px;
@@ -122,7 +118,6 @@
         .panel-title { font-size: 0.85rem; font-weight: 600; color: var(--admin-sidebar); }
         .panel-count { font-size: 0.78rem; color: var(--admin-text-muted); }
 
-        /* ── Group header rows ─────────────────────────────────── */
         .group-header-row td {
             padding: 8px 16px;
             background: #f1f5f9;
@@ -139,7 +134,6 @@
         .group-header-row:hover td { background: #e8edf5; }
         .group-toggle { float: right; font-size: 0.9rem; }
 
-        /* ── Data table ────────────────────────────────────────── */
         .data-table { width: 100%; border-collapse: collapse; }
 
         .data-table th {
@@ -166,7 +160,6 @@
         .data-table tbody tr:last-child td { border-bottom: none; }
         .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
 
-        /* ── Person cell ───────────────────────────────────────── */
         .person-cell { display: flex; align-items: center; gap: 10px; }
 
         .avatar {
@@ -186,7 +179,6 @@
         .person-name  { font-weight: 500; }
         .person-email { font-size: 0.78rem; color: var(--admin-text-muted); }
 
-        /* ── Role pills ─────────────────────────────────────────── */
         .role-pill {
             display: inline-flex; align-items: center; gap: 3px;
             padding: 2px 7px;
@@ -203,7 +195,6 @@
         .role-pill.sponsor     { background: #fce7f3; color: #9d174d; }
         .role-pill.invited     { background: #f1f5f9; color: #475569; border: 1px dashed #cbd5e1; }
 
-        /* ── Badges ─────────────────────────────────────────────── */
         .badge {
             display: inline-flex; padding: 2px 8px;
             border-radius: 4px; font-size: 0.7rem; font-weight: 500;
@@ -213,7 +204,6 @@
         .badge.accepted { background: #d1fae5; color: #065f46; }
         .badge.declined { background: #fee2e2; color: #991b1b; }
 
-        /* ── Buttons ────────────────────────────────────────────── */
         .btn-sm {
             padding: 4px 10px; font-size: 0.75rem; border-radius: 4px;
             border: 1px solid var(--admin-border);
@@ -225,7 +215,6 @@
         .btn-sm:hover { background: var(--admin-bg); }
         .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
 
-        /* ── Interest share bar ─────────────────────────────────── */
         .share-bar {
             display: flex; align-items: center; gap: 8px;
             background: var(--admin-bg);
@@ -245,7 +234,6 @@
             font-size: 0.75rem; white-space: nowrap;
         }
 
-        /* ── Drawer ─────────────────────────────────────────────── */
         .drawer-backdrop {
             display: none; position: fixed; inset: 0;
             background: rgba(0,0,0,0.25); z-index: 200;
@@ -341,10 +329,8 @@
 
         .drawer-loading { padding: 40px; text-align: center; color: var(--admin-text-muted); }
 
-        /* ── Collapsed group rows ───────────────────────────────── */
         tr.group-collapsed { display: none; }
-    </style>
-</head>
+    </style></head>
 <body>
     <div class="admin-layout">
         <div id="sidebar-container"></div>
@@ -361,7 +347,6 @@
                     <h1 class="page-title">People</h1>
                 </div>
 
-                <!-- Toolbar -->
                 <div class="toolbar">
                     <select id="filter-event">
                         <option value="">All Events</option>
@@ -396,17 +381,14 @@
                     </div>
                 </div>
 
-                <!-- Stat cards -->
                 <div class="stats-row" id="stats-row"></div>
 
-                <!-- Interest share link (shown only when interest filter active) -->
                 <div id="interest-share-bar" class="share-bar" style="display:none;">
                     <span>Interest sign-up link:</span>
                     <input type="text" id="share-link" readonly>
                     <button onclick="copyShareLink()">Copy</button>
                 </div>
 
-                <!-- Main table -->
                 <div class="panel">
                     <div class="panel-header">
                         <span class="panel-title" id="panel-title">All People</span>
@@ -423,7 +405,6 @@
         </main>
     </div>
 
-    <!-- Person detail drawer -->
     <div class="drawer-backdrop" id="drawer-backdrop" onclick="closeDrawer()"></div>
     <div class="drawer" id="person-drawer">
         <div class="drawer-header">
@@ -444,9 +425,7 @@
     <script src="js/auth.js"></script>
     <script src="js/admin-sidebar.js"></script>
     <script src="js/permissions.js"></script>
-    <script>
-        // ─── State ────────────────────────────────────────────────
-        let currentPermissions = null;
+    <script>        let currentPermissions = null;
         let allUsers           = [];
         let allParticipations  = [];
         let allEvents          = [];
@@ -454,9 +433,8 @@
         let allInvitations     = [];
         let currentView        = 'flat';
         let activeStatFilter   = null;
-        let displayRows        = [];   // current visible rows (indexed for drawer)
+        let displayRows        = [];
 
-        // ─── Boot ─────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', async () => {
             const loadingDiv = document.getElementById('loading');
             const contentDiv = document.getElementById('admin-content');
@@ -505,7 +483,6 @@
             allTeams          = teams          || [];
             allInvitations    = invitations    || [];
 
-            // Populate event filter
             const evtSel = document.getElementById('filter-event');
             allEvents
                 .sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0) || new Date(b.startDate) - new Date(a.startDate))
@@ -516,7 +493,6 @@
                     evtSel.appendChild(opt);
                 });
 
-            // Populate team filter
             const tmSel = document.getElementById('filter-team');
             allTeams
                 .sort((a, b) => (a.teamName || '').localeCompare(b.teamName || ''))
@@ -528,7 +504,6 @@
                 });
         }
 
-        // ─── Filters ──────────────────────────────────────────────
         function setupFilters() {
             ['filter-event', 'filter-group', 'filter-team'].forEach(id => {
                 document.getElementById(id).addEventListener('change', () => { activeStatFilter = null; render(); });
@@ -543,8 +518,6 @@
             render();
         }
 
-        // ─── Build unified person-event rows ──────────────────────
-        // One row = one person's relationship to one event.
         function buildRows() {
             const eventId  = document.getElementById('filter-event').value;
             const groupKey = document.getElementById('filter-group').value || activeStatFilter || '';
@@ -558,7 +531,6 @@
 
             const rows = [];
 
-            // ── From participations ──────────────────────────────
             let parts = allParticipations;
             if (eventId) parts = parts.filter(p => p.eventId === eventId);
             if (teamId)  parts = parts.filter(p => p.teamId  === teamId);
@@ -597,7 +569,6 @@
                 });
             }
 
-            // ── Portal admins with no participation ──────────────
             if (!teamId) {
                 for (const u of allUsers.filter(u2 => u2.isPortalAdmin)) {
                     const email = u.email?.toLowerCase();
@@ -621,7 +592,6 @@
                 }
             }
 
-            // ── Pending invitations not yet in participations ─────
             let invs = allInvitations.filter(inv => inv.status === 'pending');
             if (eventId) invs = invs.filter(inv => inv.eventId === eventId);
             if (teamId)  invs = invs.filter(inv => inv.teamId  === teamId);
@@ -650,7 +620,6 @@
                 });
             }
 
-            // ── Role/group filter ──────────────────────────────────
             let filtered = rows;
             if      (groupKey === 'participant')  filtered = rows.filter(r => r.primaryGroup === 'participant');
             else if (groupKey === 'judge')        filtered = rows.filter(r => r.primaryGroup === 'judge');
@@ -659,7 +628,6 @@
             else if (groupKey === 'invited')      filtered = rows.filter(r => r.primaryGroup === 'invited');
             else if (groupKey === 'no-account')   filtered = rows.filter(r => !r.hasAccount);
 
-            // ── Search ────────────────────────────────────────────
             if (search) {
                 filtered = filtered.filter(r =>
                     r.displayName.toLowerCase().includes(search) ||
@@ -672,7 +640,6 @@
             return filtered;
         }
 
-        // ─── Render ───────────────────────────────────────────────
         function render() {
             displayRows = buildRows();
             renderStats(displayRows);
@@ -722,7 +689,6 @@
             document.getElementById('interest-share-bar').style.display = gk === 'interest' ? 'flex' : 'none';
         }
 
-        // ─── Flat list ────────────────────────────────────────────
         function renderFlat(rows) {
             const noEventFilter = !document.getElementById('filter-event').value;
             document.getElementById('panel-title').textContent = buildPanelTitle();
@@ -768,7 +734,6 @@
             }).join('');
         }
 
-        // ─── By-Event grouped view ────────────────────────────────
         function renderByEvent(rows) {
             document.getElementById('panel-title').textContent = buildPanelTitle();
             document.getElementById('panel-count').textContent = `${rows.length} people`;
@@ -792,7 +757,6 @@
                 invited:     '✉️ Invited (pending)',
             };
 
-            // Sorted event keys: active first, newest first
             const eventOrder = allEvents
                 .sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0) || new Date(b.startDate) - new Date(a.startDate))
                 .map(e => e.id);
@@ -803,8 +767,6 @@
                 (byEvent[eid] = byEvent[eid] || []).push(r);
             }
 
-            // Preserve index into displayRows for drawer lookup
-            // displayRows is already set to `rows` before this function is called
             const rowIndexMap = new Map(rows.map((r, i) => [r, i]));
 
             let html = '';
@@ -873,7 +835,6 @@
             if (arrow) arrow.textContent = isCollapsed ? '▾' : '▸';
         }
 
-        // ─── Person drawer ────────────────────────────────────────
         async function openDrawer(idx) {
             const row = displayRows[idx];
             if (!row) return;
@@ -973,7 +934,6 @@
 
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
 
-        // ─── Export ───────────────────────────────────────────────
         function exportCSV() {
             if (!displayRows.length) return;
             const q = s => `"${(s || '').replace(/"/g, '""')}"`;
@@ -995,7 +955,6 @@
             URL.revokeObjectURL(a.href);
         }
 
-        // ─── Helpers ──────────────────────────────────────────────
         function buildPanelTitle() {
             const gk = document.getElementById('filter-group').value || activeStatFilter || '';
             const eid = document.getElementById('filter-event').value;

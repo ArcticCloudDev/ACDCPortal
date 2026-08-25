@@ -1,25 +1,14 @@
-// Email utility - OTP code generation and sending
-// Uses the existing mail.js (Graph API / Exchange) infrastructure for sending
 const crypto = require('crypto');
 
 const Email = {
-    /**
-     * Generate a cryptographically secure 6-digit OTP code
-     */
     generateCode() {
         return crypto.randomInt(100000, 999999).toString();
     },
 
-    /**
-     * Hash an OTP code for secure storage (SHA-256)
-     */
     hashCode(code) {
         return crypto.createHash('sha256').update(code).digest('hex');
     },
 
-    /**
-     * Timing-safe comparison of OTP codes
-     */
     verifyCode(inputCode, storedHash) {
         const inputHash = this.hashCode(inputCode);
         try {
@@ -32,20 +21,15 @@ const Email = {
         }
     },
 
-    /**
-     * Send a verification code email using the existing mail infrastructure
-     */
     async sendVerificationCode(email, code) {
-        // Always log in dev for debugging
         console.log('========================================');
         console.log(`📧 VERIFICATION EMAIL TO: ${email}`);
         console.log(`🔐 CODE: ${code}`);
         console.log('========================================');
 
-        // Send via the real mail system (Graph API / Exchange shared mailbox)
         try {
             const { sendEmail } = require('./mail');
-            
+
             const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -79,13 +63,11 @@ const Email = {
             return true;
         } catch (mailError) {
             console.error('❌ Failed to send verification email via mail system:', mailError.message);
-            // In local dev, allow continuing (code is logged to console above)
             const isLocal = !process.env.WEBSITE_HOSTNAME;
             if (isLocal) {
                 console.log('⚠️  Code was logged above for development use');
                 return true;
             }
-            // In production, propagate the error so the API can report failure
             throw new Error('Failed to send verification email. Please try again.');
         }
     }

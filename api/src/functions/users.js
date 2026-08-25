@@ -1,5 +1,3 @@
-// Users API - Get and Update user profiles
-// Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { requireAuth, canManageUser } = require('../shared/auth');
@@ -7,11 +5,8 @@ const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 const participationsStorage = new GenericStorage('participations');
 
-// Get all users (for admin dashboard)
 app.http('users-get-all', {
     methods: ['GET'],
-    // Handler enforces JWT internally via requireAuth; this remains anonymous so Azure
-    // host-level auth does not accidentally become the app's only security boundary.
     authLevel: 'anonymous',
     route: 'users/all',
     handler: async (request, context) => {
@@ -40,12 +35,8 @@ app.http('users-get-all', {
     }
 });
 
-// Get user by email (query param)
 app.http('users-get', {
     methods: ['GET'],
-    // Handler enforces JWT internally via requireAuth; this remains anonymous so Azure
-    // host-level auth does not accidentally become the app's only security boundary.
-    // This route must keep requireAuth at the top of the handler; do not remove it.
     authLevel: 'anonymous',
     route: 'users',
     handler: async (request, context) => {
@@ -59,7 +50,7 @@ app.http('users-get', {
             }
 
             const email = request.query.get('email');
-            
+
             if (email) {
                 const isSelf = auth.user.email && auth.user.email.toLowerCase() === email.toLowerCase();
                 if (!isSelf && !auth.user.isPortalAdmin) {
@@ -81,12 +72,12 @@ app.http('users-get', {
                     jsonBody: user
                 };
             }
-            
+
             return {
                 status: 400,
                 jsonBody: { message: 'Email query parameter required' }
             };
-            
+
         } catch (error) {
             await logError(context, error);
             context.error('Users GET error:', error);
@@ -98,12 +89,8 @@ app.http('users-get', {
     }
 });
 
-// Get user by ID
 app.http('users-get-by-id', {
     methods: ['GET'],
-    // Handler enforces JWT internally via requireAuth; this remains anonymous so Azure
-    // host-level auth does not accidentally become the app's only security boundary.
-    // This route must keep requireAuth at the top of the handler; do not remove it.
     authLevel: 'anonymous',
     route: 'users/{id}',
     handler: async (request, context) => {
@@ -125,7 +112,7 @@ app.http('users-get-by-id', {
                     jsonBody: { message: 'You do not have permission to view this profile' }
                 };
             }
-            
+
             const user = await Storage.users.getById(userId);
             if (!user) {
                 return {
@@ -133,12 +120,12 @@ app.http('users-get-by-id', {
                     jsonBody: { message: 'User not found' }
                 };
             }
-            
+
             return {
                 status: 200,
                 jsonBody: user
             };
-            
+
         } catch (error) {
             await logError(context, error);
             context.error('Users GET by ID error:', error);
@@ -150,12 +137,8 @@ app.http('users-get-by-id', {
     }
 });
 
-// Update user by ID
 app.http('users-update', {
     methods: ['PUT'],
-    // Handler enforces JWT internally via requireAuth; this remains anonymous so Azure
-    // host-level auth does not accidentally become the app's only security boundary.
-    // This route must keep requireAuth at the top of the handler; do not remove it.
     authLevel: 'anonymous',
     route: 'users/{id}',
     handler: async (request, context) => {
@@ -169,25 +152,20 @@ app.http('users-update', {
             }
 
             const userId = request.params.id;
-            
+
             if (!userId) {
                 return {
                     status: 400,
                     jsonBody: { message: 'User ID required' }
                 };
             }
-            
+
             const updates = await request.json();
-            
-            // Don't allow updating certain fields. isPortalAdmin can never be set through
-            // this client-facing endpoint — that would let any user grant themselves (or
-            // anyone else) admin rights. Admin promotion must happen through a separate,
-            // admin-only path.
+
             delete updates.id;
             delete updates.createdAt;
             delete updates.isPortalAdmin;
-            
-            // Get existing user to check if TBD
+
             const existingUser = await Storage.users.getById(userId);
             if (!existingUser) {
                 return {
@@ -203,15 +181,11 @@ app.http('users-update', {
                     jsonBody: { message: 'You do not have permission to modify this profile' }
                 };
             }
-            
-            // Only allow email update if this is a TBD user being converted
+
             if (updates.email && !existingUser.isTBD) {
                 delete updates.email;
             }
-            
-            // Note: Team membership and admin status is now tracked in participations.teamMemberships
-            // teamId and isTeamAdmin fields are deprecated and should not be used
-            
+
             const updatedUser = await Storage.users.update(userId, updates);
 
             context.log(`User ${userId} updated`);
@@ -219,7 +193,7 @@ app.http('users-update', {
                 status: 200,
                 jsonBody: updatedUser
             };
-            
+
         } catch (error) {
             await logError(context, error);
             context.error('Users PUT error:', error);
@@ -231,12 +205,8 @@ app.http('users-update', {
     }
 });
 
-// Create new user
 app.http('users-create', {
     methods: ['POST'],
-    // Handler enforces JWT internally via requireAuth; this remains anonymous so Azure
-    // host-level auth does not accidentally become the app's only security boundary.
-    // This route must keep requireAuth at the top of the handler; do not remove it.
     authLevel: 'anonymous',
     route: 'users',
     handler: async (request, context) => {
@@ -247,7 +217,7 @@ app.http('users-create', {
             }
 
             const userData = await request.json();
-            
+
             if (!userData.email) {
                 return {
                     status: 400,
@@ -255,12 +225,8 @@ app.http('users-create', {
                 };
             }
 
-            // isPortalAdmin can never be set through this client-facing endpoint — see
-            // the same guard in users-update for why.
             delete userData.isPortalAdmin;
 
-            // Only allow self-registration (own email) unless the caller is already a
-            // portal admin creating a record on someone else's behalf.
             const isSelf = auth.user.email && auth.user.email.toLowerCase() === userData.email.toLowerCase();
             if (!isSelf && !auth.user.isPortalAdmin) {
                 return {
@@ -268,8 +234,7 @@ app.http('users-create', {
                     jsonBody: { message: 'You can only create your own user record' }
                 };
             }
-            
-            // Check if user already exists
+
             const existingUser = await Storage.users.getByEmail(userData.email);
             if (existingUser) {
                 return {
@@ -277,16 +242,15 @@ app.http('users-create', {
                     jsonBody: { message: 'User already exists', user: existingUser }
                 };
             }
-            
-            // Create user
+
             const newUser = await Storage.users.create(userData);
-            
+
             context.log(`User created: ${userData.email}`);
             return {
                 status: 201,
                 jsonBody: newUser
             };
-            
+
         } catch (error) {
             await logError(context, error);
             context.error('Users POST error:', error);
@@ -297,5 +261,4 @@ app.http('users-create', {
         }
     }
 });
-
 

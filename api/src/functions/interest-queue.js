@@ -6,7 +6,6 @@ const { v4: uuidv4 } = require('uuid');
 
 const InterestQueueStore = new Storage.Storage('interest-queue');
 
-// Get all interest queue entries (admin)
 app.http('interest-queue-list', {
     methods: ['GET'],
     authLevel: 'function',
@@ -29,7 +28,6 @@ app.http('interest-queue-list', {
     }
 });
 
-// Add to interest queue (public)
 app.http('interest-queue-add', {
     methods: ['POST'],
     authLevel: 'function',
@@ -83,7 +81,6 @@ app.http('interest-queue-add', {
     }
 });
 
-// Check if email is in interest queue (public)
 app.http('interest-queue-check', {
     methods: ['GET'],
     authLevel: 'function',
@@ -112,7 +109,6 @@ app.http('interest-queue-check', {
     }
 });
 
-// Remove from interest queue (by id or email)
 app.http('interest-queue-remove', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -127,7 +123,6 @@ app.http('interest-queue-remove', {
             const identifier = decodeURIComponent(request.params.identifier);
             let entry = await InterestQueueStore.getById(identifier);
             if (!entry) {
-                // Try by email
                 const all = await InterestQueueStore.getAll();
                 entry = all.find(e => e.email.toLowerCase() === identifier.toLowerCase());
             }
@@ -144,7 +139,6 @@ app.http('interest-queue-remove', {
     }
 });
 
-// Mark as registered (called when someone registers for an event)
 app.http('interest-queue-mark-registered', {
     methods: ['POST'],
     authLevel: 'function',
@@ -188,7 +182,6 @@ app.http('interest-queue-mark-registered', {
     }
 });
 
-// Get stats for interest queue (admin)
 app.http('interest-queue-stats', {
     methods: ['GET'],
     authLevel: 'function',
@@ -217,7 +210,6 @@ app.http('interest-queue-stats', {
     }
 });
 
-// Mark entries as notified (admin - after sending registration open email)
 app.http('interest-queue-mark-notified', {
     methods: ['POST'],
     authLevel: 'function',

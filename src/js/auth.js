@@ -1,21 +1,12 @@
-// ACDC Portal - Auth Module (Custom OTP + JWT)
-// No external auth provider � uses our own OTP verification + JWT sessions
-// Maintains the same interface as the old MSAL wrapper for compatibility
-
 const Auth = {
-    // Initialize � load session from localStorage
     init() {
-        // Check if token is expired
         const token = this._getToken();
         if (token && this._isTokenExpired(token)) {
-            console.log('JWT expired, clearing session');
             this._clearSession();
         }
         this._installFetchWrapper();
-        console.log('Auth initialized (Custom OTP + JWT)');
     },
 
-    // Check if user is logged in (has valid JWT)
     isLoggedIn() {
         const token = this._getToken();
         if (!token) return false;
@@ -26,13 +17,12 @@ const Auth = {
         return true;
     },
 
-    // Get current user data
     getUser() {
         if (!this.isLoggedIn()) return null;
-        
+
         const userData = localStorage.getItem(CONFIG.auth.userKey);
         if (!userData) return null;
-        
+
         try {
             return JSON.parse(userData);
         } catch {
@@ -40,9 +30,6 @@ const Auth = {
         }
     },
 
-    // "Login" � redirect to unified register/sign-in page
-    // Pages that need auth call Auth.login() which sends the user to
-    // register.html where the email check routes to OTP (known) or registration (new).
     login(loginHint) {
         const params = new URLSearchParams();
         if (loginHint) params.set('email', loginHint);
@@ -50,51 +37,27 @@ const Auth = {
         window.location.href = `/register.html?${params.toString()}`;
     },
 
-    // Store session after successful OTP verification.
-    // NOTE: this token is currently stored in localStorage, which is readable by any
-    // XSS execution in the app. The safer design is to move this into a Secure;
-    // HttpOnly; SameSite=Strict cookie and keep the browser-only token in-memory only.
     setSession(token, user) {
         localStorage.setItem(CONFIG.auth.tokenKey, token);
         localStorage.setItem(CONFIG.auth.userKey, JSON.stringify(user));
     },
 
-    // Logout � clear session and redirect to home
     logout() {
         this._clearSession();
         window.location.href = '/events.html';
     },
 
-    // Handle redirect � kept for compatibility
-    // Old code calls `await Auth.handleRedirect()` on page load.
-    // With JWT, there's no redirect to handle � just return null.
     async handleRedirect() {
-        // No-op: JWT auth doesn't use redirects
         return null;
     },
 
-    // Get JWT token for API calls (if needed in future)
     getToken() {
         if (!this.isLoggedIn()) return null;
         return this._getToken();
     },
 
-    // Called when the server rejects our token (401) even though the client
-    // thought it was still valid (e.g. clock skew, server-side invalidation).
-    // Clears the stale session so the user isn't left in a broken half-logged-in
-    // state where every API call silently fails.
-    //
-    // Also forces a page reload: pages read `Auth.getUser()`/`Auth.isLoggedIn()`
-    // once near the top of their init logic and use that snapshot (e.g. `authUser`)
-    // for the rest of the page load, including subsequent header/UI updates. If we
-    // only clear localStorage here, those already-captured variables stay "truthy"
-    // for the remainder of the page's lifetime, leaving the header showing a logged
-    // -in Profile menu while the actual profile data fails to load (empty modal).
-    // Reloading makes every page immediately and consistently reflect the real
-    // (logged-out) state. The guard flag prevents multiple concurrent 401s from
-    // triggering more than one reload.
     handleUnauthorized() {
-        if (!this._getToken()) return; // already logged out, nothing to do
+        if (!this._getToken()) return;
         console.warn('Session rejected by server (401) — clearing local session');
         this._clearSession();
         if (!window.__acdcReloadingAfterAuthClear) {
@@ -112,9 +75,6 @@ const Auth = {
             const isApiRequest = typeof url === 'string' && url.includes('/api/');
             const token = this.getToken();
 
-            // Azure Static Web Apps can rewrite Authorization before the request
-            // reaches the managed Function. Send exactly one app-specific token
-            // header so the API receives the JWT unchanged.
             if (isApiRequest && token) {
                 const headers = new Headers(init.headers || {});
                 headers.delete('Authorization');
@@ -124,9 +84,6 @@ const Auth = {
 
             const response = await originalFetch(input, init);
 
-            // If the server rejects our token (expired/invalid), clear the stale
-            // local session so the user isn't left silently "half logged-in" with
-            // every subsequent API call failing the same way.
             if (isApiRequest && token && response.status === 401) {
                 this.handleUnauthorized();
             }
@@ -137,28 +94,20 @@ const Auth = {
         window.__acdcFetchPatched = true;
     },
 
-    // --- Private helpers ---
-
     _getToken() {
         return localStorage.getItem(CONFIG.auth.tokenKey);
     },
 
     _isTokenExpired(token) {
         try {
-            // JWT structure: header.payload.signature
-            // The payload is Base64URL-encoded, not standard Base64. Using atob()
-            // directly on the raw segment will fail for '-' and '_' characters and
-            // incorrectly mark otherwise valid tokens as expired. We convert to the
-            // standard Base64 form before decoding.
             const base64Url = token.split('.')[1];
             const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
             const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
             const payload = JSON.parse(atob(padded));
 
-            // exp is in seconds, Date.now() is in ms
             return payload.exp * 1000 < Date.now();
         } catch {
-            return true; // Invalid token = expired
+            return true;
         }
     },
 
@@ -168,4 +117,3 @@ const Auth = {
     }
 };
 
-console.log('Auth module loaded (Custom OTP + JWT)');

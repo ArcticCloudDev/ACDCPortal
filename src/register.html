@@ -6,9 +6,7 @@
     <title>Sign In - ACDC Portal</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/styles.css">
-    <!-- reCAPTCHA v3 -->
-    <script src="https://www.google.com/recaptcha/api.js?render=6Lc7aKwsAAAAAA5DkTtC2lFIF5eAGVTHpQAkZFep"></script>
-</head>
+    <script src="https://www.google.com/recaptcha/api.js?render=6Lc7aKwsAAAAAA5DkTtC2lFIF5eAGVTHpQAkZFep"></script></head>
 <body>
     <div class="container">
         <header>
@@ -17,7 +15,6 @@
         </header>
 
         <main>
-            <!-- Progress Steps Indicator -->
             <div class="progress-steps" id="progress-steps">
                 <div class="progress-step active" data-step="1">
                     <div class="step-circle">1</div>
@@ -35,7 +32,6 @@
                 </div>
             </div>
 
-            <!-- Step 1: Email Check -->
             <div id="step-email" class="card">
                 <h2 id="email-heading">Sign In</h2>
                 <p id="email-subheading">Enter your email address to sign in.</p>
@@ -61,7 +57,6 @@
                 </form>
             </div>
 
-            <!-- Step 2: Registration Form -->
             <div id="step-form" class="card hidden">
                 <h2 id="form-heading">Create Your Account</h2>
                 <p id="form-subheading">Complete the form below to get started.</p>
@@ -131,8 +126,8 @@
                     </button>
 
                     <p class="recaptcha-notice">
-                        Protected by reCAPTCHA. 
-                        <a href="https://policies.google.com/privacy" target="_blank">Privacy</a> · 
+                        Protected by reCAPTCHA.
+                        <a href="https://policies.google.com/privacy" target="_blank">Privacy</a> ·
                         <a href="https://policies.google.com/terms" target="_blank">Terms</a>
                     </p>
                 </form>
@@ -142,7 +137,6 @@
                 </p>
             </div>
 
-            <!-- Step 3: OTP Verification (inline, no redirect) -->
             <div id="step-otp" class="card hidden">
                 <div id="otp-welcome-back" class="info-notice info-notice-success hidden" style="margin-bottom: 16px;">
                     <strong>👋 Welcome back!</strong>
@@ -179,14 +173,12 @@
                 </p>
             </div>
 
-            <!-- Step 4: Completing -->
             <div id="step-completing" class="card hidden">
                 <h2>⏳ <span id="completing-heading">Completing...</span></h2>
                 <p id="completing-text">Please wait...</p>
                 <div id="completing-error" class="error-message hidden"></div>
             </div>
 
-            <!-- Step 4b: Hotel Acknowledgment (team registration with hotel enabled) -->
             <div id="step-hotel" class="card hidden">
                 <h2>🏨 Hotel Booking</h2>
                 <p>Please review your hotel nights for this event. <strong>Your stay has been arranged</strong> — confirm the nights below to complete your registration.</p>
@@ -215,7 +207,6 @@
                 </p>
             </div>
 
-            <!-- Step 5: Success -->
             <div id="step-success" class="card hidden">
                 <h2>✅ <span id="success-heading-text">Account Created!</span></h2>
                 <p id="success-team-line" class="hidden">Your team <strong id="success-team-name"></strong> has been registered successfully.</p>

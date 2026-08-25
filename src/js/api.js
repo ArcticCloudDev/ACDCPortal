@@ -1,9 +1,6 @@
-// ACDC Portal - API Client
-
 const API = {
     baseUrl: CONFIG.api.baseUrl,
 
-    // Helper to make API calls
     async request(endpoint, options = {}) {
         const url = `${this.baseUrl}${endpoint}`;
         const defaultOptions = {
@@ -28,9 +25,7 @@ const API = {
                 Auth.handleUnauthorized();
             }
             const errorData = await response.json().catch(() => ({ message: 'Request failed' }));
-            // Create an error object with all the response data attached
             const error = new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
-            // Copy all properties from errorData to the error object
             Object.assign(error, errorData);
             error.status = response.status;
             throw error;
@@ -39,7 +34,6 @@ const API = {
         return response.json();
     },
 
-    // Registration endpoints (reCAPTCHA + OTP)
     register: {
         async start(data) {
             return API.request('/register/start', {
@@ -55,7 +49,6 @@ const API = {
             });
         },
 
-        // Legacy endpoints (can be removed later)
         async initiate(data) {
             return API.request('/register/initiate', {
                 method: 'POST',
@@ -71,7 +64,6 @@ const API = {
         }
     },
 
-    // Auth endpoints
     auth: {
         async checkEmail(email) {
             return API.request('/auth/check-email', {
@@ -95,7 +87,6 @@ const API = {
         }
     },
 
-    // Interest endpoints
     interest: {
         async record(data) {
             return API.request('/interest/record', {
@@ -105,7 +96,6 @@ const API = {
         }
     },
 
-    // User endpoints
     users: {
         async list() {
             return API.request('/users/all');
@@ -115,7 +105,6 @@ const API = {
             return API.request(`/users?email=${encodeURIComponent(email)}`);
         },
 
-        // Returns null if user not found (instead of throwing)
         async getOrNull(email) {
             const url = `${API.baseUrl}/users?email=${encodeURIComponent(email)}`;
             const response = await fetch(url, {
@@ -151,7 +140,6 @@ const API = {
         }
     },
 
-    // Team endpoints
     teams: {
         async list() {
             return API.request('/teams');
@@ -167,7 +155,7 @@ const API = {
                 body: JSON.stringify(data)
             });
         },
-        
+
         async update(teamId, data) {
             return API.request(`/teams/${teamId}`, {
                 method: 'PUT',
@@ -186,7 +174,6 @@ const API = {
         }
     },
 
-    // Member endpoints
     members: {
         async add(teamId, email) {
             return API.request('/members', {
@@ -203,7 +190,6 @@ const API = {
         }
     },
 
-    // Invitation endpoints
     invitations: {
         async create(data) {
             return API.request('/invitations', {
@@ -251,7 +237,6 @@ const API = {
         }
     },
 
-    // Email endpoints (admin)
     email: {
         async getTemplates() {
             return API.request('/email/templates');
@@ -287,7 +272,6 @@ const API = {
         }
     },
 
-    // Events endpoints
     events: {
         async list() {
             return API.request('/events');
@@ -391,7 +375,6 @@ const API = {
         }
     },
 
-    // Participations endpoints
     participations: {
         async list() {
             return API.request('/participations/all');
@@ -403,7 +386,6 @@ const API = {
             return API.request(url);
         },
 
-        // Returns null if not found (instead of throwing)
         async getOrNull(userId, eventId = null) {
             let url = `${API.baseUrl}/participations?userId=${userId}`;
             if (eventId) url += `&eventId=${eventId}`;
@@ -450,7 +432,6 @@ const API = {
             });
         },
 
-        // Roles management (v2)
         async addRoles(participationId, roles) {
             return API.request(`/participations/${participationId}/roles`, {
                 method: 'PUT',
@@ -472,7 +453,6 @@ const API = {
             });
         },
 
-        // Team assignment (v2)
         async assignTeam(participationId, teamId, isTeamAdmin = false, isParticipant = true) {
             return API.request(`/participations/${participationId}/team`, {
                 method: 'PUT',
@@ -480,7 +460,6 @@ const API = {
             });
         },
 
-        // Legacy team membership endpoints (still work during migration)
         async addTeamMembership(participationId, teamId, isAdmin, isParticipant) {
             return API.request(`/participations/${participationId}/team-membership`, {
                 method: 'POST',
@@ -508,7 +487,6 @@ const API = {
             });
         },
 
-        // Query endpoints
         async getTeamCount(teamId) {
             return API.request(`/participations/team/${teamId}/count`);
         },
@@ -532,7 +510,6 @@ const API = {
         }
     },
 
-    // Solo Queue endpoints
     soloQueue: {
         async get(eventId, userId) {
             let url = '/solo-queue';
@@ -561,7 +538,6 @@ const API = {
         }
     },
 
-    // Email Campaigns endpoints
     campaigns: {
         async list(eventId = null) {
             const url = eventId ? `/email/campaigns?eventId=${eventId}` : '/email/campaigns';
@@ -611,7 +587,6 @@ const API = {
         }
     },
 
-    // Sequences endpoints
     sequences: {
         async list(eventId = null) {
             const url = eventId ? `/sequences?eventId=${eventId}` : '/sequences';
@@ -650,7 +625,6 @@ const API = {
         }
     },
 
-    // Deliveries endpoints
     deliveries: {
         async getEventDeliveries(eventId) {
             return API.request(`/deliveries/event/${eventId}`);
@@ -664,7 +638,6 @@ const API = {
         }
     },
 
-    // Badge endpoints
     badges: {
         async list(category = null) {
             const url = category ? `/badges?category=${category}` : '/badges';
@@ -676,7 +649,6 @@ const API = {
         }
     },
 
-    // Badge Claims endpoints
     badgeClaims: {
         async list(filters = {}) {
             const params = [];
@@ -731,4 +703,3 @@ const API = {
     }
 };
 
-console.log('API client loaded');

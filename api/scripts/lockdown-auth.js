@@ -1,15 +1,8 @@
-// One-time codemod: convert anonymous Azure Function HTTP triggers to require
-// a valid JWT session (via requireAuth), except for a documented allowlist of
-// endpoints that must remain public (login/registration/invite-accept flows).
-//
-// Usage: node api/scripts/lockdown-auth.js
 const fs = require('fs');
 const path = require('path');
 
 const FUNCTIONS_DIR = path.join(__dirname, '..', 'src', 'functions');
 
-// Files that are entirely public (auth/registration bootstrap flows).
-// Left untouched.
 const SKIP_FILES = new Set([
     'auth-check-email.js',
     'auth-send-otp.js',
@@ -20,9 +13,6 @@ const SKIP_FILES = new Set([
     'startup.js'
 ]);
 
-// Per-file allowlist of app.http() registration names that must stay
-// anonymous (public pages / pre-login flows). Everything else with
-// authLevel: 'anonymous' in that file gets a requireAuth() gate.
 const PUBLIC_EXCEPTIONS = {
     'interest.js': new Set(['interest-register', 'interest-verify', 'interest-record']),
     'invitations.js': new Set(['invitations-get', 'invitations-accept']),
@@ -30,12 +20,8 @@ const PUBLIC_EXCEPTIONS = {
     'badges.js': new Set(['badges-list', 'badges-get', 'event-badges-list', 'event-badge-summary'])
 };
 
-// Files/routes where admin (isPortalAdmin) should be required rather than
-// just "any authenticated user".
 const ADMIN_ONLY_FILES = new Set(['errors.js']);
 
-// Routes handled specially (server-to-server, Azure Function key auth instead
-// of a user JWT). authLevel becomes 'function', no requireAuth() call added.
 const FUNCTION_KEY_ONLY = {
     'scheduled-emails.js': new Set(['scheduled-emails-run'])
 };
@@ -53,7 +39,7 @@ function processFile(filePath, fileName) {
 
     text = text.replace(HEADER_RE, (match, name, indent, methods, route, tryIndent) => {
         if (publicSet.has(name)) {
-            return match; // leave untouched
+            return match;
         }
 
         if (functionKeySet.has(name)) {
@@ -75,7 +61,6 @@ function processFile(filePath, fileName) {
     if (!changed) return { fileName, changed: false };
 
     if (needsImport && !/require\(['"]\.\.\/shared\/auth['"]\)/.test(text)) {
-        // Insert after the first require(...) line
         const lines = text.split('\r\n');
         let inserted = false;
         for (let i = 0; i < lines.length; i++) {

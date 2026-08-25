@@ -1,4 +1,3 @@
-// ACDC Portal - Events API
 const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
@@ -11,39 +10,29 @@ const eventsStorage = new Storage('events');
 const teamsStorage = new Storage('teams');
 const participationsStorage = new Storage('participations');
 
-// Helper to generate GUID
 function generateGuid() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
+    return require('crypto').randomUUID();
 }
 
-// Helper to check if event status means it's active (visible to public)
 function isActiveStatus(status) {
     return status === 'pre-registration' || status === 'registration' || status === 'live';
 }
 
-// Helper to check if registration is open based on status
 function isRegistrationOpen(status) {
     return status === 'registration';
 }
 
-// Helper to generate hotel dates (1 day before start to 1 day after end)
 function generateHotelDates(startDate, endDate, daysBefore = 0, daysAfter = 0) {
     const dates = [];
     const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dayLabelsFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    
-    // Use noon to avoid timezone date-shifting (YYYY-MM-DD parsed as UTC midnight can shift)
+
     const start = new Date(startDate + 'T12:00:00');
     start.setDate(start.getDate() - Math.max(0, daysBefore));
-    
+
     const end = new Date(endDate + 'T12:00:00');
     end.setDate(end.getDate() + Math.max(0, daysAfter));
-    
-    // Generate dates
+
     const current = new Date(start);
     while (current <= end) {
         const y = current.getFullYear();
@@ -58,41 +47,35 @@ function generateHotelDates(startDate, endDate, daysBefore = 0, daysAfter = 0) {
         });
         current.setDate(current.getDate() + 1);
     }
-    
+
     return dates;
 }
 
-// Helper to generate default hotel nights (nights during the event, excluding night before)
 function generateDefaultHotelNights(hotelDates, eventStartDate, eventEndDate) {
     const defaults = [];
     const dayLabels = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    
-    // Use noon to avoid timezone issues
+
     const eventStart = new Date(eventStartDate + 'T12:00:00');
     const eventEnd = new Date(eventEndDate + 'T12:00:00');
-    
+
     for (let i = 0; i < hotelDates.length - 1; i++) {
         const currentDate = new Date(hotelDates[i].date + 'T12:00:00');
         const nextDate = new Date(hotelDates[i + 1].date + 'T12:00:00');
-        
-        // Skip the night before the event starts (day before -> first day)
+
         if (currentDate < eventStart) {
             continue;
         }
-        
-        // Include nights strictly within the event (first day up to but not including end day).
-        // Nights before the event or on/after the event end date are extra — not defaults.
+
         if (currentDate >= eventStart && currentDate < eventEnd) {
             const fromDay = dayLabels[currentDate.getDay()];
             const toDay = dayLabels[nextDate.getDay()];
             defaults.push(`${fromDay}-${toDay}`);
         }
     }
-    
+
     return defaults;
 }
 
-// GET /api/events - List all events
 app.http('events-list', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -115,9 +98,6 @@ app.http('events-list', {
     }
 });
 
-// GET /api/events/{id}/image - REMOVED (no longer used)
-
-// GET /api/events/active - Get active event
 app.http('events-active', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -125,16 +105,15 @@ app.http('events-active', {
     handler: async (request, context) => {
         try {
             const events = await eventsStorage.getAll();
-            // Find event with active status (registration or live)
             const activeEvent = events.find(e => isActiveStatus(e.status));
-            
+
             if (!activeEvent) {
                 return {
                     status: 404,
                     jsonBody: { error: 'No active event found' }
                 };
             }
-            
+
             const { eventImageData, ...activeEventPublic } = activeEvent;
             return {
                 status: 200,
@@ -151,7 +130,6 @@ app.http('events-active', {
     }
 });
 
-// GET /api/events/:id - Get event by ID (loads child tables incl. hotelDefaultNights)
 app.http('events-get', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -160,14 +138,14 @@ app.http('events-get', {
         try {
             const id = request.params.id;
             const event = await StorageModule.events.getById(id);
-            
+
             if (!event) {
                 return {
                     status: 404,
                     jsonBody: { error: 'Event not found' }
                 };
             }
-            
+
             return {
                 status: 200,
                 jsonBody: event
@@ -183,7 +161,6 @@ app.http('events-get', {
     }
 });
 
-// Sponsor helper: map a sponsorship row from EventFinancials to the API shape
 function mapSponsorFinancial(row) {
     return {
         id: row.Id,
@@ -233,7 +210,6 @@ function normalizeSponsorPayload(body = {}, { isUpdate = false } = {}) {
     return payload;
 }
 
-// GET /api/events/{eventId}/sponsors - List event sponsors (filtered view of EventFinancials)
 app.http('event-sponsors-list', {
     methods: ['GET'],
     authLevel: 'function',
@@ -264,7 +240,6 @@ app.http('event-sponsors-list', {
     }
 });
 
-// POST /api/events/{eventId}/sponsors - Create sponsor
 app.http('event-sponsors-create', {
     methods: ['POST'],
     authLevel: 'function',
@@ -313,7 +288,6 @@ app.http('event-sponsors-create', {
     }
 });
 
-// PUT /api/events/{eventId}/sponsors/{sponsorId} - Update sponsor
 app.http('event-sponsors-update', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -382,7 +356,6 @@ app.http('event-sponsors-update', {
     }
 });
 
-// DELETE /api/events/{eventId}/sponsors/{sponsorId} - Delete sponsor
 app.http('event-sponsors-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -410,7 +383,6 @@ app.http('event-sponsors-delete', {
     }
 });
 
-// POST /api/events - Create new event
 app.http('events-create', {
     methods: ['POST'],
     authLevel: 'function',
@@ -423,17 +395,16 @@ app.http('events-create', {
             }
 
             const body = await request.json();
-            
+
             if (!body.name || !body.startDate || !body.endDate) {
                 return {
                     status: 400,
                     jsonBody: { error: 'name, startDate, and endDate are required' }
                 };
             }
-            
+
             const events = await eventsStorage.getAll();
-            
-            // If new event has active status, deactivate others
+
             const newStatus = body.status || 'draft';
             if (isActiveStatus(newStatus)) {
                 for (const e of events) {
@@ -442,8 +413,7 @@ app.http('events-create', {
                     }
                 }
             }
-            
-            // Generate hotel dates from event dates
+
             const daysBefore = body.hotelDaysBefore !== undefined ? parseInt(body.hotelDaysBefore) : 0;
             const daysAfter = body.hotelDaysAfter !== undefined ? parseInt(body.hotelDaysAfter) : 0;
             const hotelDates = generateHotelDates(body.startDate, body.endDate, daysBefore, daysAfter);
@@ -481,10 +451,8 @@ app.http('events-create', {
                 createdAt: new Date().toISOString()
             };
 
-            // Note: Committee/Judge roles are managed via participations (roles[]) — no special teams needed
-            
             await eventsStorage.create(newEvent);
-            
+
             context.log(`Event created: ${newEvent.id}`);
 
             return {
@@ -502,7 +470,6 @@ app.http('events-create', {
     }
 });
 
-// PUT /api/events/:id - Update event
 app.http('events-update', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -527,37 +494,32 @@ app.http('events-update', {
                 };
             }
 
-            // Remove legacy fields if present in body
             delete body.isActive;
             delete body.registrationOpen;
-            
-            // Check if event dates changed - if so, regenerate hotel dates
+
             const datesChanged = (body.startDate && body.startDate !== existingEvent.startDate) ||
                                  (body.endDate && body.endDate !== existingEvent.endDate);
             const hotelConfigChanged = (body.hotelDaysBefore !== undefined && body.hotelDaysBefore !== existingEvent.hotelDaysBefore) ||
                                        (body.hotelDaysAfter !== undefined && body.hotelDaysAfter !== existingEvent.hotelDaysAfter);
-            
-            // Determine final start/end dates
+
             const finalStartDate = body.startDate || existingEvent.startDate;
             const finalEndDate = body.endDate || existingEvent.endDate;
-            
-            // Regenerate hotel dates if event dates changed
+
             let hotelDates = existingEvent.hotelDates;
             let hotelDefaultNights = existingEvent.hotelDefaultNights;
-            
+
             if (datesChanged || hotelConfigChanged || !hotelDates || hotelDates.length === 0) {
                 const finalDaysBefore = body.hotelDaysBefore !== undefined ? parseInt(body.hotelDaysBefore) : (existingEvent.hotelDaysBefore ?? 0);
                 const finalDaysAfter = body.hotelDaysAfter !== undefined ? parseInt(body.hotelDaysAfter) : (existingEvent.hotelDaysAfter ?? 0);
                 hotelDates = generateHotelDates(finalStartDate, finalEndDate, finalDaysBefore, finalDaysAfter);
                 hotelDefaultNights = generateDefaultHotelNights(hotelDates, finalStartDate, finalEndDate);
             }
-            
-            // Update fields
+
             const updatedEvent = {
                 ...existingEvent,
                 ...body,
-                id: existingEvent.id, // Preserve ID
-                createdAt: existingEvent.createdAt, // Preserve creation date
+                id: existingEvent.id,
+                createdAt: existingEvent.createdAt,
                 sequenceId: body.sequenceId !== undefined ? body.sequenceId : existingEvent.sequenceId,
                 sequenceEnabled: body.sequenceEnabled !== undefined ? body.sequenceEnabled : existingEvent.sequenceEnabled,
                 teamWelcomeEmailId: body.teamWelcomeEmailId !== undefined ? body.teamWelcomeEmailId : existingEvent.teamWelcomeEmailId,
@@ -574,8 +536,6 @@ app.http('events-update', {
                 hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()
             };
-
-            // Note: Committee/Judge roles are managed via participations (roles[]) — no special teams needed
 
             await eventsStorage.updateFull(updatedEvent);
 
@@ -596,7 +556,6 @@ app.http('events-update', {
     }
 });
 
-// DELETE /api/events/:id - Delete event
 app.http('events-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -609,22 +568,22 @@ app.http('events-delete', {
             }
 
             const id = request.params.id;
-            
+
             const events = await eventsStorage.getAll();
             const index = events.findIndex(e => e.id === id);
-            
+
             if (index < 0) {
                 return {
                     status: 404,
                     jsonBody: { error: 'Event not found' }
                 };
             }
-            
+
             const deletedEvent = events[index];
             await eventsStorage.delete(id);
-            
+
             context.log(`Event deleted: ${id}`);
-            
+
             return {
                 status: 200,
                 jsonBody: { message: 'Event deleted', event: deletedEvent }
@@ -642,11 +601,6 @@ app.http('events-delete', {
 
 console.log('Events API loaded');
 
-// ============================================================
-// FINANCIALS ENDPOINTS
-// ============================================================
-
-// GET /api/events/{eventId}/financials - List all financial rows
 app.http('event-financials-list', {
     methods: ['GET'],
     authLevel: 'function',
@@ -668,7 +622,6 @@ app.http('event-financials-list', {
     }
 });
 
-// GET /api/events/{eventId}/financials/summary - Financial totals
 app.http('event-financials-summary', {
     methods: ['GET'],
     authLevel: 'function',
@@ -690,7 +643,6 @@ app.http('event-financials-summary', {
     }
 });
 
-// POST /api/events/{eventId}/financials - Create manual row
 app.http('event-financials-create', {
     methods: ['POST'],
     authLevel: 'function',
@@ -714,7 +666,6 @@ app.http('event-financials-create', {
     }
 });
 
-// PUT /api/events/{eventId}/financials/{rowId} - Update manual row
 app.http('event-financials-update', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -738,7 +689,6 @@ app.http('event-financials-update', {
     }
 });
 
-// DELETE /api/events/{eventId}/financials/{rowId} - Delete manual row
 app.http('event-financials-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -761,7 +711,6 @@ app.http('event-financials-delete', {
     }
 });
 
-// PATCH /api/events/{eventId}/financials/{rowId} - Update paidBy on any row (auto or manual)
 app.http('event-financials-patch', {
     methods: ['PATCH'],
     authLevel: 'function',
@@ -786,8 +735,6 @@ app.http('event-financials-patch', {
     }
 });
 
-// POST /api/events/{eventId}/financials/recalculate
-// Rebuilds hotel + food auto rows for every participant in the event.
 app.http('event-financials-recalculate', {
     methods: ['POST'],
     authLevel: 'function',
@@ -801,16 +748,13 @@ app.http('event-financials-recalculate', {
 
             const { eventId } = request.params;
 
-            // Load event
             const events = await eventsStorage.getAll();
             const event = events.find(e => e.id === eventId);
             if (!event) return { status: 404, jsonBody: { error: 'Event not found' } };
 
-            // Load all participations for this event
             const allParticipations = await participationsStorage.getAll();
             const eventParticipations = allParticipations.filter(p => p.eventId === eventId);
 
-            // Sync hotel + food rows for each participant
             let updated = 0;
             const errors = [];
             for (const participation of eventParticipations) {

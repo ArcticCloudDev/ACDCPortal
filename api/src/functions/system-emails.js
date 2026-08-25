@@ -11,30 +11,21 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs').promises;
 
-/**
- * Extract image src from HTML (handles both <img> tags and plain base64 strings)
- * @param {string} html - HTML content or base64 string
- * @returns {string} - Image src attribute value or original string
- */
 function extractImageSrc(html) {
     if (!html) return '';
-    
-    // If it's already a data URL or regular URL, return as-is
+
     if (html.startsWith('data:') || html.startsWith('http')) {
         return html;
     }
-    
-    // Try to extract src from <img> tag
+
     const srcMatch = html.match(/src="([^"]+)"/);
     if (srcMatch) {
         return srcMatch[1];
     }
-    
-    // Return empty if no match
+
     return '';
 }
 
-// POST /api/system-emails/upload-theme - Upload theme image
 app.http('system-emails-upload-theme', {
     methods: ['POST'],
     authLevel: 'function',
@@ -55,33 +46,28 @@ app.http('system-emails-upload-theme', {
                 return { status: 400, jsonBody: { error: 'Missing required fields' } };
             }
 
-            // Generate filename: template-type_event-id_timestamp.ext
             const ext = path.extname(imageFile.name);
             const filename = `${templateType}_${eventId}_${Date.now()}${ext}`;
             const filepath = `email-themes/${filename}`;
 
-            // Read file buffer
             const buffer = Buffer.from(await imageFile.arrayBuffer());
 
-            // Save file to data/email-themes/
             const fs = require('fs').promises;
             const themesDir = path.join(__dirname, '../../data/email-themes');
-            
-            // Create directory if it doesn't exist
+
             await fs.mkdir(themesDir, { recursive: true });
-            
+
             const fullPath = path.join(themesDir, filename);
             await fs.writeFile(fullPath, buffer);
 
-            // Return public URL (relative to web root)
             const publicUrl = `/data/email-themes/${filename}`;
 
-            return { 
-                status: 200, 
-                jsonBody: { 
+            return {
+                status: 200,
+                jsonBody: {
                     url: publicUrl,
                     filename: filename
-                } 
+                }
             };
         } catch (error) {
             await logError(context, error);
@@ -91,7 +77,6 @@ app.http('system-emails-upload-theme', {
     }
 });
 
-// GET /api/system-emails/config - Get template configuration
 app.http('system-emails-config-get', {
     methods: ['GET'],
     authLevel: 'function',
@@ -131,7 +116,6 @@ function validateEmailConfig(config) {
     return null;
 }
 
-// PUT /api/system-emails/config - Save template configuration
 app.http('system-emails-config-put', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -158,7 +142,6 @@ app.http('system-emails-config-put', {
     }
 });
 
-// POST /api/system-emails/test - Send test email
 app.http('system-emails-test', {
     methods: ['POST'],
     authLevel: 'function',
@@ -171,16 +154,14 @@ app.http('system-emails-test', {
             }
 
             const { templateType, eventId, testEmail, data } = await request.json();
-            
-            // Load config
+
             const config = await readData('system-email-config.json');
             const template = config.templates[templateType];
-            
+
             if (!template) {
                 return { status: 404, jsonBody: { error: 'Template not found' } };
             }
 
-            // Load events
             const event = await Storage.events.getById(eventId);
 
             if (!event) {
@@ -189,10 +170,7 @@ app.http('system-emails-test', {
 
             let htmlContent, subject;
 
-            // For invitation templates, route through the proper build functions
-            // so the test email matches what a real invitation would produce
             if (templateType === 'invitation-judge' || templateType === 'invitation-committee') {
-                // Create a synthetic invitation object for the test
                 const fakeInvitation = {
                     id: uuidv4(),
                     email: testEmail,
@@ -212,12 +190,9 @@ app.http('system-emails-test', {
                 htmlContent = result.htmlContent;
                 subject = result.subject;
             } else {
-                // Non-invitation templates — use generic path
                 const eventTheme = template.eventThemes[eventId] || {};
                 const globalDefaults = template.editableSections;
-                
-                // Extract image src from HTML (themeImage is stored as HTML with <img> tag)
-                
+
                 const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
                 const fakeInviteId = uuidv4();
 
@@ -231,21 +206,17 @@ app.http('system-emails-test', {
                     inviteId: fakeInviteId,
                     inviterName: data?.teamAdminName || 'Event Organizer'
                 };
-                // Pre-resolve merge fields inside body/closing before injecting into the template
                 const mergeData = {
                     ...baseData,
                     bodyText: processTemplate(eventTheme.body || globalDefaults.body || '', baseData),
                     closingText: processTemplate(eventTheme.closing || globalDefaults.closing || '', baseData)
                 };
 
-                // Build HTML using the JSON-driven builder
                 htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
-                // Process subject — per-event override first, then global template subject
                 subject = processTemplate(eventTheme.subject || template.subject, mergeData);
             }
 
-            // Send test email
             await sendEmail({
                 to: testEmail,
                 subject: subject,
@@ -261,7 +232,6 @@ app.http('system-emails-test', {
     }
 });
 
-// POST /api/system-emails/preview - Render a template with sample data and return HTML
 app.http('system-emails-preview', {
     methods: ['POST'],
     authLevel: 'function',
@@ -291,7 +261,6 @@ app.http('system-emails-preview', {
             const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
             const fakeInviteId = 'preview-invite-id';
 
-            // Sample values used to substitute merge fields inside body/closing text
             const sampleData = {
                 firstName: 'Jane',
                 fullName: 'Jane Smith',
@@ -306,8 +275,6 @@ app.http('system-emails-preview', {
                 interestLink: `${portalUrl}/event.html`
             };
 
-            // Pre-process body/closing so {{mergeFields}} inside them are resolved
-            // before they get injected into the template (processTemplate is single-pass)
             const rawBody = bodyText !== undefined ? bodyText : (eventTheme.body || globalDefaults.body || '');
             const rawClosing = closingText !== undefined ? closingText : (eventTheme.closing || globalDefaults.closing || '');
 
@@ -317,7 +284,6 @@ app.http('system-emails-preview', {
                 closingText: processTemplate(rawClosing, sampleData)
             };
 
-            // Build HTML using the JSON-driven builder
             const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
             return {
@@ -333,7 +299,6 @@ app.http('system-emails-preview', {
     }
 });
 
-// POST /api/system-emails/send - Send system email (called by team creation, etc.)
 app.http('system-emails-send', {
     methods: ['POST'],
     authLevel: 'function',
@@ -346,23 +311,20 @@ app.http('system-emails-send', {
             }
 
             const { templateType, eventId, to, data } = await request.json();
-            
-            // Load config
+
             const config = await readData('system-email-config.json');
             const template = config.templates[templateType];
-            
+
             if (!template) {
                 return { status: 404, jsonBody: { error: 'Template not found' } };
             }
 
-            // Load events
             const event = await Storage.events.getById(eventId);
 
             if (!event) {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
 
-            // Build merge data
             const eventTheme = template.eventThemes[eventId] || {};
             const globalDefaults = template.editableSections;
 
@@ -371,20 +333,16 @@ app.http('system-emails-send', {
                 eventName: event.name,
                 portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'
             };
-            // Pre-resolve merge fields inside body/closing before injecting into the template
             const mergeData = {
                 ...baseData,
                 bodyText: processTemplate(eventTheme.body || globalDefaults.body || '', baseData),
                 closingText: processTemplate(eventTheme.closing || globalDefaults.closing || '', baseData)
             };
 
-            // Build HTML using the JSON-driven builder — pass per-event structural overrides
             const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
-            // Process subject — per-event override first, then global template subject
             const subject = processTemplate(eventTheme.subject || template.subject, mergeData);
 
-            // Send email
             await sendEmail({
                 to: to,
                 subject: subject,

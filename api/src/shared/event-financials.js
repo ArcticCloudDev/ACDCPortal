@@ -1,8 +1,3 @@
-// event-financials.js
-// Shared helper for reading/writing EventFinancials rows.
-// Used by: participations.js (hotel/food auto rows), events.js (sponsor income rows),
-//          and the financials API endpoints.
-
 const { getPool, sql } = require('./sql');
 
 const VALID_TYPES = new Set(['income', 'expense']);
@@ -67,7 +62,6 @@ async function ensureTable(pool) {
     `);
 }
 
-// List all financials for an event
 async function listByEvent(eventId) {
     const pool = await getPool();
     await ensureTable(pool);
@@ -90,7 +84,6 @@ async function listByEvent(eventId) {
     }));
 }
 
-// Insert a manual row (income or expense)
 async function createManual(eventId, { type, category, description, amount, paidBy = 'event', unitCost = null, days = null, notes = null, sponsorId = null }) {
     if (!VALID_TYPES.has(type)) throw new Error(`Invalid type: ${type}`);
     if (!VALID_CATEGORIES.has(category)) throw new Error(`Invalid category: ${category}`);
@@ -127,8 +120,6 @@ async function createManual(eventId, { type, category, description, amount, paid
     return mapRow(created.recordset[0]);
 }
 
-// Upsert an auto-calculated row for a participation (hotel or food)
-// Uses participationId + category as the unique key — one row per person per category
 async function upsertParticipationRow(eventId, participationId, { category, description, unitCost, days, amount, paidBy }) {
     const pool = await getPool();
     await ensureTable(pool);
@@ -174,8 +165,6 @@ async function upsertParticipationRow(eventId, participationId, { category, desc
     }
 }
 
-// Sync hotel + food rows for a single participation given pre-loaded event object.
-// Called both from the per-participation hook and the bulk recalculate endpoint.
 async function syncParticipationToFinancials(event, participation) {
     const hotelRate = event.hotelRatePerNight != null ? Number(event.hotelRatePerNight) : null;
     const foodRate  = event.foodRatePerDay    != null ? Number(event.foodRatePerDay)    : null;
@@ -187,7 +176,6 @@ async function syncParticipationToFinancials(event, participation) {
 
     const nights = participation.hotelNights || {};
     const nightCount = Object.values(nights).filter(Boolean).length;
-    // Use per-participant selection if available, otherwise fall back to event-level default
     const effectiveNights = nightCount > 0 ? nightCount : (eventHotelNights ?? 0);
 
     if (hotelRate != null && effectiveNights > 0) {
@@ -215,7 +203,6 @@ async function syncParticipationToFinancials(event, participation) {
         });
     }
 
-    // Registration fee — income row (participant pays)
     const regFee = event.costPerParticipant != null ? Number(event.costPerParticipant) : null;
     if (regFee != null && regFee > 0) {
         const pool = await getPool();
@@ -242,7 +229,6 @@ async function syncParticipationToFinancials(event, participation) {
     }
 }
 
-// Update only the PaidBy field — works on both auto and manual rows
 async function updatePaidBy(id, eventId, paidBy) {
     if (!VALID_PAID_BY.has(paidBy)) throw new Error(`Invalid paidBy: ${paidBy}`);
     const pool = await getPool();
@@ -255,7 +241,6 @@ async function updatePaidBy(id, eventId, paidBy) {
     if (!result.rowsAffected[0]) throw new Error('Financial row not found');
 }
 
-// Remove all auto rows for a participation (called on participation delete)
 async function deleteParticipationRows(participationId) {
     const pool = await getPool();
     await pool.request()
@@ -263,7 +248,6 @@ async function deleteParticipationRows(participationId) {
         .query(`DELETE FROM EventFinancials WHERE ParticipationId = @participationId AND Source = 'auto'`);
 }
 
-// Update a manual row
 async function updateManual(id, eventId, { type, category, description, amount, paidBy, unitCost, days, notes }) {
     if (type !== undefined && !VALID_TYPES.has(type)) throw new Error(`Invalid type: ${type}`);
     if (category !== undefined && !VALID_CATEGORIES.has(category)) throw new Error(`Invalid category: ${category}`);
@@ -313,7 +297,6 @@ async function updateManual(id, eventId, { type, category, description, amount, 
     return mapRow(updated.recordset[0]);
 }
 
-// Delete a manual row
 async function deleteManual(id, eventId) {
     const pool = await getPool();
     const result = await pool.request()
@@ -323,7 +306,6 @@ async function deleteManual(id, eventId) {
     return result.rowsAffected[0] > 0;
 }
 
-// Build financial summary for an event
 async function getSummary(eventId) {
     const pool = await getPool();
     const result = await pool.request()

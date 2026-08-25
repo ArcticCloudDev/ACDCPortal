@@ -2,30 +2,9 @@
 
 const { processTemplate } = require('./mail');
 
-/**
- * Build a complete email HTML string from a template config and resolved merge data.
- * This replaces the per-template .html files — all structural text now lives in
- * system-email-config.json and is editable through the admin panel.
- *
- * Expected fields on templateConfig (from system-email-config.json):
- *   headerTitle     {string}  — bold white text in the banner, supports merge fields
- *   buttonText      {string|null} — CTA button label; null means no button
- *   buttonUrlField  {string|null} — key into mergeData that holds the button URL
- *   signaturePrefix {string}  — e.g. "Best regards," or "" for none
- *   signatureName   {string}  — e.g. "The {{eventName}} Team"
- *   footer          {string}  — small text in the grey footer, supports merge fields
- *   features        {string[]} — optional extras: "teamBox", "expiryNotice"
- *
- * mergeData must already have bodyText and closingText pre-resolved.
- *
- * @param {object} templateConfig
- * @param {object} mergeData
- * @returns {string} Full HTML email string
- */
 function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
     const features = templateConfig.features || [];
 
-    // Per-event overrides take precedence over global template values
     const headerTitle = processTemplate(eventOverrides.headerTitle || templateConfig.headerTitle || '', mergeData);
 
     const resolvedButtonText = eventOverrides.buttonText !== undefined
@@ -38,13 +17,9 @@ function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
         ? (mergeData[templateConfig.buttonUrlField] || '#')
         : null;
 
-    // Process body and closing through template engine so merge fields ({{fullName}} etc.) are resolved
     const bodyText = processTemplate(mergeData.bodyText || '', mergeData);
     const closingText = processTemplate(mergeData.closingText || '', mergeData);
 
-    // --- Optional blocks ---
-
-    // Optional participation details box
     const teamBoxHtml = features.includes('teamBox') ? `
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 0 0 24px 0;">
                         <tr>
@@ -56,7 +31,6 @@ function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
                         </tr>
                     </table>` : '';
 
-    // CTA button
     const buttonHtml = buttonText ? `
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                         <tr>
@@ -74,7 +48,6 @@ function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
                         </tr>
                     </table>` : '';
 
-    // Expiry notice (invitation templates)
     const expiryHtml = features.includes('expiryNotice') ? `
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top: 16px;">
                         <tr>
@@ -87,8 +60,6 @@ function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
                             </td>
                         </tr>
                     </table>` : '';
-
-    // Signature block rendered as closingText (Quill HTML)
 
     return `<!DOCTYPE html>
 <html>

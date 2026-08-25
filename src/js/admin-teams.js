@@ -1,5 +1,3 @@
-// ACDC Portal - Admin Teams Management
-
 let currentUser = null;
 let allEvents = [];
 let allTeams = [];
@@ -21,7 +19,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const notCommitteeDiv = document.getElementById('not-committee');
     const adminContent = document.getElementById('admin-content');
 
-    // Resolve permissions (handles auth check, sidebar render, access denied)
     currentPermissions = await Permissions.initAdminPage('teams', {
         loadingEl: loadingDiv,
         accessDeniedEl: notCommitteeDiv,
@@ -33,10 +30,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUser = currentPermissions.user;
 
     try {
-        // Load data
         await loadData();
 
-        // Setup filters
         setupFilters();
 
         loadingDiv.classList.add('hidden');
@@ -59,7 +54,6 @@ async function loadData() {
             API.invitations.list()
         ]);
 
-        // Scope event-bearing entities by permissions
         allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
         allTeams = Permissions.filterByEvent(currentPermissions, teams);
         allParticipations = Permissions.filterByEvent(currentPermissions, participations);
@@ -68,13 +62,11 @@ async function loadData() {
 
         populateEventFilter();
 
-        // Compute team counts from loaded participations
         teamCounts = {};
         allTeams.forEach(team => {
             teamCounts[team.id] = getTeamMembers(team.id).length;
         });
 
-        // Render
         renderTeamsTable();
         updateStats();
 
@@ -85,14 +77,13 @@ async function loadData() {
 
 function populateEventFilter() {
     const eventFilter = document.getElementById('event-filter');
-    
-    // Status labels for display
+
     const statusLabels = {
         'pre-registration': 'Pre-Reg',
         'registration': 'Registration',
         'live': 'Live'
     };
-    
+
     allEvents.forEach(event => {
         const option = document.createElement('option');
         option.value = event.id;
@@ -118,7 +109,6 @@ function renderTeamsTable() {
     const eventFilter = document.getElementById('event-filter').value;
     const searchQuery = document.getElementById('search-teams').value.toLowerCase().trim();
 
-    // Filter teams
     let filteredTeams = [...allTeams];
 
     if (eventFilter) {
@@ -134,7 +124,6 @@ function renderTeamsTable() {
         });
     }
 
-    // Sort by creation date (newest first)
     filteredTeams.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     if (filteredTeams.length === 0) {
@@ -149,11 +138,11 @@ function renderTeamsTable() {
         const createdDate = new Date(team.createdAt).toLocaleDateString('en-US', {
             month: 'short', day: 'numeric', year: 'numeric'
         });
-        
+
         const memberCount = teamCounts[team.id] || 0;
         const pendingCount = allInvitations.filter(i => i.teamId === team.id).length;
         const committed = team.committedParticipants || 3;
-        
+
         let countClass = 'partial';
         if (memberCount >= committed) {
             countClass = 'full';
@@ -237,7 +226,6 @@ function renderTeamsTable() {
 }
 
 function getTeamAdminInfo(teamId) {
-    // Prefer explicit team-admin participation
     const adminParticipation = allParticipations.find(p =>
         (p.teamMemberships || []).some(m => m.teamId === teamId && m.isAdmin)
     ) || allParticipations.find(p => p.teamId === teamId && p.isTeamAdmin);
@@ -329,8 +317,8 @@ function updateStats() {
         totalCommitted += team.committedParticipants || 3;
     });
 
-    const fillRate = totalCommitted > 0 
-        ? Math.round((totalParticipants / totalCommitted) * 100) 
+    const fillRate = totalCommitted > 0
+        ? Math.round((totalParticipants / totalCommitted) * 100)
         : 0;
 
     document.getElementById('total-teams').textContent = totalTeams;
@@ -375,4 +363,3 @@ async function deleteTeam(teamId, teamName) {
     }
 }
 
-console.log('Admin Teams page loaded');

@@ -6,10 +6,8 @@
     <title>Manage Badges - ACDC Committee</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <style>
-        .main-content { padding: 24px 40px; }
+    <style>        .main-content { padding: 24px 40px; }
 
-        /* Tab navigation */
         .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--admin-border); margin-bottom: 24px; }
         .tab-btn {
             padding: 10px 20px; font-size: 0.85rem; font-weight: 500; color: var(--admin-text-muted);
@@ -21,7 +19,6 @@
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        /* Badge cards grid */
         .badge-grid {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 16px; margin-bottom: 24px;
@@ -38,7 +35,6 @@
         .badge-card .badge-points { font-weight: 600; color: var(--admin-primary); font-size: 0.85rem; }
         .badge-card .badge-actions { display: flex; gap: 6px; }
 
-        /* Category pills */
         .category-pill {
             display: inline-flex; padding: 2px 8px; border-radius: 12px;
             font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
@@ -48,7 +44,6 @@
         .category-pill.pro-code { background: #ede9fe; color: #5b21b6; }
         .category-pill.sponsor { background: #fef3c7; color: #92400e; }
 
-        /* Status pills */
         .status-pill {
             display: inline-flex; padding: 2px 8px; border-radius: 12px;
             font-size: 0.7rem; font-weight: 600;
@@ -57,7 +52,6 @@
         .status-pill.approved { background: #d1fae5; color: #065f46; }
         .status-pill.declined { background: #fee2e2; color: #991b1b; }
 
-        /* Judge group styling */
         .judge-group {
             background: white;
             border: 1px solid var(--admin-border);
@@ -126,7 +120,6 @@
             border: none;
         }
 
-        /* Category section headers */
         .category-header {
             display: flex; align-items: center; gap: 8px;
             margin: 24px 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid var(--admin-border);
@@ -135,7 +128,6 @@
         .category-header h3 { font-size: 0.9rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
         .category-count { font-size: 0.75rem; color: var(--admin-text-muted); }
 
-        /* Modal */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
@@ -155,7 +147,6 @@
         .modal-body { padding: 24px; }
         .modal-footer { padding: 16px 24px; border-top: 1px solid var(--admin-border); display: flex; justify-content: flex-end; gap: 8px; }
 
-        /* Form elements */
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text); margin-bottom: 4px; }
         .form-group input, .form-group select, .form-group textarea {
@@ -167,7 +158,6 @@
             outline: none; border-color: var(--admin-primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
         }
 
-        /* Event badges - assignment toggle */
         .event-badge-row {
             display: flex; align-items: center; gap: 12px; padding: 10px 16px;
             border-bottom: 1px solid var(--admin-border); transition: background 0.1s;
@@ -184,11 +174,9 @@
             border: 1px solid var(--admin-border); border-radius: 4px;
         }
 
-        /* Claims table */
         .claim-evidence { max-width: 300px; font-size: 0.8rem; color: var(--admin-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .claim-actions { display: flex; gap: 6px; }
 
-        /* Stat cards row */
         .stat-row { display: flex; gap: 16px; margin-bottom: 24px; }
         .stat-card {
             flex: 1; background: white; border: 1px solid var(--admin-border); border-radius: 8px;
@@ -197,21 +185,18 @@
         .stat-card .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--admin-sidebar); }
         .stat-card .stat-label { font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px; }
 
-        /* Filter bar */
         .filter-bar { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
         .filter-bar select, .filter-bar input {
             padding: 6px 12px; font-size: 0.8rem; border: 1px solid var(--admin-border);
             border-radius: 6px; background: white;
         }
 
-        /* Event selector */
         .event-selector { margin-bottom: 24px; }
         .event-selector select {
             padding: 8px 16px; font-size: 0.9rem; border: 1px solid var(--admin-border);
             border-radius: 6px; background: white; min-width: 300px;
         }
-    </style>
-</head>
+    </style></head>
 <body>
     <div class="admin-layout">
         <div id="sidebar-container"></div>
@@ -227,14 +212,12 @@
                     <h1 class="page-title">🏅 Badges</h1>
                 </div>
 
-                <!-- Tabs -->
                 <div class="tabs">
                     <button class="tab-btn active" data-tab="master">Badge Library</button>
                     <button class="tab-btn" data-tab="event-badges">Event Badges</button>
                     <button class="tab-btn" data-tab="claims">Badge Claims</button>
                 </div>
 
-                <!-- ===== TAB 1: Master Badge Library ===== -->
                 <div id="tab-master" class="tab-content active">
                     <div class="stat-row">
                         <div class="stat-card">
@@ -276,7 +259,6 @@
                     <div id="badges-container"></div>
                 </div>
 
-                <!-- ===== TAB 2: Event Badges ===== -->
                 <div id="tab-event-badges" class="tab-content">
                     <div class="event-selector">
                         <label style="font-size: 0.85rem; font-weight: 600; margin-right: 8px;">Select Event:</label>
@@ -319,7 +301,6 @@
                     </div>
                 </div>
 
-                <!-- ===== TAB 3: Badge Claims ===== -->
                 <div id="tab-claims" class="tab-content">
                     <div class="filter-bar">
                         <select id="claims-event-filter">
@@ -368,7 +349,6 @@
         </main>
     </div>
 
-    <!-- Badge Create/Edit Modal -->
     <div class="modal-overlay" id="badge-modal">
         <div class="modal">
             <div class="modal-header">
@@ -418,7 +398,6 @@
         </div>
     </div>
 
-    <!-- Claim Review Modal -->
     <div class="modal-overlay" id="review-modal">
         <div class="modal">
             <div class="modal-header">

@@ -1,14 +1,6 @@
-// Key Vault Secret Loader
-// Loads secrets from Azure Key Vault into process.env at startup.
-// Uses DefaultAzureCredential which works with:
-//   - Local dev: your `az login` session
-//   - Azure: Managed Identity (automatic, no credentials needed)
-
 const { SecretClient } = require('@azure/keyvault-secrets');
 const { DefaultAzureCredential } = require('@azure/identity');
 
-// Map Key Vault secret names to environment variable names
-// Key Vault doesn't allow underscores, so secrets use hyphens
 const SECRET_MAP = {
     'JWT-SECRET': 'JWT_SECRET',
     'RECAPTCHA-SECRET-KEY': 'RECAPTCHA_SECRET_KEY',
@@ -30,7 +22,6 @@ async function loadSecrets() {
 
     const kvUrl = process.env.KEY_VAULT_URL;
     if (!kvUrl) {
-        // No Key Vault configured — fall back to env vars (e.g. local.settings.json)
         console.log('[KeyVault] KEY_VAULT_URL not set, using environment variables directly');
         _loaded = true;
         return true;
@@ -43,9 +34,8 @@ async function loadSecrets() {
 
         const results = await Promise.allSettled(
             Object.entries(SECRET_MAP).map(async ([kvName, envName]) => {
-                // Don't overwrite if already set (allows local overrides)
                 if (process.env[envName]) return { kvName, skipped: true };
-                
+
                 const secret = await client.getSecret(kvName);
                 process.env[envName] = secret.value;
                 return { kvName, loaded: true };

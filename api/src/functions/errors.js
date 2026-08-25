@@ -1,9 +1,7 @@
-// Errors API — read from the Errors table (admin use)
 const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { getPool, sql } = require('../shared/sql');
 
-// GET /api/errors?limit=100&functionName=foo
 app.http('errors-list', {
     methods: ['GET'],
     authLevel: 'function',
@@ -58,7 +56,6 @@ app.http('errors-list', {
     }
 });
 
-// DELETE /api/errors/:id  (clear a single entry)
 app.http('errors-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -83,7 +80,6 @@ app.http('errors-delete', {
     }
 });
 
-// DELETE /api/errors  (clear all — admin housekeeping)
 app.http('errors-clear', {
     methods: ['DELETE'],
     authLevel: 'function',

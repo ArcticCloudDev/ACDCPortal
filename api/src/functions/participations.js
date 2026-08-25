@@ -1,8 +1,3 @@
-// ACDC Portal - Participations API (v2)
-// Unified participation model: one record per person per event
-// Roles array: ['interest', 'participant', 'judge', 'committee', 'sponsor']
-// Email is the anchor identity (present before userId)
-
 const { app } = require('@azure/functions');
 const { requireAuth, canManageUser } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
@@ -21,15 +16,12 @@ const { sendEmail } = require('../shared/mail');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
 const { upsertParticipationRow, deleteParticipationRows, syncParticipationToFinancials } = require('../shared/event-financials');
 
-// Valid roles
 const VALID_ROLES = ['interest', 'participant', 'judge', 'committee', 'sponsor'];
 
-// Helper to check if event status means it's active
 function isActiveStatus(status) {
     return status === 'pre-registration' || status === 'registration' || status === 'live';
 }
 
-// Helper to generate ID
 function generateId() {
     return uuidv4();
 }
@@ -80,13 +72,6 @@ async function enforceParticipantCapacity(participation, teamId, participations,
     return null;
 }
 
-// ============================================================
-// HELPERS: Financial rows
-// ============================================================
-
-// Sync hotel + food financial rows for a participation.
-// Reads event rates, counts booked hotel nights, then upserts rows.
-// Called after any participation change that affects hotel nights or paidBy.
 async function syncParticipationFinancials(participation, context) {
     try {
         const events = await eventsStorage.getAll();
@@ -98,10 +83,6 @@ async function syncParticipationFinancials(participation, context) {
     }
 }
 
-// ============================================================
-// HELPERS: Sequence emails & interest queue
-// ============================================================
-
 async function triggerSequenceEmails(userId, eventId, context) {
     try {
         const users = await usersStorage.getAll();
@@ -111,7 +92,6 @@ async function triggerSequenceEmails(userId, eventId, context) {
             return;
         }
 
-        // Look up event to get its sequenceId
         const events = await eventsStorage.getAll();
         const event = events.find(e => e.id === eventId);
         if (!event || !event.sequenceEnabled || !event.sequenceId) {
@@ -136,14 +116,12 @@ async function triggerSequenceEmails(userId, eventId, context) {
                 .map(d => d.campaignId)
         );
 
-        // Filter to only unsent campaigns
         const campaignsToSend = sequenceCampaigns.filter(c => !userDeliveries.has(c.id));
         if (campaignsToSend.length === 0) {
             context.log(`All sequence emails already sent to ${user.email}`);
             return;
         }
 
-        // Build digest email with all unsent campaigns in one message
         const fs = require('fs').promises;
         const path = require('path');
         const { processTemplate } = require('../shared/mail');
@@ -210,7 +188,6 @@ async function triggerSequenceEmails(userId, eventId, context) {
                 htmlContent: digestHtml
             });
 
-            // Record deliveries for all campaigns included in the digest
             for (const campaign of campaignsToSend) {
                 await deliveriesStorage.create({
                     id: uuidv4(),
@@ -269,12 +246,6 @@ async function removeFromInterestQueue(userId, eventId, context) {
     }
 }
 
-
-// ============================================================
-// CORE CRUD
-// ============================================================
-
-// GET /api/participations/all - Get all participations (admin)
 app.http('participations-get-all', {
     methods: ['GET'],
     authLevel: 'function',
@@ -287,7 +258,6 @@ app.http('participations-get-all', {
             }
 
             const participations = await participationsStorage.getAll();
-            // Migration: ensure roles array exists on all records
             participations.forEach(p => {
                 if (!p.roles) p.roles = migrateRoles(p);
             });
@@ -300,7 +270,6 @@ app.http('participations-get-all', {
     }
 });
 
-// GET /api/participations - Get participation for user/email in event
 app.http('participations-get', {
     methods: ['GET'],
     authLevel: 'function',
@@ -322,7 +291,6 @@ app.http('participations-get', {
 
             const participations = await participationsStorage.getAll();
 
-            // Determine target event
             let targetEventId = eventId;
             if (!targetEventId) {
                 const events = await eventsStorage.getAll();
@@ -330,7 +298,6 @@ app.http('participations-get', {
                 if (activeEvent) targetEventId = activeEvent.id;
             }
 
-            // Find by userId or email
             const participation = participations.find(p => {
                 const matchesUser = userId ? p.userId === userId : p.email?.toLowerCase() === email.toLowerCase();
                 return matchesUser && p.eventId === targetEventId;
@@ -352,7 +319,6 @@ app.http('participations-get', {
                 };
             }
 
-            // Migration support
             if (!participation.roles) participation.roles = migrateRoles(participation);
             if (!participation.teamMemberships) participation.teamMemberships = buildLegacyTeamMemberships(participation);
 
@@ -365,7 +331,6 @@ app.http('participations-get', {
     }
 });
 
-// POST /api/participations - Create or update participation
 app.http('participations-upsert', {
     methods: ['POST'],
     authLevel: 'function',
@@ -387,14 +352,12 @@ app.http('participations-upsert', {
                 return { status: 400, jsonBody: { error: 'userId or email is required' } };
             }
 
-            // Ownership check: caller may only upsert their own participation unless admin
             const isSelfById = userId && userId === auth.user.userId;
             const isSelfByEmail = email && auth.user.email && email.toLowerCase() === auth.user.email.toLowerCase();
             if (!isSelfById && !isSelfByEmail && !auth.user.isPortalAdmin) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            // Resolve email from userId if not provided
             let resolvedEmail = email;
             if (!resolvedEmail && userId) {
                 const users = await usersStorage.getAll();
@@ -404,7 +367,6 @@ app.http('participations-upsert', {
 
             const participations = await participationsStorage.getAll();
 
-            // Find existing: match by userId OR email for this event
             const existingIndex = participations.findIndex(p => {
                 if (userId && p.userId === userId && p.eventId === eventId) return true;
                 if (resolvedEmail && p.email?.toLowerCase() === resolvedEmail.toLowerCase() && p.eventId === eventId) return true;
@@ -414,7 +376,6 @@ app.http('participations-upsert', {
             const now = new Date().toISOString();
 
             if (existingIndex >= 0) {
-                // Update existing participation
                 const existing = participations[existingIndex];
                 const updated = {
                     ...existing,
@@ -424,7 +385,6 @@ app.http('participations-upsert', {
                     roles: existing.roles || migrateRoles(existing),
                     updatedAt: now
                 };
-                // Ensure legacy support
                 updated.teamMemberships = buildLegacyTeamMemberships(updated);
                 await participationsStorage.update(existing.id, {
                     userId: updated.userId,
@@ -437,8 +397,6 @@ app.http('participations-upsert', {
                 context.log(`Participation updated for ${resolvedEmail || userId} in event ${eventId}`);
                 return { status: 200, jsonBody: updated };
             } else {
-                // Create new participation
-                // Determine initial hotelPaidBy based on roles
                 const initialRoles = roles || [];
                 const initialHotelPaidBy = initialRoles.includes('committee') || initialRoles.includes('judge')
                     ? 'committee' : null;
@@ -456,7 +414,6 @@ app.http('participations-upsert', {
                     createdAt: now,
                     updatedAt: now
                 };
-                // Legacy support
                 newParticipation.teamMemberships = [];
                 await participationsStorage.create(newParticipation);
 
@@ -471,7 +428,6 @@ app.http('participations-upsert', {
     }
 });
 
-// PUT /api/participations/:id - Update participation fields
 app.http('participations-update', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -511,7 +467,6 @@ app.http('participations-update', {
                 updatedAt: new Date().toISOString()
             };
 
-            // Rebuild legacy support
             updated.teamMemberships = buildLegacyTeamMemberships(updated);
             await participationsStorage.update(id, {
                 ...(body.hotelNights !== undefined && { hotelNights: body.hotelNights }),
@@ -533,7 +488,6 @@ app.http('participations-update', {
     }
 });
 
-// DELETE /api/participations/:id - Delete a participation
 app.http('participations-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -563,13 +517,10 @@ app.http('participations-delete', {
             const userId = participation.userId;
             const eventId = participation.eventId;
 
-            // Remove the participation
             await participationsStorage.delete(id);
 
-            // Cascade: clean up related data
             let cleaned = { invitations: 0, deliveries: 0 };
 
-            // 1. Clean up invitations for this email + event
             try {
                 const allInvitations = await invitationsStorage.getAll();
                 const invToDelete = allInvitations.filter(inv =>
@@ -579,7 +530,6 @@ app.http('participations-delete', {
                 cleaned.invitations = invToDelete.length;
             } catch (e) { context.log(`Warning: invitation cleanup failed: ${e.message}`); }
 
-            // 2. Clean up email deliveries for this user/email
             try {
                 const allDeliveries = await deliveriesStorage.getAll();
                 const delToDelete = allDeliveries.filter(d => {
@@ -591,11 +541,8 @@ app.http('participations-delete', {
                 cleaned.deliveries = delToDelete.length;
             } catch (e) { context.log(`Warning: delivery cleanup failed: ${e.message}`); }
 
-            // 3. (sequence-progress table has been removed — no cleanup needed)
-
             context.log(`Deleted participation ${id} (${email}). Cleaned: ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries`);
 
-            // Clean up auto-generated financial rows (non-blocking)
             deleteParticipationRows(id).catch(err => context.warn('Financial cleanup after participation delete failed:', err?.message));
 
             return { status: 200, jsonBody: { success: true, cleaned } };
@@ -607,12 +554,6 @@ app.http('participations-delete', {
     }
 });
 
-
-// ============================================================
-// ROLES MANAGEMENT
-// ============================================================
-
-// PUT /api/participations/:id/roles - Add or remove roles
 app.http('participations-update-roles-v2', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -641,8 +582,6 @@ app.http('participations-update-roles-v2', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            // Privileged roles (judge/committee) may only be granted by portal admins —
-            // prevents a team admin or self-service caller from self-escalating.
             const requestedRoles = [...(set || []), ...(add || [])];
             const grantsPrivilegedRole = requestedRoles.some(r => ['judge', 'committee'].includes(r));
             if (grantsPrivilegedRole && !auth.user.isPortalAdmin) {
@@ -651,7 +590,6 @@ app.http('participations-update-roles-v2', {
 
             let roles = participation.roles || migrateRoles(participation);
 
-            // 'set' replaces the entire roles array
             if (set && Array.isArray(set)) {
                 const invalid = set.filter(r => !VALID_ROLES.includes(r));
                 if (invalid.length > 0) {
@@ -659,7 +597,6 @@ app.http('participations-update-roles-v2', {
                 }
                 roles = [...new Set(set)];
             } else {
-                // 'add' appends roles
                 if (add && Array.isArray(add)) {
                     const invalid = add.filter(r => !VALID_ROLES.includes(r));
                     if (invalid.length > 0) {
@@ -667,7 +604,6 @@ app.http('participations-update-roles-v2', {
                     }
                     roles = [...new Set([...roles, ...add])];
                 }
-                // 'remove' removes roles
                 if (remove && Array.isArray(remove)) {
                     roles = roles.filter(r => !remove.includes(r));
                 }
@@ -686,18 +622,15 @@ app.http('participations-update-roles-v2', {
             participation.roles = roles;
             participation.updatedAt = new Date().toISOString();
 
-            // If participant/judge/committee was just added, handle side effects
             const addedActionableRole = add?.some(r => ['participant', 'judge', 'committee'].includes(r));
             if (addedActionableRole && participation.userId) {
                 await removeFromInterestQueue(participation.userId, participation.eventId, context);
                 await triggerSequenceEmails(participation.userId, participation.eventId, context);
 
                 if (participation.email) {
-                    // Interest acknowledgment is only sent from interest.js when interest is first recorded
                 }
             }
 
-            // Rebuild legacy support
             participation.teamMemberships = buildLegacyTeamMemberships(participation);
             await participationsStorage.update(id, {
                 roles: participation.roles,
@@ -714,12 +647,6 @@ app.http('participations-update-roles-v2', {
     }
 });
 
-
-// ============================================================
-// TEAM ASSIGNMENT
-// ============================================================
-
-// PUT /api/participations/:id/team - Assign to a team
 app.http('participations-assign-team', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -749,7 +676,6 @@ app.http('participations-assign-team', {
             }
 
             if (teamId) {
-                // Validate team exists
                 const teams = await teamsStorage.getAll();
                 const team = teams.find(t => t.id === teamId);
                 if (!team) {
@@ -772,7 +698,6 @@ app.http('participations-assign-team', {
             participation.isTeamAdmin = isTeamAdmin || false;
             participation.updatedAt = new Date().toISOString();
 
-            // Rebuild legacy
             participation.teamMemberships = buildLegacyTeamMemberships(participation);
             await participationsStorage.update(id, {
                 teamId: participation.teamId,
@@ -781,13 +706,11 @@ app.http('participations-assign-team', {
                 updatedAt: participation.updatedAt
             });
 
-            // Side effects for joining a team
             if (teamId && participation.userId) {
                 await removeFromInterestQueue(participation.userId, participation.eventId, context);
                 await triggerSequenceEmails(participation.userId, participation.eventId, context);
 
                 if (participation.email) {
-                    // Interest acknowledgment is only sent from interest.js when interest is first recorded
                 }
             }
 
@@ -801,12 +724,6 @@ app.http('participations-assign-team', {
     }
 });
 
-
-// ============================================================
-// HOTEL
-// ============================================================
-
-// PUT /api/participations/:id/hotel - Update hotel nights
 app.http('participations-update-hotel', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -850,12 +767,6 @@ app.http('participations-update-hotel', {
     }
 });
 
-
-// ============================================================
-// QUERY ENDPOINTS
-// ============================================================
-
-// GET /api/participations/event/:eventId - All participations for an event (with optional role filter)
 app.http('participations-by-event', {
     methods: ['GET'],
     authLevel: 'function',
@@ -868,18 +779,16 @@ app.http('participations-by-event', {
             }
 
             const eventId = request.params.eventId;
-            const role = request.query.get('role'); // Optional: filter by role
+            const role = request.query.get('role');
 
             const participations = await participationsStorage.getAll();
             let results = participations.filter(p => p.eventId === eventId);
 
-            // Migration: ensure roles exist
             results.forEach(p => {
                 if (!p.roles) p.roles = migrateRoles(p);
                 if (!p.teamMemberships) p.teamMemberships = buildLegacyTeamMemberships(p);
             });
 
-            // Filter by role if specified
             if (role) {
                 results = results.filter(p => p.roles.includes(role));
             }
@@ -893,7 +802,6 @@ app.http('participations-by-event', {
     }
 });
 
-// GET /api/participations/person/:email - All participations for a person across events
 app.http('participations-by-person', {
     methods: ['GET'],
     authLevel: 'function',
@@ -912,7 +820,6 @@ app.http('participations-by-person', {
                 p.email?.toLowerCase() === email.toLowerCase()
             );
 
-            // Also check by userId if we can resolve email -> user
             const users = await usersStorage.getAll();
             const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
             if (user) {
@@ -923,12 +830,10 @@ app.http('participations-by-person', {
                 });
             }
 
-            // Migration
             personParticipations.forEach(p => {
                 if (!p.roles) p.roles = migrateRoles(p);
             });
 
-            // Enrich with event names
             const events = await eventsStorage.getAll();
             const enriched = personParticipations.map(p => ({
                 ...p,
@@ -944,7 +849,6 @@ app.http('participations-by-person', {
     }
 });
 
-// GET /api/participations/team/:teamId - Get all participations for a team
 app.http('participations-by-team', {
     methods: ['GET'],
     authLevel: 'function',
@@ -959,10 +863,8 @@ app.http('participations-by-team', {
             const teamId = request.params.teamId;
             const participations = await participationsStorage.getAll();
 
-            // New model: flat teamId
             let teamParticipations = participations.filter(p => p.teamId === teamId);
 
-            // Legacy fallback: also check teamMemberships array
             if (teamParticipations.length === 0) {
                 teamParticipations = participations.filter(p => {
                     const memberships = p.teamMemberships || [];
@@ -970,7 +872,6 @@ app.http('participations-by-team', {
                 });
             }
 
-            // Migration
             teamParticipations.forEach(p => {
                 if (!p.roles) p.roles = migrateRoles(p);
             });
@@ -984,7 +885,6 @@ app.http('participations-by-team', {
     }
 });
 
-// GET /api/participations/team/:teamId/count - Get participant count for a team
 app.http('participations-team-count', {
     methods: ['GET'],
     authLevel: 'function',
@@ -1003,13 +903,11 @@ app.http('participations-team-count', {
             let participantCount = 0;
 
             for (const p of participations) {
-                // New model
                 if (p.teamId === teamId && p.roles?.includes('participant')) {
                     participantCount++;
                     if (p.isTeamAdmin) adminCount++;
                     continue;
                 }
-                // Legacy fallback
                 const membership = (p.teamMemberships || []).find(m => m.teamId === teamId);
                 if (membership) {
                     if (membership.isAdmin) adminCount++;
@@ -1029,13 +927,6 @@ app.http('participations-team-count', {
     }
 });
 
-
-// ============================================================
-// LEGACY COMPATIBILITY ENDPOINTS
-// These keep existing frontend pages working during migration
-// ============================================================
-
-// POST /api/participations/:id/team-membership - Legacy: add team membership
 app.http('participations-add-team-membership', {
     methods: ['POST'],
     authLevel: 'function',
@@ -1068,7 +959,6 @@ app.http('participations-add-team-membership', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            // Check participant constraints
             if (isParticipant) {
                 if (participation.teamId && participation.teamId !== teamId && participation.roles?.includes('participant')) {
                     return {
@@ -1083,7 +973,6 @@ app.http('participations-add-team-membership', {
                 if (capacityError) return capacityError;
             }
 
-            // Update new model
             participation.teamId = teamId;
             participation.isTeamAdmin = isAdmin || false;
             if (!participation.roles) participation.roles = [];
@@ -1091,7 +980,6 @@ app.http('participations-add-team-membership', {
                 participation.roles.push('participant');
             }
 
-            // Also maintain legacy teamMemberships
             participation.teamMemberships = participation.teamMemberships || [];
             const existingIdx = participation.teamMemberships.findIndex(m => m.teamId === teamId);
             if (existingIdx >= 0) {
@@ -1104,7 +992,6 @@ app.http('participations-add-team-membership', {
                 });
             }
 
-            // When joining a team as participant, team pays for hotel
             if (isParticipant) {
                 participation.hotelPaidBy = 'team';
             }
@@ -1118,21 +1005,18 @@ app.http('participations-add-team-membership', {
                 updatedAt: participation.updatedAt
             });
 
-            // Side effects
             if (participation.userId) {
                 if (isParticipant) {
                     await removeFromInterestQueue(participation.userId, participation.eventId, context);
                     await triggerSequenceEmails(participation.userId, participation.eventId, context);
                 }
 
-                // Send welcome email to team admin/participant as team registration confirmation
-                // Fires whether or not the admin is also a participant
                 if (participation.email) {
                     let teamNameForWelcome = '';
                     try {
                         const teamForWelcome = teamId ? await Storage.teams.getById(teamId) : null;
                         teamNameForWelcome = teamForWelcome?.teamName || '';
-                    } catch (e) { /* non-critical */ }
+                    } catch (e) { }
 
                     sendWelcomeEmail(participation.email, participation.eventId, context, { teamName: teamNameForWelcome })
                         .then(result => {
@@ -1142,8 +1026,6 @@ app.http('participations-add-team-membership', {
                 }
             }
 
-            // Auto-create/update hotel and food financial rows for this participation
-            // Fires async — non-critical, does not block the response
             syncParticipationFinancials(participation, context);
 
             context.log(`Legacy team membership added for participation ${id}, team ${teamId}`);
@@ -1156,7 +1038,6 @@ app.http('participations-add-team-membership', {
     }
 });
 
-// DELETE /api/participations/:id/team-membership/:teamId - Legacy: remove team membership
 app.http('participations-remove-team-membership', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -1184,14 +1065,12 @@ app.http('participations-remove-team-membership', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            // Clear from new model
             if (participation.teamId === teamId) {
                 participation.teamId = null;
                 participation.isTeamAdmin = false;
                 participation.roles = (participation.roles || []).filter(r => r !== 'participant');
             }
 
-            // Clear from legacy
             const memberships = participation.teamMemberships || [];
             const membershipIndex = memberships.findIndex(m => m.teamId === teamId);
             if (membershipIndex >= 0) {
@@ -1200,7 +1079,6 @@ app.http('participations-remove-team-membership', {
 
             participation.teamMemberships = memberships;
 
-            // Update hotelPaidBy: revert to committee if they have that role, otherwise clear
             const hasOtherTeams = memberships.some(m => m.isParticipant);
             if (!hasOtherTeams) {
                 const roles = participation.roles || [];
@@ -1232,7 +1110,6 @@ app.http('participations-remove-team-membership', {
     }
 });
 
-// PUT /api/participations/:id/team-membership/:teamId/participant - Legacy: toggle participant
 app.http('participations-toggle-participant', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -1262,7 +1139,6 @@ app.http('participations-toggle-participant', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            // Update new model
             if (!participation.roles) participation.roles = [];
             if (isParticipant) {
                 const capacityError = await enforceParticipantCapacity(
@@ -1278,7 +1154,6 @@ app.http('participations-toggle-participant', {
                 }
             }
 
-            // Update legacy
             const memberships = participation.teamMemberships || [];
             const membershipIndex = memberships.findIndex(m => m.teamId === teamId);
             if (membershipIndex >= 0) {
@@ -1293,12 +1168,10 @@ app.http('participations-toggle-participant', {
                 updatedAt: participation.updatedAt
             });
 
-            // Side effects
             if (isParticipant && participation.userId) {
                 await removeFromInterestQueue(participation.userId, participation.eventId, context);
 
                 if (participation.email) {
-                    // Interest acknowledgment is only sent from interest.js when interest is first recorded
                 }
             }
 
@@ -1312,7 +1185,6 @@ app.http('participations-toggle-participant', {
     }
 });
 
-// PUT /api/participations/:id/team-membership/:teamId/roles - Legacy: update roles on team membership
 app.http('participations-update-team-roles', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -1342,7 +1214,6 @@ app.http('participations-update-team-roles', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            // Check participant constraints
             if (isParticipant && !participation.roles?.includes('participant')) {
                 if (participation.teamId && participation.teamId !== teamId) {
                     return {
@@ -1357,7 +1228,6 @@ app.http('participations-update-team-roles', {
                 if (capacityError) return capacityError;
             }
 
-            // Update new model
             participation.teamId = teamId;
             participation.isTeamAdmin = isAdmin;
             if (!participation.roles) participation.roles = [];
@@ -1367,7 +1237,6 @@ app.http('participations-update-team-roles', {
                 participation.roles = participation.roles.filter(r => r !== 'participant');
             }
 
-            // Update legacy
             const memberships = participation.teamMemberships || [];
             const membershipIndex = memberships.findIndex(m => m.teamId === teamId);
             if (membershipIndex >= 0) {
@@ -1394,12 +1263,6 @@ app.http('participations-update-team-roles', {
     }
 });
 
-
-// ============================================================
-// MIGRATION HELPERS
-// ============================================================
-
-// Derive roles from old teamMemberships structure
 function migrateRoles(participation) {
     const roles = [];
 
@@ -1422,7 +1285,6 @@ function migrateRoles(participation) {
     return roles;
 }
 
-// Build legacy teamMemberships from new flat model
 function buildLegacyTeamMemberships(participation) {
     if (participation.teamMemberships && participation.teamMemberships.length > 0) {
         return participation.teamMemberships;
@@ -1438,6 +1300,5 @@ function buildLegacyTeamMemberships(participation) {
 
     return [];
 }
-
 
 console.log('Participations API v2 loaded (with roles[])');

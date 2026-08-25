@@ -1,7 +1,3 @@
-// SQL Connection Pool Management
-// Uses Entra ID (DefaultAzureCredential) for authentication.
-// Token auto-refreshes before expiry.
-
 const sql = require('mssql');
 const { DefaultAzureCredential } = require('@azure/identity');
 
@@ -13,13 +9,12 @@ let _tokenExpiresAt = 0;
 
 async function getPool() {
     const now = Date.now();
-    // Refresh if token expires within 5 minutes
     if (_pool && now < _tokenExpiresAt - 300000) {
         return _pool;
     }
 
     if (_pool) {
-        try { await _pool.close(); } catch (e) { /* ignore */ }
+        try { await _pool.close(); } catch (e) { }
         _pool = null;
     }
 
@@ -45,7 +40,7 @@ async function getPool() {
 
 async function closePool() {
     if (_pool) {
-        try { await _pool.close(); } catch (e) { /* ignore */ }
+        try { await _pool.close(); } catch (e) { }
         _pool = null;
     }
 }

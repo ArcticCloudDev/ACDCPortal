@@ -1,9 +1,7 @@
-// Badges API - Master badges, event-badge assignments, and badge claims
-// Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
+const crypto = require('crypto');
 const { logError } = require('../shared/error-log');
 const { requireAuth, isTeamMember, hasEventRole } = require('../shared/auth');
-const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 
 const badgesStorage = new GenericStorage('badges');
@@ -11,21 +9,12 @@ const eventBadgesStorage = new GenericStorage('event-badges');
 const badgeClaimsStorage = new GenericStorage('badge-claims');
 const eventsStorage = new GenericStorage('events');
 const participationsStorage = new GenericStorage('participations');
+const teamsStorage = new GenericStorage('teams');
 
-// Helper to generate GUID
 function generateGuid() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
+    return crypto.randomUUID();
 }
 
-// ============================================================
-// MASTER BADGES - CRUD
-// ============================================================
-
-// GET /api/badges - List all master badges
 app.http('badges-list', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -39,7 +28,6 @@ app.http('badges-list', {
                 badges = badges.filter(b => b.category === category);
             }
 
-            // Sort by category then name
             const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3 };
             badges.sort((a, b) => {
                 const catDiff = (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99);
@@ -59,7 +47,6 @@ app.http('badges-list', {
     }
 });
 
-// GET /api/badges/:id - Get single badge
 app.http('badges-get', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -83,7 +70,6 @@ app.http('badges-get', {
     }
 });
 
-// POST /api/badges - Create a new master badge
 app.http('badges-create', {
     methods: ['POST'],
     authLevel: 'function',
@@ -138,7 +124,6 @@ app.http('badges-create', {
     }
 });
 
-// PUT /api/badges/:id - Update a master badge
 app.http('badges-update', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -195,7 +180,6 @@ app.http('badges-update', {
     }
 });
 
-// DELETE /api/badges/:id - Delete a master badge
 app.http('badges-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -218,7 +202,6 @@ app.http('badges-delete', {
             const badgeName = badge.name;
             await badgesStorage.delete(id);
 
-            // Also clean up event-badge assignments
             const eventBadges = await eventBadgesStorage.getAll();
             for (const eb of eventBadges) {
                 if (eb.badgeId === id) {
@@ -236,12 +219,6 @@ app.http('badges-delete', {
     }
 });
 
-
-// ============================================================
-// EVENT-BADGES - Many-to-many with judge assignment
-// ============================================================
-
-// GET /api/events/:eventId/badges - List badges assigned to an event
 app.http('event-badges-list', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -269,10 +246,8 @@ app.http('event-badges-list', {
             const eventBadges = await eventBadgesStorage.getAll();
             const badges = await badgesStorage.getAll();
 
-            // Get event-badge assignments for this event
             const assignments = eventBadges.filter(eb => eb.eventId === eventId);
 
-            // Enrich with badge details
             const enriched = assignments.map(eb => {
                 const badge = badges.find(b => b.id === eb.badgeId);
                 return {
@@ -281,7 +256,6 @@ app.http('event-badges-list', {
                 };
             });
 
-            // Sort by category then name
             const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3 };
             enriched.sort((a, b) => {
                 if (!a.badge || !b.badge) return 0;
@@ -294,8 +268,6 @@ app.http('event-badges-list', {
                 return { status: 200, jsonBody: enriched };
             }
 
-            // Participants only need the available badge visuals. Do not expose
-            // the staff-only judge assignment fields in the participant view.
             return {
                 status: 200,
                 jsonBody: enriched
@@ -316,7 +288,6 @@ app.http('event-badges-list', {
     }
 });
 
-// POST /api/events/:eventId/badges - Add badge(s) to event
 app.http('event-badges-add', {
     methods: ['POST'],
     authLevel: 'function',
@@ -331,20 +302,17 @@ app.http('event-badges-add', {
             const eventId = request.params.eventId;
             const body = await request.json();
 
-            // Support single badgeId or array of badgeIds
             const badgeIds = body.badgeIds || (body.badgeId ? [body.badgeId] : []);
             if (badgeIds.length === 0) {
                 return { status: 400, jsonBody: { error: 'badgeId or badgeIds is required' } };
             }
 
-            // Validate event exists
             const events = await eventsStorage.getAll();
             const event = events.find(e => e.id === eventId);
             if (!event) {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
 
-            // Validate badges exist
             const badges = await badgesStorage.getAll();
             const eventBadges = await eventBadgesStorage.getAll();
 
@@ -358,7 +326,6 @@ app.http('event-badges-add', {
                     continue;
                 }
 
-                // Check if already assigned
                 const existing = eventBadges.find(eb => eb.eventId === eventId && eb.badgeId === badgeId);
                 if (existing) {
                     skipped.push({ badgeId, reason: 'Already assigned' });
@@ -391,7 +358,6 @@ app.http('event-badges-add', {
     }
 });
 
-// PUT /api/events/:eventId/badges/:id - Update event-badge (assign judge, toggle active)
 app.http('event-badges-update', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -428,7 +394,6 @@ app.http('event-badges-update', {
     }
 });
 
-// DELETE /api/events/:eventId/badges/:id - Remove badge from event
 app.http('event-badges-remove', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -450,7 +415,6 @@ app.http('event-badges-remove', {
 
             await eventBadgesStorage.delete(id);
 
-            // Also clean up claims for this event-badge
             const claims = await badgeClaimsStorage.getAll();
             for (const c of claims) {
                 if (c.eventBadgeId === id) {
@@ -468,7 +432,6 @@ app.http('event-badges-remove', {
     }
 });
 
-// POST /api/events/:eventId/badges/bulk - Bulk add/remove badges for an event
 app.http('event-badges-bulk', {
     methods: ['POST'],
     authLevel: 'function',
@@ -482,7 +445,7 @@ app.http('event-badges-bulk', {
 
             const eventId = request.params.eventId;
             const body = await request.json();
-            const { selectedBadgeIds } = body; // Array of badge IDs that should be assigned
+            const { selectedBadgeIds } = body;
 
             if (!Array.isArray(selectedBadgeIds)) {
                 return { status: 400, jsonBody: { error: 'selectedBadgeIds array is required' } };
@@ -490,20 +453,16 @@ app.http('event-badges-bulk', {
 
             const eventBadges = await eventBadgesStorage.getAll();
 
-            // Get current assignments for this event
             const currentAssignments = eventBadges.filter(eb => eb.eventId === eventId);
             const currentBadgeIds = currentAssignments.map(eb => eb.badgeId);
 
-            // Determine adds and removes
             const toAdd = selectedBadgeIds.filter(id => !currentBadgeIds.includes(id));
             const toRemove = currentAssignments.filter(eb => !selectedBadgeIds.includes(eb.badgeId));
 
-            // Remove
             for (const eb of toRemove) {
                 await eventBadgesStorage.delete(eb.id);
             }
 
-            // Add
             const added = [];
             for (const badgeId of toAdd) {
                 const newEb = await eventBadgesStorage.create({
@@ -517,7 +476,6 @@ app.http('event-badges-bulk', {
                 added.push(newEb);
             }
 
-            // Clean up claims for removed badges
             if (toRemove.length > 0) {
                 const removeIds = new Set(toRemove.map(eb => eb.id));
                 const claims = await badgeClaimsStorage.getAll();
@@ -547,12 +505,6 @@ app.http('event-badges-bulk', {
     }
 });
 
-
-// ============================================================
-// BADGE CLAIMS - Teams claim badges, judges review
-// ============================================================
-
-// GET /api/badge-claims - List claims (filterable by eventId, teamId, status)
 app.http('badge-claims-list', {
     methods: ['GET'],
     authLevel: 'function',
@@ -576,7 +528,6 @@ app.http('badge-claims-list', {
             if (status) claims = claims.filter(c => c.status === status);
             if (badgeId) claims = claims.filter(c => c.badgeId === badgeId);
 
-            // Object-level authorization: restrict to claims the caller may see.
             if (!auth.user.isPortalAdmin) {
                 const participations = await participationsStorage.getAll();
                 claims = claims.filter(c => {
@@ -588,9 +539,8 @@ app.http('badge-claims-list', {
                 });
             }
 
-            // Enrich with badge details
             const badges = await badgesStorage.getAll();
-            const teams = await Storage.teams.getAll();
+            const teams = await teamsStorage.getAll();
 
             const enriched = claims.map(c => ({
                 ...c,
@@ -598,7 +548,6 @@ app.http('badge-claims-list', {
                 team: teams.find(t => t.id === c.teamId) ? { id: c.teamId, teamName: teams.find(t => t.id === c.teamId).teamName } : null
             }));
 
-            // Sort by claimed date (newest first)
             enriched.sort((a, b) => new Date(b.claimedAt) - new Date(a.claimedAt));
 
             return { status: 200, jsonBody: enriched };
@@ -610,7 +559,6 @@ app.http('badge-claims-list', {
     }
 });
 
-// POST /api/badge-claims - Team claims a badge
 app.http('badge-claims-create', {
     methods: ['POST'],
     authLevel: 'function',
@@ -633,7 +581,6 @@ app.http('badge-claims-create', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to claim badges for this team' } };
             }
 
-            // Validate event-badge assignment exists and is active
             const eventBadges = await eventBadgesStorage.getAll();
             const eventBadge = eventBadges.find(eb => eb.id === body.eventBadgeId && eb.isActive);
             if (!eventBadge) {
@@ -651,7 +598,6 @@ app.http('badge-claims-create', {
                 return { status: 409, jsonBody: { error: 'Team has already claimed this badge', existingClaim } };
             }
 
-            // Check if there's a declined claim — re-claim by upgrading it back to pending
             const declinedClaim = claims.find(c =>
                 c.eventBadgeId === body.eventBadgeId &&
                 c.teamId === body.teamId &&
@@ -672,7 +618,6 @@ app.http('badge-claims-create', {
                 return { status: 201, jsonBody: upgraded };
             }
 
-            // Check if there's a draft claim (from assigning) - upgrade it
             const draftClaim = claims.find(c =>
                 c.eventBadgeId === body.eventBadgeId &&
                 c.teamId === body.teamId &&
@@ -680,7 +625,6 @@ app.http('badge-claims-create', {
             );
 
             if (draftClaim) {
-                // Upgrade draft to pending claim
                 const upgraded = await badgeClaimsStorage.update(draftClaim.id, {
                     status: 'pending',
                     blogUrl: body.blogUrl || body.evidence || '',
@@ -718,7 +662,6 @@ app.http('badge-claims-create', {
     }
 });
 
-// PUT /api/badge-claims/:id/review - Judge reviews a claim (approve/decline)
 app.http('badge-claims-review', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -769,7 +712,6 @@ app.http('badge-claims-review', {
     }
 });
 
-// PUT /api/badge-claims/:id - Update a claim (e.g. update evidence)
 app.http('badge-claims-update', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -790,7 +732,6 @@ app.http('badge-claims-update', {
                 return { status: 404, jsonBody: { error: 'Badge claim not found' } };
             }
 
-            // Only allow updating evidence/blogUrl and re-claiming if declined
             if (claim.status === 'approved') {
                 return { status: 400, jsonBody: { error: 'Cannot modify an approved claim' } };
             }
@@ -804,7 +745,6 @@ app.http('badge-claims-update', {
                 evidence: body.evidence !== undefined ? body.evidence : claim.evidence,
                 blogUrl: body.blogUrl !== undefined ? body.blogUrl : (claim.blogUrl || ''),
                 assignedToUserId: body.assignedToUserId !== undefined ? body.assignedToUserId : claim.assignedToUserId,
-                // If re-claiming after decline, reset to pending
                 status: claim.status === 'declined' && body.reclaim ? 'pending' : claim.status
             });
 
@@ -818,7 +758,6 @@ app.http('badge-claims-update', {
     }
 });
 
-// DELETE /api/badge-claims/:id - Delete a claim
 app.http('badge-claims-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -855,7 +794,6 @@ app.http('badge-claims-delete', {
     }
 });
 
-// POST /api/badge-claims/award - Judge awards an exclusive badge to a team (no blog URL required)
 app.http('badge-claims-award', {
     methods: ['POST'],
     authLevel: 'function',
@@ -873,7 +811,6 @@ app.http('badge-claims-award', {
                 return { status: 400, jsonBody: { error: 'eventBadgeId and teamId are required' } };
             }
 
-            // Validate event-badge assignment exists and is active
             const eventBadges = await eventBadgesStorage.getAll();
             const eventBadge = eventBadges.find(eb => eb.id === body.eventBadgeId && eb.isActive);
             if (!eventBadge) {
@@ -885,14 +822,12 @@ app.http('badge-claims-award', {
                 return { status: 403, jsonBody: { error: 'Only judges or admins can award badges' } };
             }
 
-            // Validate badge is exclusive type
             const badges = await badgesStorage.getAll();
             const badge = badges.find(b => b.id === eventBadge.badgeId);
             if (!badge || (badge.claimType || 'common') !== 'exclusive') {
                 return { status: 400, jsonBody: { error: 'Only exclusive badges can be awarded by judges' } };
             }
 
-            // Check if this team already has this badge awarded
             const claims = await badgeClaimsStorage.getAll();
             const existingClaim = claims.find(c =>
                 c.eventBadgeId === body.eventBadgeId &&
@@ -909,7 +844,7 @@ app.http('badge-claims-award', {
                 eventId: eventBadge.eventId,
                 badgeId: eventBadge.badgeId,
                 teamId: body.teamId,
-                status: 'approved',  // Exclusive badges are instantly approved when awarded by judge
+                status: 'approved',
                 blogUrl: body.blogUrl || '',
                 evidence: '',
                 assignedToUserId: null,
@@ -931,7 +866,6 @@ app.http('badge-claims-award', {
     }
 });
 
-// PUT /api/badge-claims/assign - Assign a team member to a badge (creates draft claim if none exists)
 app.http('badge-claims-assign', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -954,14 +888,12 @@ app.http('badge-claims-assign', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to assign badges for this team' } };
             }
 
-            // Validate event-badge exists
             const eventBadges = await eventBadgesStorage.getAll();
             const eventBadge = eventBadges.find(eb => eb.id === body.eventBadgeId);
             if (!eventBadge) {
                 return { status: 404, jsonBody: { error: 'Event-badge assignment not found' } };
             }
 
-            // Find existing claim for this team + event-badge
             const allClaims = await badgeClaimsStorage.getAll();
             const existing = allClaims.find(c =>
                 c.eventBadgeId === body.eventBadgeId &&
@@ -969,13 +901,11 @@ app.http('badge-claims-assign', {
             );
 
             if (existing) {
-                // Update assignment on existing claim
                 const updated = await badgeClaimsStorage.update(existing.id, {
                     assignedToUserId: body.assignedToUserId || null
                 });
                 return { status: 200, jsonBody: updated };
             } else {
-                // Create a draft claim with just assignment
                 const draft = {
                     id: generateGuid(),
                     eventBadgeId: body.eventBadgeId,
@@ -1000,7 +930,6 @@ app.http('badge-claims-assign', {
     }
 });
 
-// GET /api/events/:eventId/badge-summary - Get badge summary for an event (points per team)
 app.http('event-badge-summary', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -1022,12 +951,10 @@ app.http('event-badge-summary', {
 
             const claims = await badgeClaimsStorage.getAll();
             const badges = await badgesStorage.getAll();
-            const teams = await Storage.teams.getAll();
+            const teams = await teamsStorage.getAll();
 
-            // Get approved claims for this event
             const eventClaims = claims.filter(c => c.eventId === eventId && c.status === 'approved');
 
-            // Calculate points per team
             const teamPoints = {};
             for (const claim of eventClaims) {
                 const badge = badges.find(b => b.id === claim.badgeId);
@@ -1054,7 +981,6 @@ app.http('event-badge-summary', {
                 });
             }
 
-            // Sort by total points descending
             const leaderboard = Object.values(teamPoints).sort((a, b) => b.totalPoints - a.totalPoints);
 
             return {

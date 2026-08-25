@@ -1,13 +1,8 @@
-// Reset transactional test data in Azure SQL
-// Preserves: Events, Users, EmailCampaigns, Sequences, SystemEmailConfig, Badges, EventBadges
-// Clears:    Participations, Invitations, Teams, InterestLeads, InterestQueue, SoloQueue,
-//            EmailDeliveries, EmailLog, ScheduledRuns, ScheduledRunCampaigns, BadgeClaims
 const sql = require('../api/node_modules/mssql');
 const { DefaultAzureCredential } = require('../api/node_modules/@azure/identity');
 const readline = require('readline');
 
 const TABLES_TO_CLEAR = [
-    // Children first (FK order)
     { name: 'ScheduledRunCampaigns', note: 'child of ScheduledRuns' },
     { name: 'EmailDeliveries',       note: '' },
     { name: 'EmailLog',              note: '' },
@@ -18,7 +13,6 @@ const TABLES_TO_CLEAR = [
     { name: 'InterestLeads',         note: '' },
     { name: 'InterestQueue',         note: '' },
     { name: 'SoloQueue',             note: '' },
-    // Teams last — must null out cross-references in Events/Users first
 ];
 
 async function confirm(question) {
@@ -66,26 +60,22 @@ async function run() {
     console.log('Connected!\n');
 
     try {
-        // Clear all transactional tables
         for (const { name } of TABLES_TO_CLEAR) {
             const result = await pool.request().query(`DELETE FROM [${name}]`);
             console.log(`  ✓ Cleared ${name} (${result.rowsAffected[0]} rows deleted)`);
         }
 
-        // Null out cross-references in Events before deleting Teams
         const eventsResult = await pool.request().query(
             `UPDATE Events SET CommitteeTeamId = NULL, JudgesTeamId = NULL
              WHERE CommitteeTeamId IS NOT NULL OR JudgesTeamId IS NOT NULL`
         );
         console.log(`  ✓ Nulled Events.CommitteeTeamId/JudgesTeamId (${eventsResult.rowsAffected[0]} rows updated)`);
 
-        // Null out legacy Users.TeamId
         const usersResult = await pool.request().query(
             `UPDATE Users SET TeamId = NULL WHERE TeamId IS NOT NULL`
         );
         console.log(`  ✓ Nulled Users.TeamId legacy field (${usersResult.rowsAffected[0]} rows updated)`);
 
-        // Delete Teams
         const teamsResult = await pool.request().query(`DELETE FROM Teams`);
         console.log(`  ✓ Cleared Teams (${teamsResult.rowsAffected[0]} rows deleted)`);
 

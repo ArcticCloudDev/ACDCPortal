@@ -1,10 +1,3 @@
-// ACDC Portal - Unified Register / Sign In Page Logic
-// Flow A (known user):     Email → auto-send OTP → Verify → JWT session → redirect
-// Flow B (new user, sign-in):  Email → Profile Form (name/phone) → reCAPTCHA → Send OTP → Verify → Complete → redirect
-// Flow C (new user, team):     Email → Full Form (profile + team) → reCAPTCHA → Send OTP → Verify → Complete → Success
-// Flow D (interest):           Same as A or B, but after auth → record interest for eventId → interest success
-// No external auth provider � everything happens on this page
-
 const RECAPTCHA_SITE_KEY = '6Lc7aKwsAAAAAA5DkTtC2lFIF5eAGVTHpQAkZFep';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -19,25 +12,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const registrationForm = document.getElementById('registration-form');
     const otpForm = document.getElementById('otp-form');
 
-    // Store form data between steps
     let pendingFormData = null;
-    // Track flow: 'login', 'team-login', 'register-profile', 'register-team',
-    // 'interest-login', 'interest-register'
     let flowMode = null;
-    // Store the email being used
     let currentEmail = '';
 
-    // Initialize Auth (checks for existing session)
     Auth.init();
 
-    // Parse URL params
     const urlParams = new URLSearchParams(window.location.search);
-    const intent = urlParams.get('intent'); // 'team', 'interest', or null (profile/sign-in)
+    const intent = urlParams.get('intent');
     const eventId = urlParams.get('eventId');
     const isTeamIntent = intent === 'team';
     const isInterestIntent = intent === 'interest' && eventId;
 
-    // Update page wording based on intent
     const subtitle = document.getElementById('page-subtitle');
     const emailHeading = document.getElementById('email-heading');
     const emailSubheading = document.getElementById('email-subheading');
@@ -53,33 +39,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         emailSubheading.textContent = 'Enter your email address to get started.';
     }
 
-    // If already logged in and this is an interest request, record interest immediately
     if (Auth.isLoggedIn() && isInterestIntent) {
         await recordInterestAndShow();
         return;
     }
 
-    // Team creation belongs to the authenticated event flow. Sending a signed-in
-    // user back to the event list loses the team intent and creates a redirect
-    // loop from the Register Team button.
     if (Auth.isLoggedIn() && isTeamIntent) {
         window.location.href = `/event.html?id=${encodeURIComponent(eventId)}&action=create-team`;
         return;
     }
 
-    // If already logged in (no interest intent), go to events
     if (Auth.isLoggedIn()) {
         window.location.href = '/events.html';
         return;
     }
 
-    // Pre-fill email from query param (e.g. from login.html redirect)
     const emailParam = urlParams.get('email');
     if (emailParam) {
         document.getElementById('checkEmail').value = emailParam;
     }
 
-    // --- Step 1: Email Check ---
     emailCheckForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -96,12 +75,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const result = await API.auth.checkEmail(currentEmail);
 
             if (result.allowed && !result.isNewUser) {
-                // Known user → LOGIN flow: auto-send OTP
                 flowMode = isInterestIntent
                     ? 'interest-login'
                     : (isTeamIntent ? 'team-login' : 'login');
 
-                // Try to auto-send OTP immediately
                 let sendError = null;
                 try {
                     const otpResult = await API.auth.sendOtp(currentEmail);
@@ -112,14 +89,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     sendError = otpErr.message || 'Failed to send code.';
                 }
 
-                // Show OTP step with welcome-back messaging
                 showStep('otp', currentEmail);
 
                 if (sendError) {
                     showError('otp-error', sendError + ' You can try resending below.');
                 }
             } else {
-                // New user → show form (profile-only, team, or interest based on intent)
                 if (isInterestIntent) {
                     flowMode = 'interest-register';
                 } else if (isTeamIntent) {
@@ -138,7 +113,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Back links
     document.getElementById('back-to-email').addEventListener('click', (e) => {
         e.preventDefault();
         flowMode = null;
@@ -151,7 +125,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         showStep('email');
     });
 
-    // --- Step 2: Registration Form submission (register flow � profile or team) ---
     registrationForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -165,12 +138,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             registrationType: flowMode === 'register-team' ? 'team' : (flowMode === 'interest-register' ? 'interest' : 'profile')
         };
 
-        // Include phone for non-interest flows
         if (flowMode !== 'interest-register') {
             pendingFormData.phone = document.getElementById('phone').value.trim();
         }
 
-        // Include team fields only for team registration
         if (flowMode === 'register-team') {
             pendingFormData.teamName = document.getElementById('teamName').value.trim();
             pendingFormData.numberOfParticipants = document.getElementById('numberOfParticipants').value;
@@ -183,7 +154,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        // For interest flow, store eventId
         if (flowMode === 'interest-register') {
             pendingFormData.interestEventId = eventId;
         }
@@ -194,13 +164,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         errorDiv.classList.add('hidden');
 
         try {
-            // Get reCAPTCHA token
             let captchaToken = '';
             if (typeof grecaptcha !== 'undefined' && RECAPTCHA_SITE_KEY !== 'RECAPTCHA_SITE_KEY') {
                 captchaToken = await grecaptcha.execute(RECAPTCHA_SITE_KEY, { action: 'register' });
             }
 
-            // Phase 1: Send all form data to server + validate captcha
             const startResult = await API.register.start({
                 ...pendingFormData,
                 captchaToken: captchaToken
@@ -210,13 +178,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 throw new Error(startResult.message || 'Registration failed');
             }
 
-            // Send OTP code to the email
             const otpResult = await API.auth.sendOtp(pendingFormData.email);
             if (!otpResult.success) {
                 throw new Error(otpResult.message || 'Failed to send verification code');
             }
 
-            // Show OTP input step
             showStep('otp', pendingFormData.email);
 
         } catch (error) {
@@ -229,7 +195,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // --- Step 3: OTP Verification (handles both login + register) ---
     otpForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -252,14 +217,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const isLoginFlow = flowMode === 'login' || flowMode === 'team-login' || flowMode === 'interest-login';
             const emailToVerify = isLoginFlow ? currentEmail : pendingFormData.email;
 
-            // Verify the OTP code � returns JWT + user data
             const verifyResult = await API.auth.verifyOtp(emailToVerify, code);
 
             if (!verifyResult.success) {
                 throw new Error(verifyResult.message || 'Verification failed');
             }
 
-            // Store the JWT session
             Auth.setSession(verifyResult.token, verifyResult.user || {
                 email: emailToVerify,
                 name: !isLoginFlow
@@ -268,17 +231,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
 
             if (flowMode === 'interest-login') {
-                // Known user + interest: record interest, show success
                 await recordInterestAndShow();
             } else if (flowMode === 'team-login') {
-                // Known user requested team registration before signing in.
                 window.location.href = `/event.html?id=${encodeURIComponent(eventId)}&action=create-team`;
             } else if (flowMode === 'login') {
-                // LOGIN flow: JWT set → redirect immediately
                 const redirect = urlParams.get('redirect') || '/events.html';
                 window.location.href = redirect;
             } else {
-                // REGISTER flow (profile, team, or interest-register): complete registration first
                 showStep('completing');
 
                 const completeResult = await API.register.complete({ email: pendingFormData.email });
@@ -288,19 +247,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 if (flowMode === 'interest-register') {
-                    // New user + interest: registration done, now record interest
                     await recordInterestAndShow();
                 } else if (flowMode === 'register-team') {
-                    // Team registration: check if hotel step is needed
                     const targetEventId = completeResult.eventId || eventId;
                     if (targetEventId && completeResult.isParticipant) {
-                        // Fetch event to check hotel config
                         let eventData = null;
-                        try { eventData = await API.events.get(targetEventId); } catch (e) { /* skip hotel step if fetch fails */ }
+                        try { eventData = await API.events.get(targetEventId); } catch (e) { }
                         if (eventData && eventData.hotelEnabled) {
-                            // Fetch participation to get participationId
                             let participation = null;
-                            try { participation = await API.participations.get(completeResult.userId, targetEventId); } catch (e) { /* skip */ }
+                            try { participation = await API.participations.get(completeResult.userId, targetEventId); } catch (e) { }
                             if (participation && participation.id) {
                                 showHotelStep(eventData, participation.id, targetEventId);
                             } else {
@@ -312,14 +267,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else if (targetEventId) {
                         window.location.href = `/event.html?id=${targetEventId}`;
                     } else {
-                        // Fallback: show success page if no eventId
                         document.getElementById('success-heading-text').textContent = 'Registration Complete!';
                         document.getElementById('success-team-line').classList.remove('hidden');
                         document.getElementById('success-team-name').textContent = pendingFormData.teamName;
                         showStep('success');
                     }
                 } else {
-                    // Profile-only: redirect to events
                     const redirect = urlParams.get('redirect') || '/events.html';
                     window.location.href = redirect;
                 }
@@ -335,7 +288,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Resend code button
     document.getElementById('resend-otp-btn').addEventListener('click', async (e) => {
         e.preventDefault();
         const resendBtn = e.target;
@@ -353,7 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             setTimeout(() => {
                 resendBtn.textContent = 'Resend code';
                 resendBtn.style.pointerEvents = '';
-            }, 30000); // 30s cooldown on UI
+            }, 30000);
         } catch (error) {
             resendBtn.textContent = 'Resend code';
             resendBtn.style.pointerEvents = '';
@@ -361,12 +313,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Auto-strip non-digits from OTP input
     document.getElementById('otpCode').addEventListener('input', (e) => {
         e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
     });
 
-    // --- Step Navigation ---
     function showStep(step, email) {
         stepEmail.classList.add('hidden');
         stepForm.classList.add('hidden');
@@ -375,7 +325,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         stepHotel.classList.add('hidden');
         stepSuccess.classList.add('hidden');
 
-        // Welcome-back banner (login flow only)
         const welcomeBack = document.getElementById('otp-welcome-back');
         welcomeBack.classList.add('hidden');
 
@@ -389,7 +338,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 updateProgress(2);
                 document.getElementById('regEmail').value = email;
 
-                // Configure form based on flow mode
                 const teamFieldset = document.getElementById('team-fieldset');
                 const roleFieldset = document.getElementById('role-fieldset');
                 const formHeading = document.getElementById('form-heading');
@@ -437,17 +385,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             case 'otp':
                 if (flowMode === 'login' || flowMode === 'team-login' || flowMode === 'interest-login') {
-                    updateProgress(2); // Login: Email(1) → Verify(2)
+                    updateProgress(2);
                     welcomeBack.classList.remove('hidden');
                     document.getElementById('verify-btn-text').textContent = 'Verify & Sign In →';
                 } else if (flowMode === 'register-team') {
-                    updateProgress(3); // Team Register: Email(1) → Details(2) → Verify(3)
+                    updateProgress(3);
                     document.getElementById('verify-btn-text').textContent = 'Verify & Complete Registration →';
                 } else if (flowMode === 'interest-register') {
                     updateProgress(3);
                     document.getElementById('verify-btn-text').textContent = 'Verify & Register Interest →';
                 } else {
-                    updateProgress(3); // Profile Register: Email(1) → Details(2) → Verify(3)
+                    updateProgress(3);
                     document.getElementById('verify-btn-text').textContent = 'Verify & Create Account →';
                 }
                 document.getElementById('otp-email-display').textContent = email;
@@ -485,21 +433,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // --- Hotel Step Builder (post-team-registration) ---
     function showHotelStep(event, participationId, targetEventId) {
-        // Hide all other steps
         stepEmail.classList.add('hidden');
         stepForm.classList.add('hidden');
         stepOtp.classList.add('hidden');
         stepCompleting.classList.add('hidden');
         stepSuccess.classList.add('hidden');
 
-        // Build hotel night calendar in the container
         const container = document.getElementById('hotel-nights-container');
         const defaultNights = event.hotelDefaultNights || [];
         const isMandatory = event.hotelMandatory || false;
 
-        // Compute hotel dates using event-configured booking window
         const daysBefore = event.hotelDaysBefore ?? 1;
         const daysAfter = event.hotelDaysAfter ?? 1;
         const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -514,7 +458,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             cur.setDate(cur.getDate() + 1);
         }
 
-        // Check if any optional nights exist (nights not in defaultNights)
         const optionalNights = [];
         hotelDates.forEach((d, i) => {
             if (i < hotelDates.length - 1) {
@@ -526,7 +469,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('hotel-optional-notice').classList.remove('hidden');
         }
 
-        // Build calendar HTML
         let html = '<div class="hotel-calendar" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">';
         hotelDates.forEach((dateInfo, index) => {
             const date = new Date(dateInfo.date + 'T12:00:00');
@@ -546,7 +488,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         html += '</div>';
         container.innerHTML = html;
 
-        // Update summary
         function updateSummary() {
             const checked = Array.from(container.querySelectorAll('input[type="checkbox"]')).filter(cb => cb.checked);
             const countEl = document.getElementById('hotel-nights-summary');
@@ -557,7 +498,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         showStep('hotel');
 
-        // Wire acknowledge button
         const ackBtn = document.getElementById('acknowledge-hotel-btn');
         ackBtn.addEventListener('click', async () => {
             ackBtn.disabled = true;
@@ -565,7 +505,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             ackBtn.querySelector('.btn-loading').classList.remove('hidden');
             document.getElementById('hotel-step-error').classList.add('hidden');
 
-            // Gather selected nights
             const hotelNights = {};
             container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
                 hotelNights[cb.dataset.nightId] = cb.checked;
@@ -586,7 +525,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, { once: true });
     }
 
-    // --- Record Interest Helper (used by both interest-login and interest-register flows) ---
     async function recordInterestAndShow() {
         showStep('completing');
 
@@ -599,7 +537,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 lastName: user.lastName || (pendingFormData ? pendingFormData.lastName : '')
             });
 
-            // Redirect to the event page � they'll see their interest card there
             window.location.href = `event.html?id=${eventId}`;
 
         } catch (error) {
@@ -609,7 +546,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// --- Progress Indicator ---
 function updateProgress(activeStep) {
     const steps = document.querySelectorAll('.progress-step');
     steps.forEach((step, index) => {
@@ -623,7 +559,6 @@ function updateProgress(activeStep) {
     });
 }
 
-// --- Helper ---
 function showError(elementId, message) {
     const errorDiv = document.getElementById(elementId);
     if (errorDiv) {
@@ -632,4 +567,3 @@ function showError(elementId, message) {
     }
 }
 
-console.log('Register/Sign-In page loaded (unified flow)');

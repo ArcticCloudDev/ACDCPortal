@@ -6,8 +6,7 @@
     <title>Person Search - ACDC Committee</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <style>
-        .search-container {
+    <style>        .search-container {
             display: flex;
             gap: 10px;
             margin-bottom: 24px;
@@ -42,7 +41,6 @@
 
         .search-container button:hover { background: #2563eb; }
 
-        /* Person card */
         .person-card {
             background: white;
             border-radius: 12px;
@@ -107,7 +105,6 @@
             color: #fcd34d;
         }
 
-        /* Stats strip */
         .person-stats {
             display: flex;
             gap: 0;
@@ -125,7 +122,6 @@
         .person-stat .value { font-size: 1.4rem; font-weight: 700; color: var(--admin-sidebar); }
         .person-stat .label { font-size: 0.7rem; color: var(--admin-text-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        /* Timeline */
         .timeline { padding: 24px; }
         .timeline-title {
             font-size: 0.75rem;
@@ -211,7 +207,6 @@
             gap: 4px;
         }
 
-        /* Empty / no results */
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -261,36 +256,30 @@
     <script src="js/api.js"></script>
     <script src="js/admin-sidebar.js"></script>
     <script src="js/permissions.js"></script>
-    <script>
-        let allEvents = [];
+    <script>        let allEvents = [];
         let allUsers = [];
         let currentPermissions = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // Resolve permissions (handles auth check, sidebar render, access denied)
             currentPermissions = await Permissions.initAdminPage('person');
 
             if (!currentPermissions) return;
 
-            // Load reference data
             try {
                 let [events, users] = await Promise.all([
                     API.events.list(),
                     API.users.list()
                 ]);
-                // Scope events to permitted events for non-admin users
                 allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
                 allUsers = users;
             } catch (e) {
                 console.error('Error loading reference data:', e);
             }
 
-            // Enter key triggers search
             document.getElementById('search-email').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') searchPerson();
             });
 
-            // Auto-search if query param present
             const params = new URLSearchParams(window.location.search);
             const emailParam = params.get('email');
             if (emailParam) {
@@ -340,7 +329,6 @@
         function renderPersonResult(email, participations) {
             const container = document.getElementById('results-container');
 
-            // Find user profile if exists
             const user = allUsers.find(u => u.email?.toLowerCase() === email);
             const firstName = user?.firstName || participations[0]?.interestFirstName || '';
             const lastName = user?.lastName || participations[0]?.interestLastName || '';
@@ -349,13 +337,11 @@
                 ? (firstName[0] + lastName[0]).toUpperCase()
                 : email.substring(0, 2).toUpperCase();
 
-            // Aggregate stats
             const allRoles = new Set();
             participations.forEach(p => (p.roles || []).forEach(r => allRoles.add(r)));
             const eventCount = new Set(participations.map(p => p.eventId)).size;
             const roleCount = allRoles.size;
 
-            // Sort participations by event date (newest first)
             const sorted = [...participations].sort((a, b) => {
                 const eventA = allEvents.find(e => e.id === a.eventId);
                 const eventB = allEvents.find(e => e.id === b.eventId);
@@ -372,7 +358,7 @@
                     : '';
                 const roles = p.roles || [];
 
-                const rolePills = roles.map(r => 
+                const rolePills = roles.map(r =>
                     `<span class="role-pill ${r}">${getRoleIcon(r)} ${r}</span>`
                 ).join('');
 

@@ -1,5 +1,3 @@
-// Members API - Add and remove team members
-// Azure Functions v4 Programming Model
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { requireAuth, isTeamAuthorized } = require('../shared/auth');
@@ -9,7 +7,6 @@ const { Storage: GenericStorage } = require('../shared/storage');
 const Email = require('../shared/email');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
 
-// Add member to team
 app.http('members-add', {
     methods: ['POST'],
     authLevel: 'function',
@@ -26,15 +23,14 @@ app.http('members-add', {
 
             const body = await request.json();
             const { teamId, email } = body;
-            
+
             if (!teamId || !email) {
                 return {
                     status: 400,
                     jsonBody: { message: 'Team ID and email are required' }
                 };
             }
-            
-            // Get team
+
             const team = await Storage.teams.getById(teamId);
             if (!team) {
                 return {
@@ -50,8 +46,7 @@ app.http('members-add', {
                     jsonBody: { message: 'You do not have permission to add members to this team' }
                 };
             }
-            
-            // Check team capacity
+
             const currentMembers = await Storage.users.getByTeamId(teamId);
             if (currentMembers.length >= team.numberOfParticipants) {
                 return {
@@ -59,8 +54,7 @@ app.http('members-add', {
                     jsonBody: { message: `Team is at maximum capacity (${team.numberOfParticipants} members)` }
                 };
             }
-            
-            // Check if email already exists
+
             const existingUser = await Storage.users.getByEmail(email);
             if (existingUser) {
                 return {
@@ -68,8 +62,7 @@ app.http('members-add', {
                     jsonBody: { message: 'This email is already registered' }
                 };
             }
-            
-            // Create new user (minimal profile - they'll complete it on login)
+
             const now = new Date().toISOString();
             const newUser = {
                 id: uuidv4(),
@@ -85,13 +78,11 @@ app.http('members-add', {
                 createdAt: now,
                 updatedAt: now
             };
-            
+
             await Storage.users.create(newUser);
-            
-            // Add to allowed emails
+
             await Storage.allowedEmails.add(email, team.adminUserId);
-            
-            // Send welcome email to new member (async, don't wait)
+
             if (team.eventId) {
                 sendWelcomeEmail(email, team.eventId, context, { teamName: team.teamName })
                     .then(result => {
@@ -99,18 +90,17 @@ app.http('members-add', {
                     })
                     .catch(error => context.error(`Failed to send welcome email to ${email}:`, error));
 
-                // Interest acknowledgment is only sent from interest.js when interest is first recorded
             }
-            
+
             context.log(`Member ${email} added to team ${teamId}`);
             return {
                 status: 200,
-                jsonBody: { 
+                jsonBody: {
                     message: 'Member added successfully',
                     user: newUser
                 }
             };
-            
+
         } catch (error) {
             await logError(context, error);
             context.error('Members POST error:', error);
@@ -122,7 +112,6 @@ app.http('members-add', {
     }
 });
 
-// Remove member from team
 app.http('members-remove', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -144,17 +133,15 @@ app.http('members-remove', {
                 const body = await request.json();
                 teamId = body?.teamId || null;
             } catch {
-                // DELETE bodies may be omitted by some clients; teamId remains null.
             }
-            
+
             if (!memberId) {
                 return {
                     status: 400,
                     jsonBody: { message: 'Member ID required' }
                 };
             }
-            
-            // Get user
+
             const user = await Storage.users.getById(memberId);
             if (!user) {
                 return {
@@ -162,8 +149,7 @@ app.http('members-remove', {
                     jsonBody: { message: 'Member not found' }
                 };
             }
-            
-            // Resolve team/event context for cleanup.
+
             let team = null;
             if (teamId) {
                 team = await Storage.teams.getById(teamId);
@@ -172,8 +158,6 @@ app.http('members-remove', {
                 teamId = user.teamId;
             }
 
-            // Authorization: allowed if caller is a portal/team admin for this team,
-            // OR the caller is removing themselves (self-service "leave team").
             const participationsStorage = new GenericStorage('participations');
             const allParticipations = await participationsStorage.getAll();
             const isSelfRemoval = auth.user.userId && auth.user.userId === memberId;
@@ -186,15 +170,12 @@ app.http('members-remove', {
 
             const eventId = team?.eventId || null;
 
-            // Remove related participation(s) for this user in the same team/event context.
             const invitationsStorage = new GenericStorage('invitations');
             const deliveriesStorage = new GenericStorage('email-deliveries');
             const sequenceProgressStorage = new GenericStorage('sequence-progress');
             const interestLeadsStorage = new GenericStorage('interest-leads');
 
             const matchedParticipations = allParticipations.filter(p => {
-                // Match by userId if set; fall back to email match for leads registered
-                // before the user had a system account (userId was null on those rows).
                 const byUserId = p.userId && p.userId === memberId;
                 const byEmail = user.email && p.email &&
                     p.email.toLowerCase() === user.email.toLowerCase();
@@ -220,7 +201,6 @@ app.http('members-remove', {
                 const pUserId = participation.userId;
                 const pEventId = participation.eventId;
 
-                // Clean invitations for this person/event.
                 const invitations = await invitationsStorage.getAll();
                 const removedInvitations = invitations.filter(inv => {
                     const emailMatch = pEmail && inv.email && inv.email.toLowerCase() === pEmail.toLowerCase();
@@ -233,7 +213,6 @@ app.http('members-remove', {
                     }
                 }
 
-                // Clean deliveries tied to this user/email.
                 const deliveries = await deliveriesStorage.getAll();
                 const removedDeliveries = deliveries.filter(d => {
                     if (pUserId && d.userId === pUserId) return true;
@@ -247,7 +226,6 @@ app.http('members-remove', {
                     }
                 }
 
-                // Clean sequence progress if present (legacy JSON-backed dataset).
                 const progressRows = await sequenceProgressStorage.getAll();
                 if (Array.isArray(progressRows) && progressRows.length > 0) {
                     const removedProgress = progressRows.filter(p => p.userId === pUserId && p.eventId === pEventId);
@@ -260,7 +238,6 @@ app.http('members-remove', {
                 }
             }
 
-            // Clean up InterestLeads by email (independent of participation records).
             const allLeads = await interestLeadsStorage.getAll();
             const removedLeads = allLeads.filter(lead =>
                 lead.email && lead.email.toLowerCase() === user.email.toLowerCase()
@@ -272,8 +249,6 @@ app.http('members-remove', {
                 }
             }
 
-            // Safety-net: if no participations were found above (can happen when
-            // the lead had userId=null), still clean deliveries by email.
             if (cleaned.participations === 0) {
                 const allDeliveries = await deliveriesStorage.getAll();
                 const removedDeliveries = allDeliveries.filter(d =>
@@ -287,12 +262,10 @@ app.http('members-remove', {
                 }
             }
 
-            // Remove from allowed emails
             await Storage.allowedEmails.remove(user.email);
-            
-            // Delete user
+
             await Storage.users.delete(memberId);
-            
+
             context.log(`Member ${memberId} removed. Cleaned ${cleaned.participations} participations, ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries, ${cleaned.sequenceProgress} sequence-progress rows, ${cleaned.interestLeads} interest leads.`);
             return {
                 status: 200,
@@ -301,7 +274,7 @@ app.http('members-remove', {
                     cleaned
                 }
             };
-            
+
         } catch (error) {
             await logError(context, error);
             context.error('Members DELETE error:', error);

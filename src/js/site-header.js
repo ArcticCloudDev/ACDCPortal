@@ -1,24 +1,8 @@
-// Shared Site Header Component
-// Renders the top banner bar + self-contained profile modal.
-// Works identically on events.html and event.html � no page-specific config needed.
-//
-// Usage:
-//   SiteHeader.render({
-//       title: '🏔️ ACDC Portal',
-//       subtitle: 'Arctic Cloud Developer Challenge',
-//       infoBadges: [ ... ],           // optional info spans
-//       containerId: 'site-header',    // target element id
-//       showSignIn: true,              // show Sign In link when logged out
-//       inactive: false                // grey gradient for inactive events
-//   });
-//
-//   SiteHeader.update({ user, authUser, isAdmin });
-
 const SiteHeader = (() => {
     let _config = {};
     let _containerEl = null;
-    let _user = null;           // current user object (for profile modal)
-    let _modalInjected = false; // only inject modal HTML once
+    let _user = null;
+    let _modalInjected = false;
 
     function render(config = {}) {
         _config = Object.assign({
@@ -37,7 +21,6 @@ const SiteHeader = (() => {
             return;
         }
 
-        // Build info section
         let infoHTML = '';
         if (_config.infoBadges && _config.infoBadges.length) {
             const spans = _config.infoBadges.map(b => {
@@ -86,10 +69,8 @@ const SiteHeader = (() => {
             </div>
         `;
 
-        // Inject modal once
         _ensureProfileModal();
 
-        // Wire up dropdown handlers
         const userMenu = document.getElementById('header-user-menu');
         const userBtn = document.getElementById('header-user-btn');
         const userDropdown = document.getElementById('header-user-dropdown');
@@ -101,7 +82,6 @@ const SiteHeader = (() => {
             });
         }
 
-        // Profile button → open modal
         const profileLink = document.getElementById('header-profile-link');
         if (profileLink) {
             profileLink.addEventListener('click', () => {
@@ -110,7 +90,6 @@ const SiteHeader = (() => {
             });
         }
 
-        // Logout
         const logoutMenuItem = document.getElementById('header-logout-menuitem');
         if (logoutMenuItem) {
             logoutMenuItem.addEventListener('click', async (e) => {
@@ -119,17 +98,12 @@ const SiteHeader = (() => {
             });
         }
 
-        // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
             if (userMenu && !userMenu.contains(e.target)) {
                 userDropdown.classList.add('hidden');
             }
         });
     }
-
-    // ============================================================
-    // Profile Modal � injected once, reused across any page
-    // ============================================================
 
     function _ensureProfileModal() {
         if (_modalInjected) return;
@@ -182,24 +156,20 @@ const SiteHeader = (() => {
 
         const modal = document.getElementById('sh-profile-modal');
 
-        // Close button
         document.getElementById('sh-close-profile').addEventListener('click', () => {
             modal.classList.remove('active');
         });
 
-        // Close on overlay click
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.classList.remove('active');
         });
 
-        // Close on Escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && modal.classList.contains('active')) {
                 modal.classList.remove('active');
             }
         });
 
-        // Form submit
         document.getElementById('sh-profile-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             await _saveProfile();
@@ -210,7 +180,6 @@ const SiteHeader = (() => {
         const modal = document.getElementById('sh-profile-modal');
         if (!modal) return;
 
-        // Populate form with current user data
         if (_user) {
             document.getElementById('sh-firstName').value = _user.firstName || '';
             document.getElementById('sh-lastName').value = _user.lastName || '';
@@ -220,7 +189,6 @@ const SiteHeader = (() => {
             document.getElementById('sh-allergies').value = _user.allergies || '';
         }
 
-        // Reset messages
         document.getElementById('sh-profile-error').classList.add('hidden');
         document.getElementById('sh-profile-success').classList.add('hidden');
 
@@ -251,7 +219,6 @@ const SiteHeader = (() => {
             await API.users.update(_user.id, formData);
             _user = { ..._user, ...formData };
 
-            // Update the header name button to reflect changes
             const userBtn = document.getElementById('header-user-btn');
             if (userBtn) {
                 const fullName = [_user.firstName, _user.lastName].filter(Boolean).join(' ').trim();
@@ -274,16 +241,8 @@ const SiteHeader = (() => {
         }
     }
 
-    // ============================================================
-    // Public API
-    // ============================================================
-
-    /**
-     * Update auth controls visibility and name label.
-     * Call after loading user data and participation info.
-     */
     function update({ authUser = null, user = null, isAdmin = false } = {}) {
-        _user = user; // store for profile modal
+        _user = user;
 
         const signInBtn = document.getElementById('header-signin-btn');
         const userMenu = document.getElementById('header-user-menu');
@@ -303,16 +262,12 @@ const SiteHeader = (() => {
             userBtn.textContent = fullName ? `👤 ${fullName}` : '👤 Profile';
         }
 
-        // Show admin portal link for portal admins OR event committee/judge
         const showAdmin = isAdmin || !!user?.isPortalAdmin;
         if (dashboardLink) {
             dashboardLink.classList.toggle('hidden', !showAdmin);
         }
     }
 
-    /**
-     * Get references to the header DOM elements (for pages that need direct access).
-     */
     function getElements() {
         return {
             container: _containerEl,

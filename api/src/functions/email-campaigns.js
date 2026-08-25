@@ -1,5 +1,3 @@
-// Email Campaigns API
-// Stores email templates once, tracks deliveries per recipient
 const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
@@ -21,7 +19,6 @@ function generateDeliveryId() {
     return uuidv4();
 }
 
-// GET /api/email/campaigns - List campaigns for an event
 app.http('email-campaigns-list', {
     methods: ['GET'],
     authLevel: 'function',
@@ -40,10 +37,8 @@ app.http('email-campaigns-list', {
                 campaigns = campaigns.filter(c => c.eventId === eventId);
             }
 
-            // Sort by createdAt desc
             campaigns.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-            // Add delivery stats
             const deliveries = await deliveriesStorage.getAll();
             campaigns = campaigns.map(campaign => {
                 const campaignDeliveries = deliveries.filter(d => d.campaignId === campaign.id);
@@ -67,7 +62,6 @@ app.http('email-campaigns-list', {
     }
 });
 
-// GET /api/campaigns/:id - Get campaign by ID (short route)
 app.http('campaigns-get', {
     methods: ['GET'],
     authLevel: 'function',
@@ -95,7 +89,6 @@ app.http('campaigns-get', {
     }
 });
 
-// GET /api/email/campaigns/:id - Get campaign with deliveries
 app.http('email-campaigns-get', {
     methods: ['GET'],
     authLevel: 'function',
@@ -114,13 +107,11 @@ app.http('email-campaigns-get', {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
-            // Get deliveries for this campaign
             const allDeliveries = await deliveriesStorage.getAll();
             const deliveries = allDeliveries
                 .filter(d => d.campaignId === campaignId)
                 .sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
 
-            // Enrich with user names
             const users = await usersStorage.getAll();
             const enrichedDeliveries = deliveries.map(d => {
                 const user = users.find(u => u.email === d.email);
@@ -150,7 +141,6 @@ app.http('email-campaigns-get', {
     }
 });
 
-// POST /api/campaigns - Create campaign (short route)
 app.http('campaigns-create', {
     methods: ['POST'],
     authLevel: 'function',
@@ -194,7 +184,6 @@ app.http('campaigns-create', {
     }
 });
 
-// POST /api/email/campaigns - Create a new campaign
 app.http('email-campaigns-create', {
     methods: ['POST'],
     authLevel: 'function',
@@ -213,7 +202,6 @@ app.http('email-campaigns-create', {
                 return { status: 400, jsonBody: { error: 'sequenceId, subject, and content are required' } };
             }
 
-            // Calculate sequence order within this sequence
             const allExistingCampaigns = await campaignsStorage.getAll();
             const sequenceEmails = allExistingCampaigns.filter(c => c.sequenceId === sequenceId);
             const sequenceOrder = sequenceEmails.length + 1;
@@ -244,7 +232,6 @@ app.http('email-campaigns-create', {
     }
 });
 
-// PUT /api/campaigns/:id - Update campaign (short route)
 app.http('campaigns-update', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -286,7 +273,6 @@ app.http('campaigns-update', {
     }
 });
 
-// PUT /api/email/campaigns/:id - Update campaign
 app.http('email-campaigns-update', {
     methods: ['PUT'],
     authLevel: 'function',
@@ -306,7 +292,6 @@ app.http('email-campaigns-update', {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
-            // Update allowed fields
             const updates = {};
             if (body.subject !== undefined) updates.subject = body.subject;
             if (body.content !== undefined) updates.content = body.content;
@@ -328,7 +313,6 @@ app.http('email-campaigns-update', {
     }
 });
 
-// DELETE /api/campaigns/:id - Delete campaign (short route)
 app.http('campaigns-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -362,7 +346,6 @@ app.http('campaigns-delete', {
     }
 });
 
-// DELETE /api/email/campaigns/:id - Delete campaign and its deliveries
 app.http('email-campaigns-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -396,7 +379,6 @@ app.http('email-campaigns-delete', {
     }
 });
 
-// POST /api/email/campaigns/:id/send - Send campaign to recipients
 app.http('email-campaigns-send', {
     methods: ['POST'],
     authLevel: 'function',
@@ -410,19 +392,17 @@ app.http('email-campaigns-send', {
 
             const campaignId = request.params.id;
             const body = await request.json();
-            const { recipients } = body; // Array of { email, userId?, firstName? }
+            const { recipients } = body;
 
             if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
                 return { status: 400, jsonBody: { error: 'recipients array is required' } };
             }
 
-            // Get campaign
             const campaign = await campaignsStorage.getById(campaignId);
             if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
-            // Get existing deliveries to avoid duplicates
             const existingDeliveries = await deliveriesStorage.getAll();
             const existingEmails = new Set(
                 existingDeliveries
@@ -433,7 +413,6 @@ app.http('email-campaigns-send', {
             const results = { sent: 0, failed: 0, skipped: 0, errors: [] };
 
             for (const recipient of recipients) {
-                // Skip if already sent
                 if (existingEmails.has(recipient.email.toLowerCase())) {
                     results.skipped++;
                     continue;
@@ -449,7 +428,6 @@ app.http('email-campaigns-send', {
                 };
 
                 try {
-                    // Send the email
                     await sendEmail({
                         to: recipient.email,
                         subject: campaign.subject,
@@ -482,8 +460,6 @@ app.http('email-campaigns-send', {
     }
 });
 
-// POST /api/email/trigger-sequence - Send sequence emails to a user for an event
-// Called when user joins an event
 app.http('email-trigger-sequence', {
     methods: ['POST'],
     authLevel: 'function',
@@ -502,14 +478,12 @@ app.http('email-trigger-sequence', {
                 return { status: 400, jsonBody: { error: 'userId and eventId are required' } };
             }
 
-            // Get user
             const users = await usersStorage.getAll();
             const user = users.find(u => u.id === userId);
             if (!user) {
                 return { status: 404, jsonBody: { error: 'User not found' } };
             }
 
-            // Get sequence campaigns for this event
             const allCampaignsForEvent = await campaignsStorage.getAll();
             const sequenceCampaigns = allCampaignsForEvent
                 .filter(c => c.eventId === eventId && c.type === 'sequence')
@@ -519,7 +493,6 @@ app.http('email-trigger-sequence', {
                 return { status: 200, jsonBody: { message: 'No sequence emails for this event', sent: 0 } };
             }
 
-            // Get existing deliveries for this user
             const existingUserDeliveries = await deliveriesStorage.getAll();
             const userDeliveries = new Set(
                 existingUserDeliveries
@@ -530,7 +503,6 @@ app.http('email-trigger-sequence', {
             const results = { sent: 0, failed: 0, skipped: 0 };
 
             for (const campaign of sequenceCampaigns) {
-                // Skip if already sent
                 if (userDeliveries.has(campaign.id)) {
                     results.skipped++;
                     continue;
@@ -578,7 +550,6 @@ app.http('email-trigger-sequence', {
     }
 });
 
-// GET /api/email/campaigns/:id/deliveries - Get deliveries for a campaign
 app.http('email-campaigns-deliveries', {
     methods: ['GET'],
     authLevel: 'function',
@@ -596,7 +567,6 @@ app.http('email-campaigns-deliveries', {
                 .filter(d => d.campaignId === campaignId)
                 .sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
 
-            // Enrich with user names
             const users = await usersStorage.getAll();
             const enriched = deliveries.map(d => {
                 const user = users.find(u => u.email === d.email);

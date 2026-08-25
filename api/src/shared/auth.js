@@ -1,24 +1,13 @@
 const jwt = require('jsonwebtoken');
 
-// IMPORTANT: do NOT cache this in a module-level constant. Key Vault secrets are
-// loaded asynchronously via a preInvocation hook (see functions/startup.js), which
-// runs AFTER all function files are `require`'d at cold start. A top-level
-// `const JWT_SECRET = process.env.JWT_SECRET || fallback` would freeze at the
-// insecure per-instance hostname fallback for that worker's entire lifetime, even
-// though the real secret gets loaded moments later — causing tokens signed/verified
-// on different scaled-out instances to silently use different secrets (intermittent
-// 401s). Always read it lazily, at call time, after the hook has populated it.
+// Read lazily at call time: Key Vault populates process.env after modules are require()'d.
 function getJwtSecret() {
     if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
 
-    // If Key Vault is configured but the secret isn't loaded yet, fail closed.
-    // Returning a per-instance fallback here causes cross-instance signature
-    // mismatches (one instance signs, another verifies) and intermittent 401s.
     if (process.env.KEY_VAULT_URL) {
         throw new Error('ServerAuthConfigError: JWT secret unavailable');
     }
 
-    // Local/dev fallback when Key Vault is not configured.
     return 'acdc-dev-secret-change-in-production-local-only';
 }
 
@@ -26,10 +15,7 @@ function getTokenFromRequest(request) {
     const headers = request?.headers;
     if (!headers) return null;
 
-    // Azure Static Web Apps can rewrite Authorization before forwarding a request
-    // to the managed Function. The browser therefore sends one app-specific
-    // header and the API accepts only that header: no duplicate credential and no
-    // fallback path.
+    // Custom header on purpose: the SWA proxy rewrites Authorization in transit.
     const token = typeof headers.get === 'function' ? headers.get('x-acdc-token') : headers['x-acdc-token'];
     if (token && token.trim()) return token.trim();
 
@@ -43,8 +29,6 @@ function verifyToken(token) {
         const payload = jwt.verify(token, getJwtSecret(), { issuer: 'acdc-portal' });
         return { valid: true, payload };
     } catch (error) {
-        // error.name is one of: TokenExpiredError, JsonWebTokenError (bad
-        // signature / malformed / wrong issuer), NotBeforeError.
         return { valid: false, reason: error.name + ': ' + error.message };
     }
 }
@@ -94,9 +78,6 @@ function requireAuth(request, context, options = {}) {
     };
 }
 
-// Resolve the set of teamIds a participation row grants (accounting for the legacy
-// single-team fields vs. the newer teamMemberships[] array). Membership items use
-// the `isAdmin` field name (not `isTeamAdmin` — that's only the legacy row-level field).
 function membershipsFor(participation) {
     if (participation.teamMemberships && participation.teamMemberships.length > 0) {
         return participation.teamMemberships;
@@ -107,9 +88,6 @@ function membershipsFor(participation) {
     return [];
 }
 
-// Object-level authorization check: is this caller allowed to manage a given team?
-// True if they are a portal admin, the team's recorded adminUserId, or hold an
-// isAdmin membership for this team in the participations dataset.
 function isTeamAuthorized(user, team, participations = []) {
     if (!user || !team) return false;
     if (user.isPortalAdmin) return true;
@@ -121,9 +99,6 @@ function isTeamAuthorized(user, team, participations = []) {
     });
 }
 
-// Object-level authorization check: is this caller allowed to view/manage another
-// user's profile? True for the user themselves, portal admins, or a team admin who
-// shares a team with the target user.
 function canManageUser(callerUser, targetUserId, participations = []) {
     if (!callerUser) return false;
     if (callerUser.userId && callerUser.userId === targetUserId) return true;
@@ -146,9 +121,6 @@ function canManageUser(callerUser, targetUserId, participations = []) {
     return false;
 }
 
-// True if the caller is a member (any role) of the given team, a portal admin, or
-// that team's admin. Used for actions any team member may perform (e.g. claiming a
-// badge for their own team), as opposed to isTeamAuthorized which is admin-only.
 function isTeamMember(user, teamId, participations = []) {
     if (!user) return false;
     if (user.isPortalAdmin) return true;
@@ -158,8 +130,6 @@ function isTeamMember(user, teamId, participations = []) {
     });
 }
 
-// True if the caller is a portal admin or holds the given role (e.g. 'judge',
-// 'committee') on their participation record for the given event.
 function hasEventRole(user, eventId, role, participations = []) {
     if (!user) return false;
     if (user.isPortalAdmin) return true;

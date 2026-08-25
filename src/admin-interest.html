@@ -6,10 +6,7 @@
     <title>Interest Queue - ACDC Committee</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <style>
-        /* Page-specific styles */
-
-        .stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
+    <style>        .stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
 
         .stat-card {
             background: white;
@@ -236,18 +233,15 @@
     <script src="js/api.js"></script>
     <script src="js/admin-sidebar.js"></script>
     <script src="js/permissions.js"></script>
-    <script>
-        let allEntries = [];
+    <script>        let allEntries = [];
         let allEvents = [];
         let currentPermissions = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // Resolve permissions (handles auth check, sidebar render, access denied)
             currentPermissions = await Permissions.initAdminPage('interest');
 
             if (!currentPermissions) return;
-            
-            // Set share link
+
             const shareLink = window.location.origin + '/register.html?intent=interest';
             document.getElementById('share-link').value = shareLink;
 
@@ -256,23 +250,20 @@
 
         async function loadData() {
             try {
-                // Load events (scoped by permissions)
                 let events = await API.events.list();
                 allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
-                
-                // Load participations with 'interest' role
+
                 const allParticipations = await API.participations.list();
-                let interestParticipations = allParticipations.filter(p => 
+                let interestParticipations = allParticipations.filter(p =>
                     p.roles?.includes('interest')
                 );
-                // Scope to permitted events
                 interestParticipations = Permissions.filterByEvent(currentPermissions, interestParticipations);
-                
+
                 allEntries = interestParticipations.map(p => {
                     const firstName = p.interestFirstName || '';
                     const lastName = p.interestLastName || '';
                     const hasUpgraded = p.roles?.some(r => r !== 'interest');
-                    
+
                     return {
                         id: p.id,
                         email: p.email,
@@ -284,30 +275,28 @@
                         converted: hasUpgraded || !!p.teamId
                     };
                 });
-                
-                // Sort by newest first
+
                 allEntries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-                
-                // Calculate stats
+
                 const total = allEntries.length;
                 const verified = allEntries.filter(e => !e.converted).length;
                 const converted = allEntries.filter(e => e.converted).length;
-                
+
                 document.getElementById('stat-total').textContent = total;
                 document.getElementById('stat-verified').textContent = verified;
                 document.getElementById('stat-converted').textContent = converted;
-                
+
                 renderTable();
             } catch (error) {
                 console.error('Error loading data:', error);
-                document.getElementById('queue-table-body').innerHTML = 
+                document.getElementById('queue-table-body').innerHTML =
                     '<tr><td colspan="8" class="empty-state">Error loading data</td></tr>';
             }
         }
 
         function renderTable() {
             const tbody = document.getElementById('queue-table-body');
-            
+
             if (allEntries.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No entries</td></tr>';
                 return;
@@ -326,8 +315,7 @@
                 }
 
                 const name = [entry.firstName, entry.lastName].filter(Boolean).join(' ') || '-';
-                
-                // Find event name
+
                 const event = allEvents.find(e => e.id === entry.eventId);
                 const eventName = event ? event.name : '-';
 
@@ -370,10 +358,10 @@
         function exportSelected() {
             const ids = getSelectedIds();
             const entries = allEntries.filter(e => ids.includes(e.id));
-            
+
             const csv = [
                 'Email,First Name,Last Name,Company,Phone,Signed Up',
-                ...entries.map(e => 
+                ...entries.map(e =>
                     `${e.email},"${e.firstName || ''}","${e.lastName || ''}","${e.company || ''}","${e.phone || ''}",${e.createdAt}`
                 )
             ].join('\n');
@@ -402,7 +390,7 @@
             const input = document.getElementById('share-link');
             input.select();
             document.execCommand('copy');
-            
+
             const btn = input.nextElementSibling;
             btn.textContent = 'Copied!';
             setTimeout(() => btn.textContent = 'Copy', 2000);

@@ -6,8 +6,7 @@
     <title>Accept Invitation - ACDC Portal</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/styles.css">
-    <style>
-        body {
+    <style>        body {
             background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
             min-height: 100vh;
         }
@@ -31,7 +30,6 @@
             margin: 4px 0 0;
         }
 
-        /* Invitation card */
         .invite-card {
             background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
             border: 2px solid #93c5fd;
@@ -75,7 +73,6 @@
             color: #94a3b8;
         }
 
-        /* Step breadcrumb */
         .step-breadcrumb {
             text-align: center;
             margin-bottom: 16px;
@@ -86,7 +83,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* Success state */
         .success-card {
             text-align: center;
             padding: 32px 20px;
@@ -104,7 +100,6 @@
             line-height: 1.6;
         }
 
-        /* Error state for full-page errors */
         .error-card {
             text-align: center;
             padding: 32px 20px;
@@ -124,8 +119,7 @@
             color: #94a3b8;
             font-size: 0.8rem;
         }
-    </style>
-</head>
+    </style></head>
 <body>
     <div class="container">
         <header>
@@ -134,13 +128,11 @@
         </header>
 
         <main>
-            <!-- Loading state -->
             <div id="step-loading" class="card acdc-loader">
                 <div class="loader-spinner"></div>
                 <div class="loader-text">Loading invitation...</div>
             </div>
 
-            <!-- Error state (invalid/expired invitation) -->
             <div id="step-error" class="card hidden">
                 <div class="error-card">
                     <div class="error-icon">❌</div>
@@ -150,7 +142,6 @@
                 </div>
             </div>
 
-            <!-- Screen 1: Invitation Details -->
             <div id="step-invite" class="hidden">
                 <div class="invite-card">
                     <div class="invite-icon">🎉</div>
@@ -169,7 +160,6 @@
                 </button>
             </div>
 
-            <!-- Screen 2: Profile / Contact Details -->
             <div id="step-profile" class="hidden">
                 <div class="step-breadcrumb">Step 1 of 2 — Your Details</div>
                 <div class="card">
@@ -220,11 +210,9 @@
                 </div>
             </div>
 
-            <!-- Screen 3: OTP Verification -->
             <div id="step-verify" class="hidden">
                 <div class="step-breadcrumb">Step 2 of 2 — Verify Identity</div>
 
-                <!-- 3a: Send OTP -->
                 <div id="substep-email" class="card">
                     <h2>📧 Verify Your Identity</h2>
                     <p>We'll send a one-time code to <strong id="email-display"></strong> to confirm it's you.</p>
@@ -237,7 +225,6 @@
                     </button>
                 </div>
 
-                <!-- 3b: Enter OTP Code -->
                 <div id="substep-otp" class="card hidden">
                     <h2>🔐 Enter Your Code</h2>
                     <p>We sent a 6-digit code to <strong id="otp-email-display"></strong></p>
@@ -268,7 +255,6 @@
                 </div>
             </div>
 
-            <!-- Step 3: Success -->
             <div id="step-success" class="card hidden">
                 <div class="success-card">
                     <div class="success-icon">🎉</div>
@@ -287,8 +273,7 @@
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', async () => {
+    <script>        document.addEventListener('DOMContentLoaded', async () => {
             Auth.init();
 
             const stepLoading = document.getElementById('step-loading');
@@ -299,7 +284,6 @@
                 }
             }, 1200);
 
-            // Get invitation ID from URL
             const urlParams = new URLSearchParams(window.location.search);
             const inviteId = urlParams.get('invite');
 
@@ -308,13 +292,11 @@
                 return;
             }
 
-            // State
             let invitation = null;
             let currentUser = null;
             let alreadyLoggedIn = false;
-            let pendingProfile = {}; // collected in step 1, submitted after OTP
+            let pendingProfile = {};
 
-            // Load invitation
             try {
                 invitation = await API.invitations.get(inviteId);
 
@@ -333,7 +315,6 @@
                     return;
                 }
 
-                // Show the invitation details
                 displayInvitation(invitation);
 
             } catch (err) {
@@ -342,9 +323,6 @@
                 return;
             }
 
-            // Check if user is already logged in with a matching email for this invite.
-            // The raw invite email is intentionally not returned from the server, so we
-            // compare only against the authenticated session and the email the user verifies.
             if (Auth.isLoggedIn()) {
                 const authUser = Auth.getUser();
                 if (authUser?.email) {
@@ -352,17 +330,13 @@
                     try {
                         currentUser = await API.users.getOrNull(authUser.email);
                     } catch (e) {
-                        console.log('Could not load user:', e);
+                        console.warn('Could not load user:', e);
                     }
                 }
             }
 
-            // Pre-fill profile form (step 1 — shown first)
             initProfileForm();
 
-            // ============================================================
-            // Step 1: Profile — collect name + phone
-            // ============================================================
             function initProfileForm() {
                 const firstNameField = document.getElementById('profile-firstName');
                 const lastNameField = document.getElementById('profile-lastName');
@@ -376,7 +350,6 @@
                 emailField.readOnly = false;
                 emailField.required = true;
 
-                // Pre-fill from existing user record, else from invitation data
                 if (currentUser) {
                     firstNameField.value = currentUser.firstName || invitation.inviteeFirstName || '';
                     lastNameField.value = currentUser.lastName || invitation.inviteeLastName || '';
@@ -394,18 +367,12 @@
                 firstNameField.focus();
             }
 
-            // ============================================================
-            // Screen 1: "Accept Invitation" button → go to profile
-            // ============================================================
             document.getElementById('next-to-profile-btn').addEventListener('click', () => {
                 document.getElementById('step-invite').classList.add('hidden');
                 document.getElementById('step-profile').classList.remove('hidden');
                 initProfileForm();
             });
 
-            // ============================================================
-            // Screen 2: Profile form → collect data, then verify or submit
-            // ============================================================
             document.getElementById('profile-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const errorDiv = document.getElementById('profile-error');
@@ -431,27 +398,19 @@
                     return;
                 }
 
-                // Store profile data — we'll submit it after OTP verification
                 pendingProfile = { firstName, lastName, phone, gamertag, allergies };
                 pendingProfile.email = email;
 
-                // If already logged in with a matching session, skip OTP entirely.
                 if (alreadyLoggedIn && Auth.getUser()?.email?.toLowerCase() === email.toLowerCase()) {
                     await submitAcceptance();
                     return;
                 }
 
-                // Advance to OTP verification screen
                 document.getElementById('step-profile').classList.add('hidden');
                 document.getElementById('step-verify').classList.remove('hidden');
                 document.getElementById('email-display').textContent = email;
             });
 
-            // ============================================================
-            // Screen 3: OTP Verification
-            // ============================================================
-
-            // Send OTP button
             document.getElementById('send-otp-btn').addEventListener('click', async () => {
                 const btn = document.getElementById('send-otp-btn');
                 const errorDiv = document.getElementById('email-error');
@@ -466,7 +425,6 @@
                 try {
                     await API.auth.sendOtp(email);
 
-                    // Move to OTP entry
                     document.getElementById('substep-email').classList.add('hidden');
                     document.getElementById('substep-otp').classList.remove('hidden');
                     document.getElementById('otp-email-display').textContent = email;
@@ -474,7 +432,6 @@
                     document.getElementById('otp-code').focus();
 
                 } catch (err) {
-                    // If cooldown, still show OTP step (code may already be pending)
                     document.getElementById('substep-email').classList.add('hidden');
                     document.getElementById('substep-otp').classList.remove('hidden');
                     document.getElementById('otp-email-display').textContent = email;
@@ -488,7 +445,6 @@
                 }
             });
 
-            // Verify OTP — on success, submit profile + accept invitation
             document.getElementById('otp-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const btn = document.getElementById('verify-otp-btn');
@@ -515,19 +471,14 @@
                         throw new Error(result.message || 'Invalid code.');
                     }
 
-                    // Store JWT session
                     Auth.setSession(result.token, result.user);
 
-                    // Load full user record (may be null for new invitees — backend will create)
                     try {
                         currentUser = await API.users.getOrNull(email);
                     } catch (e) {
-                        console.log('Could not load user:', e);
+                        console.warn('Could not load user:', e);
                     }
 
-                    // OTP verified. Reload the pending contact record so the
-                    // invitee can review the details entered by their team lead
-                    // before confirming the invitation.
                     alreadyLoggedIn = true;
                     initProfileForm();
                     document.getElementById('step-verify').classList.add('hidden');
@@ -542,7 +493,6 @@
                 }
             });
 
-            // Resend OTP
             document.getElementById('resend-otp-link').addEventListener('click', async (e) => {
                 e.preventDefault();
                 const link = e.target;
@@ -564,21 +514,14 @@
                 }
             });
 
-            // Strip non-digits from OTP
             document.getElementById('otp-code').addEventListener('input', (e) => {
                 e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
             });
 
-            // ============================================================
-            // Submit: Update profile + Accept invitation
-            // ============================================================
             async function submitAcceptance(authToken) {
                 try {
                     const userId = currentUser ? currentUser.id : null;
 
-                    // Accept the invitation using the authenticated session. The server matches
-                    // the session email against the invitation and ignores any client-supplied
-                    // email/userId payload values.
                     const result = await API.invitations.accept(inviteId, userId, pendingProfile.email, {
                         firstName: pendingProfile.firstName,
                         lastName: pendingProfile.lastName,
@@ -591,14 +534,12 @@
                         throw new Error('Failed to accept invitation.');
                     }
 
-                    // Show success
                     document.getElementById('step-invite').classList.add('hidden');
                     document.getElementById('step-profile').classList.add('hidden');
                     document.getElementById('step-verify').classList.add('hidden');
                     document.getElementById('step-success').classList.remove('hidden');
                     document.getElementById('success-team-name').textContent = invitation.teamName || 'the team';
 
-                    // Redirect after a short delay
                     const eventId = result.eventId || invitation.eventId;
                     setTimeout(() => {
                         if (eventId) {
@@ -609,7 +550,6 @@
                     }, 2000);
 
                 } catch (err) {
-                    // Show error on whichever step is currently visible
                     const visibleError = document.querySelector('#substep-otp:not(.hidden) #otp-error') ||
                                          document.getElementById('profile-error');
                     if (visibleError) {
@@ -619,7 +559,6 @@
                         alert(err.message || 'Something went wrong. Please try again.');
                     }
 
-                    // Re-enable buttons
                     document.querySelectorAll('.btn').forEach(b => {
                         b.disabled = false;
                         const txt = b.querySelector('.btn-text');
@@ -630,9 +569,6 @@
                 }
             }
 
-            // ============================================================
-            // Helpers
-            // ============================================================
             function displayInvitation(inv) {
                 document.getElementById('step-loading').classList.add('hidden');
                 clearTimeout(wakeTimer);
@@ -648,7 +584,6 @@
                     eventLine.classList.add('hidden');
                 }
 
-                // Event meta (dates, location)
                 const metaParts = [];
                 if (inv.eventStartDate) {
                     metaParts.push(`📅 ${formatDate(inv.eventStartDate)}${inv.eventEndDate ? ' – ' + formatDate(inv.eventEndDate) : ''}`);
@@ -663,7 +598,6 @@
                     metaLine.classList.add('hidden');
                 }
 
-                // Expiry
                 const expiresLine = document.getElementById('invite-expires-line');
                 if (inv.expiresAt) {
                     const days = Math.ceil((new Date(inv.expiresAt) - new Date()) / (1000 * 60 * 60 * 24));

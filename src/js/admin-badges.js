@@ -1,5 +1,3 @@
-// ACDC Portal - Admin Badges Management
-
 let currentUser = null;
 let allBadges = [];
 let allEvents = [];
@@ -8,10 +6,9 @@ let allClaims = [];
 let judgeUsers = [];
 let selectedEventId = null;
 let currentPermissions = null;
-let allClaimsEventBadges = [];  // event-badges for judge lookup in claims tab
-let allJudgeUsers = [];         // all judge users across events
+let allClaimsEventBadges = [];
+let allJudgeUsers = [];
 
-// Category display config
 const CATEGORIES = {
     'soft': { label: 'Soft Code', emoji: '🟦', icon: '🤝' },
     'low-code': { label: 'Low Code', emoji: '🟩', icon: '⚡' },
@@ -31,7 +28,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 1200);
     const adminContent = document.getElementById('admin-content');
 
-    // Resolve permissions (handles auth check, sidebar render, access denied)
     currentPermissions = await Permissions.initAdminPage('badges', {
         loadingEl: loadingDiv,
         contentEl: adminContent
@@ -42,23 +38,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUser = currentPermissions.user;
 
     try {
-        // Load all data
         await loadAllData();
 
-        // Setup event listeners
         setupEventListeners();
 
         loadingDiv.classList.add('hidden');
         clearTimeout(wakeTimer);
         adminContent.classList.remove('hidden');
 
-        // Judges only see Claims tab
         const isJudgeOnly = currentPermissions.highestRole === 'judge';
         if (isJudgeOnly) {
-            // Hide Library and Event Badges tabs
             document.querySelectorAll('.tab-btn[data-tab="master"], .tab-btn[data-tab="event-badges"]').forEach(t => t.style.display = 'none');
             document.getElementById('tab-master')?.classList.remove('active');
-            // Activate claims tab
             document.querySelector('.tab-btn[data-tab="claims"]').classList.add('active');
             document.getElementById('tab-claims').classList.add('active');
             renderClaims();
@@ -72,11 +63,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-
-// ============================================================
-// DATA LOADING
-// ============================================================
-
 async function loadAllData() {
     const [badges, events, claims] = await Promise.all([
         API.request('/badges'),
@@ -85,11 +71,9 @@ async function loadAllData() {
     ]);
 
     allBadges = badges;
-    // Scope events to permitted events for non-admin users
     allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
     allClaims = claims;
 
-    // Load event-badges for all permitted events (for judge lookup in claims tab)
     try {
         const ebPromises = allEvents.map(e => API.request(`/events/${e.id}/badges`));
         const ebResults = await Promise.all(ebPromises);
@@ -99,7 +83,6 @@ async function loadAllData() {
         allClaimsEventBadges = [];
     }
 
-    // Build judge user lookup from all event-badges
     await loadJudgeUsersForClaims();
 }
 
@@ -124,7 +107,6 @@ async function loadJudgeUsersForClaims() {
 async function loadEventBadges(eventId) {
     allEventBadges = await API.request(`/events/${eventId}/badges`);
 
-    // Load judges for this event from participations (role-based)
     judgeUsers = [];
     try {
         const participations = await API.participations.getByEvent(eventId, 'judge');
@@ -146,13 +128,7 @@ async function loadEventBadges(eventId) {
     }
 }
 
-
-// ============================================================
-// EVENT LISTENERS
-// ============================================================
-
 function setupEventListeners() {
-    // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -164,14 +140,11 @@ function setupEventListeners() {
         });
     });
 
-    // Badge library filters
     document.getElementById('filter-category').addEventListener('change', renderBadgeLibrary);
     document.getElementById('filter-search').addEventListener('input', renderBadgeLibrary);
 
-    // Add badge button
     document.getElementById('add-badge-btn').addEventListener('click', () => openBadgeModal());
 
-    // Event selector for Event Badges tab
     document.getElementById('event-badge-selector').addEventListener('change', async (e) => {
         selectedEventId = e.target.value;
         if (selectedEventId) {
@@ -185,21 +158,17 @@ function setupEventListeners() {
         }
     });
 
-    // Save event badges button
     document.getElementById('save-event-badges-btn').addEventListener('click', saveEventBadges);
 
-    // Claims filters
     document.getElementById('claims-event-filter').addEventListener('change', renderClaims);
     document.getElementById('claims-status-filter').addEventListener('change', renderClaims);
     document.getElementById('claims-category-filter').addEventListener('change', renderClaims);
 
-    // Review modal decision toggle
     document.getElementById('review-decision').addEventListener('change', (e) => {
         document.getElementById('decline-reason-group').style.display =
             e.target.value === 'declined' ? 'block' : 'none';
     });
 
-    // Populate event selectors
     populateEventSelectors();
 }
 
@@ -214,11 +183,6 @@ function populateEventSelectors() {
         claimsEventFilter.appendChild(opt2);
     });
 }
-
-
-// ============================================================
-// TAB 1: BADGE LIBRARY
-// ============================================================
 
 function renderBadgeLibrary() {
     const container = document.getElementById('badges-container');
@@ -237,7 +201,6 @@ function renderBadgeLibrary() {
         );
     }
 
-    // Update stats
     document.getElementById('stat-total').textContent = allBadges.length;
     document.getElementById('stat-soft').textContent = allBadges.filter(b => b.category === 'soft').length;
     document.getElementById('stat-lowcode').textContent = allBadges.filter(b => b.category === 'low-code').length;
@@ -249,7 +212,6 @@ function renderBadgeLibrary() {
         return;
     }
 
-    // Group by category
     const grouped = {};
     for (const badge of badges) {
         if (!grouped[badge.category]) grouped[badge.category] = [];
@@ -296,18 +258,11 @@ function renderBadgeCard(badge) {
     `;
 }
 
-
-// ============================================================
-// TAB 2: EVENT BADGES
-// ============================================================
-
 function renderEventBadges() {
     const container = document.getElementById('event-badges-list');
 
-    // Get current assignments for this event
     const assignedBadgeIds = new Set(allEventBadges.map(eb => eb.badgeId));
 
-    // Calculate stats
     const judgesAssigned = allEventBadges.filter(eb => eb.judgeUserId).length;
     const eventClaims = allClaims.filter(c => c.eventId === selectedEventId);
     const maxPoints = allEventBadges.reduce((sum, eb) => {
@@ -320,10 +275,8 @@ function renderEventBadges() {
     document.getElementById('eb-stat-claims').textContent = eventClaims.length;
     document.getElementById('eb-stat-points').textContent = maxPoints;
 
-    // Get judges list (users on the judges team for this event)
     const judges = getJudgesForEvent(selectedEventId);
 
-    // Group all badges by category, show toggle for assignment
     let html = '';
     for (const cat of CATEGORY_ORDER) {
         const catBadges = allBadges.filter(b => b.category === cat);
@@ -372,7 +325,6 @@ function renderEventBadges() {
 
     container.innerHTML = html;
 
-    // Wire up checkbox change to enable/disable judge dropdown
     container.querySelectorAll('.event-badge-toggle').forEach(cb => {
         cb.addEventListener('change', (e) => {
             const badgeId = e.target.dataset.badgeId;
@@ -406,22 +358,18 @@ async function saveEventBadges() {
     btn.textContent = 'Saving...';
 
     try {
-        // Collect selected badge IDs
         const selectedBadgeIds = [];
         document.querySelectorAll('.event-badge-toggle:checked').forEach(cb => {
             selectedBadgeIds.push(cb.dataset.badgeId);
         });
 
-        // Bulk update assignments
         await API.request(`/events/${selectedEventId}/badges/bulk`, {
             method: 'POST',
             body: JSON.stringify({ selectedBadgeIds })
         });
 
-        // Reload event badges to get new IDs
         await loadEventBadges(selectedEventId);
 
-        // Now update judge assignments
         for (const eb of allEventBadges) {
             const judgeSelect = document.querySelector(`.judge-select[data-badge-id="${eb.badgeId}"]`);
             if (judgeSelect) {
@@ -435,7 +383,6 @@ async function saveEventBadges() {
             }
         }
 
-        // Reload and re-render
         await loadEventBadges(selectedEventId);
         renderEventBadges();
 
@@ -451,14 +398,8 @@ async function saveEventBadges() {
 }
 
 function getJudgesForEvent(eventId) {
-    // Return members of the judges team for this event (loaded in loadEventBadges)
     return judgeUsers;
 }
-
-
-// ============================================================
-// TAB 3: BADGE CLAIMS
-// ============================================================
 
 function renderClaims() {
     const container = document.getElementById('claims-grouped-container');
@@ -474,20 +415,17 @@ function renderClaims() {
     if (statusFilter) claims = claims.filter(c => c.status === statusFilter);
     if (categoryFilter) claims = claims.filter(c => c.badge && c.badge.category === categoryFilter);
 
-    // Update stats (based on filtered claims with event filter only for consistency)
     let statClaims = eventFilter ? allClaims.filter(c => c.eventId === eventFilter) : allClaims;
     document.getElementById('cl-stat-total').textContent = statClaims.length;
     document.getElementById('cl-stat-pending').textContent = statClaims.filter(c => c.status === 'pending').length;
     document.getElementById('cl-stat-approved').textContent = statClaims.filter(c => c.status === 'approved').length;
     document.getElementById('cl-stat-declined').textContent = statClaims.filter(c => c.status === 'declined').length;
 
-    // Determine if current user can review a given claim
     const isPortalAdmin = currentPermissions?.isPortalAdmin;
     const isCommittee = currentPermissions?.highestRole === 'committee' || currentPermissions?.highestRole === 'portalAdmin';
 
     let html = '';
 
-    // ── Exclusive Badges Group (above judge groups) ──
     if (!statusFilter || statusFilter === 'approved') {
         const exclusiveBadges = getExclusiveBadgesForUser(eventFilter);
         if (exclusiveBadges.length > 0) {
@@ -520,7 +458,6 @@ function renderClaims() {
         }
     }
 
-    // ── Judge Groups (claims) ──
     if (claims.length === 0 && !html) {
         container.innerHTML = '';
         emptyState.classList.remove('hidden');
@@ -529,8 +466,7 @@ function renderClaims() {
 
     emptyState.classList.add('hidden');
 
-    // Group claims by badge owner (judgeUserId from event-badge)
-    const grouped = {};  // judgeUserId -> claims[]
+    const grouped = {};
     for (const claim of claims) {
         const eb = allClaimsEventBadges.find(e => e.id === claim.eventBadgeId);
         const judgeId = eb?.judgeUserId || '__unassigned__';
@@ -538,7 +474,6 @@ function renderClaims() {
         grouped[judgeId].push(claim);
     }
 
-    // Sort groups: current user's group first, then alphabetical by judge name, unassigned last
     const currentUserId = currentUser?.id;
     const groupOrder = Object.keys(grouped).sort((a, b) => {
         if (a === currentUserId) return -1;
@@ -555,7 +490,6 @@ function renderClaims() {
         const isMyGroup = judgeId === currentUserId;
         const canReview = isMyGroup || isPortalAdmin || isCommittee;
 
-        // Judge name
         let judgeName;
         if (judgeId === '__unassigned__') {
             judgeName = 'Unassigned';
@@ -564,7 +498,6 @@ function renderClaims() {
             judgeName = judge ? judge.name : 'Unknown Judge';
         }
 
-        // Group stats
         const pendingCount = groupClaims.filter(c => c.status === 'pending').length;
         const approvedCount = groupClaims.filter(c => c.status === 'approved').length;
         const declinedCount = groupClaims.filter(c => c.status === 'declined').length;
@@ -619,7 +552,7 @@ function renderClaimRow(claim, canReview) {
             <td><strong>${escapeHtml(badgeName)}</strong></td>
             <td><span class="category-pill ${badgeCategory}">${catConfig.label || badgeCategory}</span></td>
             <td>${escapeHtml(teamName)}</td>
-            <td class="claim-evidence" title="${escapeHtml(claim.evidence || '')}">${escapeHtml(claim.evidence || '�')}</td>
+            <td class="claim-evidence" title="${escapeHtml(claim.evidence || '')}">${escapeHtml(claim.evidence || '�')}</td>
             <td><span class="status-pill ${claim.status}">${statusIcon(claim.status)} ${capitalize(claim.status)}</span></td>
             <td style="font-size: 0.8rem; color: var(--admin-text-muted);">${claimedDate}</td>
             <td>
@@ -633,11 +566,6 @@ function renderClaimRow(claim, canReview) {
         </tr>
     `;
 }
-
-
-// ============================================================
-// BADGE MODAL (Create/Edit)
-// ============================================================
 
 function openBadgeModal(badgeId = null) {
     const modal = document.getElementById('badge-modal');
@@ -724,11 +652,6 @@ async function deleteBadge(badgeId) {
     }
 }
 
-
-// ============================================================
-// REVIEW MODAL
-// ============================================================
-
 function openReviewModal(claimId) {
     const claim = allClaims.find(c => c.id === claimId);
     if (!claim) return;
@@ -740,7 +663,6 @@ function openReviewModal(claimId) {
         ? `<strong>Evidence:</strong><br>${escapeHtml(claim.evidence)}`
         : '<em>No evidence provided</em>';
 
-    // Show previous decline reason as reviewer comments
     const commentsEl = document.getElementById('review-previous-comments');
     if (claim.declineReason) {
         commentsEl.innerHTML = `<strong>Previous reviewer comments:</strong><br>${escapeHtml(claim.declineReason)}`;
@@ -771,7 +693,6 @@ function viewDeclineComments(claimId) {
     commentsEl.innerHTML = `<strong>Reviewer comments:</strong><br>${escapeHtml(claim.declineReason)}`;
     commentsEl.style.display = 'block';
 
-    // Hide decision controls � this is just a read-only view
     document.getElementById('review-decision').parentElement.style.display = 'none';
     document.getElementById('decline-reason-group').style.display = 'none';
     document.querySelector('#review-modal .modal-footer .primary').style.display = 'none';
@@ -781,7 +702,6 @@ function viewDeclineComments(claimId) {
 
 function closeReviewModal() {
     document.getElementById('review-modal').classList.remove('visible');
-    // Restore decision controls for next openReviewModal call
     document.getElementById('review-decision').parentElement.style.display = '';
     document.querySelector('#review-modal .modal-footer .primary').style.display = '';
 }
@@ -812,12 +732,7 @@ async function submitReview() {
     }
 }
 
-
-// ============================================================
-// EXCLUSIVE BADGE AWARDING (inline in claims list)
-// ============================================================
-
-let awardTeamsCache = {};  // eventId -> teams[]
+let awardTeamsCache = {};
 
 function getExclusiveBadgesForUser(eventFilter) {
     const isPortalAdmin = currentPermissions?.isPortalAdmin;
@@ -826,7 +741,6 @@ function getExclusiveBadgesForUser(eventFilter) {
     let eventBadges = [...allClaimsEventBadges].filter(eb => eb.isActive);
     if (eventFilter) eventBadges = eventBadges.filter(eb => eb.eventId === eventFilter);
 
-    // Filter to exclusive badges the user can award
     const exclusiveEBs = eventBadges.filter(eb => {
         const badge = allBadges.find(b => b.id === eb.badgeId);
         if (!badge || (badge.claimType || 'common') !== 'exclusive') return false;
@@ -834,7 +748,6 @@ function getExclusiveBadgesForUser(eventFilter) {
         return eb.judgeUserId === currentUser?.id;
     });
 
-    // Enrich with badge info and existing award
     return exclusiveEBs.map(eb => {
         const badge = allBadges.find(b => b.id === eb.badgeId) || {};
         const existingClaim = allClaims.find(c =>
@@ -858,7 +771,6 @@ function renderExclusiveRow(badge) {
     const catConfig = CATEGORIES[badge.category] || { label: badge.category };
 
     if (badge.awardedTeamId) {
-        // Already awarded
         return `
             <tr>
                 <td><strong>${escapeHtml(badge.badgeName)}</strong></td>
@@ -870,7 +782,6 @@ function renderExclusiveRow(badge) {
         `;
     }
 
-    // Not yet awarded � show team dropdown + award button
     return `
         <tr>
             <td><strong>${escapeHtml(badge.badgeName)}</strong></td>
@@ -889,18 +800,15 @@ function renderExclusiveRow(badge) {
 }
 
 async function loadTeamsForExclusiveDropdowns() {
-    // Find all unique event IDs from the exclusive badges currently rendered
     const selects = document.querySelectorAll('.award-team-select');
     if (selects.length === 0) return;
 
-    // Collect event IDs from exclusive badges
     const eventIds = [...new Set(
         getExclusiveBadgesForUser(document.getElementById('claims-event-filter').value)
             .filter(b => !b.awardedTeamId)
             .map(b => b.eventId)
     )];
 
-    // Load teams for each event
     for (const eventId of eventIds) {
         if (!awardTeamsCache[eventId]) {
             try {
@@ -913,7 +821,6 @@ async function loadTeamsForExclusiveDropdowns() {
         }
     }
 
-    // Populate each dropdown
     const exclusiveBadges = getExclusiveBadgesForUser(document.getElementById('claims-event-filter').value);
     for (const badge of exclusiveBadges) {
         if (badge.awardedTeamId) continue;
@@ -958,11 +865,6 @@ async function awardBadgeInline(eventBadgeId) {
         btn.textContent = '🏆 Award';
     }
 }
-
-
-// ============================================================
-// HELPERS
-// ============================================================
 
 function escapeHtml(str) {
     if (!str) return '';

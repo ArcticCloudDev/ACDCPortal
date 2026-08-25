@@ -144,8 +144,7 @@
             border-color: #3b82f6;
             color: #1e40af;
         }
-    </style>
-</head>
+    </style></head>
 <body>
     <div class="admin-layout">
         <main class="main-content">
@@ -154,7 +153,6 @@
                 <p style="color: var(--admin-text-muted);">Manage automated system email templates with custom themes and text</p>
             </div>
 
-            <!-- Template Selector -->
             <div class="panel" style="margin-bottom: 24px;">
                 <div class="panel-header" style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border);">
                     <span style="font-weight: 600;">Select Template Type</span>
@@ -181,7 +179,6 @@
                 </div>
             </div>
 
-            <!-- Event & Theme Selection -->
             <div class="panel" style="margin-bottom: 24px;">
                 <div class="panel-header" style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border);">
                     <span style="font-weight: 600;">Event & Theme</span>
@@ -196,23 +193,19 @@
                 </div>
             </div>
 
-            <!-- Main Editor Area -->
             <div class="two-column">
                 <div>
-                    <!-- Editable Sections -->
                     <div class="panel">
                         <div class="panel-header" style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border);">
                             <span style="font-weight: 600;">Customize Text</span>
                         </div>
                         <div class="panel-body padded">
-                            <!-- Merge Fields Helper -->
                             <div style="margin-bottom: 20px; padding: 12px; background: #fef3c7; border-radius: 6px;">
                                 <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 8px;">Available Merge Fields:</div>
                                 <div class="merge-fields" id="merge-fields"></div>
                                 <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px;">Click to copy • Paste into text sections below</div>
                             </div>
 
-                            <!-- Structural fields ordered top-to-bottom as they appear in the email -->
                             <div class="form-group" style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--admin-border);">
                                 <label for="field-header-title">Header</label>
                                 <input type="text" id="field-header-title" style="width:100%;" placeholder="Welcome to {{eventName}}!">
@@ -242,7 +235,6 @@
                     </div>
                 </div>
 
-                <!-- Preview Pane -->
                 <div>
                     <div class="preview-pane">
                         <div class="preview-header">📧 Email Preview</div>
@@ -264,8 +256,7 @@
     <script src="js/api.js"></script>
     <script src="js/admin-sidebar.js"></script>
     <script src="js/permissions.js"></script>
-    <script>
-        let bodyEditor, closingEditor;
+    <script>        let bodyEditor, closingEditor;
         let currentTemplate = 'welcome';
         let currentEvent = null;
         let allEvents = [];
@@ -273,12 +264,10 @@
         let currentPermissions = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // Resolve permissions (handles auth check, sidebar render, access denied)
             currentPermissions = await Permissions.initAdminPage('email-templates');
 
             if (!currentPermissions) return;
-            
-            // Initialize Quill editors
+
             bodyEditor = new Quill('#body-editor', {
                 theme: 'snow',
                 placeholder: 'Enter body text...',
@@ -295,11 +284,9 @@
                 }
             });
 
-            // Listen to editor changes for live preview
             bodyEditor.on('text-change', updatePreview);
             closingEditor.on('text-change', updatePreview);
 
-            // Template selector click handlers
             document.querySelectorAll('.template-option').forEach(option => {
                 option.addEventListener('click', () => {
                     document.querySelectorAll('.template-option').forEach(o => o.classList.remove('selected'));
@@ -313,7 +300,6 @@
                 });
             });
 
-            // Load data
             await loadEvents();
             await loadTemplateConfig();
             renderMergeFields();
@@ -323,11 +309,11 @@
             try {
                 const response = await fetch(`${CONFIG.api.baseUrl}/events`);
                 allEvents = await response.json();
-                
+
                 const select = document.getElementById('event-select');
                 select.innerHTML = '<option value="">Select an event...</option>' +
                     allEvents.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
-                
+
                 select.addEventListener('change', (e) => {
                     currentEvent = allEvents.find(ev => ev.id === e.target.value);
                     if (currentEvent) {
@@ -346,7 +332,6 @@
                 if (response.ok) {
                     templateConfig = await response.json();
                 } else {
-                    // Initialize default config
                     templateConfig = {
                         templates: {
                             "welcome": {
@@ -394,14 +379,11 @@
             const globalDefaults = template.editableSections;
             const eventTheme = template.eventThemes[currentEvent.id] || {};
 
-            // Load event-specific sections (with fallback to global defaults)
             bodyEditor.root.innerHTML = eventTheme.body || globalDefaults.body || '';
             closingEditor.root.innerHTML = eventTheme.closing || globalDefaults.closing || '';
 
-            // Load structural fields — per-event first, fall back to global default
             document.getElementById('field-header-title').value = eventTheme.headerTitle || template.headerTitle || '';
 
-            // Show/hide button field based on whether this template has a button URL
             const hasButton = !!template.buttonUrlField;
             document.getElementById('button-text-row').style.display = hasButton ? '' : 'none';
             if (hasButton) {
@@ -412,8 +394,8 @@
         function renderMergeFields() {
             const template = templateConfig.templates[currentTemplate];
             const container = document.getElementById('merge-fields');
-            
-            container.innerHTML = template.mergeFields.map(field => 
+
+            container.innerHTML = template.mergeFields.map(field =>
                 `<span class="merge-field-tag" onclick="copyMergeField('${field}')">{{${field}}}</span>`
             ).join('');
         }
@@ -443,7 +425,6 @@
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const response = await resp.json();
 
-                // Render the real email HTML inside an isolated iframe
                 let iframe = previewEl.querySelector('iframe');
                 if (!iframe) {
                     previewEl.innerHTML = '';
@@ -458,7 +439,6 @@
                 doc.write(response.html);
                 doc.close();
 
-                // Size iframe to its content height
                 iframe.style.height = doc.documentElement.scrollHeight + 'px';
                 previewEl.style.height = '';
                 previewEl.style.overflow = 'hidden';
@@ -475,13 +455,11 @@
 
             try {
                 const template = templateConfig.templates[currentTemplate];
-                
-                // Create event theme object if it doesn't exist
+
                 if (!template.eventThemes[currentEvent.id]) {
                     template.eventThemes[currentEvent.id] = {};
                 }
-                
-                // Store body/closing/structural fields per-event
+
                 template.eventThemes[currentEvent.id].body = bodyEditor.root.innerHTML;
                 template.eventThemes[currentEvent.id].closing = closingEditor.root.innerHTML;
                 const headerVal = document.getElementById('field-header-title').value || null;
@@ -497,10 +475,8 @@
                     template.eventThemes[currentEvent.id].buttonText = buttonTextVal;
                 }
 
-                // Keep top-level subject in sync so validation passes
                 if (headerVal) template.subject = headerVal;
 
-                // Save to backend
                 const response = await fetch(`${CONFIG.api.baseUrl}/system-emails/config`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },

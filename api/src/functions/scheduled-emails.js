@@ -1,6 +1,3 @@
-// Scheduled Emails
-// HTTP endpoint for manual/automated triggering
-// When deployed to Azure, can be called by Azure Logic Apps, Power Automate, or an external timer
 const crypto = require('crypto');
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
@@ -25,17 +22,12 @@ const participationsStorage = new Storage('participations');
 const usersStorage = new Storage('users');
 
 function generateGuid() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
+    return crypto.randomUUID();
 }
 
-// HTTP endpoint - call manually or via an external scheduler (e.g. Azure Logic App)
-// Requires X-Scheduler-Secret header matching SCHEDULER_SECRET app setting
 app.http('scheduled-emails-run', {
     methods: ['POST'],
+    // Anonymous on purpose: called by an external scheduler, guarded by x-scheduler-secret below.
     authLevel: 'anonymous',
     route: 'scheduled-emails/run',
     handler: async (request, context) => {
@@ -66,10 +58,8 @@ async function processScheduledEmails(context) {
         let emailsFailed = 0;
         const processedCampaigns = [];
 
-        // Get all campaigns
         const campaigns = await campaignsStorage.getAll();
 
-        // Filter for live campaigns with scheduledSendTime that has passed
         const dueCampaigns = campaigns.filter(c =>
             c.status === 'live' &&
             c.scheduledSendTime &&
@@ -84,35 +74,24 @@ async function processScheduledEmails(context) {
             return result;
         }
 
-        // Get all verified interest leads
         const leads = (await leadsStorage.getAll()).filter(l => l.verified);
         context.log(`[SCHEDULED] Found ${leads.length} verified leads`);
 
-        // Get all participations and users (for committee/judges/participants)
         const allParticipations = await participationsStorage.getAll();
         const allUsers = await usersStorage.getAll();
 
-        // Get existing deliveries
         const existingDeliveries = await deliveriesStorage.getAll();
 
-        // Get events for context
         const events = await eventsStorage.getAll();
 
-        // Process each due campaign
         for (const campaign of dueCampaigns) {
             context.log(`[SCHEDULED] Processing campaign: ${campaign.subject}`);
 
-            // Find event that uses this campaign's sequence
             const event = events.find(e => e.sequenceId === campaign.sequenceId);
             if (!event) {
                 context.log(`[SCHEDULED] No event found for sequence ${campaign.sequenceId}`);
                 continue;
             }
-
-            // Build the full recipient list for this event:
-            // - Event participants (committee, judges, participants) — always eligible
-            // - Verified interest leads who joined before the campaign's scheduled send time
-            // Deduplicate by email so a lead who registered as a participant is only sent one copy.
 
             const eventParticipations = allParticipations.filter(p => p.eventId === event.id);
             const eventParticipants = eventParticipations
@@ -125,7 +104,6 @@ async function processScheduledEmails(context) {
 
             const participantEmails = new Set(eventParticipants.map(p => p.email.toLowerCase()));
 
-            // Interest leads who joined before the scheduled time and are not already a participant
             const eligibleLeads = leads
                 .filter(l => l.eventId === event.id)
                 .filter(l => new Date(l.createdAt) <= new Date(campaign.scheduledSendTime))
@@ -144,7 +122,6 @@ async function processScheduledEmails(context) {
 
             context.log(`[SCHEDULED] ${recipientsToSend.length} recipients need this email (${eventParticipants.length} participants + ${eligibleLeads.length} leads)`);
 
-            // Send to each recipient
             for (const recipient of recipientsToSend) {
                 const delivery = {
                     id: generateGuid(),
@@ -192,7 +169,6 @@ async function processScheduledEmails(context) {
             });
         }
 
-        // Log to email-log for unified history
         if (processedCampaigns.length > 0) {
             for (const campaign of processedCampaigns) {
                 const emailLog = {
@@ -215,7 +191,6 @@ async function processScheduledEmails(context) {
             context.log(`[SCHEDULED] Logged ${processedCampaigns.length} campaigns to email-log`);
         }
 
-        // Record this run
         const result = await recordRun(startTime, emailsSent, emailsFailed, processedCampaigns, context);
 
         const duration = (new Date() - startTime) / 1000;
@@ -248,7 +223,6 @@ async function recordRun(startTime, sent, failed, campaigns, context, error = nu
 
         await runsStorage.create(run);
 
-        // Prune runs beyond 100 (keep most recent)
         const allRuns = await runsStorage.getAll();
         if (allRuns.length > 100) {
             const sorted = allRuns.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));

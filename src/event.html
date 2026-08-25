@@ -6,9 +6,7 @@
     <title>Event - ACDC Portal</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/styles.css">
-    <style>
-        /* Event page styles */
-        .back-link {
+    <style>        .back-link {
             display: inline-flex;
             align-items: center;
             gap: 5px;
@@ -17,20 +15,17 @@
             margin-bottom: 15px;
             font-size: 0.9rem;
         }
-        
+
         .back-link:hover {
             color: var(--primary-color);
         }
-        
-        /* Banner CSS now in css/styles.css */
-        
-        /* Teams section - no outer box */
+
         .teams-section {
             display: flex;
             flex-direction: column;
             gap: 20px;
         }
-        
+
         .teams-header {
             display: flex;
             justify-content: space-between;
@@ -39,21 +34,20 @@
             padding-bottom: 15px;
             border-bottom: 1px solid var(--border-color);
         }
-        
+
         .teams-header h2 {
             margin: 0;
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        
-        /* My Teams - full width stacked layout */
+
         .my-teams-container {
             display: flex;
             flex-direction: column;
             gap: 20px;
         }
-        
+
         .team-card {
             background: #ffffff;
             border: 1px solid #cbd5e1;
@@ -61,7 +55,7 @@
             overflow: hidden;
             box-shadow: 0 2px 6px rgba(0,0,0,0.06);
         }
-        
+
         .team-card-header {
             padding: 15px 20px;
             background: var(--primary-color);
@@ -72,22 +66,22 @@
             flex-wrap: wrap;
             gap: 10px;
         }
-        
+
         .team-card-header h3 {
             margin: 0;
             font-size: 1.2rem;
         }
-        
+
         .team-admin-info {
             font-size: 0.85rem;
             opacity: 0.95;
         }
-        
+
         .team-card-body {
             padding: 20px;
             background: #f8fafc;
         }
-        
+
         .team-stats {
             display: flex;
             gap: 20px;
@@ -100,36 +94,35 @@
             border-radius: var(--border-radius);
             border: 1px solid #cbd5e1;
         }
-        
+
         .team-stats span {
             display: flex;
             align-items: center;
             gap: 6px;
         }
-        
-        /* Participants grid - always 3 columns, flows naturally */
+
         .participants-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 15px;
         }
-        
+
         .participant-card, .empty-slot, .unlock-slot {
             min-width: 0;
         }
-        
+
         @media (max-width: 768px) {
             .participants-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
         }
-        
+
         @media (max-width: 480px) {
             .participants-grid {
                 grid-template-columns: 1fr;
             }
         }
-        
+
         .participant-card {
             background: #ffffff;
             border: 1px solid #cbd5e1;
@@ -139,28 +132,28 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.06);
             border-top: 3px solid var(--primary-color);
         }
-        
+
         .participant-card.editable {
             cursor: pointer;
             transition: all 0.2s;
         }
-        
+
         .participant-card.editable:hover {
             border-color: var(--primary-color);
             box-shadow: 0 2px 8px rgba(0, 120, 212, 0.15);
         }
-        
+
         .participant-card .name {
             font-weight: 700;
             font-size: 1.05rem;
             margin-bottom: 6px;
             color: #1e293b;
         }
-        
+
         .participant-card .edit-participant-btn {
             margin-top: 10px;
         }
-        
+
         .participant-card .detail-row {
             font-size: 0.85rem;
             color: #334155;
@@ -169,11 +162,11 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        
+
         .participant-card .detail-row.email {
             color: var(--primary-color);
         }
-        
+
         .participant-card .roles {
             display: flex;
             gap: 6px;
@@ -181,7 +174,7 @@
             justify-content: center;
             margin-top: 10px;
         }
-        
+
         .participant-card .role-tag {
             font-size: 0.78rem;
             padding: 3px 10px;
@@ -189,20 +182,19 @@
             font-weight: 600;
             border: 1px solid;
         }
-        
+
         .participant-card .role-tag.admin {
             background: #fef3c7;
             color: #92400e;
             border-color: #fcd34d;
         }
-        
+
         .participant-card .role-tag.participant {
             background: #d1fae5;
             color: #065f46;
             border-color: #6ee7b7;
         }
 
-        /* Hotel status indicator on participant cards */
         .participant-card .hotel-status {
             display: inline-flex;
             align-items: center;
@@ -232,7 +224,7 @@
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
         }
-        
+
         .empty-slot {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
             border: 2px dashed #64b5f6;
@@ -247,18 +239,18 @@
             min-height: 120px;
             transition: all 0.2s;
         }
-        
+
         .empty-slot.add-member-slot {
             cursor: pointer;
         }
-        
+
         .empty-slot.add-member-slot:hover {
             border-color: #1976d2;
             background: linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(25, 118, 210, 0.25);
         }
-        
+
         .empty-slot .add-icon {
             font-size: 2rem;
             font-weight: 300;
@@ -266,20 +258,18 @@
             margin-bottom: 8px;
             color: #1976d2;
         }
-        
+
         .empty-slot .add-text {
             font-size: 0.85rem;
             font-weight: 500;
         }
-        
-        /* TBD participant cards */
+
         .participant-card.tbd-card {
             background: #fff8e1;
             border: 2px dashed #ffc107;
             position: relative;
         }
 
-        /* Pending invitation cards */
         .participant-card.pending-card {
             background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
             border: 2px dashed #f59e0b;
@@ -319,7 +309,7 @@
             color: #b45309;
             margin-top: 6px;
         }
-        
+
         .tbd-badge {
             position: absolute;
             top: 8px;
@@ -331,22 +321,21 @@
             padding: 2px 8px;
             border-radius: 10px;
         }
-        
+
         .tbd-placeholder {
             color: var(--text-muted);
             font-style: italic;
         }
-        
+
         .tbd-card .btn-primary {
             background: #ffc107;
             color: #000;
         }
-        
+
         .tbd-card .btn-primary:hover {
             background: #ffca28;
         }
-        
-        /* Unlock slot */
+
         .unlock-slot {
             background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
             border: 2px dashed #4caf50;
@@ -362,47 +351,45 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        
+
         .unlock-slot:hover {
             border-color: #2e7d32;
             background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
         }
-        
+
         .unlock-slot .unlock-icon {
             font-size: 2rem;
             margin-bottom: 8px;
         }
-        
+
         .unlock-slot .unlock-text {
             font-size: 0.85rem;
             font-weight: 500;
         }
-        
-        /* Readonly and TBD field styles */
+
         .readonly-field {
             background: var(--bg-color);
             color: var(--text-muted);
             cursor: not-allowed;
         }
-        
+
         .field-hint {
             display: block;
             font-size: 0.8rem;
             color: var(--text-muted);
             margin-top: 4px;
         }
-        
+
         .field-hint.tbd-hint {
             color: #ffc107;
         }
-        
-        /* Modal Tabs */
+
         .modal-tabbed {
             max-width: 550px;
         }
-        
+
         .modal-tabs {
             display: flex;
             border-bottom: 2px solid var(--border-color);
@@ -410,7 +397,7 @@
             padding: 0 25px;
             gap: 5px;
         }
-        
+
         .modal-tab {
             padding: 12px 20px;
             border: none;
@@ -422,49 +409,48 @@
             margin-bottom: -2px;
             transition: all 0.2s;
         }
-        
+
         .modal-tab:hover {
             color: var(--text-color);
             background: rgba(0, 120, 212, 0.05);
         }
-        
+
         .modal-tab.active {
             color: var(--primary-color);
             border-bottom-color: var(--primary-color);
             font-weight: 500;
         }
-        
+
         .modal-tab.hidden {
             display: none;
         }
-        
+
         .tab-content {
             display: none;
         }
-        
+
         .tab-content.active {
             display: block;
         }
-        
+
         .tab-description {
             color: var(--text-muted);
             font-size: 0.9rem;
             margin-bottom: 20px;
         }
-        
+
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
         }
-        
+
         @media (max-width: 500px) {
             .form-row {
                 grid-template-columns: 1fr;
             }
         }
-        
-        /* Hotel Calendar */
+
         .hotel-calendar {
             display: flex;
             align-items: center;
@@ -476,7 +462,7 @@
             margin-bottom: 20px;
             overflow-x: auto;
         }
-        
+
         .hotel-day {
             display: flex;
             flex-direction: column;
@@ -485,20 +471,20 @@
             min-width: 48px;
             flex-shrink: 0;
         }
-        
+
         .day-label {
             font-weight: 700;
             font-size: 0.85rem;
             color: var(--text-color);
         }
-        
+
         .day-date {
             font-size: 0.7rem;
             color: var(--text-muted);
             margin-top: 2px;
             white-space: nowrap;
         }
-        
+
         .hotel-night {
             display: flex;
             align-items: center;
@@ -506,12 +492,11 @@
             flex-shrink: 0;
             position: relative;
         }
-        
+
         .hotel-night input[type="checkbox"] {
             display: none;
         }
-        
-        /* Connecting arm: left side of the circle */
+
         .night-checkbox::before {
             content: '';
             position: absolute;
@@ -524,8 +509,7 @@
             border-radius: 3px 0 0 3px;
             transition: background 0.2s;
         }
-        
-        /* Connecting arm: right side of the circle */
+
         .night-checkbox::after {
             content: '';
             position: absolute;
@@ -538,7 +522,7 @@
             border-radius: 0 3px 3px 0;
             transition: background 0.2s;
         }
-        
+
         .night-checkbox {
             position: relative;
             width: 44px;
@@ -553,13 +537,13 @@
             background: #fff;
             flex-shrink: 0;
         }
-        
+
         .night-checkbox:hover {
             border-color: #1976d2;
             border-style: solid;
             transform: scale(1.08);
         }
-        
+
         .night-icon {
             font-size: 1.1rem;
             opacity: 0.2;
@@ -567,8 +551,7 @@
             position: relative;
             z-index: 1;
         }
-        
-        /* Lock badge that overlays the bottom-right corner of the circle */
+
         .lock-badge {
             position: absolute;
             bottom: -4px;
@@ -585,43 +568,40 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.2);
             z-index: 2;
         }
-        
-        /* ── CHECKED state: solid blue circle, bright icon, blue arms ── */
+
         .hotel-night input[type="checkbox"]:checked + .night-checkbox {
             background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
             border: 2.5px solid #1565c0;
             box-shadow: 0 3px 10px rgba(25, 118, 210, 0.45);
         }
-        
+
         .hotel-night input[type="checkbox"]:checked + .night-checkbox .night-icon {
             opacity: 1;
             filter: brightness(0) invert(1);
         }
-        
+
         .hotel-night input[type="checkbox"]:checked + .night-checkbox::before,
         .hotel-night input[type="checkbox"]:checked + .night-checkbox::after {
             background: #1976d2;
         }
-        
-        /* ── DISABLED + CHECKED: booked night (read-only or mandatory) — blue ── */
+
         .hotel-night input[type="checkbox"]:disabled:checked + .night-checkbox {
             background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
             border: 2.5px solid #1565c0;
             box-shadow: 0 3px 10px rgba(25, 118, 210, 0.35);
             cursor: not-allowed;
         }
-        
+
         .hotel-night input[type="checkbox"]:disabled:checked + .night-checkbox .night-icon {
             opacity: 1;
             filter: brightness(0) invert(1);
         }
-        
+
         .hotel-night input[type="checkbox"]:disabled:checked + .night-checkbox::before,
         .hotel-night input[type="checkbox"]:disabled:checked + .night-checkbox::after {
             background: #1976d2;
         }
 
-        /* ── DISABLED + UNCHECKED: not booked, read-only — muted grey ── */
         .hotel-night input[type="checkbox"]:disabled:not(:checked) + .night-checkbox {
             background: #f5f5f5;
             border: 2px dashed #ccc;
@@ -637,7 +617,7 @@
         .hotel-night input[type="checkbox"]:disabled:not(:checked) + .night-checkbox::after {
             background: #ddd;
         }
-        
+
         .hotel-summary {
             display: flex;
             align-items: center;
@@ -647,37 +627,35 @@
             background: var(--bg-color);
             border-radius: var(--border-radius);
         }
-        
+
         .summary-label {
             color: var(--text-muted);
             font-size: 0.9rem;
         }
-        
+
         .summary-count {
             font-weight: 600;
             font-size: 1.1rem;
             color: var(--primary-color);
         }
-        
-        /* Role toggles */
+
             height: 18px;
             cursor: pointer;
         }
-        
-        /* Role toggles */
+
         .role-toggles {
             border-top: 1px solid var(--border-color);
             padding-top: 15px;
             margin-top: 10px;
         }
-        
+
         .toggle-group {
             display: flex;
             flex-direction: column;
             gap: 12px;
             margin-top: 8px;
         }
-        
+
         .toggle-label {
             display: flex;
             align-items: flex-start;
@@ -689,12 +667,12 @@
             transition: all 0.2s;
             background: var(--card-background);
         }
-        
+
         .toggle-label:hover {
             border-color: var(--primary-color);
             background: rgba(0, 120, 212, 0.05);
         }
-        
+
         .toggle-label input[type="checkbox"] {
             margin: 2px 0 0 0;
             width: 18px;
@@ -702,36 +680,35 @@
             cursor: pointer;
             flex-shrink: 0;
         }
-        
+
         .toggle-content {
             display: flex;
             flex-direction: column;
         }
-        
+
         .toggle-text {
             font-weight: 500;
             color: var(--text-color);
         }
-        
+
         .toggle-hint {
             display: block;
             font-size: 0.8rem;
             color: var(--text-muted);
             margin-top: 2px;
         }
-        
+
         .toggle-label input[type="checkbox"]:checked + .toggle-content .toggle-text {
             color: var(--primary-color);
         }
-        
-        /* Radio button group */
+
         .radio-group {
             display: flex;
             flex-direction: column;
             gap: 10px;
             margin-top: 8px;
         }
-        
+
         .radio-label {
             display: flex;
             align-items: center;
@@ -742,22 +719,21 @@
             border-radius: var(--border-radius);
             transition: all 0.2s;
         }
-        
+
         .radio-label:hover {
             border-color: var(--primary-color);
             background: rgba(0, 120, 212, 0.05);
         }
-        
+
         .radio-label input[type="radio"] {
             margin: 0;
         }
-        
+
         .radio-label input[type="radio"]:checked + span {
             font-weight: 500;
             color: var(--primary-color);
         }
 
-        /* Create Team modal — step indicators */
         .modal-step-indicators {
             display: flex;
             align-items: center;
@@ -800,32 +776,31 @@
             background: var(--border-color);
             margin: 0 10px;
         }
-        
-        /* Team file uploads section */
+
         .team-uploads {
             margin-top: 20px;
             padding-top: 20px;
             border-top: 1px solid var(--border-color);
         }
-        
+
         .team-uploads h4 {
             margin: 0 0 15px 0;
             font-size: 1rem;
             color: var(--text-color);
         }
-        
+
         .uploads-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 15px;
         }
-        
+
         @media (max-width: 600px) {
             .uploads-grid {
                 grid-template-columns: 1fr;
             }
         }
-        
+
         .upload-box {
             background: var(--bg-color);
             border: 2px dashed var(--border-color);
@@ -834,49 +809,49 @@
             text-align: center;
             transition: all 0.2s;
         }
-        
+
         .upload-box:hover {
             border-color: var(--primary-color);
             background: rgba(0, 120, 212, 0.05);
         }
-        
+
         .upload-box.has-file {
             border-style: solid;
             border-color: var(--success-color, #28a745);
             background: rgba(40, 167, 69, 0.05);
         }
-        
+
         .upload-box .upload-icon {
             font-size: 2rem;
             margin-bottom: 10px;
         }
-        
+
         .upload-box .upload-label {
             font-weight: 500;
             margin-bottom: 5px;
         }
-        
+
         .upload-box .upload-hint {
             font-size: 0.8rem;
             color: var(--text-muted);
             margin-bottom: 10px;
         }
-        
+
         .upload-box .upload-status {
             font-size: 0.85rem;
             color: var(--success-color, #28a745);
             margin-top: 8px;
         }
-        
+
         .upload-box input[type="file"] {
             display: none;
         }
-        
+
         .upload-box .btn-upload {
             padding: 6px 16px;
             font-size: 0.85rem;
         }
-        
+
         .upload-box .file-info {
             display: flex;
             align-items: center;
@@ -884,7 +859,7 @@
             gap: 10px;
             margin-top: 10px;
         }
-        
+
         .upload-box .file-name {
             font-size: 0.85rem;
             color: var(--text-color);
@@ -893,7 +868,7 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        
+
         .upload-box .btn-remove {
             background: none;
             border: none;
@@ -974,15 +949,14 @@
             background: #eef6ff;
             color: var(--primary-color);
         }
-        
+
         .team-card-footer {
             padding: 15px 20px;
             border-top: 1px solid var(--border-color);
             display: flex;
             gap: 10px;
         }
-        
-        /* Event info strip (date, location, cost, status) */
+
         .event-info-strip {
             display: flex;
             flex-wrap: wrap;
@@ -1009,7 +983,6 @@
             font-size: 0.82rem;
         }
 
-        /* Pre-registration info section */
         .pre-reg-section {
             background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
             border: 2px solid #f59e0b;
@@ -1063,7 +1036,6 @@
             color: #a16207;
         }
 
-        /* Role confirmation section (judge/committee) */
         .role-confirmed-section {
             border-radius: var(--border-radius);
             padding: 40px 30px;
@@ -1158,14 +1130,12 @@
             color: white;
         }
 
-        /* Interest card: mirrors team-card structure */
         .interest-upgrade {
             margin: 0;
             padding: 0;
             border: none;
         }
 
-        /* The placeholder "team card" shell */
         .interest-card {
             background: #ffffff;
             border: 1px solid #cbd5e1;
@@ -1203,7 +1173,6 @@
             line-height: 1.5;
         }
 
-        /* CTA buttons inside interest card body */
         .interest-cta-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1245,7 +1214,6 @@
         .interest-cta-btn .icb-hint  { font-size: 0.75rem; color: #64748b; }
         .interest-cta-btn:hover .icb-label { color: var(--primary-color); }
 
-        /* In-queue tile state */
         .interest-cta-btn.icb-queued {
             border-color: #86efac;
             background: #f0fdf4;
@@ -1277,7 +1245,6 @@
             .interest-cta-row { grid-template-columns: 1fr; }
         }
 
-        /* Hotel urgency alert for judges/committee */
         .hotel-urgency-alert {
             margin-top: 20px;
             padding: 16px 24px;
@@ -1332,35 +1299,33 @@
             display: inline-block;
         }
 
-        /* Create team button - standalone */
         .create-team-section {
             text-align: center;
             margin-top: 10px;
         }
-        
+
         .action-buttons {
             display: flex;
             gap: 15px;
             justify-content: center;
             flex-wrap: wrap;
         }
-        
+
         .solo-hint {
             margin-top: 12px;
             font-size: 0.9rem;
             color: var(--text-muted);
         }
-        
+
         .btn-lg {
             padding: 15px 30px;
             font-size: 1.1rem;
         }
-        
-        /* Solo Queue Status */
+
         .solo-queue-status {
             margin-top: 20px;
         }
-        
+
         .queue-card {
             background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
             border: 2px solid #ff9800;
@@ -1370,74 +1335,72 @@
             max-width: 500px;
             margin: 0 auto;
         }
-        
+
         .queue-icon {
             font-size: 3rem;
             margin-bottom: 15px;
         }
-        
+
         .queue-card h3 {
             margin: 0 0 10px 0;
             color: #e65100;
         }
-        
+
         .queue-card p {
             margin: 0 0 10px 0;
             color: #5d4037;
         }
-        
+
         .queue-position {
             font-weight: 600;
             font-size: 1.1rem;
             margin: 15px 0 !important;
         }
-        
+
         .queue-position span {
             color: #e65100;
         }
-        
+
         .btn-outline {
             background: transparent;
             border: 2px solid #e65100;
             color: #e65100;
         }
-        
+
         .btn-outline:hover {
             background: #e65100;
             color: white;
         }
-        
-        /* Solo Queue Modal Info */
+
         .solo-queue-info {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
             border-radius: var(--border-radius);
             padding: 20px;
             margin-bottom: 20px;
         }
-        
+
         .solo-queue-info p {
             margin: 0 0 10px 0;
             color: var(--text-color);
         }
-        
+
         .solo-queue-info ul {
             margin: 10px 0;
             padding-left: 25px;
         }
-        
+
         .solo-queue-info li {
             margin: 5px 0;
             color: var(--text-color);
         }
-        
+
         .solo-queue-info .info-note {
             font-size: 0.9rem;
             color: #1565c0;
             font-style: italic;
             margin-bottom: 0;
         }
-        
-        /* Empty state */
+
         .empty-teams {
             text-align: center;
             padding: 40px;
@@ -1446,15 +1409,12 @@
             border-radius: var(--border-radius);
             border: 2px dashed var(--border-color);
         }
-        
+
         .empty-teams .icon {
             font-size: 3rem;
             margin-bottom: 15px;
         }
-        
-        /* ============================================================ */
-        /* EVENT PAGE NAV TABS                                          */
-        /* ============================================================ */
+
         .event-nav {
             display: flex;
             gap: 0;
@@ -1503,9 +1463,6 @@
             display: block;
         }
 
-        /* ============================================================ */
-        /* BADGE SECTION                                                */
-        /* ============================================================ */
         .badges-section {
             margin-top: 0;
         }
@@ -1528,7 +1485,6 @@
             color: #475569;
         }
 
-        /* Category tabs */
         .badge-tabs {
             display: flex;
             flex-wrap: wrap;
@@ -1576,7 +1532,6 @@
             background: #fef3c7;
         }
 
-        /* Panels */
         .badge-panels {
             background: #e2e8f0;
             border: 1px solid #cbd5e1;
@@ -1590,7 +1545,6 @@
             display: block;
         }
 
-        /* Badge row — single-line layout */
         .badge-row {
             padding: 12px 16px;
             border-radius: 8px;
@@ -1712,7 +1666,6 @@
             text-align: center;
         }
 
-        /* Examples button */
         .btn-badge-examples {
             display: inline-flex;
             align-items: center;
@@ -1733,7 +1686,6 @@
             color: #4338ca;
         }
 
-        /* Blog post link button */
         .btn-badge-blog {
             display: inline-flex;
             align-items: center;
@@ -1752,7 +1704,6 @@
             background: #dbeafe;
         }
 
-        /* Claim & Award buttons */
         .btn-badge-claim,
         .btn-badge-award {
             font-size: 0.85rem;
@@ -1784,7 +1735,6 @@
             background: #d97706;
         }
 
-        /* Assign dropdown inline */
         .badge-assign-select {
             font-size: 0.85rem;
             padding: 4px 8px;
@@ -1806,7 +1756,6 @@
             font-weight: 500;
         }
 
-        /* Badge Claim Modal */
         #badge-claim-modal {
             position: fixed;
             top: 0;
@@ -1862,11 +1811,10 @@
             border-top: 1px solid #e2e8f0;
         }
 
-        /* Team details modal */
         .team-members-list {
             margin-top: 20px;
         }
-        
+
         .member-row {
             display: flex;
             justify-content: space-between;
@@ -1877,13 +1825,13 @@
             border-radius: var(--border-radius);
             margin-bottom: 10px;
         }
-        
+
         .member-info {
             display: flex;
             align-items: center;
             gap: 12px;
         }
-        
+
         .member-info .avatar {
             width: 40px;
             height: 40px;
@@ -1895,62 +1843,55 @@
             justify-content: center;
             font-weight: 600;
         }
-        
+
         .member-info .name {
             font-weight: 600;
             color: #1e293b;
         }
-        
+
         .member-info .email {
             font-size: 0.85rem;
             color: #475569;
         }
-        
+
         .member-roles {
             display: flex;
             gap: 5px;
         }
-        
+
         .role-badge {
             padding: 3px 10px;
             border-radius: 12px;
             font-size: 0.78rem;
             font-weight: 600;
         }
-        
+
         .role-badge.admin {
             background: #fef3c7;
             color: #92400e;
             border: 1px solid #fcd34d;
         }
-        
+
         .role-badge.participant {
             background: #d1fae5;
             color: #065f46;
             border: 1px solid #6ee7b7;
         }
-    </style>
-</head>
+    </style></head>
 <body>
     <div class="container" style="max-width: 1000px;">
-        <!-- Back link -->
         <a href="events.html" class="back-link">← Back to Events</a>
-        
-        <!-- Loading -->
+
         <div id="loading" class="card acdc-loader">
             <div class="loader-spinner"></div>
             <div class="loader-text">Loading event...</div>
         </div>
 
-        <!-- Event Content -->
         <div id="content" class="hidden">
-            <!-- Event Banner (rendered by SiteHeader) -->
             <div id="site-header"></div>
 
-            <!-- Event Info Strip -->
             <div id="event-info-strip" class="event-info-strip hidden"></div>
 
-            <!-- Pre-Registration Info (shown when event is in pre-registration status) -->
             <div id="pre-reg-section" class="pre-reg-section hidden">
                 <div class="pre-reg-icon">🔔</div>
                 <h2>This Event is in Pre-Registration</h2>
@@ -1959,7 +1900,6 @@
                 <p class="pre-reg-hint">No account needed — just your name and email.</p>
             </div>
 
-            <!-- Role Confirmation (shown for judges/committee members) -->
             <div id="role-confirmed-section" class="role-confirmed-section hidden">
                 <div class="role-icon" id="role-confirmed-icon"></div>
                 <h2 id="role-confirmed-title"></h2>
@@ -1968,11 +1908,9 @@
                 <div class="role-details" id="role-confirmed-details"></div>
                 <div id="role-hotel-alert"></div>
 
-                <!-- Upgrade options for interest-only users -->
                 <div id="interest-upgrade-actions" class="interest-upgrade hidden">
                     <div class="interest-card">
 
-                        <!-- Card header — matches .team-card-header style -->
                         <div class="interest-card-header" id="interest-card-header">
                             <div>
                                 <h3>🔔 Interest Registered</h3>
@@ -1980,11 +1918,9 @@
                             </div>
                         </div>
 
-                        <!-- Card body -->
                         <div class="interest-card-body">
                             <p class="ich-message">You've registered your interest. Take the next step by creating a team or joining the solo queue so we can match you with other participants.</p>
 
-                            <!-- State A: Not in queue -->
                             <div id="upgrade-not-queued" class="interest-cta-row">
                                 <button id="upgrade-register-team-btn-a" class="interest-cta-btn">
                                     <span class="icb-icon">👥</span>
@@ -2002,7 +1938,6 @@
                                 </button>
                             </div>
 
-                            <!-- State B: In queue -->
                             <div id="upgrade-in-queue" class="interest-cta-row hidden">
                                 <button id="upgrade-register-team-btn-b" class="interest-cta-btn">
                                     <span class="icb-icon">👥</span>
@@ -2035,7 +1970,6 @@
                 </div>
             </div>
 
-            <!-- Event Page Navigation Tabs -->
             <div id="event-nav" class="event-nav hidden">
                 <button class="event-nav-tab active" data-tab="team" onclick="switchEventTab('team')">
                     👥 My Team
@@ -2045,20 +1979,17 @@
                 </button>
             </div>
 
-            <!-- TAB: My Team -->
             <div id="tab-content-team" class="event-tab-content active">
-                <!-- Teams Section -->
                 <div class="teams-section">
                     <div id="my-teams-container" class="my-teams-container">
-                        <!-- User's team cards will be inserted here -->
                     </div>
-                    
+
                     <div id="no-teams" class="empty-teams hidden">
                         <div class="icon">👥</div>
                         <p>You are not part of any team for this event yet</p>
                     </div>
                 </div>
-                
+
                 <div id="create-team-section" class="create-team-section">
                     <div class="action-buttons">
                         <button id="create-team-btn" class="btn btn-primary btn-lg">+ Create New Team</button>
@@ -2066,8 +1997,7 @@
                     </div>
                     <p class="solo-hint">No team? Join solo and we'll match you with others!</p>
                 </div>
-                
-                <!-- Solo Queue Status (shown when in queue) -->
+
                 <div id="solo-queue-status" class="solo-queue-status hidden">
                     <div class="queue-card">
                         <div class="queue-icon">🎲</div>
@@ -2079,10 +2009,8 @@
                 </div>
             </div>
 
-            <!-- TAB: Badges -->
             <div id="tab-content-badges" class="event-tab-content">
                 <div id="badges-section" class="badges-section">
-                    <!-- Badge content rendered by JS -->
                 </div>
             </div>
         </div>
@@ -2092,7 +2020,6 @@
         </footer>
     </div>
 
-    <!-- Create Team Modal -->
     <div id="create-team-modal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
@@ -2113,7 +2040,6 @@
             </div>
 
             <form id="create-team-form">
-                <!-- Step 1: Team details -->
                 <div id="create-team-step-1">
                     <div class="form-group">
                         <label for="teamName">Team Name *</label>
@@ -2146,7 +2072,6 @@
                     <button type="button" class="btn btn-primary" id="create-team-next" style="width: 100%;">Next →</button>
                 </div>
 
-                <!-- Step 2: Terms & acknowledgement -->
                 <div id="create-team-step-2" class="hidden">
                     <div id="create-team-terms-display" style="margin-bottom: 16px; line-height: 1.6; padding: 14px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--border-radius);"></div>
 
@@ -2172,35 +2097,34 @@
         </div>
     </div>
 
-    <!-- Invite Member Modal -->
     <div id="invite-member-modal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
                 <h2>➕ Register Team Member</h2>
                 <button class="modal-close" id="close-invite-member">&times;</button>
             </div>
-            
+
             <form id="invite-member-form">
                 <input type="hidden" id="invite-teamId">
-                
+
                 <p>Invite a new member to <strong id="invite-teamName"></strong></p>
-                
+
                 <div style="display: flex; gap: 12px;">
                     <div class="form-group" style="flex: 1;">
                         <label for="invite-firstName">First Name *</label>
-                        <input type="text" id="invite-firstName" name="firstName" required 
+                        <input type="text" id="invite-firstName" name="firstName" required
                                placeholder="First name">
                     </div>
                     <div class="form-group" style="flex: 1;">
                         <label for="invite-lastName">Last Name *</label>
-                        <input type="text" id="invite-lastName" name="lastName" required 
+                        <input type="text" id="invite-lastName" name="lastName" required
                                placeholder="Last name">
                     </div>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="invite-email">Email Address *</label>
-                    <input type="email" id="invite-email" name="email" required 
+                    <input type="email" id="invite-email" name="email" required
                            placeholder="Enter email address">
                 </div>
 
@@ -2221,10 +2145,10 @@
                 </div>
 
                 <p class="form-hint">This creates an editable pending contact in your team. They will confirm these details when they first sign in.</p>
-                
+
                 <div id="invite-error" class="error-message hidden"></div>
                 <div id="invite-success" class="success-message hidden"></div>
-                
+
                 <button type="submit" class="btn btn-primary" id="send-invite-btn">
                     <span class="btn-text">Register Team Member</span>
                     <span class="btn-loading hidden">Sending...</span>
@@ -2233,19 +2157,17 @@
         </div>
     </div>
 
-    <!-- Team Details Modal -->
     <div id="team-details-modal" class="modal-overlay">
         <div class="modal" style="max-width: 600px;">
             <div class="modal-header">
                 <h2 id="team-modal-title">👥 Team Name</h2>
                 <button class="modal-close" id="close-team-details">&times;</button>
             </div>
-            
+
             <div id="team-modal-content">
                 <div class="team-members-list" id="team-members-list">
-                    <!-- Members will be loaded here -->
                 </div>
-                
+
                 <div id="team-admin-actions" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
                     <h4>Admin Actions</h4>
                     <button id="invite-member-btn" class="btn btn-secondary btn-small">+ Register Team Member</button>
@@ -2254,7 +2176,6 @@
         </div>
     </div>
 
-    <!-- Solo Queue Modal -->
     <div id="solo-queue-modal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
@@ -2282,61 +2203,58 @@
         </div>
     </div>
 
-    <!-- Edit Participant Modal -->
     <div id="edit-participant-modal" class="modal-overlay">
         <div class="modal modal-tabbed">
             <div class="modal-header">
                 <h2>✏️ Edit Participant</h2>
                 <button class="modal-close" id="close-edit-participant">&times;</button>
             </div>
-            
-            <!-- Tab Navigation -->
+
             <div class="modal-tabs">
                 <button class="modal-tab active" data-tab="tab-personal">👤 Personal</button>
                 <button class="modal-tab" data-tab="tab-hotel" id="tab-hotel-btn">🏨 Hotel</button>
                 <button class="modal-tab" data-tab="tab-roles" id="tab-roles-btn">🔑 Roles</button>
             </div>
-            
+
             <form id="edit-participant-form">
                 <input type="hidden" id="edit-userId">
                 <input type="hidden" id="edit-participationId">
                 <input type="hidden" id="edit-teamId">
-                
-                <!-- Personal Info Tab -->
+
                 <div class="tab-content active" id="tab-personal">
                     <div class="form-group">
                         <label for="edit-email">Email</label>
                         <input type="email" id="edit-email" name="email" readonly class="readonly-field">
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="edit-firstName">First Name *</label>
                             <input type="text" id="edit-firstName" name="firstName">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="edit-lastName">Last Name *</label>
                             <input type="text" id="edit-lastName" name="lastName">
                         </div>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="edit-phone">Phone *</label>
                             <input type="tel" id="edit-phone" name="phone">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="edit-gamertag">Gamertag</label>
-                            <input type="text" id="edit-gamertag" name="gamertag" 
+                            <input type="text" id="edit-gamertag" name="gamertag"
                                    placeholder="Gaming username (optional)">
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="edit-allergies">Allergies / Dietary Requirements</label>
-                        <textarea id="edit-allergies" name="allergies" rows="3" 
+                        <textarea id="edit-allergies" name="allergies" rows="3"
                                   maxlength="500" placeholder="Enter any allergies or dietary requirements..."></textarea>
                     </div>
 
@@ -2347,25 +2265,22 @@
                         </label>
                     </div>
                 </div>
-                
-                <!-- Hotel Tab -->
+
                 <div class="tab-content" id="tab-hotel">
                     <p class="tab-description" id="hotel-tab-description">Select which nights you need hotel accommodation. Check the boxes between the days you'll be staying.</p>
-                    
+
                     <div class="hotel-calendar" id="hotel-calendar-container">
-                        <!-- Dynamic calendar will be generated from event data -->
                     </div>
-                    
+
                     <div class="hotel-summary">
                         <span class="summary-label">Nights selected:</span>
                         <span class="summary-count" id="hotel-nights-count">0</span>
                     </div>
                 </div>
-                
-                <!-- Roles Tab (admin only) -->
+
                 <div class="tab-content" id="tab-roles">
                     <p class="tab-description">Configure team membership roles for this participant.</p>
-                    
+
                     <div class="toggle-group">
                         <label class="toggle-label">
                             <input type="checkbox" id="edit-isAdmin">
@@ -2386,7 +2301,7 @@
 
                 <div id="edit-participant-error" class="error-message hidden"></div>
                 <div id="edit-participant-success" class="success-message hidden"></div>
-                
+
                 <button type="submit" class="btn btn-primary" id="save-participant-btn">
                     <span class="btn-text">Save Changes</span>
                     <span class="btn-loading hidden">Saving...</span>
@@ -2395,7 +2310,6 @@
         </div>
     </div>
 
-    <!-- Badge Claim Modal -->
     <div id="badge-claim-modal" class="hidden">
         <div class="badge-modal-backdrop" onclick="closeBadgeClaimModal()"></div>
         <div class="badge-modal-dialog">
@@ -2420,7 +2334,6 @@
         </div>
     </div>
 
-    <!-- Registration Terms Confirmation Modal -->
     <div id="registration-terms-modal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
@@ -2435,7 +2348,6 @@
         </div>
     </div>
 
-    <!-- Badge Award Modal (Exclusive badges — judges pick a team) -->
     <div id="badge-award-modal" class="hidden">
         <div class="badge-modal-backdrop" onclick="closeAwardModal()"></div>
         <div class="badge-modal-dialog">

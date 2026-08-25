@@ -1,17 +1,4 @@
-// Storage Module — SQL-backed (Azure SQL via Entra ID)
-// Drop-in replacement for the JSON file storage module.
-//
-// Exports:
-//   module.exports = Storage          (named stores: .users, .teams, .events, etc.)
-//   module.exports.Storage = GenericStorage  (class for any table)
-//   module.exports.readData = readData
-//   module.exports.writeData = writeData
-
 const { getPool, sql } = require('./sql');
-
-// ============================================================
-// HELPERS
-// ============================================================
 
 const DATE_ONLY_COLUMNS = new Set([
     'StartDate', 'EndDate', 'HotelDate'
@@ -36,9 +23,6 @@ function camelToSql(key) {
     return key.charAt(0).toUpperCase() + key.slice(1);
 }
 
-// Build parameterized INSERT from a JS object
-// skipKeys: JS properties to skip (handled separately)
-// jsonKeys: JS properties to JSON.stringify before inserting
 async function insertGeneric(pool, tableName, item, skipKeys = [], jsonKeys = []) {
     const request = pool.request();
     const cols = [];
@@ -73,7 +57,6 @@ async function insertGeneric(pool, tableName, item, skipKeys = [], jsonKeys = []
     await request.query(`INSERT INTO [${tableName}] (${cols.join(', ')}) VALUES (${paramNames.join(', ')})`);
 }
 
-// Build parameterized UPDATE from a JS object
 async function updateGeneric(pool, tableName, idColumn, idValue, updates, skipKeys = [], jsonKeys = []) {
     const request = pool.request();
     request.input('_id', idValue);
@@ -82,7 +65,7 @@ async function updateGeneric(pool, tableName, idColumn, idValue, updates, skipKe
 
     for (const [key, val] of Object.entries(updates)) {
         if (skipKeys.includes(key)) continue;
-        if (key === 'id') continue; // Don't update the ID
+        if (key === 'id') continue;
         if (val === undefined) continue;
 
         const sqlCol = camelToSql(key);
@@ -108,10 +91,6 @@ async function updateGeneric(pool, tableName, idColumn, idValue, updates, skipKe
     await request.query(`UPDATE [${tableName}] SET ${setClauses.join(', ')} WHERE [${idColumn}] = @_id`);
 }
 
-// ============================================================
-// TABLE CONFIGURATION
-// ============================================================
-
 const TABLE_MAP = {
     'events':           { table: 'Events',           wrapperKey: null,             idCol: 'Id' },
     'users':            { table: 'Users',            wrapperKey: null,             idCol: 'Id' },
@@ -129,20 +108,15 @@ const TABLE_MAP = {
     'sequences':        { table: 'Sequences',        wrapperKey: 'sequences',      idCol: 'Id' },
     'interest-queue':   { table: 'InterestQueue',    wrapperKey: 'entries',        idCol: 'Id' },
     'solo-queue':       { table: 'SoloQueue',        wrapperKey: null,             idCol: 'Id' },
-    'sequence-progress':{ table: null },  // dead code
+    'sequence-progress':{ table: null },
     'system-email-config': { table: 'SystemEmailConfig', wrapperKey: 'templates',  idCol: 'TemplateKey' },
     'errors':           { table: 'Errors',           wrapperKey: 'errors',         idCol: 'Id' },
 };
 
-// ============================================================
-// SPECIAL ROW CONVERTERS (for complex tables)
-// ============================================================
-
 function eventRowToJs(row) {
     const obj = rowToJs(row);
-    // Parse FileCategories from JSON string to array
     if (obj.fileCategories && typeof obj.fileCategories === 'string') {
-        try { obj.fileCategories = JSON.parse(obj.fileCategories); } catch (e) { /* keep as string */ }
+        try { obj.fileCategories = JSON.parse(obj.fileCategories); } catch (e) { }
     }
     return obj;
 }
@@ -150,7 +124,7 @@ function eventRowToJs(row) {
 function participationRowToJs(row) {
     const obj = {};
     for (const [key, value] of Object.entries(row)) {
-        if (key.startsWith('HotelNight_')) continue; // handled below
+        if (key.startsWith('HotelNight_')) continue;
         const jsKey = key.charAt(0).toLowerCase() + key.slice(1);
         if (value instanceof Date) {
             obj[jsKey] = value.toISOString();
@@ -158,14 +132,11 @@ function participationRowToJs(row) {
             obj[jsKey] = value;
         }
     }
-    // Split Roles CSV string back into an array
     if (typeof obj.roles === 'string') {
         obj.roles = obj.roles.split(',').map(r => r.trim()).filter(Boolean);
     } else if (!obj.roles) {
         obj.roles = [];
     }
-    // Production stores the current team relationship in TeamId. Expose the
-    // normalized membership view expected by authorization and event UI code.
     if (obj.teamId && !obj.teamMemberships) {
         obj.teamMemberships = [{
             teamId: obj.teamId,
@@ -173,7 +144,6 @@ function participationRowToJs(row) {
             isParticipant: obj.roles.includes('participant')
         }];
     }
-    // Assemble hotelNights object from BIT columns
     obj.hotelNights = {
         'mon-tue': !!row.HotelNight_MonTue,
         'tue-wed': !!row.HotelNight_TueWed,
@@ -189,7 +159,6 @@ function participationRowToJs(row) {
 
 function emailLogRowToJs(row) {
     const obj = rowToJs(row);
-    // Reconstruct results object from flat columns
     obj.results = {
         sent: obj.resultsSent || 0,
         failed: obj.resultsFailed || 0,
@@ -203,25 +172,20 @@ function emailLogRowToJs(row) {
 
 function scheduledRunRowToJs(row) {
     return rowToJs(row);
-    // campaigns array is added separately after JOIN with ScheduledRunCampaigns
 }
 
 function systemEmailConfigToJs(rows) {
-    // Convert rows into the { templates: { key: {...} } } structure
     const templates = {};
     for (const row of rows) {
         const structural = row.StructuralConfig ? JSON.parse(row.StructuralConfig) : {};
-        // Transparently migrate legacy keys
-        // 'team-welcome' → 'welcome'; 'team-registration' is retired — skip it
         const templateKey = row.TemplateKey === 'team-welcome' ? 'welcome' : row.TemplateKey;
-        if (templateKey === 'team-registration') continue; // retired template
+        if (templateKey === 'team-registration') continue;
         templates[templateKey] = {
             name: row.Name,
             subject: row.Subject,
             mergeFields: row.MergeFields ? JSON.parse(row.MergeFields) : [],
             editableSections: row.EditableSections ? JSON.parse(row.EditableSections) : {},
             eventThemes: row.EventThemes ? JSON.parse(row.EventThemes) : {},
-            // Structural fields stored as JSON blob
             headerTitle: structural.headerTitle ?? null,
             buttonText: structural.buttonText ?? null,
             buttonUrlField: structural.buttonUrlField ?? null,
@@ -231,19 +195,13 @@ function systemEmailConfigToJs(rows) {
     return { templates };
 }
 
-// ============================================================
-// EVENTS — with hotelDates + hotelDefaultNights
-// ============================================================
-
 async function readAllEvents(pool) {
     const eventsResult = await pool.request().query('SELECT * FROM [Events]');
     const events = eventsResult.recordset.map(eventRowToJs);
 
-    // Load child tables for all events at once
     const hotelDatesResult = await pool.request().query('SELECT * FROM [EventHotelDates] ORDER BY HotelDate');
     const defaultNightsResult = await pool.request().query('SELECT * FROM [EventDefaultNights]');
 
-    // Group by eventId
     const hotelDatesByEvent = {};
     for (const row of hotelDatesResult.recordset) {
         const eid = row.EventId;
@@ -261,7 +219,6 @@ async function readAllEvents(pool) {
         defaultNightsByEvent[eid].push(row.NightLabel);
     }
 
-    // Merge into event objects
     for (const event of events) {
         event.hotelDates = hotelDatesByEvent[event.id] || [];
         event.hotelDefaultNights = defaultNightsByEvent[event.id] || [];
@@ -270,11 +227,9 @@ async function readAllEvents(pool) {
 }
 
 async function saveEvent(pool, event) {
-    // Insert/update the event row
     const { hotelDates, hotelDefaultNights, ...eventData } = event;
     await insertGeneric(pool, 'Events', eventData, [], ['fileCategories']);
 
-    // Insert hotel dates
     if (hotelDates && Array.isArray(hotelDates)) {
         for (const hd of hotelDates) {
             await pool.request()
@@ -286,7 +241,6 @@ async function saveEvent(pool, event) {
                         VALUES (@eventId, @hotelDate, @dayLabel, @dayLabelFull)`);
         }
     }
-    // Insert default nights
     if (hotelDefaultNights && Array.isArray(hotelDefaultNights)) {
         for (const night of hotelDefaultNights) {
             await pool.request()
@@ -298,14 +252,11 @@ async function saveEvent(pool, event) {
     }
 }
 
-// Atomic UPDATE of a single event row + its hotel date child rows (no DELETE on main Events table)
 async function updateEventFull(pool, event) {
     const { hotelDates, hotelDefaultNights, ...eventData } = event;
 
-    // UPDATE the event row in place — no DELETE, so FK constraints on Teams/Participations are safe
     await updateGeneric(pool, 'Events', 'Id', event.id, eventData, [], ['fileCategories']);
 
-    // Refresh hotel child rows for just this event
     await pool.request().input('eid', event.id)
         .query('DELETE FROM [EventHotelDates] WHERE [EventId] = @eid');
     await pool.request().input('eid', event.id)
@@ -333,17 +284,12 @@ async function updateEventFull(pool, event) {
     }
 }
 
-// ============================================================
-// PARTICIPATIONS — with hotelNights columns
-// ============================================================
-
 async function insertParticipation(pool, item) {
     const hotelNights = item.hotelNights || {};
     const { hotelNights: _, ...rest } = item;
     const roles = Array.isArray(rest.roles) ? rest.roles.join(',') : rest.roles;
 
     const request = pool.request();
-    // Helper for nullable string/id/date values: passes NVarChar type for null, auto-detects otherwise
     const i = (name, val) => {
         if (val === null || val === undefined) {
             request.input(name, sql.NVarChar, null);
@@ -351,7 +297,6 @@ async function insertParticipation(pool, item) {
             request.input(name, val);
         }
     };
-    // Helper for BIT (boolean) columns — mssql cannot auto-detect JS booleans
     const ib = (name, val) => request.input(name, sql.Bit, val ? 1 : 0);
 
     i('id', rest.id);
@@ -389,7 +334,6 @@ async function insertParticipation(pool, item) {
     `);
 }
 
-// Atomic UPDATE for a single participation row — handles hotel nights + roles serialization
 async function updateParticipation(pool, id, updates) {
     const request = pool.request();
     request.input('_id', id);
@@ -452,10 +396,6 @@ async function updateParticipation(pool, id, updates) {
     await request.query(`UPDATE [Participations] SET ${setClauses.join(', ')} WHERE [Id] = @_id`);
 }
 
-// ============================================================
-// EMAIL LOG — with results object
-// ============================================================
-
 async function insertEmailLog(pool, item) {
     const results = item.results || {};
     const flat = {
@@ -474,10 +414,6 @@ async function insertEmailLog(pool, item) {
     };
     await insertGeneric(pool, 'EmailLog', flat);
 }
-
-// ============================================================
-// SCHEDULED RUNS — with campaigns child table
-// ============================================================
 
 async function readAllScheduledRuns(pool) {
     const runsResult = await pool.request().query('SELECT * FROM [ScheduledRuns]');
@@ -518,10 +454,6 @@ async function insertScheduledRun(pool, run) {
     }
 }
 
-// ============================================================
-// SYSTEM EMAIL CONFIG — key-value with JSON columns
-// ============================================================
-
 async function readSystemEmailConfig(pool) {
     const result = await pool.request().query('SELECT * FROM [SystemEmailConfig]');
     return systemEmailConfigToJs(result.recordset);
@@ -529,7 +461,6 @@ async function readSystemEmailConfig(pool) {
 
 async function writeSystemEmailConfig(pool, config) {
     const templates = config.templates || {};
-    // Delete and re-insert all
     await pool.request().query('DELETE FROM [SystemEmailConfig]');
     for (const [key, t] of Object.entries(templates)) {
         const structural = {
@@ -552,10 +483,6 @@ async function writeSystemEmailConfig(pool, config) {
     }
 }
 
-// ============================================================
-// GENERIC STORAGE CLASS
-// ============================================================
-
 class GenericStorage {
     constructor(filename) {
         this.filename = filename.endsWith('.json') ? filename : `${filename}.json`;
@@ -564,7 +491,6 @@ class GenericStorage {
         this.wrapperKey = this.config?.wrapperKey || key;
     }
 
-    // Get a row converter for this table
     _convertRow(row) {
         if (!this.config) return rowToJs(row);
         switch (this.config.table) {
@@ -579,10 +505,9 @@ class GenericStorage {
         if (!this.config || !this.config.table) return {};
         const pool = await getPool();
 
-        // Special cases
         if (this.config.table === 'Events') {
             const events = await readAllEvents(pool);
-            return events; // plain array
+            return events;
         }
         if (this.config.table === 'ScheduledRuns') {
             const runs = await readAllScheduledRuns(pool);
@@ -605,13 +530,11 @@ class GenericStorage {
         if (!this.config || !this.config.table) return false;
         const pool = await getPool();
 
-        // Special cases
         if (this.config.table === 'SystemEmailConfig') {
             await writeSystemEmailConfig(pool, data);
             return true;
         }
 
-        // Extract items from wrapper or use as-is
         let items;
         if (this.config.wrapperKey && data && data[this.config.wrapperKey]) {
             items = data[this.config.wrapperKey];
@@ -648,7 +571,6 @@ class GenericStorage {
     async _saveItems(pool, items) {
         const table = this.config.table;
 
-        // Delete all rows (and children for parent tables)
         if (table === 'Events') {
             await pool.request().query('DELETE FROM [EventDefaultNights]');
             await pool.request().query('DELETE FROM [EventHotelDates]');
@@ -658,7 +580,6 @@ class GenericStorage {
         }
         await pool.request().query(`DELETE FROM [${table}]`);
 
-        // Re-insert all
         for (const item of items) {
             await this._insertItem(pool, item);
         }
@@ -707,24 +628,18 @@ class GenericStorage {
         if (!this.config || !this.config.table) return null;
         const pool = await getPool();
 
-        // Verify the row exists
         const current = await this.getById(id);
         if (!current) return null;
 
-        // Participations have special column mappings (hotel nights, roles array)
         if (this.config.table === 'Participations') {
             await updateParticipation(pool, id, updates);
         } else {
-            // Use atomic UPDATE instead of DELETE+INSERT to avoid data loss on failure
             await updateGeneric(pool, this.config.table, this.config.idCol, id, updates);
         }
 
-        // Return the merged view
         return { ...current, ...updates };
     }
 
-    // Atomic full-object update for tables with child rows (currently Events only).
-    // Unlike saveAll, this never DELETEs the parent row so FK constraints on Teams/Participations are safe.
     async updateFull(item) {
         if (!this.config || !this.config.table) return item;
         const pool = await getPool();
@@ -732,14 +647,12 @@ class GenericStorage {
             await updateEventFull(pool, item);
             return item;
         }
-        // Fallback for other tables
         return this.update(item.id, item);
     }
 
     async delete(id) {
         if (!this.config || !this.config.table) return false;
         const pool = await getPool();
-        // Clean up child rows for Events before deleting the parent
         if (this.config.table === 'Events') {
             await pool.request().input('eid', id).query('DELETE FROM [EventHotelDates] WHERE EventId = @eid');
             await pool.request().input('eid', id).query('DELETE FROM [EventDefaultNights] WHERE EventId = @eid');
@@ -751,12 +664,7 @@ class GenericStorage {
     }
 }
 
-// ============================================================
-// NAMED STORAGE OBJECT
-// ============================================================
-
 const Storage = {
-    // Teams
     teams: {
         async getAll() {
             const pool = await getPool();
@@ -789,7 +697,6 @@ const Storage = {
         async update(id, updates) {
             const pool = await getPool();
             await updateGeneric(pool, 'Teams', 'Id', id, updates);
-            // Return the updated record
             const result = await pool.request()
                 .input('id', id)
                 .query('SELECT * FROM [Teams] WHERE Id = @id');
@@ -805,7 +712,6 @@ const Storage = {
         }
     },
 
-    // Events
     events: {
         async getAll() {
             const pool = await getPool();
@@ -821,7 +727,6 @@ const Storage = {
 
             const event = eventRowToJs(result.recordset[0]);
 
-            // Load child tables
             const hd = await pool.request()
                 .input('eventId', id)
                 .query('SELECT * FROM [EventHotelDates] WHERE EventId = @eventId ORDER BY HotelDate');
@@ -840,7 +745,6 @@ const Storage = {
         }
     },
 
-    // Users
     users: {
         async getAll() {
             const pool = await getPool();
@@ -899,7 +803,6 @@ const Storage = {
         }
     },
 
-    // Allowed Emails
     allowedEmails: {
         async getAll() {
             const pool = await getPool();
@@ -922,7 +825,6 @@ const Storage = {
 
         async add(email, addedByUserId = null) {
             const pool = await getPool();
-            // Check if already exists
             const existing = await this.getByEmail(email);
             if (existing) return existing;
 
@@ -953,7 +855,6 @@ const Storage = {
         }
     },
 
-    // Pending Registrations
     pendingRegistrations: {
         async getAll() {
             const pool = await getPool();
@@ -979,24 +880,20 @@ const Storage = {
 
         async create(registration) {
             const pool = await getPool();
-            // Remove any existing record with same id, or same email AND same type
             const isOtpRecord = registration.id && registration.id.startsWith('otp_');
             if (isOtpRecord) {
-                // Delete existing OTP records for this email
                 await pool.request()
                     .input('email', registration.email)
                     .query(`DELETE FROM [PendingRegistrations]
                             WHERE LOWER(Email) = LOWER(@email)
                             AND Id LIKE 'otp_%'`);
             } else {
-                // Delete existing non-OTP records for this email
                 await pool.request()
                     .input('email', registration.email)
                     .query(`DELETE FROM [PendingRegistrations]
                             WHERE LOWER(Email) = LOWER(@email)
                             AND Id NOT LIKE 'otp_%'`);
             }
-            // Also delete exact id match
             await pool.request()
                 .input('id', registration.id)
                 .query('DELETE FROM [PendingRegistrations] WHERE Id = @id');
@@ -1021,7 +918,6 @@ const Storage = {
         }
     },
 
-    // Interest Leads (read-only from named store; write via GenericStorage)
     interestLeads: {
         async getAll() {
             const pool = await getPool();
@@ -1030,7 +926,6 @@ const Storage = {
         }
     },
 
-    // Email Campaigns (read-only from named store; write via GenericStorage)
     emailCampaigns: {
         async getAll() {
             const pool = await getPool();
@@ -1039,10 +934,6 @@ const Storage = {
         }
     }
 };
-
-// ============================================================
-// readData / writeData — legacy file-shaped compatibility wrappers on top of SQL
-// ============================================================
 
 async function readData(filename) {
     const key = filename.replace('.json', '');
@@ -1054,7 +945,6 @@ async function readData(filename) {
 
     const pool = await getPool();
 
-    // Special cases
     if (config.table === 'SystemEmailConfig') {
         return readSystemEmailConfig(pool);
     }
@@ -1074,7 +964,6 @@ async function readData(filename) {
         return { participations: result.recordset.map(participationRowToJs) };
     }
 
-    // Generic case
     const result = await pool.request().query(`SELECT * FROM [${config.table}]`);
     const items = result.recordset.map(rowToJs);
 
@@ -1094,7 +983,6 @@ async function writeData(filename, data) {
 
     const pool = await getPool();
 
-    // Special cases
     if (config.table === 'SystemEmailConfig') {
         await writeSystemEmailConfig(pool, data);
         return true;
@@ -1135,7 +1023,6 @@ async function writeData(filename, data) {
         return true;
     }
 
-    // Generic case: extract items, delete all, re-insert
     let items;
     if (config.wrapperKey && data && data[config.wrapperKey]) {
         items = data[config.wrapperKey];
@@ -1151,10 +1038,6 @@ async function writeData(filename, data) {
     }
     return true;
 }
-
-// ============================================================
-// EXPORTS
-// ============================================================
 
 module.exports = Storage;
 module.exports.Storage = GenericStorage;

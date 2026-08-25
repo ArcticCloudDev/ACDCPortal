@@ -11,7 +11,6 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const path = require('path');
 
-// Helper to get template
 async function getTemplate(templateName) {
     const templatePath = path.join(__dirname, `../../data/email-templates/${templateName}.html`);
     try {
@@ -22,7 +21,6 @@ async function getTemplate(templateName) {
     }
 }
 
-// List available templates
 app.http('email-templates', {
     methods: ['GET'],
     authLevel: 'function',
@@ -42,7 +40,7 @@ app.http('email-templates', {
                     id: f.replace('.html', ''),
                     name: f.replace('.html', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
                 }));
-            
+
             return { status: 200, jsonBody: templates };
         } catch (error) {
             await logError(context, error);
@@ -52,7 +50,6 @@ app.http('email-templates', {
     }
 });
 
-// Get template content
 app.http('email-template-get', {
     methods: ['GET'],
     authLevel: 'function',
@@ -75,7 +72,6 @@ app.http('email-template-get', {
     }
 });
 
-// Preview email (apply template with data)
 app.http('email-preview', {
     methods: ['POST'],
     authLevel: 'function',
@@ -89,24 +85,23 @@ app.http('email-preview', {
 
             const body = await request.json();
             const { templateId, data } = body;
-            
+
             if (!templateId) {
                 return { status: 400, jsonBody: { error: 'templateId is required' } };
             }
-            
-            // Ensure data has defaults for required fields
+
             const templateData = {
                 subject: data?.subject || 'Preview Subject',
                 firstName: data?.firstName || 'User',
                 content: data?.content || '<p>Your content will appear here...</p>',
                 ctaUrl: data?.ctaUrl || null,
                 ctaText: data?.ctaText || 'Learn More',
-                ...data // Override with any provided data
+                ...data
             };
-            
+
             const template = await getTemplate(templateId);
             const preview = processTemplate(template, templateData);
-            
+
             return { status: 200, jsonBody: { html: preview } };
         } catch (error) {
             await logError(context, error);
@@ -116,7 +111,6 @@ app.http('email-preview', {
     }
 });
 
-// Get recipients by filter (event-based)
 app.http('email-recipients', {
     methods: ['GET'],
     authLevel: 'function',
@@ -130,23 +124,20 @@ app.http('email-recipients', {
 
             const eventId = request.query.get('eventId');
             const filter = request.query.get('filter') || 'all-participants';
-            
+
             if (!eventId) {
                 return { status: 400, jsonBody: { error: 'eventId is required' } };
             }
 
-            // Load all data
             const users = await Storage.users.getAll();
             const teams = await Storage.teams.getAll();
             const participations = await ParticipationsStore.getAll();
             const invitations = await InvitationsStore.getAll();
             const soloQueue = await SoloQueueStore.getAll();
 
-            // Get teams for this event
             const eventTeams = teams.filter(t => t.eventId === eventId);
             const eventTeamIds = eventTeams.map(t => t.id);
 
-            // Get participations for event teams
             const eventParticipations = participations.filter(p => eventTeamIds.includes(p.teamId));
             const participantUserIds = eventParticipations.map(p => p.userId);
 
@@ -154,36 +145,30 @@ app.http('email-recipients', {
 
             switch (filter) {
                 case 'all-participants':
-                    // All users who are participating in teams for this event
                     recipients = users.filter(u => participantUserIds.includes(u.id));
                     break;
 
                 case 'team-admins':
-                    // Team admins for this event
                     const adminEmails = eventTeams.map(t => t.adminEmail);
                     recipients = users.filter(u => adminEmails.includes(u.email));
                     break;
 
                 case 'team-members':
-                    // Team members who are NOT admins
                     const nonAdminParticipations = eventParticipations.filter(p => !p.isAdmin);
                     const memberUserIds = nonAdminParticipations.map(p => p.userId);
                     recipients = users.filter(u => memberUserIds.includes(u.id));
                     break;
 
                 case 'solo-queue':
-                    // Solo queue participants for this event
                     const soloForEvent = soloQueue.filter(s => s.eventId === eventId);
                     const soloUserIds = soloForEvent.map(s => s.userId);
                     recipients = users.filter(u => soloUserIds.includes(u.id));
                     break;
 
                 case 'pending-invites':
-                    // Pending invitations for teams in this event
-                    const pendingInvites = invitations.filter(i => 
+                    const pendingInvites = invitations.filter(i =>
                         eventTeamIds.includes(i.teamId) && i.status === 'pending'
                     );
-                    // Return invitation emails (may not be registered users)
                     recipients = pendingInvites.map(i => ({
                         id: i.id,
                         email: i.email,
@@ -196,7 +181,7 @@ app.http('email-recipients', {
                 default:
                     recipients = users.filter(u => participantUserIds.includes(u.id));
             }
-            
+
             const formattedRecipients = recipients.map(u => ({
                 id: u.id,
                 email: u.email,
@@ -204,7 +189,7 @@ app.http('email-recipients', {
                 lastName: u.lastName || '',
                 displayName: u.firstName ? `${u.firstName} ${u.lastName || ''}`.trim() : u.email.split('@')[0]
             }));
-            
+
             return { status: 200, jsonBody: formattedRecipients };
         } catch (error) {
             await logError(context, error);
@@ -214,7 +199,6 @@ app.http('email-recipients', {
     }
 });
 
-// Send email
 app.http('email-send', {
     methods: ['POST'],
     authLevel: 'function',
@@ -227,23 +211,21 @@ app.http('email-send', {
             }
 
             const body = await request.json();
-            const { 
-                templateId, 
-                subject, 
-                recipients, 
+            const {
+                templateId,
+                subject,
+                recipients,
                 data,
                 senderId,
-                senderName 
+                senderName
             } = body;
-            
+
             if (!templateId || !subject || !recipients || recipients.length === 0) {
                 return { status: 400, jsonBody: { error: 'templateId, subject, and recipients are required' } };
             }
-            
+
             const template = await getTemplate(templateId);
-            
-            // For personalized emails, we need to send individually
-            // For bulk (same content), we can batch
+
             const emailLog = {
                 id: uuidv4(),
                 templateId,
@@ -255,8 +237,7 @@ app.http('email-send', {
                 status: 'sending',
                 results: { sent: 0, failed: 0, errors: [] }
             };
-            
-            // Send emails
+
             for (const recipient of recipients) {
                 const personalizedData = {
                     ...data,
@@ -265,9 +246,9 @@ app.http('email-send', {
                     email: recipient.email,
                     year: new Date().getFullYear().toString()
                 };
-                
+
                 const htmlContent = processTemplate(template, personalizedData);
-                
+
                 try {
                     await sendEmail({
                         to: recipient.email,
@@ -284,10 +265,9 @@ app.http('email-send', {
                     });
                 }
             }
-            
+
             emailLog.status = emailLog.results.failed === 0 ? 'completed' : 'completed-with-errors';
 
-            // Save to log
             await EmailLogStore.create(emailLog);
 
             return { status: 200, jsonBody: emailLog };
@@ -299,7 +279,6 @@ app.http('email-send', {
     }
 });
 
-// Get email history
 app.http('email-history', {
     methods: ['GET'],
     authLevel: 'function',
@@ -312,7 +291,6 @@ app.http('email-history', {
             }
 
             const allEmails = await EmailLogStore.getAll();
-            // Return most recent first
             const emails = allEmails.sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
             return { status: 200, jsonBody: emails };
         } catch (error) {

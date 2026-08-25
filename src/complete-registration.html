@@ -75,8 +75,7 @@
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', async () => {
+    <script>        document.addEventListener('DOMContentLoaded', async () => {
             const loadingDiv = document.getElementById('loading');
             const wakeTimer = setTimeout(() => {
                 if (loadingDiv.classList.contains('hidden')) return;
@@ -86,34 +85,30 @@
             }, 1200);
             const registrationCard = document.getElementById('registration-card');
             const form = document.getElementById('complete-registration-form');
-            
+
             let currentUser = null;
             const redirect = new URLSearchParams(window.location.search).get('redirect') || 'events.html';
 
-            // Initialize Auth
             Auth.init();
-            
+
             try {
                 await Auth.handleRedirect();
-                
+
                 if (!Auth.isLoggedIn()) {
                     window.location.href = '/register.html';
                     return;
                 }
-                
+
                 const authUser = Auth.getUser();
-                
-                // Try to load existing user or create new one
+
                 try {
                     currentUser = await API.users.get(authUser.email);
-                    
-                    // If profile is already complete, continue the originating flow.
+
                     if (currentUser.profileComplete) {
                         window.location.href = redirect;
                         return;
                     }
                 } catch (error) {
-                    // User doesn't exist - create a minimal record
                     currentUser = {
                         id: generateId(),
                         email: authUser.email,
@@ -125,18 +120,15 @@
                     };
                     await API.users.create(currentUser);
                 }
-                
-                // Pre-fill email
+
                 document.getElementById('email').value = authUser.email;
-                
-                // Pre-fill name if available from token
+
                 if (authUser.name && authUser.name !== authUser.email) {
                     const nameParts = authUser.name.split(' ');
                     document.getElementById('firstName').value = nameParts[0] || '';
                     document.getElementById('lastName').value = nameParts.slice(1).join(' ') || '';
                 }
-                
-                // Check for pending invitation and show banner
+
                 const inviteId = sessionStorage.getItem('pendingInvitation');
                 if (inviteId) {
                     try {
@@ -146,7 +138,7 @@
                             const titleEl = document.getElementById('invitation-title');
                             const detailsEl = document.getElementById('invitation-details');
                             const helperEl = document.getElementById('invitation-helper');
-                            
+
                             if (invitation.role === 'judge') {
                                 banner.style.background = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
                                 banner.style.borderLeft = '4px solid #d97706';
@@ -169,19 +161,18 @@
                                 detailsEl.innerHTML = `<strong>${invitation.inviterName}</strong> invited you to join team <strong style="color: #1e40af;">${invitation.teamName}</strong>`;
                                 helperEl.textContent = 'Complete your profile below to accept the invitation.';
                             }
-                            
+
                             banner.classList.remove('hidden');
                         }
                     } catch (err) {
-                        console.log('Could not load invitation:', err);
+                        console.warn('Could not load invitation:', err);
                     }
                 }
-                
-                // Show form
+
                 loadingDiv.classList.add('hidden');
                 clearTimeout(wakeTimer);
                 registrationCard.classList.remove('hidden');
-                
+
             } catch (error) {
                 console.error('Error:', error);
                 loadingDiv.innerHTML = `<p class="error-message">Error: ${error.message}</p>
@@ -192,48 +183,43 @@
                 return crypto.randomUUID();
             }
 
-            // Form submission
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
+
                 const completeBtn = document.getElementById('complete-btn');
                 const errorDiv = document.getElementById('form-error');
-                
+
                 const formData = {
                     firstName: document.getElementById('firstName').value.trim(),
                     lastName: document.getElementById('lastName').value.trim(),
                     phone: document.getElementById('phone').value.trim()
                 };
-                
-                // Validate
+
                 if (!formData.firstName || !formData.lastName || !formData.phone) {
                     errorDiv.textContent = 'Please fill in all fields.';
                     errorDiv.classList.remove('hidden');
                     return;
                 }
-                
-                // Show loading
+
                 completeBtn.disabled = true;
                 completeBtn.querySelector('.btn-text').classList.add('hidden');
                 completeBtn.querySelector('.btn-loading').classList.remove('hidden');
                 errorDiv.classList.add('hidden');
-                
+
                 try {
-                    // Update user profile
                     await API.users.update(currentUser.id, {
                         firstName: formData.firstName,
                         lastName: formData.lastName,
                         phone: formData.phone,
                         profileComplete: true
                     });
-                    
-                    // Continue the flow that required profile completion.
+
                     window.location.href = redirect;
-                    
+
                 } catch (error) {
                     errorDiv.textContent = error.message || 'Registration failed. Please try again.';
                     errorDiv.classList.remove('hidden');
-                    
+
                     completeBtn.disabled = false;
                     completeBtn.querySelector('.btn-text').classList.remove('hidden');
                     completeBtn.querySelector('.btn-loading').classList.add('hidden');

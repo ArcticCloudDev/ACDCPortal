@@ -1,5 +1,3 @@
-// ACDC Portal - Team Admin Page Logic
-
 document.addEventListener('DOMContentLoaded', async () => {
     const loadingDiv = document.getElementById('loading');
     const wakeTimer = setTimeout(() => {
@@ -12,52 +10,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     const adminContent = document.getElementById('admin-content');
     const inviteMemberForm = document.getElementById('invite-member-form');
     const logoutBtn = document.getElementById('logout-btn');
-    
+
     let currentUser = null;
     let currentTeam = null;
 
-    // Initialize Auth
     Auth.init();
-    
+
     try {
-        // Check auth state
         await Auth.handleRedirect();
-        
-        // Check if logged in
+
         if (!Auth.isLoggedIn()) {
             window.location.href = '/register.html';
             return;
         }
-        
+
         const authUser = Auth.getUser();
-        
-        // Load user data from API
+
         currentUser = await API.users.get(authUser.email);
-        
-        // Check if user is team admin
+
         if (!currentUser.isTeamAdmin) {
             loadingDiv.classList.add('hidden');
             clearTimeout(wakeTimer);
             notAdminDiv.classList.remove('hidden');
             return;
         }
-        
-        // Load team data
+
         currentTeam = await API.teams.get(currentUser.teamId);
-        
-        // Populate team info
+
         document.getElementById('team-name').textContent = currentTeam.teamName;
         document.getElementById('max-participants').textContent = currentTeam.numberOfParticipants;
-        
-        // Load and display members and invitations
+
         await loadMembers();
         await loadInvitations();
-        
-        // Show admin content
+
         loadingDiv.classList.add('hidden');
         clearTimeout(wakeTimer);
         adminContent.classList.remove('hidden');
-        
+
     } catch (error) {
         console.error('Error loading team data:', error);
         loadingDiv.innerHTML = `<p class="error-message">Error: ${error.message}</p>
@@ -66,17 +55,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function loadMembers() {
         const memberList = document.getElementById('member-list');
-        
+
         try {
             const members = await API.teams.getMembers(currentTeam.id);
-            
+
             document.getElementById('current-members').textContent = members.length;
-            
+
             if (members.length === 0) {
                 memberList.innerHTML = '<p class="text-muted">No team members yet. Send some invitations!</p>';
                 return;
             }
-            
+
             memberList.innerHTML = members.map(member => `
                 <div class="member-item" data-user-id="${member.id}">
                     <div class="member-info">
@@ -93,8 +82,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ` : ''}
                 </div>
             `).join('');
-            
-            // Add remove handlers
+
             memberList.querySelectorAll('.remove-member-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const userId = e.target.dataset.userId;
@@ -103,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
             });
-            
+
         } catch (error) {
             memberList.innerHTML = `<p class="error-message">Failed to load members: ${error.message}</p>`;
         }
@@ -111,20 +99,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function loadInvitations() {
         const invitationList = document.getElementById('invitation-list');
-        
+
         try {
             const invitations = await API.invitations.list(currentTeam.id);
             const pendingInvitations = invitations.filter(i => i.status === 'pending');
-            
+
             if (pendingInvitations.length === 0) {
                 invitationList.innerHTML = '<p class="text-muted">No pending invitations.</p>';
                 return;
             }
-            
+
             invitationList.innerHTML = pendingInvitations.map(invite => {
                 const createdDate = new Date(invite.createdAt).toLocaleDateString();
                 const isExpired = new Date(invite.expiresAt) < new Date();
-                
+
                 return `
                     <div class="invitation-item ${isExpired ? 'expired' : ''}" data-invite-id="${invite.id}">
                         <div class="invitation-info">
@@ -143,16 +131,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                 `;
             }).join('');
-            
-            // Add resend handlers
+
             invitationList.querySelectorAll('.resend-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const inviteId = e.target.dataset.inviteId;
                     await resendInvitation(inviteId);
                 });
             });
-            
-            // Add cancel handlers
+
             invitationList.querySelectorAll('.cancel-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const inviteId = e.target.dataset.inviteId;
@@ -161,7 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
             });
-            
+
         } catch (error) {
             invitationList.innerHTML = `<p class="error-message">Failed to load invitations: ${error.message}</p>`;
         }
@@ -195,20 +181,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Invite member form
     inviteMemberForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const inviteBtn = document.getElementById('invite-member-btn');
         const errorDiv = document.getElementById('invite-member-error');
         const successDiv = document.getElementById('invite-member-success');
         const email = document.getElementById('inviteEmail').value.trim().toLowerCase();
         const message = document.getElementById('inviteMessage').value.trim();
 
-        // Check member limit (include pending invitations)
         const currentCount = parseInt(document.getElementById('current-members').textContent);
         const pendingInvites = document.querySelectorAll('.invitation-item:not(.expired)').length;
-        
+
         if (currentCount + pendingInvites >= currentTeam.numberOfParticipants) {
             errorDiv.textContent = `Team is at maximum capacity (${currentTeam.numberOfParticipants} members including pending invites)`;
             errorDiv.classList.remove('hidden');
@@ -216,7 +200,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Show loading state
         inviteBtn.disabled = true;
         inviteBtn.querySelector('.btn-text').classList.add('hidden');
         inviteBtn.querySelector('.btn-loading').classList.remove('hidden');
@@ -232,16 +215,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 inviterEmail: currentUser.email,
                 message: message || 'Join our team for the Arctic Cloud Developer Challenge!'
             });
-            
+
             successDiv.textContent = `${email} is registered as a pending team member and will receive a confirmation link.`;
             successDiv.classList.remove('hidden');
-            
+
             document.getElementById('inviteEmail').value = '';
             document.getElementById('inviteMessage').value = '';
-            
-            // Refresh invitation list
+
             await loadInvitations();
-            
+
         } catch (error) {
             errorDiv.textContent = error.message || 'Failed to send invitation.';
             errorDiv.classList.remove('hidden');
@@ -252,13 +234,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Logout
     logoutBtn.addEventListener('click', async () => {
         await Auth.logout();
     });
 });
 
-// Add some styles for invitations
 const style = document.createElement('style');
 style.textContent = `
     .invitation-item {
@@ -319,4 +299,3 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-console.log('Team Admin page loaded');

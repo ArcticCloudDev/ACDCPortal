@@ -7,12 +7,9 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/admin-styles.css">
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    <style>
-        /* Page-specific styles */
-        .page-title { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
+    <style>        .page-title { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
         .page-subtitle { font-size: 0.9rem; color: var(--admin-text-muted); margin-top: 8px; }
 
-        /* Cards */
         .sequence-card {
             background: white;
             border-radius: 8px;
@@ -21,11 +18,11 @@
             overflow: hidden;
             transition: box-shadow 0.2s;
         }
-        
+
         .sequence-card:hover {
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
-        
+
         .sequence-header {
             padding: 20px;
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
@@ -35,29 +32,28 @@
             align-items: center;
             cursor: pointer;
         }
-        
+
         .sequence-header:hover {
             background: linear-gradient(135deg, #f1f5f9 0%, #d1d5db 100%);
         }
-        
+
         .sequence-info h3 {
             margin: 0 0 4px 0;
             font-size: 1.1rem;
             font-weight: 600;
             color: var(--admin-sidebar);
         }
-        
+
         .sequence-meta {
             font-size: 0.85rem;
             color: var(--admin-text-muted);
         }
-        
+
         .sequence-actions {
             display: flex;
             gap: 8px;
         }
 
-        /* Panels */
         .panel {
             background: white;
             border-radius: 8px;
@@ -76,7 +72,6 @@
         .panel-title { font-size: 0.9rem; font-weight: 600; color: var(--admin-sidebar); }
         .panel-body { padding: 20px; }
 
-        /* Form */
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.85rem; }
         .form-group input, .form-group select, .form-group textarea {
@@ -94,7 +89,6 @@
 
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-        /* Buttons */
         .btn {
             padding: 8px 16px;
             border: none;
@@ -118,12 +112,10 @@
 
         .btn-row { display: flex; gap: 10px; margin-top: 16px; }
 
-        /* Quill editor */
         .ql-container { min-height: 200px; }
         .ql-toolbar { border-radius: 6px 6px 0 0 !important; background: #f8fafc; }
         .ql-container { border-radius: 0 0 6px 6px !important; }
 
-        /* Table */
         .data-table { width: 100%; border-collapse: collapse; }
         .data-table th {
             text-align: left;
@@ -143,7 +135,6 @@
         }
         .data-table tbody tr:hover { background: #f8fafc; }
 
-        /* Badges */
         .badge {
             display: inline-flex;
             padding: 3px 8px;
@@ -158,7 +149,6 @@
 
         .hidden { display: none !important; }
 
-        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -171,11 +161,11 @@
             align-items: center;
             justify-content: center;
         }
-        
+
         .modal.active {
             display: flex;
         }
-        
+
         .modal-content {
             background: white;
             border-radius: 8px;
@@ -185,22 +175,22 @@
             overflow-y: auto;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
         }
-        
+
         .modal-header {
             padding: 20px;
             border-bottom: 1px solid var(--admin-border);
         }
-        
+
         .modal-header h3 {
             margin: 0;
             font-size: 1.1rem;
             font-weight: 600;
         }
-        
+
         .modal-body {
             padding: 20px;
         }
-        
+
         .modal-footer {
             padding: 16px 20px;
             border-top: 1px solid var(--admin-border);
@@ -224,17 +214,16 @@
             color: var(--admin-text-muted);
             margin-bottom: 16px;
         }
-        
+
         .breadcrumb a {
             color: var(--admin-primary);
             text-decoration: none;
         }
-        
+
         .breadcrumb a:hover {
             text-decoration: underline;
         }
 
-        /* Preview */
         .preview-frame {
             width: 100%;
             height: 400px;
@@ -242,16 +231,13 @@
             border-radius: 6px;
             background: white;
         }
-    </style>
-</head>
+    </style></head>
 <body>
     <div class="admin-layout">
         <div id="sidebar-container"></div>
 
         <main class="main-content" id="admin-content">
-            <!-- Sequences List View -->
             <div id="view-sequences" class="view">
-                <!-- Read-Only Banner -->
                 <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde047 100%); border: 2px solid #eab308; border-radius: 8px; padding: 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
                     <div style="font-size: 2rem;">📖</div>
                     <div style="flex: 1;">
@@ -273,12 +259,11 @@
                 <div id="sequences-list"></div>
             </div>
 
-            <!-- Sequence Detail View (emails in sequence) -->
             <div id="view-sequence-detail" class="view hidden">
                 <div class="breadcrumb">
                     <a href="#" onclick="showSequencesList()">← Back to Sequences</a>
                 </div>
-                
+
                 <div class="page-header">
                     <div>
                         <h1 class="page-title" id="detail-sequence-name"></h1>
@@ -286,7 +271,6 @@
                     </div>
                 </div>
 
-                <!-- Sequence Statistics -->
                 <div id="sequence-stats" style="margin-bottom: 24px;">
                     <p style="color: var(--admin-text-muted); font-size: 0.9rem;">Loading recipient statistics...</p>
                 </div>
@@ -314,7 +298,6 @@
                 </div>
             </div>
 
-            <!-- Email Create/Edit View -->
             <div id="view-email-form" class="view hidden">
                 <div class="breadcrumb">
                     <a href="#" onclick="showSequenceDetail(currentSequenceId)">← Back to Sequence</a>
@@ -328,7 +311,7 @@
                         <input type="hidden" id="email-id">
                         <input type="hidden" id="email-sequence-id">
                         <input type="hidden" id="email-sequence-order">
-                        
+
                         <div class="form-group">
                             <label>Email Order</label>
                             <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;" id="email-order-info">
@@ -377,7 +360,7 @@
                             <label>Send On (optional) <span id="user-timezone-display" style="font-weight: normal; color: var(--admin-text-muted);"></span></label>
                             <input type="datetime-local" id="email-schedule" style="width: 100%; padding: 8px; border: 1px solid var(--admin-border); border-radius: 4px;">
                             <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;">
-                                💡 <strong>Timezone note:</strong> The time you select will be in YOUR local timezone. 
+                                💡 <strong>Timezone note:</strong> The time you select will be in YOUR local timezone.
                                 The system will automatically convert and send at the correct time for you.
                             </p>
                             <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;">
@@ -395,7 +378,6 @@
                     </div>
                 </div>
 
-                <!-- Preview -->
                 <div class="panel">
                     <div class="panel-header">Preview</div>
                     <div class="panel-body">
@@ -406,7 +388,6 @@
         </main>
     </div>
 
-    <!-- Create Sequence Modal -->
     <div id="create-sequence-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -414,7 +395,7 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="sequence-id">
-                
+
                 <div class="form-group">
                     <label>Sequence Name *</label>
                     <input type="text" id="sequence-name" placeholder="e.g., Standard Interest Follow-up" required>
@@ -422,7 +403,7 @@
                         Give this sequence a descriptive name - it can be reused across multiple events
                     </p>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Description (optional)</label>
                     <textarea id="sequence-description" rows="3" placeholder="Brief description of this email sequence..."></textarea>
@@ -436,7 +417,6 @@
         </div>
     </div>
 
-    <!-- Copy Sequence Modal -->
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
     <script src="https://unpkg.com/quill-image-resize-module@3.0.0/image-resize.min.js"></script>
     <script src="https://unpkg.com/quill-image-drop-module@1.0.3/image-drop.min.js"></script>

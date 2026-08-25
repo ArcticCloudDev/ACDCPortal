@@ -6,9 +6,7 @@
     <title>Committee Dashboard - ACDC Portal</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <style>
-        /* Page-specific styles */
-        .main-content {
+    <style>        .main-content {
             max-width: 1400px;
         }
 
@@ -32,7 +30,6 @@
             margin-top: 4px;
         }
 
-        /* Stats Row */
         .stats-row {
             display: flex;
             gap: 16px;
@@ -84,7 +81,6 @@
             margin-top: 4px;
         }
 
-        /* Content Grid */
         .content-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -95,7 +91,6 @@
             grid-template-columns: 1fr;
         }
 
-        /* Panel */
         .panel {
             background: white;
             border-radius: 8px;
@@ -127,7 +122,6 @@
             padding: 16px 18px;
         }
 
-        /* Quick Actions */
         .quick-actions {
             display: flex;
             gap: 10px;
@@ -159,7 +153,6 @@
             font-size: 1.25rem;
         }
 
-        /* Table */
         .data-table {
             width: 100%;
             border-collapse: collapse;
@@ -191,7 +184,6 @@
             border-bottom: none;
         }
 
-        /* Event Row */
         .event-row {
             display: flex;
             align-items: center;
@@ -227,7 +219,6 @@
             margin-right: 12px;
         }
 
-        /* Badge */
         .badge {
             display: inline-flex;
             align-items: center;
@@ -254,7 +245,6 @@
             color: #0369a1;
         }
 
-        /* Buttons */
         .btn-sm {
             padding: 5px 10px;
             font-size: 0.75rem;
@@ -281,7 +271,6 @@
             background: #2563eb;
         }
 
-        /* Empty State */
         .empty-state {
             padding: 32px;
             text-align: center;
@@ -294,7 +283,6 @@
             opacity: 0.5;
         }
 
-        /* Loading */
         .loading-container {
             display: flex;
             justify-content: center;
@@ -313,14 +301,11 @@
             border-radius: 8px;
             border: 1px solid var(--admin-border);
         }
-    </style>
-</head>
+    </style></head>
 <body>
     <div class="admin-layout">
-        <!-- Sidebar -->
         <div id="sidebar-container"></div>
 
-        <!-- Main Content -->
         <main class="main-content" id="main-content">
             <div id="loading" class="acdc-loader">
                 <div class="loader-spinner"></div>
@@ -343,7 +328,6 @@
             </div>
         </div>
 
-        <!-- Stats -->
         <div class="stats-row">
             <div class="stat-card">
                 <div class="stat-icon blue">📅</div>
@@ -375,7 +359,6 @@
             </div>
         </div>
 
-        <!-- Quick Actions & Events -->
         <div class="content-grid">
             <div class="panel">
                 <div class="panel-header">
@@ -415,7 +398,6 @@
             </div>
         </div>
 
-        <!-- Teams Table -->
         <div class="content-grid full-width" style="margin-top: 20px;">
             <div class="panel">
                 <div class="panel-header">

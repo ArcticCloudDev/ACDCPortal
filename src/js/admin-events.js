@@ -1,5 +1,3 @@
-// ACDC Portal - Admin Events Management
-
 let currentUser = null;
 let allEvents = [];
 let allSequences = [];
@@ -14,7 +12,6 @@ function normalizeId(value) {
     return (value || '').toString().toLowerCase();
 }
 
-// Status workflow - defines valid transitions
 const STATUS_ORDER = ['draft', 'pre-registration', 'registration', 'live', 'completed'];
 const STATUS_LABELS = {
     draft: '📝 Draft',
@@ -24,12 +21,10 @@ const STATUS_LABELS = {
     completed: '✓ Completed'
 };
 
-// Valid status transitions (can only go forward one step, or back to previous)
 function canTransitionTo(currentStatus, targetStatus) {
     const currentIndex = STATUS_ORDER.indexOf(currentStatus);
     const targetIndex = STATUS_ORDER.indexOf(targetStatus);
-    
-    // Can go forward one step or backward one step
+
     return Math.abs(targetIndex - currentIndex) === 1;
 }
 
@@ -44,7 +39,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const notCommitteeDiv = document.getElementById('not-committee');
     const adminContent = document.getElementById('admin-content');
 
-    // Resolve permissions (handles auth check, sidebar render, access denied)
     currentPermissions = await Permissions.initAdminPage('events', {
         loadingEl: loadingDiv,
         accessDeniedEl: notCommitteeDiv,
@@ -56,17 +50,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUser = currentPermissions.user;
 
     try {
-        // Load events
         await loadEvents();
 
-        // Setup event listeners
         setupEventListeners();
 
-        // Check for action in URL
         const urlParams = new URLSearchParams(window.location.search);
         const eventId = urlParams.get('event');
         const tab = urlParams.get('tab');
-        
+
         if (eventId) {
             const event = allEvents.find(e => e.id === eventId);
             if (event) {
@@ -74,7 +65,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentEvent = event;
                 showForm(event);
                 if (tab && tab !== 'general') {
-                    // Switch to specific tab after a brief delay to ensure DOM is ready
                     setTimeout(() => {
                         const targetBtn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
                         if (targetBtn) targetBtn.click();
@@ -98,19 +88,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadEvents() {
     try {
         let events = await API.events.list();
-        // Scope to permitted events for non-admin users
         allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
         renderEventsList();
     } catch (error) {
         console.error('Error loading events:', error);
     }
 }
-
-// Email sequence is now a boolean checkbox
-// Sequence content is configured in the Sequence tab
-
-// Team welcome email is now a boolean checkbox
-// Theme/content is configured in Email Templates page
 
 function renderEventsList() {
     const eventsTableBody = document.getElementById('events-table-body');
@@ -122,7 +105,6 @@ function renderEventsList() {
         return;
     }
 
-    // Sort: by status priority (live > registration > waitlist > draft), then by date
     const statusPriority = { live: 0, registration: 1, waitlist: 2, draft: 3 };
     const sortedEvents = [...allEvents].sort((a, b) => {
         const statusA = a.status || 'draft';
@@ -141,11 +123,9 @@ function renderEventsList() {
             month: 'short', day: 'numeric', year: 'numeric'
         });
 
-        // Get status - migrate old events
         const status = event.status || (event.registrationOpen ? 'registration' : 'draft');
         const statusLabel = STATUS_LABELS[status] || status;
-        
-        // Registration type
+
         const regType = event.registrationType || 'team';
         const regTypeLabel = regType === 'team' ? '👥 Team' : '👤 Single';
 
@@ -166,53 +146,42 @@ function renderEventsList() {
         `;
     }).join('');
 
-    // Add edit button listeners
     document.querySelectorAll('.edit-event-btn').forEach(btn => {
         btn.addEventListener('click', () => editEvent(btn.dataset.id));
     });
 }
 
 function setupEventListeners() {
-    // Create button
     document.getElementById('create-event-btn').addEventListener('click', () => showForm());
 
-    // Back to list
     document.getElementById('back-to-list').addEventListener('click', hideForm);
     document.getElementById('cancel-btn').addEventListener('click', hideForm);
 
-    // Form submit
     document.getElementById('event-form').addEventListener('submit', handleFormSubmit);
 
-    // Delete button
     document.getElementById('delete-btn').addEventListener('click', handleDelete);
 
-    // Registration type radio buttons
     document.querySelectorAll('.radio-option').forEach(option => {
         option.addEventListener('click', () => {
             document.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
             option.classList.add('selected');
             option.querySelector('input').checked = true;
-            
-            // Toggle team fields visibility
+
             const regType = option.dataset.value;
             const teamFields = document.getElementById('team-fields');
             teamFields.classList.toggle('visible', regType === 'team');
         });
     });
 
-    // Status buttons
     document.querySelectorAll('.status-step').forEach(step => {
         step.addEventListener('click', () => handleStatusChange(step.dataset.status));
     });
 
-    // Tab navigation
     setupTabs();
 
-    // Invitation buttons
     document.getElementById('invite-committee-btn').addEventListener('click', () => sendInvitation('committee'));
     document.getElementById('invite-judge-btn').addEventListener('click', () => sendInvitation('judge'));
 
-    // Sponsor form
     document.getElementById('sponsor-form').addEventListener('submit', handleSponsorSubmit);
     document.getElementById('open-sponsor-modal-btn').addEventListener('click', openSponsorCreateModal);
     document.getElementById('close-sponsor-modal-btn').addEventListener('click', closeSponsorModal);
@@ -237,7 +206,6 @@ function setupEventListeners() {
     });
 }
 
-// Status display configuration
 const STATUS_CONFIG = {
     draft: {
         icon: '📝',
@@ -289,51 +257,43 @@ const STATUS_CONFIG = {
 function updateStatusUI(status) {
     currentStatus = status;
     document.getElementById('event-status').value = status;
-    
+
     const currentIndex = STATUS_ORDER.indexOf(status);
     const steps = document.querySelectorAll('.status-step');
-    
-    // Update step states
+
     steps.forEach((step, index) => {
         const indicator = step.querySelector('.step-indicator');
         step.classList.remove('completed', 'current', 'available', 'disabled');
-        
+
         if (index < currentIndex) {
-            // Completed steps
             step.classList.add('completed');
             indicator.innerHTML = '✓';
         } else if (index === currentIndex) {
-            // Current step
             step.classList.add('current');
             indicator.innerHTML = index + 1;
         } else if (index === currentIndex + 1) {
-            // Next available step
             step.classList.add('available');
             indicator.innerHTML = index + 1;
         } else {
-            // Future disabled steps
             step.classList.add('disabled');
             indicator.innerHTML = index + 1;
         }
     });
-    
-    // Update progress line
+
     const progressLine = document.getElementById('progress-line');
     if (progressLine) {
-        // Calculate progress percentage based on current step
         const progressPercent = currentIndex / (STATUS_ORDER.length - 1) * 100;
-        const containerWidth = document.querySelector('.status-stepper').offsetWidth - 80; // Subtract padding
+        const containerWidth = document.querySelector('.status-stepper').offsetWidth - 80;
         progressLine.style.width = `${(containerWidth * progressPercent) / 100}px`;
     }
-    
-    // Update status banner
+
     const config = STATUS_CONFIG[status];
     if (config) {
         const banner = document.getElementById('status-banner');
         const icon = document.getElementById('status-icon');
         const title = document.getElementById('status-title');
         const description = document.getElementById('status-description');
-        
+
         banner.style.background = config.bannerBg;
         banner.style.borderLeftColor = config.bannerBorder;
         icon.textContent = config.icon;
@@ -345,13 +305,12 @@ function updateStatusUI(status) {
 }
 
 function handleStatusChange(newStatus) {
-    // Ignore clicks on current status
     if (newStatus === currentStatus) return;
-    
+
     if (!canTransitionTo(currentStatus, newStatus)) {
         const currentIndex = STATUS_ORDER.indexOf(currentStatus);
         const targetIndex = STATUS_ORDER.indexOf(newStatus);
-        
+
         if (targetIndex > currentIndex) {
             alert(`You can only advance one step at a time.\nCurrent: ${STATUS_LABELS[currentStatus]}\nNext available: ${STATUS_LABELS[STATUS_ORDER[currentIndex + 1]]}`);
         } else {
@@ -359,20 +318,19 @@ function handleStatusChange(newStatus) {
         }
         return;
     }
-    
-    // Confirm status change
+
     const direction = STATUS_ORDER.indexOf(newStatus) > STATUS_ORDER.indexOf(currentStatus) ? 'advance to' : 'revert to';
     const confirmMsg = `${direction === 'advance to' ? '▶️' : '◀️'} ${direction.charAt(0).toUpperCase() + direction.slice(1)} "${STATUS_LABELS[newStatus]}"?\n\nCurrent: ${STATUS_LABELS[currentStatus]}`;
     if (!confirm(confirmMsg)) return;
-    
+
     updateStatusUI(newStatus);
 }
 
 function showForm(event = null) {
     editingEventId = event?.id || null;
-    currentEventId = event?.id || null; // Set for committee/judges tabs
-    currentEvent = event || null; // Store full event object
-    
+    currentEventId = event?.id || null;
+    currentEvent = event || null;
+
     document.getElementById('events-list-view').classList.add('hidden');
     document.getElementById('event-form-view').classList.remove('hidden');
 
@@ -386,7 +344,6 @@ function showForm(event = null) {
     const budgetTab = document.getElementById('budget-tab-btn');
     const form = document.getElementById('event-form');
 
-    // Disable committee/judges/leads tabs for new events
     if (event) {
         committeeTab.disabled = false;
         judgesTab.disabled = false;
@@ -402,7 +359,6 @@ function showForm(event = null) {
         resetSponsorForm();
     }
 
-    // Reset to General tab
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
     document.querySelector('.tab-btn[data-tab="general"]').classList.add('active');
@@ -412,8 +368,7 @@ function showForm(event = null) {
         formTitle.textContent = 'Edit Event';
         deleteBtn.classList.remove('hidden');
         statusSection.classList.remove('hidden');
-        
-        // Populate form
+
         document.getElementById('event-id').value = event.id;
         document.getElementById('event-name').value = event.name || '';
         document.getElementById('event-description').value = event.description || '';
@@ -427,7 +382,6 @@ function showForm(event = null) {
         document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
         document.getElementById('event-sharepoint-url').value = event.sharepointUrl || '';
         document.getElementById('sharepoint-verify-result').innerHTML = '';
-        // sequenceEnabled is managed automatically via the Sequence tab
         document.getElementById('event-team-registration-email').checked = event.sendTeamRegistrationEmail !== false;
         document.getElementById('event-team-welcome-email').checked = event.sendWelcomeEmail || false;
         document.getElementById('event-interest-acknowledgment').checked = event.sendInterestAcknowledgment || false;
@@ -440,8 +394,7 @@ function showForm(event = null) {
         document.getElementById('event-hotel-mandatory').checked = event.hotelMandatory || false;
         document.getElementById('event-hotel-days-before').value = event.hotelDaysBefore ?? 0;
         document.getElementById('event-hotel-days-after').value = event.hotelDaysAfter ?? 0;
-        
-        // Set registration type
+
         const regType = event.registrationType || 'team';
         document.querySelectorAll('.radio-option').forEach(option => {
             const isSelected = option.dataset.value === regType;
@@ -449,31 +402,27 @@ function showForm(event = null) {
             option.querySelector('input').checked = isSelected;
         });
         document.getElementById('team-fields').classList.toggle('visible', regType === 'team');
-        
-        // Set status (migrate old events)
+
         const status = event.status || (event.registrationOpen ? 'registration' : 'draft');
         updateStatusUI(status);
-        
+
     } else {
         formTitle.textContent = 'Create Event';
         deleteBtn.classList.add('hidden');
         statusSection.classList.add('hidden');
         form.reset();
         document.getElementById('event-id').value = '';
-        
-        // Default email toggles for new events
+
         document.getElementById('event-judge-invitation-email').checked = true;
         document.getElementById('event-committee-invitation-email').checked = true;
-        
-        // Reset registration type to team
+
         document.querySelectorAll('.radio-option').forEach(option => {
             const isTeam = option.dataset.value === 'team';
             option.classList.toggle('selected', isTeam);
             option.querySelector('input').checked = isTeam;
         });
         document.getElementById('team-fields').classList.add('visible');
-        
-        // New events start as draft
+
         currentStatus = 'draft';
         document.getElementById('event-status').value = 'draft';
     }
@@ -495,8 +444,7 @@ function hideForm() {
     editingEventId = null;
     currentEventId = null;
     currentEvent = null;
-    
-    // Clear URL params
+
     window.history.replaceState({}, '', 'admin-events.html');
 }
 
@@ -525,10 +473,8 @@ async function verifySharePointUrl() {
     btn.textContent = '⏳ Checking...';
     resultDiv.innerHTML = '';
 
-    // Open URL for manual verification
     window.open(url, '_blank', 'noopener,noreferrer');
 
-    // Ensure FileCategory column exists on the document library
     const categoriesInput = document.getElementById('event-file-categories').value;
     const categories = categoriesInput.split(',').map(c => c.trim()).filter(c => c.length > 0);
 
@@ -568,14 +514,14 @@ function editEvent(eventId) {
 
 async function handleFormSubmit(e) {
     e.preventDefault();
-    
+
     const saveBtn = document.getElementById('save-btn');
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
 
     try {
         const registrationType = document.querySelector('input[name="registration-type"]:checked').value;
-        
+
         const eventData = {
             name: document.getElementById('event-name').value.trim(),
             description: document.getElementById('event-description').value.trim(),
@@ -584,7 +530,6 @@ async function handleFormSubmit(e) {
             location: document.getElementById('event-location').value.trim(),
             registrationType: registrationType,
             status: document.getElementById('event-status').value || 'draft',
-            // sequenceEnabled is not sent from this form — managed by Sequence tab
             sendTeamRegistrationEmail: document.getElementById('event-team-registration-email').checked,
             sendWelcomeEmail: document.getElementById('event-team-welcome-email').checked,
             sendInterestAcknowledgment: document.getElementById('event-interest-acknowledgment').checked,
@@ -603,8 +548,7 @@ async function handleFormSubmit(e) {
             hotelDaysBefore: parseInt(document.getElementById('event-hotel-days-before').value) || 0,
             hotelDaysAfter: parseInt(document.getElementById('event-hotel-days-after').value) || 0,
         };
-        
-        // Only include team size if team type
+
         if (registrationType === 'team') {
             eventData.minTeamSize = parseInt(document.getElementById('min-team-size').value) || 3;
             eventData.maxTeamSize = parseInt(document.getElementById('max-team-size').value) || 5;
@@ -618,29 +562,23 @@ async function handleFormSubmit(e) {
 
         let savedEvent;
         if (eventId) {
-            // Update existing
             savedEvent = await API.events.update(eventId, eventData);
         } else {
-            // Create new
             savedEvent = await API.events.create(eventData);
         }
 
-        // Reload events list
         await loadEvents();
-        
-        // If we're editing, update the current event object with the new data (including team IDs)
+
         if (savedEvent) {
             currentEvent = savedEvent;
             currentEventId = savedEvent.id;
-            
-            // If this is a new event, enable the related tabs
+
             if (!eventId) {
                 document.getElementById('committee-tab-btn').disabled = false;
                 document.getElementById('judges-tab-btn').disabled = false;
                 document.getElementById('leads-tab-btn').disabled = false;
                 document.getElementById('sponsors-tab-btn').disabled = false;
                 document.getElementById('budget-tab-btn').disabled = false;
-                // Update the hidden event ID field
                 document.getElementById('event-id').value = savedEvent.id;
             }
         } else {
@@ -681,7 +619,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ===== Tab Navigation =====
 function setupTabs() {
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabPanels = document.querySelectorAll('.tab-panel');
@@ -689,21 +626,17 @@ function setupTabs() {
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
             const targetTab = button.getAttribute('data-tab');
-            
-            // Update button states
+
             tabButtons.forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
-            
-            // Update panel visibility
+
             tabPanels.forEach(panel => panel.classList.remove('active'));
             document.getElementById(`${targetTab}-panel`).classList.add('active');
-            
-            // Update URL
+
             if (currentEventId) {
                 updateURL();
             }
-            
-            // Load data for committee/judges/leads tabs when opened
+
             if (targetTab === 'committee') {
                 loadCommitteeMembers();
             } else if (targetTab === 'judges') {
@@ -723,26 +656,23 @@ function setupTabs() {
             }
         });
     });
-    
-    // Leads tab button handlers
+
 }
 
-// ===== Committee & Judges Management =====
 let currentEventId = null;
-let currentEvent = null; // Store the full event object
+let currentEvent = null;
 let allParticipations = [];
 let allUsers = [];
 let allInvitations = [];
 
 async function loadCommitteeMembers() {
     if (!currentEventId || !currentEvent) {
-        document.getElementById('committee-members-body').innerHTML = 
+        document.getElementById('committee-members-body').innerHTML =
             '<tr><td colspan="5" class="empty-state">Save the event first to add committee members</td></tr>';
         return;
     }
 
     try {
-        // Load all data
         [allParticipations, allUsers, allInvitations] = await Promise.all([
             API.participations.list(),
             API.users.list(),
@@ -757,13 +687,12 @@ async function loadCommitteeMembers() {
 
 async function loadJudgesMembers() {
     if (!currentEventId || !currentEvent) {
-        document.getElementById('judges-members-body').innerHTML = 
+        document.getElementById('judges-members-body').innerHTML =
             '<tr><td colspan="5" class="empty-state">Save the event first to add judges</td></tr>';
         return;
     }
 
     try {
-        // Load all data (reuse if already loaded)
         if (allParticipations.length === 0) {
             [allParticipations, allUsers, allInvitations] = await Promise.all([
                 API.participations.list(),
@@ -780,23 +709,20 @@ async function loadJudgesMembers() {
 
 function renderCommitteeMembers() {
     const tbody = document.getElementById('committee-members-body');
-    
-    // Find participations with 'committee' role for this event
-    const committeeParticipations = allParticipations.filter(p => 
-        p.eventId === currentEventId && 
+
+    const committeeParticipations = allParticipations.filter(p =>
+        p.eventId === currentEventId &&
         p.roles?.includes('committee')
     );
 
-    // Find pending invitations for committee
-    const pendingInvites = allInvitations.filter(i => 
-        i.status === 'pending' && 
-        i.role === 'committee' && 
+    const pendingInvites = allInvitations.filter(i =>
+        i.status === 'pending' &&
+        i.role === 'committee' &&
         i.eventId === currentEventId
     );
 
     const members = [];
 
-    // Add registered users
     committeeParticipations.forEach(p => {
         const user = allUsers.find(u => u.id === p.userId);
         if (user) {
@@ -812,7 +738,6 @@ function renderCommitteeMembers() {
         }
     });
 
-    // Add pending invites
     pendingInvites.forEach(inv => {
         members.push({
             name: '-',
@@ -838,8 +763,8 @@ function renderCommitteeMembers() {
             <td><span class="badge ${m.status === 'registered' ? 'live' : 'waitlist'}">${m.status}</span></td>
             <td>${m.registeredDate}</td>
             <td>
-                ${m.type === 'invite' ? 
-                    `<button class="btn-sm danger" onclick="revokeInvite('${m.id}', 'committee')">✕ Revoke</button>` : 
+                ${m.type === 'invite' ?
+                    `<button class="btn-sm danger" onclick="revokeInvite('${m.id}', 'committee')">✕ Revoke</button>` :
                     (canDelete ? `<button class="btn-sm danger" onclick="removeRegisteredMember('${m.participationId}', '${escapeHtml(m.name)}', 'committee')">🗑️ Remove</button>` : '')}
             </td>
         </tr>
@@ -848,23 +773,20 @@ function renderCommitteeMembers() {
 
 function renderJudgesMembers() {
     const tbody = document.getElementById('judges-members-body');
-    
-    // Find participations with 'judge' role for this event
-    const judgesParticipations = allParticipations.filter(p => 
-        p.eventId === currentEventId && 
+
+    const judgesParticipations = allParticipations.filter(p =>
+        p.eventId === currentEventId &&
         p.roles?.includes('judge')
     );
 
-    // Find pending invitations for judges
-    const pendingInvites = allInvitations.filter(i => 
-        i.status === 'pending' && 
-        i.role === 'judge' && 
+    const pendingInvites = allInvitations.filter(i =>
+        i.status === 'pending' &&
+        i.role === 'judge' &&
         i.eventId === currentEventId
     );
 
     const members = [];
 
-    // Add registered users
     judgesParticipations.forEach(p => {
         const user = allUsers.find(u => u.id === p.userId);
         if (user) {
@@ -880,7 +802,6 @@ function renderJudgesMembers() {
         }
     });
 
-    // Add pending invites
     pendingInvites.forEach(inv => {
         members.push({
             name: '-',
@@ -906,15 +827,14 @@ function renderJudgesMembers() {
             <td><span class="badge ${m.status === 'registered' ? 'live' : 'waitlist'}">${m.status}</span></td>
             <td>${m.registeredDate}</td>
             <td>
-                ${m.type === 'invite' ? 
-                    `<button class="btn-sm danger" onclick="revokeInvite('${m.id}', 'judge')">✕ Revoke</button>` : 
+                ${m.type === 'invite' ?
+                    `<button class="btn-sm danger" onclick="revokeInvite('${m.id}', 'judge')">✕ Revoke</button>` :
                     (canDelete ? `<button class="btn-sm danger" onclick="removeRegisteredMember('${m.participationId}', '${escapeHtml(m.name)}', 'judge')">🗑️ Remove</button>` : '')}
             </td>
         </tr>
     `).join('');
 }
 
-// Send invitation
 async function sendInvitation(role) {
     const emailInput = document.getElementById(`${role === 'committee' ? 'committee' : 'judge'}-email`);
     const email = emailInput.value.trim();
@@ -939,7 +859,7 @@ async function sendInvitation(role) {
         await API.invitations.create({
             email: email,
             eventId: currentEventId,
-            role: role, // 'committee' or 'judge'
+            role: role,
             inviterId: currentUser.id,
             inviterName: `${currentUser.firstName} ${currentUser.lastName}`,
             inviterEmail: currentUser.email,
@@ -949,10 +869,8 @@ async function sendInvitation(role) {
         alert(`Invitation sent to ${email}`);
         emailInput.value = '';
 
-        // Clear cached data so reload fetches fresh
         allParticipations = [];
 
-        // Reload the members list
         if (role === 'committee') {
             await loadCommitteeMembers();
         } else {
@@ -965,7 +883,6 @@ async function sendInvitation(role) {
     }
 }
 
-// Revoke invitation
 async function revokeInvite(inviteId, role) {
     if (!confirm('Are you sure you want to revoke this invitation?')) {
         return;
@@ -973,11 +890,9 @@ async function revokeInvite(inviteId, role) {
 
     try {
         await API.invitations.delete(inviteId);
-        
-        // Clear cached data so reload fetches fresh
+
         allParticipations = [];
 
-        // Reload the members list
         if (role === 'committee') {
             await loadCommitteeMembers();
         } else {
@@ -998,11 +913,9 @@ async function removeRegisteredMember(participationId, name, role) {
 
     try {
         await API.participations.delete(participationId);
-        
-        // Clear cached data so reload fetches fresh
+
         allParticipations = [];
-        
-        // Reload the members list
+
         if (role === 'committee') {
             await loadCommitteeMembers();
         } else {
@@ -1015,13 +928,12 @@ async function removeRegisteredMember(participationId, name, role) {
     }
 }
 
-// ===== Interest Leads Management =====
 let allLeads = [];
 let allSoloQueueForEvent = [];
 
 async function loadInterestLeads() {
     if (!currentEventId) {
-        document.getElementById('leads-table-body').innerHTML = 
+        document.getElementById('leads-table-body').innerHTML =
             '<tr><td colspan="5" class="empty-state">Save the event first to view leads</td></tr>';
         return;
     }
@@ -1029,11 +941,10 @@ async function loadInterestLeads() {
     try {
         const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads?eventId=${currentEventId}`);
         if (!response.ok) throw new Error('Failed to load leads');
-        
+
         const data = await response.json();
         allLeads = data.leads || [];
 
-        // Ensure participations, users, teams and solo queue are loaded
         const loaders = [];
         if (allParticipations.length === 0) loaders.push(API.participations.list().then(r => { allParticipations = r; }));
         if (allUsers.length === 0) loaders.push(API.users.list().then(r => { allUsers = r; }));
@@ -1042,7 +953,6 @@ async function loadInterestLeads() {
                 allTeams = (Array.isArray(teams) ? teams : (teams.teams || [])).filter(t => t.eventId === currentEventId);
             })
         );
-        // Always refresh solo queue so it's up to date
         loaders.push(
             fetch(`${CONFIG.api.baseUrl}/solo-queue?eventId=${currentEventId}`)
                 .then(r => r.json())
@@ -1054,14 +964,14 @@ async function loadInterestLeads() {
         renderLeadsTable();
     } catch (error) {
         console.error('Error loading leads:', error);
-        document.getElementById('leads-table-body').innerHTML = 
+        document.getElementById('leads-table-body').innerHTML =
             '<tr><td colspan="6" class="empty-state">Error loading leads</td></tr>';
     }
 }
 
 function renderLeadsTable() {
     const tbody = document.getElementById('leads-table-body');
-    
+
     if (allLeads.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No interest leads yet. Share the interest link to collect leads!</td></tr>';
         return;
@@ -1072,7 +982,6 @@ function renderLeadsTable() {
         const displayFirst = lead.firstName || matchedUser?.firstName || '';
         const displayLast = lead.lastName || matchedUser?.lastName || '';
 
-        // Determine status: Converted > In Queue > Interest
         let statusCell;
         let isConverted = false;
         let convertedDetail = '';
@@ -1098,7 +1007,6 @@ function renderLeadsTable() {
             }
 
             if (!isConverted) {
-                // Check solo queue
                 const inQueue = allSoloQueueForEvent.find(q => q.userId === matchedUser.id);
                 if (inQueue) {
                     const pos = allSoloQueueForEvent
@@ -1137,9 +1045,9 @@ async function deleteLead(leadId) {
         const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads/${leadId}`, {
             method: 'DELETE'
         });
-        
+
         if (!response.ok) throw new Error('Failed to delete lead');
-        
+
         await loadInterestLeads();
     } catch (error) {
         console.error('Error deleting lead:', error);
@@ -1170,7 +1078,6 @@ async function restartSequence(leadId, userId) {
 
     try {
         const payload = leadId ? { leadId } : { userId, eventId: currentEventId };
-        console.log('🔄 Restarting sequence for:', payload);
         const response = await fetch(`${CONFIG.api.baseUrl}/interest/restart-sequence`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1183,7 +1090,6 @@ async function restartSequence(leadId, userId) {
         }
 
         const result = await response.json();
-        console.log('✅ Sequence restart result:', result);
 
         const sentCount = result.sent || 0;
         if (sentCount > 0) {
@@ -1209,61 +1115,55 @@ async function restartSequence(leadId, userId) {
     }
 }
 
-// ===== Teams Management =====
 let allTeams = [];
 
 async function loadEventTeams() {
     if (!currentEventId) {
-        document.getElementById('teams-table-body').innerHTML = 
+        document.getElementById('teams-table-body').innerHTML =
             '<tr><td colspan="5" class="empty-state">Save the event first to view teams</td></tr>';
         return;
     }
 
     try {
-        // Load teams for this event
         const response = await fetch(`${CONFIG.api.baseUrl}/teams`);
         if (!response.ok) throw new Error('Failed to load teams');
-        
+
         const teams = await response.json();
         allTeams = teams.filter(t => t.eventId === currentEventId);
-        
-        // Load participations to get member counts
+
         const partResponse = await fetch(`${CONFIG.api.baseUrl}/participations/event/${currentEventId}`);
         if (partResponse.ok) {
             allParticipations = await partResponse.json();
         }
 
-        // Load users so we can resolve admin names from participation.userId
         try {
             allUsers = await API.users.list();
         } catch (e) {
             allUsers = [];
         }
-        
+
         renderTeamsTable();
     } catch (error) {
         console.error('Error loading teams:', error);
-        document.getElementById('teams-table-body').innerHTML = 
+        document.getElementById('teams-table-body').innerHTML =
             '<tr><td colspan="5" class="empty-state">Error loading teams</td></tr>';
     }
 }
 
 function renderTeamsTable() {
     const tbody = document.getElementById('teams-table-body');
-    
+
     if (allTeams.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No teams registered yet</td></tr>';
         return;
     }
 
     tbody.innerHTML = allTeams.map(team => {
-        // Count team members
-        const memberships = allParticipations.filter(p => 
+        const memberships = allParticipations.filter(p =>
             (p.teamMemberships || []).some(m => m.teamId === team.id && m.isParticipant)
         );
         const memberCount = memberships.length;
-        
-        // Find team admin
+
         const adminMembership = allParticipations.find(p =>
             (p.teamMemberships || []).some(m => m.teamId === team.id && m.isAdmin)
         );
@@ -1275,7 +1175,7 @@ function renderTeamsTable() {
         const teamDisplayName = team.teamName || team.name || 'Unnamed Team';
         const maxMembers = team.numberOfParticipants || team.maxSize || 5;
         const createdDate = new Date(team.createdAt).toLocaleDateString();
-        
+
         return `
             <tr>
                 <td><strong>${escapeHtml(teamDisplayName)}</strong></td>
@@ -1290,7 +1190,6 @@ function renderTeamsTable() {
     }).join('');
 }
 
-// ===== Sponsors Management =====
 function formatSponsorAmount(amount) {
     if (amount === null || amount === undefined || amount === '') return '-';
     const numeric = Number(amount);
@@ -1333,7 +1232,6 @@ async function loadEventSponsors() {
         return;
     }
     try {
-        // Sponsors are category='sponsorship' rows in EventFinancials
         allFinancials = await API.events.financials.list(currentEventId) || [];
         renderSponsorsTable();
     } catch (error) {
@@ -1445,7 +1343,7 @@ async function handleSponsorSubmit(e) {
         }
 
         await loadEventSponsors();
-        renderBudgetTable(); // keep budget tab in sync if it was already open
+        renderBudgetTable();
         closeSponsorModal();
     } catch (error) {
         console.error('Error saving sponsor:', error);
@@ -1461,7 +1359,7 @@ async function deleteSponsor(sponsorId) {
     try {
         await API.events.sponsors.delete(currentEventId, sponsorId);
         await loadEventSponsors();
-        renderBudgetTable(); // keep budget tab in sync
+        renderBudgetTable();
         const editingId = document.getElementById('sponsor-id').value;
         const modal = document.getElementById('sponsor-modal');
         if (editingId === sponsorId && modal.classList.contains('active')) {
@@ -1476,18 +1374,16 @@ async function deleteSponsor(sponsorId) {
 async function saveSponsorStatus(sponsorId, status) {
     try {
         await API.events.sponsors.update(currentEventId, sponsorId, { sponsorStatus: status });
-        // Refresh allFinancials so status is current in both tabs
         allFinancials = await API.events.financials.list(currentEventId) || [];
         renderSponsorsTable();
         renderBudgetTable();
     } catch (error) {
         console.error('Error updating sponsor status:', error);
         alert(`Error: ${error.message}`);
-        renderSponsorsTable(); // revert
+        renderSponsorsTable();
     }
 }
 
-// ===== Sequence Management =====
 function setNoSequenceStateMessage(message, isError = false) {
     const stateEl = document.getElementById('no-sequence-state');
     const descriptionEl = stateEl?.querySelector('p');
@@ -1498,7 +1394,6 @@ function setNoSequenceStateMessage(message, isError = false) {
 }
 
 async function loadEventSequence() {
-    // Show sequence if it exists, regardless of whether it's currently enabled
     if (!currentEvent || !currentEvent.sequenceId) {
         document.getElementById('no-sequence-state').style.display = 'block';
         document.getElementById('sequence-exists-state').style.display = 'none';
@@ -1510,12 +1405,12 @@ async function loadEventSequence() {
     try {
         const response = await API.sequences.get(currentEvent.sequenceId);
         currentEventSequence = response.sequence;
-        currentEventSequence.emails = response.emails || []; // API returns emails separately
-        
+        currentEventSequence.emails = response.emails || [];
+
         document.getElementById('no-sequence-state').style.display = 'none';
         document.getElementById('sequence-exists-state').style.display = 'block';
         setNoSequenceStateMessage('Create an email sequence to send automated emails to interest leads for this event.');
-        
+
         renderSequenceEmails();
     } catch (error) {
         console.error('Failed to load sequence:', error);
@@ -1534,7 +1429,7 @@ async function loadEventSequence() {
 
 function renderSequenceEmails() {
     const container = document.getElementById('sequence-emails-list');
-    
+
     if (!currentEventSequence || !currentEventSequence.emails || currentEventSequence.emails.length === 0) {
         container.innerHTML = '<p style="text-align: center; color: var(--admin-text-muted); padding: 40px;">No emails yet. Click "Add Email" to create the first email.</p>';
         document.getElementById('recipient-delivery-overview').style.display = 'none';
@@ -1542,25 +1437,23 @@ function renderSequenceEmails() {
     }
 
     const emails = currentEventSequence.emails.sort((a, b) => (a.sequenceOrder || a.order || 0) - (b.sequenceOrder || b.order || 0));
-    
-    // Load delivery stats for all emails
+
     loadEmailDeliveryStats(emails).then(emailStats => {
         container.innerHTML = emails.map(email => {
             const order = email.sequenceOrder || email.order || 1;
             const statusBadge = email.status === 'live' ? '✅ Live' : '📝 Draft';
-            const scheduleText = email.scheduledSendTime 
+            const scheduleText = email.scheduledSendTime
                 ? `⏰ ${new Date(email.scheduledSendTime).toLocaleString()}`
                 : '';
-            
-            // Get delivery stats for this email
+
             const stats = emailStats[email.id] || { sent: 0, total: 0 };
-            const deliveryBadge = stats.total > 0 
-                ? `📊 Sent: ${stats.sent}/${stats.total}` 
+            const deliveryBadge = stats.total > 0
+                ? `📊 Sent: ${stats.sent}/${stats.total}`
                 : '';
-            
+
             const isLive = email.status === 'live';
             const editButtonText = isLive ? '👁️ View' : '✏️ Edit';
-            
+
             return `
                 <div class="email-card">
                     <div class="email-card-header">
@@ -1580,14 +1473,13 @@ function renderSequenceEmails() {
             `;
         }).join('');
     });
-    
-    // Load recipient delivery overview
+
     loadRecipientDeliveryOverview();
 }
 
 async function loadSequenceStatsForEvent() {
     const statsContainer = document.getElementById('sequence-stats-section');
-    
+
     if (!currentEvent) {
         statsContainer.innerHTML = '';
         return;
@@ -1596,7 +1488,7 @@ async function loadSequenceStatsForEvent() {
     try {
         const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads?eventId=${currentEvent.id}`);
         if (!response.ok) throw new Error('Failed to load leads');
-        
+
         const data = await response.json();
         const leads = data.leads || [];
         const verifiedCount = leads.filter(l => l.isVerified).length;
@@ -1621,17 +1513,16 @@ async function loadEmailDeliveryStats(emails) {
     if (!currentEvent || !emails || emails.length === 0) {
         return {};
     }
-    
+
     try {
         const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${currentEvent.id}`);
         if (!response.ok) return {};
-        
+
         const data = await response.json();
         const { deliveries, leads, recipients = [] } = data;
         const verifiedLeads = leads.filter(l => l.verified);
         const totalRecipients = verifiedLeads.length + recipients.length;
-        
-        // Calculate stats for each email — match by email address
+
         const stats = {};
         emails.forEach(email => {
             const emailId = normalizeId(email.id);
@@ -1642,7 +1533,7 @@ async function loadEmailDeliveryStats(emails) {
                 total: totalRecipients
             };
         });
-        
+
         return stats;
     } catch (error) {
         console.error('Failed to load email delivery stats:', error);
@@ -1654,29 +1545,26 @@ async function loadRecipientDeliveryOverview() {
     const overviewSection = document.getElementById('recipient-delivery-overview');
     const headerEl = document.getElementById('recipient-overview-header');
     const bodyEl = document.getElementById('recipient-overview-body');
-    
-    // Show delivery stats if sequence exists, regardless of whether it's currently enabled
+
     if (!currentEvent || !currentEvent.sequenceId) {
         overviewSection.style.display = 'none';
         return;
     }
-    
+
     try {
         const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${currentEvent.id}`);
         if (!response.ok) throw new Error('Failed to load deliveries');
-        
+
         const data = await response.json();
         const { deliveries, leads, recipients = [], campaigns } = data;
-        
+
         if (!campaigns || campaigns.length === 0) {
             overviewSection.style.display = 'none';
             return;
         }
-        
-        // Show the section
+
         overviewSection.style.display = 'block';
-        
-        // Build header with email columns
+
         const sortedCampaigns = campaigns.sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
         headerEl.innerHTML = `
             <tr>
@@ -1686,11 +1574,9 @@ async function loadRecipientDeliveryOverview() {
                 <th style="text-align: center;">Action</th>
             </tr>
         `;
-        
-        // Get verified leads
+
         const verifiedLeads = leads.filter(l => l.verified);
-        
-        // Combine leads and recipients (judges/committee/participants) into unified list
+
         const allRecipients = [
             ...verifiedLeads.map(lead => ({
                 id: lead.id,
@@ -1709,20 +1595,17 @@ async function loadRecipientDeliveryOverview() {
                 matchField: 'userId'
             }))
         ];
-        
+
         if (allRecipients.length === 0) {
             bodyEl.innerHTML = '<tr><td colspan="' + (campaigns.length + 3) + '" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">No recipients yet</td></tr>';
             return;
         }
-        
-        // Build rows for each recipient
+
         const rows = allRecipients.map(recipient => {
-            // Match deliveries by email (reliable across all recipient types)
             const recipientDeliveries = deliveries.filter(d =>
                 d.email?.toLowerCase() === recipient.email.toLowerCase()
             );
-            
-            // Check each campaign
+
             const emailStatuses = sortedCampaigns.map(campaign => {
                 const campaignId = normalizeId(campaign.id);
                 const delivery = recipientDeliveries.find(d => normalizeId(d.campaignId) === campaignId);
@@ -1731,11 +1614,11 @@ async function loadRecipientDeliveryOverview() {
                 if (delivery.status === 'failed') return { sent: false, symbol: '✗', style: 'color: #ef4444;' };
                 return { sent: false, symbol: '⏳', style: 'color: var(--admin-text-muted);' };
             });
-            
+
             const sentCount = emailStatuses.filter(s => s.sent).length;
             const totalCount = sortedCampaigns.length;
             const completion = totalCount > 0 ? Math.round((sentCount / totalCount) * 100) : 0;
-            
+
             const typeLabels = {
                 'interest': '<span style="font-size: 0.75rem; background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 3px;">Interest</span>',
                 'judge': '<span style="font-size: 0.75rem; background: #ede9fe; color: #6d28d9; padding: 1px 6px; border-radius: 3px;">Judge</span>',
@@ -1743,7 +1626,7 @@ async function loadRecipientDeliveryOverview() {
                 'participant': '<span style="font-size: 0.75rem; background: #d1fae5; color: #065f46; padding: 1px 6px; border-radius: 3px;">Participant</span>'
             };
             const typeLabel = typeLabels[recipient.type] ? ' ' + typeLabels[recipient.type] : '';
-            
+
             return {
                 name: recipient.name,
                 email: recipient.email,
@@ -1756,10 +1639,9 @@ async function loadRecipientDeliveryOverview() {
                 completion
             };
         });
-        
-        // Sort by completion (lowest first to highlight gaps)
+
         rows.sort((a, b) => a.completion - b.completion);
-        
+
         bodyEl.innerHTML = rows.map(row => `
             <tr>
                 <td style="text-align: left;">
@@ -1770,32 +1652,30 @@ async function loadRecipientDeliveryOverview() {
                 <td style="text-align: center; font-weight: 600;">${row.sentCount}/${row.totalCount}</td>
                 <td style="text-align: center;">
                     <div style="display:flex;gap:4px;justify-content:center;">
-                    ${row.leadId 
-                        ? `<button class="btn-sm" onclick="restartSequence('${row.leadId}')">🔄 Restart</button>` 
+                    ${row.leadId
+                        ? `<button class="btn-sm" onclick="restartSequence('${row.leadId}')">🔄 Restart</button>`
                         : `<button class="btn-sm" onclick="restartSequence(null, '${row.userId}')">🔄 Restart</button>`}
                     <button class="btn-sm" style="background:var(--admin-danger,#dc2626);color:#fff;" onclick="clearRecipientDeliveries('${row.email}')">🗑 Clear</button>
                     </div>
                 </td>
             </tr>
         `).join('');
-        
+
     } catch (error) {
         console.error('Failed to load recipient delivery overview:', error);
         overviewSection.style.display = 'none';
     }
 }
 
-// Create sequence button handler
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('create-sequence-btn')?.addEventListener('click', () => {
         showCreateSequenceModal();
     });
-    
+
     document.getElementById('add-sequence-email-btn')?.addEventListener('click', () => {
         showAddEmailModal();
     });
-    
-    // Radio button handler for create sequence modal
+
     document.querySelectorAll('input[name="sequence-create-option"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
             const copySection = document.getElementById('copy-from-event-section');
@@ -1807,8 +1687,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
-    
-    // Status radio button handler for email modal
+
     document.querySelectorAll('input[name="edit-email-status"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
             const scheduleGroup = document.getElementById('edit-email-schedule-group');
@@ -1820,8 +1699,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
-    
-    // Schedule input handler
+
     document.getElementById('edit-email-schedule')?.addEventListener('input', updateSchedulePreviewInline);
 });
 
@@ -1836,16 +1714,16 @@ function closeCreateSequenceModal() {
 async function loadEventsWithSequences() {
     const select = document.getElementById('copy-from-event-select');
     select.innerHTML = '<option value="">Loading events...</option>';
-    
+
     try {
         const eventsWithSeq = allEvents.filter(e => e.sequenceId && e.id !== currentEvent.id);
-        
+
         if (eventsWithSeq.length === 0) {
             select.innerHTML = '<option value="">No other events have sequences yet</option>';
             return;
         }
-        
-        select.innerHTML = '<option value="">Select an event...</option>' + 
+
+        select.innerHTML = '<option value="">Select an event...</option>' +
             eventsWithSeq.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
     } catch (error) {
         console.error('Failed to load events:', error);
@@ -1855,84 +1733,75 @@ async function loadEventsWithSequences() {
 
 async function confirmCreateSequence() {
     const option = document.querySelector('input[name="sequence-create-option"]:checked').value;
-    
+
     try {
         if (option === 'scratch') {
-            // Create new empty sequence (1:1 relationship with event, user never sees this)
             const response = await API.sequences.create({
                 name: `${currentEvent.name} ${currentEvent.startDate} - ${currentEvent.endDate}`,
                 description: `Email sequence for ${currentEvent.name}`,
                 emails: []
             });
-            
-            // Link sequence to event and enable it by default
+
             await API.events.update(currentEvent.id, {
                 sequenceId: response.sequence.id,
                 sequenceEnabled: true
             });
-            
+
             currentEvent.sequenceId = response.sequence.id;
             currentEvent.sequenceEnabled = true;
             currentEventSequence = response.sequence;
-            
+
         } else {
-            // Copy from another event
             const sourceEventId = document.getElementById('copy-from-event-select').value;
             if (!sourceEventId) {
                 alert('Please select an event to copy from');
                 return;
             }
-            
+
             const sourceEvent = allEvents.find(e => e.id === sourceEventId);
             if (!sourceEvent || !sourceEvent.sequenceId) {
                 alert('Selected event has no sequence');
                 return;
             }
-            
-            // Duplicate the sequence
+
             const response = await API.sequences.duplicate(sourceEvent.sequenceId);
-            
-            // Update sequence name for this event
+
             await API.sequences.update(response.sequence.id, {
                 name: `${currentEvent.name} ${currentEvent.startDate} - ${currentEvent.endDate}`,
                 description: `Copied from ${sourceEvent.name} ${sourceEvent.startDate} - ${sourceEvent.endDate}`
             });
-            
-            // Link to current event and enable it by default
+
             await API.events.update(currentEvent.id, {
                 sequenceId: response.sequence.id,
                 sequenceEnabled: true
             });
-            
+
             currentEvent.sequenceId = response.sequence.id;
             currentEvent.sequenceEnabled = true;
-            
-            // Reload the sequence
+
             const seqResponse = await API.sequences.get(response.sequence.id);
             currentEventSequence = seqResponse.sequence;
         }
-        
+
         closeCreateSequenceModal();
         loadEventSequence();
-        
+
     } catch (error) {
         console.error('Failed to create sequence:', error);
         alert('Failed to create sequence. Please try again.');
     }
 }
 
-// Navigate to admin-email.html for adding new sequence email
 function showAddEmailModal() {
     const nextOrder = currentEventSequence.emails ? currentEventSequence.emails.length + 1 : 1;
     const url = `admin-email.html?mode=sequence&sequenceId=${currentEventSequence.id}&eventId=${currentEvent.id}&order=${nextOrder}`;
     window.location.href = url;
 }
 
-// Navigate to admin-email.html for editing existing sequence email
 function editSequenceEmailInline(emailId) {
     const email = currentEventSequence.emails.find(e => e.id === emailId);
     if (!email) return;
-    
+
     const url = `admin-email.html?mode=sequence&sequenceId=${currentEventSequence.id}&eventId=${currentEvent.id}&emailId=${emailId}`;
     window.location.href = url;
 }
@@ -1946,7 +1815,6 @@ async function moveEmailDown(emailId) {
 }
 
 async function reorderEmail(emailId, direction) {
-    // Sort by current display order (handles null sequenceOrder gracefully)
     const sorted = [...currentEventSequence.emails].sort(
         (a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0)
     );
@@ -1957,17 +1825,14 @@ async function reorderEmail(emailId, direction) {
     const swapIdx = idx + direction;
     if (swapIdx < 0 || swapIdx >= sorted.length) return;
 
-    // Swap the two elements
     [sorted[idx], sorted[swapIdx]] = [sorted[swapIdx], sorted[idx]];
 
     try {
-        // Update both in parallel with their new 1-based positions
         await Promise.all([
             API.campaigns.update(sorted[idx].id,    { sequenceOrder: idx + 1 }),
             API.campaigns.update(sorted[swapIdx].id, { sequenceOrder: swapIdx + 1 })
         ]);
 
-        // Apply new order locally and re-render immediately (no server round-trip needed)
         sorted[idx].sequenceOrder    = idx + 1;
         sorted[swapIdx].sequenceOrder = swapIdx + 1;
         currentEventSequence.emails = sorted;
@@ -1979,9 +1844,6 @@ async function reorderEmail(emailId, direction) {
     }
 }
 
-console.log('Admin Events page loaded');
-
-// ===== Budget / Financials Management =====
 
 let allFinancials = [];
 
@@ -1992,7 +1854,6 @@ async function loadEventBudget() {
         return;
     }
 
-    // Populate rate fields from currentEvent
     if (currentEvent) {
         document.getElementById('budget-hotel-rate').value = currentEvent.hotelRatePerNight ?? '';
         document.getElementById('budget-hotel-nights').value = currentEvent.hotelNights ?? '';
@@ -2070,7 +1931,6 @@ function renderBudgetTable() {
         if (row.unitCost != null && row.days != null) {
             desc += `<span style="color:var(--admin-text-muted);font-size:0.75rem;margin-left:6px;">(${fmt(row.unitCost)} × ${row.days})</span>`;
         }
-        // Show status badge for non-confirmed sponsor rows
         if (row.category === 'sponsorship' && row.sponsorStatus && row.sponsorStatus !== 'confirmed') {
             const statusColors = { 'reached-out': '#64748b', negotiating: '#d97706', declined: '#dc2626' };
             const color = statusColors[row.sponsorStatus] || '#64748b';
@@ -2089,8 +1949,7 @@ function renderBudgetTable() {
             <td style="white-space:nowrap;">${actionCell(row)}</td>
         </tr>`;
 
-    // Split into participant groups and event-level rows
-    const participantMap = new Map(); // participationId -> { email, roles, rows[] }
+    const participantMap = new Map();
     const eventRows = [];
 
     for (const row of allFinancials) {
@@ -2118,7 +1977,6 @@ function renderBudgetTable() {
 
     let html = '';
 
-    // Participant groups
     for (const [, group] of participantMap) {
         const roleLabel = group.roles ? ` — ${escapeHtml(group.roles)}` : '';
         html += `<tr class="budget-group-header">
@@ -2129,7 +1987,6 @@ function renderBudgetTable() {
         html += group.rows.map(dataRow).join('');
     }
 
-    // Event-level rows (sponsorships, venue, etc.)
     if (eventRows.length > 0) {
         html += `<tr class="budget-group-header">
             <td colspan="6">🏢 Event-level rows
@@ -2231,7 +2088,6 @@ async function deleteFinancialRow(rowId) {
 async function savePaidBy(rowId, paidBy) {
     try {
         await API.events.financials.patchPaidBy(currentEventId, rowId, paidBy);
-        // Update local cache and re-render summary without full reload
         const row = allFinancials.find(r => r.id === rowId);
         if (row) row.paidBy = paidBy;
         const summary = await API.events.financials.summary(currentEventId);
@@ -2239,7 +2095,6 @@ async function savePaidBy(rowId, paidBy) {
     } catch (error) {
         console.error('Error updating paidBy:', error);
         alert(`Error: ${error.message}`);
-        // Re-render to restore original value in the dropdown
         renderBudgetTable();
     }
 }

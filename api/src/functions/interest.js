@@ -1,4 +1,3 @@
-// ACDC Portal - Interest Registration API
 const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
@@ -17,8 +16,6 @@ const deliveriesStorage = new Storage('email-deliveries');
 const participationsStorage = new Storage('participations');
 const usersStorage = new Storage('users');
 
-// Helper to trigger sequence emails for a recipient (lead or user)
-// recipient: { id, email, firstName, userId? } — if userId is set, deliveries are stored with userId instead of leadId
 async function triggerSequenceEmailsForLead(lead, event, context) {
     try {
         context.log(`[SEQUENCE] Starting sequence emails for ${lead.email}, event: ${event.name}`);
@@ -31,27 +28,23 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
             reason: null
         };
 
-        // Determine recipient identifier for delivery records
         const recipientIdField = lead.userId ? { userId: lead.userId } : { leadId: lead.id };
-        
-        // Check if event has sequence enabled
+
         if (!event.sequenceEnabled) {
             context.log(`[SEQUENCE] Sequence not enabled for event ${event.id}`);
             result.reason = 'sequence-disabled';
             return result;
         }
-        
-        // Check if event has a sequence assigned (backward compatibility)
+
         if (!event.sequenceId) {
             context.log(`[SEQUENCE] No sequence assigned to event ${event.id}`);
             result.reason = 'no-sequence-assigned';
             return result;
         }
-        
-        // Get sequence campaigns for this sequence
+
         const allCampaigns = await campaignsStorage.getAll();
         context.log(`[SEQUENCE] Loaded ${allCampaigns.length} total campaigns`);
-        
+
         const sequenceCampaigns = allCampaigns
             .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence')
             .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
@@ -59,14 +52,13 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
         result.totalCampaigns = sequenceCampaigns.length;
 
         context.log(`[SEQUENCE] Found ${sequenceCampaigns.length} sequence campaigns for sequence ${event.sequenceId}`);
-        
+
         if (sequenceCampaigns.length === 0) {
             context.log(`[SEQUENCE] No sequence campaigns for event ${event.id}`);
             result.reason = 'no-sequence-campaigns';
             return result;
         }
 
-        // Get existing deliveries for this email
         const existingDeliveries = await deliveriesStorage.getAll();
         const userDeliveries = new Set(
             existingDeliveries
@@ -74,10 +66,9 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 .map(d => d.campaignId)
         );
 
-        // Filter campaigns that haven't been sent yet
         const campaignsToSend = sequenceCampaigns.filter(campaign => !userDeliveries.has(campaign.id));
         result.eligible = campaignsToSend.length;
-        
+
         if (campaignsToSend.length === 0) {
             context.log(`[SEQUENCE] All emails already sent to ${lead.email}`);
             result.reason = 'already-sent';
@@ -88,14 +79,11 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
 
         let sent = 0;
 
-        // If multiple emails to send, combine into one digest email
         if (campaignsToSend.length > 1) {
             context.log(`[SEQUENCE] Combining ${campaignsToSend.length} emails into digest`);
-            
-            // Create digest email
+
             const digestSubject = `${event.name} — Your ${campaignsToSend.length} Updates`;
-            
-            // Build message blocks as HTML table rows
+
             const messageBlocks = campaignsToSend.map((campaign, index) => `
                   <tr>
                     <td style="padding: 0;">
@@ -141,7 +129,6 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                   </tr>
             `).join('');
 
-            // Load digest template
             const digestTemplatePath = path.join(__dirname, '../../data/email-templates/sequence-digest.html');
             let digestTemplate = await fs.readFile(digestTemplatePath, 'utf-8');
             const digestContent = processTemplate(digestTemplate, {
@@ -154,7 +141,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
 
             const delivery = {
                 id: generateGuid(),
-                campaignId: campaignsToSend.map(c => c.id).join(','), // Track all campaigns in digest
+                campaignId: campaignsToSend.map(c => c.id).join(','),
                 email: lead.email,
                 ...recipientIdField,
                 status: 'pending',
@@ -165,7 +152,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
 
             try {
                 context.log(`[SEQUENCE] Sending digest email to ${lead.email}`);
-                
+
                 await sendEmail({
                     to: lead.email,
                     subject: digestSubject,
@@ -175,10 +162,9 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                 context.log(`[SEQUENCE] Digest email sent successfully!`);
                 delivery.status = 'sent';
                 delivery.sentAt = new Date().toISOString();
-                sent = campaignsToSend.length; // Count as all campaigns sent
+                sent = campaignsToSend.length;
                 result.sent = sent;
-                
-                // Create individual delivery records for each campaign (for tracking)
+
                 for (const campaign of campaignsToSend) {
                     await deliveriesStorage.create({
                         id: generateGuid(),
@@ -188,7 +174,7 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
                         status: 'sent',
                         sentAt: delivery.sentAt,
                         createdAt: delivery.createdAt,
-                        digestId: delivery.id // Link to digest
+                        digestId: delivery.id
                     });
                 }
             } catch (err) {
@@ -203,10 +189,9 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
 
             await deliveriesStorage.create(delivery);
         } else {
-            // Single email - send normally
             const campaign = campaignsToSend[0];
             context.log(`[SEQUENCE] Sending single email to ${lead.email}: "${campaign.subject}"`);
-            
+
             const delivery = {
                 id: generateGuid(),
                 campaignId: campaign.id,
@@ -251,7 +236,6 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
         return result;
     } catch (error) {
         await logError(context, error);
-        // Don't fail the main operation if this fails
         context.log('[SEQUENCE] WARNING: Failed to trigger sequence emails');
         context.error(error);
         return {
@@ -265,18 +249,14 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
     }
 }
 
-
-// Helper to generate 6-digit verification code
 function generateVerificationCode() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Helper to generate GUID
 function generateGuid() {
     return uuidv4();
 }
 
-// Helper to get verification email HTML from template
 async function getVerificationEmailHtml(code, eventName, firstName) {
     const templatePath = path.join(__dirname, '../../data/email-templates/verification.html');
     const template = await fs.readFile(templatePath, 'utf-8');
@@ -287,7 +267,6 @@ async function getVerificationEmailHtml(code, eventName, firstName) {
     });
 }
 
-// POST /api/interest/register - Submit interest (sends verification code)
 app.http('interest-register', {
     methods: ['POST'],
     authLevel: 'anonymous',
@@ -298,24 +277,21 @@ app.http('interest-register', {
             const { eventId, email, firstName, lastName } = body;
 
             if (!eventId || !email || !firstName || !lastName) {
-                return { 
-                    status: 400, 
-                    jsonBody: { error: 'eventId, email, firstName, and lastName are required' } 
+                return {
+                    status: 400,
+                    jsonBody: { error: 'eventId, email, firstName, and lastName are required' }
                 };
             }
 
-            // Validate event exists
             const events = await eventsStorage.getAll();
             const event = events.find(e => e.id === eventId);
             if (!event) {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
 
-            // Generate verification code
             const verificationCode = generateVerificationCode();
-            const codeExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutes
+            const codeExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-            // Check for existing lead (verified or not) - update with new code
             const allLeads = await leadsStorage.getAll();
             const existingLead = allLeads.find(l =>
                 l.eventId === eventId &&
@@ -342,7 +318,6 @@ app.http('interest-register', {
                 await leadsStorage.create(lead);
             }
 
-            // Send verification email
             try {
                 const verificationHtml = await getVerificationEmailHtml(verificationCode, event.name, firstName);
                 await sendEmail({
@@ -353,15 +328,15 @@ app.http('interest-register', {
                 context.log(`Verification email sent to ${email}`);
             } catch (emailError) {
                 context.error('Failed to send verification email:', emailError);
-                return { 
-                    status: 500, 
-                    jsonBody: { error: 'Failed to send verification email. Please try again.' } 
+                return {
+                    status: 500,
+                    jsonBody: { error: 'Failed to send verification email. Please try again.' }
                 };
             }
 
             return {
                 status: 200,
-                jsonBody: { 
+                jsonBody: {
                     message: 'Verification code sent to your email',
                     leadId: lead.id
                 }
@@ -374,7 +349,6 @@ app.http('interest-register', {
     }
 });
 
-// POST /api/interest/verify - Verify code and confirm registration
 app.http('interest-verify', {
     methods: ['POST'],
     authLevel: 'anonymous',
@@ -394,8 +368,6 @@ app.http('interest-verify', {
                 return { status: 404, jsonBody: { error: 'Registration not found' } };
             }
 
-            // Check if this email+event combo is already verified by someone else
-            // (could happen if they register again with a new request while one is pending)
             const allLeadsForVerify = await leadsStorage.getAll();
             const alreadyVerified = allLeadsForVerify.find(l =>
                 l.eventId === lead.eventId &&
@@ -403,11 +375,11 @@ app.http('interest-verify', {
                 l.verified &&
                 l.id !== lead.id
             );
-            
+
             if (alreadyVerified) {
-                return { 
-                    status: 200, 
-                    jsonBody: { 
+                return {
+                    status: 200,
+                    jsonBody: {
                         message: 'You have already registered interest for this event!',
                         alreadyRegistered: true,
                         lead: {
@@ -415,14 +387,14 @@ app.http('interest-verify', {
                             lastName: alreadyVerified.lastName,
                             email: alreadyVerified.email
                         }
-                    } 
+                    }
                 };
             }
 
             if (lead.verified) {
-                return { 
-                    status: 200, 
-                    jsonBody: { 
+                return {
+                    status: 200,
+                    jsonBody: {
                         message: 'You have already registered interest for this event!',
                         alreadyRegistered: true,
                         lead: {
@@ -430,21 +402,18 @@ app.http('interest-verify', {
                             lastName: lead.lastName,
                             email: lead.email
                         }
-                    } 
+                    }
                 };
             }
 
-            // Check code expiration
             if (new Date() > new Date(lead.codeExpiresAt)) {
                 return { status: 400, jsonBody: { error: 'Verification code has expired. Please request a new one.' } };
             }
 
-            // Check code match
             if (lead.verificationCode !== code.trim()) {
                 return { status: 400, jsonBody: { error: 'Invalid verification code' } };
             }
 
-            // Mark as verified
             const verifiedAt = new Date().toISOString();
             const verifiedLead = {
                 ...lead,
@@ -464,7 +433,6 @@ app.http('interest-verify', {
 
             context.log(`Interest verified for ${verifiedLead.email}`);
 
-            // Mirror verified interest into participations with roles:['interest']
             try {
                 const allPartsForVerify = await participationsStorage.getAll();
                 const existingPart = allPartsForVerify.find(p =>
@@ -473,7 +441,6 @@ app.http('interest-verify', {
                 );
 
                 if (existingPart) {
-                    // Already has a participation — ensure 'interest' role is present
                     const roles = existingPart.roles || [];
                     if (!roles.includes('interest')) roles.push('interest');
                     await participationsStorage.update(existingPart.id, {
@@ -484,7 +451,6 @@ app.http('interest-verify', {
                         updatedAt: new Date().toISOString()
                     });
                 } else {
-                    // Create new participation (email-only, no userId yet)
                     await participationsStorage.create({
                         id: generateGuid(),
                         email: verifiedLead.email.toLowerCase(),
@@ -506,23 +472,19 @@ app.http('interest-verify', {
                 context.log(`Participation with interest role created/updated for ${verifiedLead.email}`);
             } catch (partError) {
                 context.error('Warning: Failed to create interest participation:', partError);
-                // Don't fail the main flow
             }
 
             context.log(`About to trigger sequences for lead:`, { email: verifiedLead.email, eventId: verifiedLead.eventId, firstName: verifiedLead.firstName });
-            
-            // Fetch event to get sequenceId
+
             const events = await eventsStorage.getAll();
             context.log(`[SEQUENCE] Loaded ${events.length} events`);
             const event = events.find(e => e.id === verifiedLead.eventId);
             context.log(`[SEQUENCE] Event found:`, event ? { id: event.id, name: event.name, sequenceId: event.sequenceId } : 'NOT FOUND');
-            
-                // Always send the interest acknowledgment confirmation
+
             sendInterestAcknowledgmentEmail(verifiedLead.email, verifiedLead.eventId, context)
                 .then(r => context.log(`[VERIFY] Interest ack sent: ${r?.reason || 'ok'}`))
                 .catch(err => context.error('[VERIFY] Interest ack error:', err));
 
-            // Trigger sequence digest if available
             if (event) {
                 try {
                     context.log('[VERIFY] About to call triggerSequenceEmailsForLead');
@@ -535,12 +497,12 @@ app.http('interest-verify', {
             } else {
                 context.log(`Event ${verifiedLead.eventId} not found, skipping sequence emails`);
             }
-            
+
             context.log(`Sequences triggered, returning response`);
 
             return {
                 status: 200,
-                jsonBody: { 
+                jsonBody: {
                     message: 'Thank you! Your interest has been registered.',
                     lead: {
                         firstName: verifiedLead.firstName,
@@ -557,9 +519,6 @@ app.http('interest-verify', {
     }
 });
 
-// POST /api/interest/record - Record interest after authentication (called from unified register page)
-// Expects: { eventId, email, firstName, lastName }
-// The user has already authenticated via OTP, so no separate verification needed
 app.http('interest-record', {
     methods: ['POST'],
     authLevel: 'anonymous',
@@ -573,7 +532,6 @@ app.http('interest-record', {
                 return { status: 400, jsonBody: { error: 'eventId and email are required' } };
             }
 
-            // Validate event exists
             const events = await eventsStorage.getAll();
             const event = events.find(e => e.id === eventId);
             if (!event) {
@@ -584,7 +542,6 @@ app.http('interest-record', {
             const leadFirstName = (firstName || '').trim();
             const leadLastName = (lastName || '').trim();
 
-            // Check for existing lead
             const allLeadsForRecord = await leadsStorage.getAll();
             const existingLead = allLeadsForRecord.find(l =>
                 l.eventId === eventId &&
@@ -592,7 +549,6 @@ app.http('interest-record', {
             );
 
             if (existingLead && existingLead.verified) {
-                // Already registered interest — just return success
                 return {
                     status: 200,
                     jsonBody: {
@@ -603,7 +559,6 @@ app.http('interest-record', {
                 };
             }
 
-            // Create or update lead as verified (no separate verification needed — already authenticated)
             const lead = {
                 id: existingLead ? existingLead.id : generateGuid(),
                 eventId,
@@ -626,9 +581,7 @@ app.http('interest-record', {
 
             context.log(`Interest recorded (authenticated) for ${normalizedEmail} on event ${event.name}`);
 
-            // Mirror into participations with roles:['interest']
             try {
-                // Look up user to set userId on participation
                 const allUsers = await usersStorage.getAll();
                 const user = allUsers.find(u => u.email?.toLowerCase() === normalizedEmail);
                 const userId = user ? user.id : null;
@@ -649,7 +602,6 @@ app.http('interest-record', {
                         interestSource: 'unified-register',
                         updatedAt: new Date().toISOString()
                     };
-                    // Update userId if we found the user and it wasn't set before
                     if (userId && !existingPart.userId) updates.userId = userId;
                     await participationsStorage.update(existingPart.id, updates);
                 } else {
@@ -676,12 +628,10 @@ app.http('interest-record', {
                 context.error('Warning: Failed to create interest participation:', partError);
             }
 
-            // Always send the interest acknowledgment confirmation
             sendInterestAcknowledgmentEmail(normalizedEmail, eventId, context)
                 .then(r => context.log(`[INTEREST-RECORD] Interest ack sent: ${r?.reason || 'ok'}`))
                 .catch(err => context.error('[INTEREST-RECORD] Interest ack error:', err));
 
-            // Trigger sequence digest if available
             let seqResult = { sent: 0, reason: null };
             try {
                 seqResult = await triggerSequenceEmailsForLead(lead, event, context);
@@ -710,7 +660,6 @@ app.http('interest-record', {
     }
 });
 
-// GET /api/interest/leads?eventId=xxx - List leads for an event (admin)
 app.http('interest-list', {
     methods: ['GET'],
     authLevel: 'function',
@@ -726,18 +675,15 @@ app.http('interest-list', {
 
             let leads = await leadsStorage.getAll();
 
-            // Filter by event if specified
             if (eventId) {
                 leads = leads.filter(l => l.eventId === eventId);
             }
 
-            // Only return verified leads (or all if admin needs to see pending)
             const verifiedOnly = request.query.get('verified') !== 'false';
             if (verifiedOnly) {
                 leads = leads.filter(l => l.verified);
             }
 
-            // Remove sensitive fields
             const sanitizedLeads = leads.map(l => ({
                 id: l.id,
                 eventId: l.eventId,
@@ -758,7 +704,6 @@ app.http('interest-list', {
     }
 });
 
-// DELETE /api/interest/leads/:id - Delete a lead (admin)
 app.http('interest-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
@@ -780,10 +725,8 @@ app.http('interest-delete', {
 
             const email = lead.email;
 
-            // Remove the lead (atomic single-row delete)
             await leadsStorage.delete(id);
 
-            // Cascade: clean up email deliveries for this lead
             let cleaned = { deliveries: 0, participations: 0 };
             try {
                 const allDeliveries = await deliveriesStorage.getAll();
@@ -796,7 +739,6 @@ app.http('interest-delete', {
                 cleaned.deliveries = toDeleteDeliveries.length;
             } catch (e) { context.log(`Warning: delivery cleanup failed: ${e.message}`); }
 
-            // Cascade: remove 'interest' role from SQL participations for this lead's email + event
             try {
                 const allParts = await participationsStorage.getAll();
                 for (const p of allParts) {
@@ -805,10 +747,8 @@ app.http('interest-delete', {
                     const roles = p.roles || [];
                     if (!roles.includes('interest')) continue;
                     if (roles.length === 1) {
-                        // Only role was 'interest' — delete the participation entirely
                         await participationsStorage.delete(p.id);
                     } else {
-                        // Has other roles — just strip 'interest'
                         await participationsStorage.update(p.id, { roles: roles.filter(r => r !== 'interest') });
                     }
                     cleaned.participations++;
@@ -826,7 +766,6 @@ app.http('interest-delete', {
     }
 });
 
-// POST /api/interest/restart-sequence - Manually trigger sequence for a recipient (lead or user)
 app.http('interest-restart-sequence', {
     methods: ['POST'],
     authLevel: 'function',
@@ -849,7 +788,6 @@ app.http('interest-restart-sequence', {
             let recipientEventId;
 
             if (leadId) {
-                // Lead-based restart
                 const lead = await leadsStorage.getById(leadId);
                 if (!lead) {
                     return { status: 404, jsonBody: { error: 'Lead not found' } };
@@ -860,7 +798,6 @@ app.http('interest-restart-sequence', {
                 recipient = lead;
                 recipientEventId = lead.eventId;
             } else {
-                // User-based restart (participants, judges, committee)
                 const users = await usersStorage.getAll();
                 const user = users.find(u => u.id === userId);
                 if (!user) {
@@ -875,7 +812,6 @@ app.http('interest-restart-sequence', {
 
             context.log(`[RESTART] Manually restarting sequence for ${recipient.email}`);
 
-            // Delete existing delivery records for this recipient to allow resend
             const normalizedEmail = (recipient.email || '').toLowerCase();
             const allDeliveriesForRestart = await deliveriesStorage.getAll();
             const deliveriesToDelete = allDeliveriesForRestart.filter(d => {
@@ -890,7 +826,6 @@ app.http('interest-restart-sequence', {
                 context.log(`[RESTART] Deleted ${deliveriesToDelete.length} existing delivery records for ${leadId || userId}`);
             }
 
-            // Fetch event to get sequenceId
             const events = await eventsStorage.getAll();
             const event = events.find(e => e.id === recipientEventId);
             context.log(`[RESTART] Event found:`, event ? { id: event.id, name: event.name, sequenceId: event.sequenceId } : 'NOT FOUND');
@@ -899,10 +834,8 @@ app.http('interest-restart-sequence', {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
 
-            // Trigger sequence emails
             const triggerResult = await triggerSequenceEmailsForLead(recipient, event, context);
 
-            // Get delivery count after sending
             const updatedDeliveries = await deliveriesStorage.getAll();
             const sentDeliveries = updatedDeliveries
                 .filter(d => {

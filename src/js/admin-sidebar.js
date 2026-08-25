@@ -1,12 +1,3 @@
-// Admin Sidebar - Shared component for all admin pages
-// All admin pages should link to css/admin-styles.css for consistent styling
-// Include this file and call renderAdminSidebar() to inject the sidebar
-//
-// Usage:
-//   renderAdminSidebar('events');              // No filtering (initial render)
-//   renderAdminSidebar('events', permissions); // Filtered by permissions
-
-// All available nav items with their page keys
 const SIDEBAR_NAV_ITEMS = [
     { section: 'Main' },
     { page: 'dashboard', href: 'admin-dashboard.html', icon: '📊', label: 'Dashboard' },
@@ -28,24 +19,19 @@ const SIDEBAR_NAV_ITEMS = [
 ];
 
 function renderAdminSidebar(activePage = '', permissions = null) {
-    // Determine which pages to show
     const allowedPages = permissions ? permissions.allowedPages : null;
 
-    // Build nav items HTML, filtering by permissions
     let navHTML = '';
     let lastSectionHadItems = false;
     let pendingSection = null;
 
     for (const item of SIDEBAR_NAV_ITEMS) {
         if (item.section) {
-            // Buffer the section header � only render it if at least one item follows
             pendingSection = `<div class="nav-section">${item.section}</div>`;
             lastSectionHadItems = false;
         } else if (item.page) {
-            // Skip if permissions provided and page not allowed
             if (allowedPages && !allowedPages.includes(item.page)) continue;
 
-            // Render the buffered section header if needed
             if (pendingSection) {
                 navHTML += pendingSection;
                 pendingSection = null;
@@ -60,7 +46,6 @@ function renderAdminSidebar(activePage = '', permissions = null) {
         }
     }
 
-    // Role indicator for the sidebar header
     let roleIndicator = '';
     if (permissions && !permissions.isPortalAdmin && permissions.highestRole) {
         const roleLabel = typeof Permissions !== 'undefined'
@@ -87,15 +72,12 @@ function renderAdminSidebar(activePage = '', permissions = null) {
         </aside>
     `;
 
-    // Find or create sidebar container
     const adminLayout = document.querySelector('.admin-layout');
     if (adminLayout) {
-        // Remove any existing sidebar
         const existingSidebar = adminLayout.querySelector('.sidebar');
         if (existingSidebar) {
             existingSidebar.remove();
         }
-        // Insert new sidebar at the beginning
         adminLayout.insertAdjacentHTML('afterbegin', sidebarHTML);
     }
 }

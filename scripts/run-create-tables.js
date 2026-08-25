@@ -1,4 +1,3 @@
-// Run CREATE TABLE statements against Azure SQL using Entra ID auth
 const sql = require('mssql');
 const { DefaultAzureCredential } = require('@azure/identity');
 const fs = require('fs');
@@ -8,7 +7,7 @@ async function run() {
     console.log('Getting Azure AD token...');
     const credential = new DefaultAzureCredential();
     const tokenResponse = await credential.getToken('https://database.windows.net/.default');
-    
+
     console.log('Connecting to Azure SQL (database may need to wake from auto-pause, this can take ~60s)...');
     const config = {
         server: 'acdc-portal-db.database.windows.net',
@@ -30,19 +29,16 @@ async function run() {
     const pool = await sql.connect(config);
     console.log('Connected!');
 
-    // Read and execute the SQL file
     const sqlFile = fs.readFileSync(path.join(__dirname, 'create-tables.sql'), 'utf8');
-    
-    // Split on GO statements (batch separator)
+
     const batches = sqlFile.split(/^\s*GO\s*$/im).filter(b => b.trim());
-    
+
     let batchNum = 0;
     for (const batch of batches) {
         batchNum++;
         if (!batch.trim()) continue;
         try {
             await pool.request().query(batch);
-            // Extract table name from batch for progress reporting
             const tableMatch = batch.match(/CREATE TABLE (\w+)/i);
             if (tableMatch) {
                 console.log(`  ✓ ${tableMatch[1]}`);
@@ -57,13 +53,12 @@ async function run() {
         }
     }
 
-    // Verify
     const result = await pool.request().query(
         "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME"
     );
     console.log(`\n=== ${result.recordset.length} tables in database ===`);
     result.recordset.forEach(r => console.log(`  • ${r.TABLE_NAME}`));
-    
+
     await pool.close();
 }
 
