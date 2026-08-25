@@ -4,11 +4,7 @@ const jwt = require('jsonwebtoken');
 function getJwtSecret() {
     if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
 
-    if (process.env.KEY_VAULT_URL) {
-        throw new Error('ServerAuthConfigError: JWT secret unavailable');
-    }
-
-    return 'acdc-dev-secret-change-in-production-local-only';
+    throw new Error('ServerAuthConfigError: JWT secret unavailable');
 }
 
 function getTokenFromRequest(request) {
