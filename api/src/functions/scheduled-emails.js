@@ -243,4 +243,3 @@ async function recordRun(startTime, sent, failed, campaigns, context, error = nu
     }
 }
 
-console.log('Scheduled emails timer loaded');

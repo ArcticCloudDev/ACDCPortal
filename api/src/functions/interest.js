@@ -369,4 +369,3 @@ app.http('interest-restart-sequence', {
     }
 });
 
-console.log('Interest API loaded');

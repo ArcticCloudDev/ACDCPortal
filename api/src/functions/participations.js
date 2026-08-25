@@ -912,4 +912,3 @@ function buildLegacyTeamMemberships(participation) {
     return [];
 }
 
-console.log('Participations API v2 loaded (with roles[])');

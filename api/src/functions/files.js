@@ -335,4 +335,3 @@ app.http('files-setup-columns', {
     }
 });
 
-console.log('Files API loaded');
