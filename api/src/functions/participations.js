@@ -1,5 +1,5 @@
 const { app } = require('@azure/functions');
-const { requireAuth, canManageUser, hasEventRole } = require('../shared/auth');
+const { requireAuth, canManageUser, isTeamAuthorized, hasEventRole } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { generateId } = require('../shared/id');
@@ -223,17 +223,24 @@ app.http('participations-upsert', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            let resolvedEmail = email;
-            if (!resolvedEmail && userId) {
+            const isAdmin = auth.user.isPortalAdmin;
+            if (!isAdmin && roles !== undefined) {
+                return { status: 403, jsonBody: { error: 'Only administrators can assign participation roles' } };
+            }
+
+            const requestedUserId = isAdmin ? userId : auth.user.userId;
+            const requestedEmail = isAdmin ? email : auth.user.email;
+            let resolvedEmail = requestedEmail;
+            if (!resolvedEmail && requestedUserId) {
                 const users = await usersStorage.getAll();
-                const user = users.find(u => u.id === userId);
+                const user = users.find(u => u.id === requestedUserId);
                 resolvedEmail = user?.email;
             }
 
             const participations = await participationsStorage.getAll();
 
             const existingIndex = participations.findIndex(p => {
-                if (userId && p.userId === userId && p.eventId === eventId) return true;
+                if (requestedUserId && p.userId === requestedUserId && p.eventId === eventId) return true;
                 if (resolvedEmail && p.email?.toLowerCase() === resolvedEmail.toLowerCase() && p.eventId === eventId) return true;
                 return false;
             });
@@ -244,7 +251,7 @@ app.http('participations-upsert', {
                 const existing = participations[existingIndex];
                 const updated = {
                     ...existing,
-                    userId: userId || existing.userId,
+                    userId: requestedUserId || existing.userId,
                     email: resolvedEmail || existing.email,
                     hotelNights: hotelNights !== undefined ? hotelNights : existing.hotelNights,
                     roles: existing.roles || migrateRoles(existing),
@@ -262,13 +269,17 @@ app.http('participations-upsert', {
                 context.log(`Participation updated for ${resolvedEmail || userId} in event ${eventId}`);
                 return { status: 200, jsonBody: updated };
             } else {
-                const initialRoles = roles || [];
+                const initialRoles = isAdmin ? [...new Set(roles || [])] : [];
+                const invalidRoles = initialRoles.filter(role => !VALID_ROLES.includes(role));
+                if (invalidRoles.length) {
+                    return { status: 400, jsonBody: { error: `Invalid roles: ${invalidRoles.join(', ')}` } };
+                }
                 const initialHotelPaidBy = initialRoles.includes('committee') || initialRoles.includes('judge')
                     ? 'committee' : null;
 
                 const newParticipation = {
                     id: generateId(),
-                    userId: userId || null,
+                    userId: requestedUserId || null,
                     email: resolvedEmail || null,
                     eventId,
                     roles: initialRoles,
@@ -318,6 +329,10 @@ app.http('participations-update', {
 
             if (!canManageUser(auth.user, existing.userId, participations)) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
+            }
+
+            if (!auth.user.isPortalAdmin && Object.keys(body).some(key => key !== 'hotelNights')) {
+                return { status: 403, jsonBody: { error: 'Only administrators can modify participation identity or membership fields' } };
             }
 
             const updated = {
@@ -447,6 +462,15 @@ app.http('participations-update-roles-v2', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
+            const requestedTeamId = teamId || participation.teamId;
+            if (!auth.user.isPortalAdmin && requestedTeamId) {
+                const teams = await teamsStorage.getAll();
+                const team = teams.find(t => t.id === requestedTeamId);
+                if (!team || !isTeamAuthorized(auth.user, team, participations)) {
+                    return { status: 403, jsonBody: { error: 'Only the team administrator can change team assignment' } };
+                }
+            }
+
             const requestedRoles = [...(set || []), ...(add || [])];
             const grantsPrivilegedRole = requestedRoles.some(r => ['judge', 'committee'].includes(r));
             if (grantsPrivilegedRole && !auth.user.isPortalAdmin) {
@@ -538,6 +562,15 @@ app.http('participations-assign-team', {
 
             if (!canManageUser(auth.user, participation.userId, participations)) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
+            }
+
+            const assignedTeamId = teamId || participation.teamId;
+            if (!auth.user.isPortalAdmin && assignedTeamId) {
+                const teams = await teamsStorage.getAll();
+                const team = teams.find(t => t.id === assignedTeamId);
+                if (!team || !isTeamAuthorized(auth.user, team, participations)) {
+                    return { status: 403, jsonBody: { error: 'Only the team administrator can change team assignment' } };
+                }
             }
 
             if (teamId) {
@@ -814,6 +847,12 @@ app.http('participations-update-team-roles', {
 
             if (!canManageUser(auth.user, participation.userId, participations)) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
+            }
+
+            const teams = await teamsStorage.getAll();
+            const team = teams.find(t => t.id === teamId);
+            if (!team || (!auth.user.isPortalAdmin && !isTeamAuthorized(auth.user, team, participations))) {
+                return { status: 403, jsonBody: { error: 'Only the team administrator can change team roles' } };
             }
 
             if (isParticipant && !participation.roles?.includes('participant')) {

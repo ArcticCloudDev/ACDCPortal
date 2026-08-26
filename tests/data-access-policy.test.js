@@ -138,6 +138,30 @@ function endpoint(name) {
     res = await position(request(SELF, { params: { eventId: 'event-1', userId: 'user-1' } }), ctx());
     assert.equal(res.status, 200, 'own position must work');
 
+    const upsert = endpoint('participations-upsert');
+    res = await upsert({
+        ...request(SELF),
+        method: 'POST',
+        json: async () => ({ userId: 'user-1', email: 'other@example.com', eventId: 'event-1', roles: ['judge'] })
+    }, ctx());
+    assert.equal(res.status, 403, 'non-admin must not self-assign privileged roles');
+
+    const update = endpoint('participations-update');
+    res = await update({
+        ...request(SELF, { params: { id: 'p-self' } }),
+        method: 'PUT',
+        json: async () => ({ isTeamAdmin: true, userId: 'user-3', teamId: 'team-2' })
+    }, ctx());
+    assert.equal(res.status, 403, 'non-admin must not change identity or admin status');
+
+    const assignTeam = endpoint('participations-assign-team');
+    res = await assignTeam({
+        ...request(SELF, { params: { id: 'p-self' } }),
+        method: 'PUT',
+        json: async () => ({ teamId: 'team-2', isTeamAdmin: true })
+    }, ctx());
+    assert.equal(res.status, 403, 'non-admin must not assign across teams or grant admin status');
+
     // by-team endpoint was removed as uncalled surface; ensure it stays gone.
     assert.ok(!registrations.some(r => r.name === 'participations-by-team'), 'participations-by-team must stay removed');
 
