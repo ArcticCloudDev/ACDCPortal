@@ -262,6 +262,15 @@ const SharePointStorage = {
         return true;
     },
 
+    async deleteFolder(folderPath) {
+        try {
+            return await this.deleteFile(folderPath);
+        } catch (error) {
+            if (error.message.includes('(404)')) return false;
+            throw error;
+        }
+    },
+
     async createSharingLink(filePath, type = 'view', scope = 'organization') {
         const drive = await getDriveId();
         const site = await getSiteId();

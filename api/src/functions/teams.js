@@ -5,10 +5,12 @@ const { generateId } = require('../shared/id');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
+const SharePointStorage = require('../shared/sharepoint');
 
 const eventsStorage = new GenericStorage('events');
 const soloQueueStorage = new GenericStorage('solo-queue');
 const participationsStorage = new GenericStorage('participations');
+const usersStorage = new GenericStorage('users');
 
 function isActiveStatus(status) {
     return status === 'pre-registration' || status === 'registration' || status === 'live';
@@ -330,6 +332,19 @@ app.http('teams-delete', {
                     jsonBody: { message: 'You do not have permission to delete this team' }
                 };
             }
+
+            if (!SharePointStorage.isConfigured()) {
+                return {
+                    status: 503,
+                    jsonBody: { message: 'Team file storage is not configured; team deletion was not completed' }
+                };
+            }
+
+            const eventFolder = team.eventId ? `Events/${team.eventId}/${teamId}` : null;
+            if (eventFolder) {
+                await SharePointStorage.deleteFolder(eventFolder);
+            }
+
             let participationsChanged = 0;
             const noRemainingTeamEmails = [];
 
@@ -375,6 +390,13 @@ app.http('teams-delete', {
 
             if (participationsChanged > 0) {
                 context.log(`Cleaned ${participationsChanged} participation(s) for team ${teamId}`);
+            }
+
+            let usersUpdated = 0;
+            const teamUsers = await usersStorage.getAll();
+            for (const user of teamUsers.filter(candidate => candidate.teamId === teamId)) {
+                await usersStorage.update(user.id, { teamId: null, updatedAt: new Date().toISOString() });
+                usersUpdated++;
             }
 
             let deliveriesRemoved = 0;
@@ -434,6 +456,7 @@ app.http('teams-delete', {
                     message: `Team "${team.teamName}" deleted`,
                     cleanup: {
                         participationsUpdated: participationsChanged,
+                        usersUpdated,
                         badgeClaimsRemoved: claimsRemoved,
                         invitationsRemoved: invitationsRemoved,
                         deliveriesRemoved: deliveriesRemoved
