@@ -92,8 +92,8 @@ async function createManual(eventId, { type, category, description, amount, paid
 
     const pool = await getPool();
     await ensureTable(pool);
-    const { v4: uuidv4 } = require('uuid');
-    const id = uuidv4();
+    const { generateId } = require('./id');
+    const id = generateId();
 
     await pool.request()
         .input('id', sql.UniqueIdentifier, id)
@@ -144,8 +144,8 @@ async function upsertParticipationRow(eventId, participationId, { category, desc
                 WHERE Id = @id
             `);
     } else {
-        const { v4: uuidv4 } = require('uuid');
-        const id = uuidv4();
+        const { generateId } = require('./id');
+        const id = generateId();
         await pool.request()
             .input('id', sql.UniqueIdentifier, id)
             .input('eventId', sql.UniqueIdentifier, eventId)
@@ -216,8 +216,8 @@ async function syncParticipationToFinancials(event, participation) {
                 .input('amount', sql.Decimal(12, 2), regFee)
                 .query(`UPDATE EventFinancials SET Amount = @amount, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id`);
         } else {
-            const { v4: uuidv4 } = require('uuid');
-            const id = uuidv4();
+            const { generateId } = require('./id');
+            const id = generateId();
             await pool.request()
                 .input('id', sql.UniqueIdentifier, id)
                 .input('eventId', sql.UniqueIdentifier, participation.eventId)

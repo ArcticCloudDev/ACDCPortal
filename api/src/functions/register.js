@@ -1,6 +1,6 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../shared/id');
 const Storage = require('../shared/storage');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
 const { requireAuth } = require('../shared/auth');
@@ -64,7 +64,7 @@ app.http('register-start', {
                 };
             }
 
-            const pendingId = uuidv4();
+            const pendingId = generateId();
             const pendingData = {
                 id: pendingId,
                 email: email.toLowerCase().trim(),
@@ -179,7 +179,7 @@ app.http('register-complete', {
             const isParticipant = isTeamRegistration ? (willParticipate !== false) : false;
 
             const now = new Date().toISOString();
-            const userId = uuidv4();
+            const userId = generateId();
 
             const user = {
                 id: userId,
@@ -199,7 +199,7 @@ app.http('register-complete', {
 
             let teamId = null;
             if (isTeamRegistration && teamName) {
-                teamId = uuidv4();
+                teamId = generateId();
                 const team = {
                     id: teamId,
                     teamName: teamName,
@@ -238,7 +238,7 @@ app.http('register-complete', {
                 }
 
                 const participation = {
-                    id: uuidv4(),
+                    id: generateId(),
                     userId: userId,
                     email: normalizedEmail,
                     eventId: resolvedEventId,

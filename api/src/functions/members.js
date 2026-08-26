@@ -1,7 +1,6 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { requireAuth, isTeamAuthorized } = require('../shared/auth');
-const { v4: uuidv4 } = require('uuid');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 const Email = require('../shared/email');

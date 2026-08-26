@@ -2,7 +2,7 @@ const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../shared/id');
 
 const sequencesStorage = new Storage('sequences');
 const campaignsStorage = new Storage('email-campaigns');
@@ -121,7 +121,7 @@ app.http('sequences-create', {
             }
 
             const sequence = {
-                id: uuidv4(),
+                id: generateId(),
                 name,
                 description: description || '',
                 createdAt: new Date().toISOString(),
@@ -226,7 +226,7 @@ app.http('sequences-copy', {
             }
 
             const newSequence = {
-                id: uuidv4(),
+                id: generateId(),
                 name: sourceSequence.name + ' (Copy)',
                 description: sourceSequence.description,
                 createdAt: new Date().toISOString(),
@@ -242,7 +242,7 @@ app.http('sequences-copy', {
 
             const newEmails = sourceEmails.map(email => ({
                 ...email,
-                id: uuidv4(),
+                id: generateId(),
                 sequenceId: newSequence.id,
                 createdAt: new Date().toISOString(),
                 status: 'draft',

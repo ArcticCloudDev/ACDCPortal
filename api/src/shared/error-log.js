@@ -1,5 +1,5 @@
 const { getPool, sql } = require('./sql');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('./id');
 
 async function logError(context, error, details = null) {
     try {
@@ -15,7 +15,7 @@ async function logError(context, error, details = null) {
 
         const pool = await getPool();
         await pool.request()
-            .input('id',            sql.UniqueIdentifier,  uuidv4())
+            .input('id',            sql.UniqueIdentifier,  generateId())
             .input('functionName',  sql.NVarChar(100),     functionName)
             .input('errorMessage',  sql.NVarChar(sql.MAX), errorMessage)
             .input('stackTrace',    sql.NVarChar(sql.MAX), stackTrace)

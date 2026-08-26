@@ -1,7 +1,7 @@
 const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../shared/id');
 const { Storage: GenericStorage } = require('../shared/storage');
 
 const soloQueueStorage = new GenericStorage('solo-queue.json');
@@ -117,7 +117,7 @@ app.http('solo-queue-join', {
             }
 
             const entry = {
-                id: uuidv4(),
+                id: generateId(),
                 userId,
                 eventId,
                 note: note || '',

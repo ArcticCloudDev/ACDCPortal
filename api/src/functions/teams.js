@@ -1,7 +1,7 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { requireAuth, isTeamAuthorized, isTeamMember } = require('../shared/auth');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../shared/id');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
 const { sendWelcomeEmail } = require('../shared/welcome-email');
@@ -149,7 +149,7 @@ app.http('teams-create', {
                 };
             }
 
-            const teamId = uuidv4();
+            const teamId = generateId();
 
             const eventId = teamData.eventId || await getActiveEventId();
 

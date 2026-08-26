@@ -5,7 +5,7 @@ const { sendEmail, processTemplate } = require('../shared/mail');
 const { buildInvitationEmail } = require('../shared/invitation-email');
 const { buildEmailHtml } = require('../shared/email-builder');
 const Storage = require('../shared/storage');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../shared/id');
 const fs = require('fs').promises;
 const path = require('path');
 const { sendSequenceDigest } = require('../shared/sequence-digest');
@@ -197,7 +197,7 @@ app.http('invitations-create', {
             }
 
             const invitation = {
-                id: uuidv4(),
+                id: generateId(),
                 email: email.toLowerCase(),
                 inviteeFirstName: inviteeFirstName || null,
                 inviteeLastName: inviteeLastName || null,
@@ -223,7 +223,7 @@ app.http('invitations-create', {
 
                 if (!contact) {
                     contact = await UsersStore.create({
-                        id: uuidv4(),
+                        id: generateId(),
                         email: invitation.email,
                         firstName: invitation.inviteeFirstName || '',
                         lastName: invitation.inviteeLastName || '',
@@ -269,7 +269,7 @@ app.http('invitations-create', {
                     });
                 } else if (resolvedEventId) {
                     await ParticipationsStore.create({
-                        id: uuidv4(),
+                        id: generateId(),
                         eventId: resolvedEventId,
                         email: invitation.email,
                         userId: contact.id,
@@ -508,7 +508,7 @@ app.http('invitations-accept', {
             }
 
             if (!existingUser) {
-                const newId = uuidv4();
+                const newId = generateId();
                 const now = new Date().toISOString();
                 const newUser = {
                     id: newId,
@@ -568,7 +568,7 @@ app.http('invitations-accept', {
                     }
 
                     await ParticipationsStore.create({
-                        id: uuidv4(),
+                        id: generateId(),
                         eventId,
                         email: userEmail.toLowerCase(),
                         userId: resolvedUserId,

@@ -7,7 +7,7 @@ const InvitationsStore = new Storage.Storage('invitations');
 const SoloQueueStore = new Storage.Storage('solo-queue');
 const EmailLogStore = new Storage.Storage('email-log');
 const { sendEmail, sendBulkEmail, processTemplate, SENDER_EMAIL } = require('../shared/mail');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../shared/id');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -227,7 +227,7 @@ app.http('email-send', {
             const template = await getTemplate(templateId);
 
             const emailLog = {
-                id: uuidv4(),
+                id: generateId(),
                 templateId,
                 subject,
                 recipientCount: recipients.length,

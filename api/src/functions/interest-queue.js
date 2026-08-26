@@ -2,7 +2,7 @@ const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../shared/id');
 
 const InterestQueueStore = new Storage.Storage('interest-queue');
 
@@ -59,7 +59,7 @@ app.http('interest-queue-add', {
             }
 
             const newEntry = {
-                id: uuidv4(),
+                id: generateId(),
                 email: email.toLowerCase().trim(),
                 firstName: firstName?.trim() || '',
                 lastName: lastName?.trim() || '',

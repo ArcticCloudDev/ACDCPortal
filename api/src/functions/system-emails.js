@@ -7,7 +7,7 @@ const { sendEmail, processTemplate } = require('../shared/mail');
 const { uploadFile } = require('../shared/storage');
 const { buildInvitationEmail } = require('../shared/invitation-email');
 const { buildEmailHtml } = require('../shared/email-builder');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../shared/id');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -172,7 +172,7 @@ app.http('system-emails-test', {
 
             if (templateType === 'invitation-judge' || templateType === 'invitation-committee') {
                 const fakeInvitation = {
-                    id: uuidv4(),
+                    id: generateId(),
                     email: testEmail,
                     eventId: eventId,
                     role: templateType === 'invitation-judge' ? 'judge' : 'committee',
@@ -194,7 +194,7 @@ app.http('system-emails-test', {
                 const globalDefaults = template.editableSections;
 
                 const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
-                const fakeInviteId = uuidv4();
+                    const fakeInviteId = generateId();
 
                 const baseData = {
                     firstName: data?.fullName?.split(' ')[0] || 'Test',
