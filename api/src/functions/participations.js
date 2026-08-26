@@ -1,8 +1,8 @@
 const { app } = require('@azure/functions');
 const { requireAuth, canManageUser, hasEventRole } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
-const { v4: uuidv4 } = require('uuid');
 const { Storage } = require('../shared/storage');
+const { generateId } = require('../shared/id');
 
 const participationsStorage = new Storage('participations');
 const teamsStorage = new Storage('teams');
@@ -19,10 +19,6 @@ const VALID_ROLES = ['interest', 'participant', 'judge', 'committee', 'sponsor']
 
 function isActiveStatus(status) {
     return status === 'pre-registration' || status === 'registration' || status === 'live';
-}
-
-function generateId() {
-    return uuidv4();
 }
 
 async function enforceParticipantCapacity(participation, teamId, participations, confirmCommitmentIncrease = false) {

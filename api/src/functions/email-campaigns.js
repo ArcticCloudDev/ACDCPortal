@@ -3,7 +3,7 @@ const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../shared/id');
 
 const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
@@ -11,12 +11,8 @@ const usersStorage = new Storage('users');
 const participationsStorage = new Storage('participations');
 const teamsStorage = new Storage('teams');
 
-function generateId() {
-    return uuidv4();
-}
-
 function generateDeliveryId() {
-    return uuidv4();
+    return generateId();
 }
 
 app.http('email-campaigns-list', {

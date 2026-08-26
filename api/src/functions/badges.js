@@ -1,15 +1,11 @@
 const { app } = require('@azure/functions');
-const crypto = require('crypto');
 const { logError } = require('../shared/error-log');
 const { requireAuth } = require('../shared/auth');
 const { Storage: GenericStorage } = require('../shared/storage');
+const { generateId } = require('../shared/id');
 
 const badgesStorage = new GenericStorage('badges');
 const eventBadgesStorage = new GenericStorage('event-badges');
-
-function generateGuid() {
-    return crypto.randomUUID();
-}
 
 app.http('badges-list', {
     methods: ['GET'],
@@ -98,7 +94,7 @@ app.http('badges-create', {
             }
 
             const newBadge = {
-                id: generateGuid(),
+                id: generateId(),
                 name: body.name,
                 description: body.description || '',
                 category: body.category,

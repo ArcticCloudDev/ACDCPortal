@@ -1,18 +1,14 @@
 const { app } = require('@azure/functions');
-const crypto = require('crypto');
 const { logError } = require('../shared/error-log');
 const { requireAuth, hasEventRole } = require('../shared/auth');
 const { Storage: GenericStorage } = require('../shared/storage');
+const { generateId } = require('../shared/id');
 
 const badgesStorage = new GenericStorage('badges');
 const eventBadgesStorage = new GenericStorage('event-badges');
 const badgeClaimsStorage = new GenericStorage('badge-claims');
 const eventsStorage = new GenericStorage('events');
 const participationsStorage = new GenericStorage('participations');
-
-function generateGuid() {
-    return crypto.randomUUID();
-}
 
 app.http('event-badges-list', {
     methods: ['GET'],
@@ -128,7 +124,7 @@ app.http('event-badges-add', {
                 }
 
                 const assignment = {
-                    id: generateGuid(),
+                    id: generateId(),
                     eventId: eventId,
                     badgeId: badgeId,
                     judgeUserId: body.judgeUserId || null,
@@ -261,7 +257,7 @@ app.http('event-badges-bulk', {
             const added = [];
             for (const badgeId of toAdd) {
                 const newEb = await eventBadgesStorage.create({
-                    id: generateGuid(),
+                    id: generateId(),
                     eventId: eventId,
                     badgeId: badgeId,
                     judgeUserId: null,

@@ -2,7 +2,7 @@ const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
-const { v4: uuidv4 } = require('uuid');
+const { generateId } = require('../shared/id');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -18,10 +18,6 @@ const usersStorage = new Storage('users');
 
 async function triggerSequenceEmailsForLead(lead, event, context) {
     return sendSequenceDigest({ event, email: lead.email, firstName: lead.firstName }, context);
-}
-
-function generateGuid() {
-    return uuidv4();
 }
 
 app.http('interest-record', {
@@ -65,7 +61,7 @@ app.http('interest-record', {
             }
 
             const lead = {
-                id: existingLead ? existingLead.id : generateGuid(),
+                id: existingLead ? existingLead.id : generateId(),
                 eventId,
                 email: normalizedEmail,
                 firstName: leadFirstName,
@@ -111,7 +107,7 @@ app.http('interest-record', {
                     await participationsStorage.update(existingPart.id, updates);
                 } else {
                     await participationsStorage.create({
-                        id: generateGuid(),
+                        id: generateId(),
                         email: normalizedEmail,
                         userId: userId,
                         eventId: eventId,

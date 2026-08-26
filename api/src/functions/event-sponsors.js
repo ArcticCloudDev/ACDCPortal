@@ -3,10 +3,7 @@ const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { getPool, sql } = require('../shared/sql');
-
-function generateGuid() {
-    return require('crypto').randomUUID();
-}
+const { generateId } = require('../shared/id');
 
 function mapSponsorFinancial(row) {
     return {
@@ -101,7 +98,7 @@ app.http('event-sponsors-create', {
             const eventId = request.params.eventId;
             const body = await request.json();
             const payload = normalizeSponsorPayload(body);
-            const id = generateGuid();
+            const id = generateId();
             const pool = await getPool();
 
             await pool.request()

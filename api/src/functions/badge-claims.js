@@ -1,18 +1,14 @@
 const { app } = require('@azure/functions');
-const crypto = require('crypto');
 const { logError } = require('../shared/error-log');
 const { requireAuth, isTeamMember, hasEventRole } = require('../shared/auth');
 const { Storage: GenericStorage } = require('../shared/storage');
+const { generateId } = require('../shared/id');
 
 const badgesStorage = new GenericStorage('badges');
 const eventBadgesStorage = new GenericStorage('event-badges');
 const badgeClaimsStorage = new GenericStorage('badge-claims');
 const participationsStorage = new GenericStorage('participations');
 const teamsStorage = new GenericStorage('teams');
-
-function generateGuid() {
-    return crypto.randomUUID();
-}
 
 app.http('badge-claims-list', {
     methods: ['GET'],
@@ -146,7 +142,7 @@ app.http('badge-claims-create', {
             }
 
             const newClaim = {
-                id: generateGuid(),
+                id: generateId(),
                 eventBadgeId: body.eventBadgeId,
                 eventId: eventBadge.eventId,
                 badgeId: eventBadge.badgeId,
@@ -348,7 +344,7 @@ app.http('badge-claims-award', {
             }
 
             const newClaim = {
-                id: generateGuid(),
+                id: generateId(),
                 eventBadgeId: body.eventBadgeId,
                 eventId: eventBadge.eventId,
                 badgeId: eventBadge.badgeId,
@@ -416,7 +412,7 @@ app.http('badge-claims-assign', {
                 return { status: 200, jsonBody: updated };
             } else {
                 const draft = {
-                    id: generateGuid(),
+                    id: generateId(),
                     eventBadgeId: body.eventBadgeId,
                     eventId: eventBadge.eventId,
                     badgeId: eventBadge.badgeId,

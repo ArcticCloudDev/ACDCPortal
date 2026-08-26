@@ -3,6 +3,7 @@ const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
+const { generateId } = require('../shared/id');
 
 function safeEqual(a, b) {
     if (typeof a !== 'string' || typeof b !== 'string') return false;
@@ -20,10 +21,6 @@ const runsStorage = new Storage('scheduled-runs');
 const emailLogStorage = new Storage('email-log');
 const participationsStorage = new Storage('participations');
 const usersStorage = new Storage('users');
-
-function generateGuid() {
-    return crypto.randomUUID();
-}
 
 app.http('scheduled-emails-run', {
     methods: ['POST'],
@@ -126,7 +123,7 @@ async function processScheduledEmails(context) {
 
             for (const recipient of recipientsToSend) {
                 const delivery = {
-                    id: generateGuid(),
+                    id: generateId(),
                     campaignId: campaign.id,
                     email: recipient.email,
                     leadId: recipient.leadId || null,
@@ -174,7 +171,7 @@ async function processScheduledEmails(context) {
         if (processedCampaigns.length > 0) {
             for (const campaign of processedCampaigns) {
                 const emailLog = {
-                    id: generateGuid(),
+                    id: generateId(),
                     templateId: campaign.template || 'sequence',
                     subject: campaign.subject,
                     recipientCount: campaign.recipients,
@@ -211,7 +208,7 @@ async function processScheduledEmails(context) {
 async function recordRun(startTime, sent, failed, campaigns, context, error = null) {
     try {
         const run = {
-            id: generateGuid(),
+            id: generateId(),
             startTime: startTime.toISOString(),
             endTime: new Date().toISOString(),
             duration: (new Date() - startTime) / 1000,

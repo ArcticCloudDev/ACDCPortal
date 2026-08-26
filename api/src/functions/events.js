@@ -3,12 +3,9 @@ const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const StorageModule = require('../shared/storage');
 const { Storage } = StorageModule;
+const { generateId } = require('../shared/id');
 
 const eventsStorage = new Storage('events');
-
-function generateGuid() {
-    return require('crypto').randomUUID();
-}
 
 function isActiveStatus(status) {
     return status === 'pre-registration' || status === 'registration' || status === 'live';
@@ -189,7 +186,7 @@ app.http('events-create', {
             const hotelDates = generateHotelDates(body.startDate, body.endDate, daysBefore, daysAfter);
             const hotelDefaultNights = generateDefaultHotelNights(hotelDates, body.startDate, body.endDate);
 
-            const newEventId = generateGuid();
+            const newEventId = generateId();
             const newEvent = {
                 id: newEventId,
                 name: body.name,
