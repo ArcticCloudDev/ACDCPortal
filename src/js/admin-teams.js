@@ -152,20 +152,24 @@ function renderTeamsTable() {
 
         const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
         const members = getTeamMembers(team.id);
+        const teamAdmin = getTeamAdminMember(team);
+        const displayedMembers = teamAdmin && !members.some(member => member.participation.userId === teamAdmin.participation.userId)
+            ? [teamAdmin, ...members]
+            : members;
         const isExpanded = expandedTeams.has(team.id);
         const eventUrl = `admin-events.html?event=${team.eventId}&tab=teams`;
         const adminInfo = getTeamAdminInfo(team.id);
 
-        const memberRows = members.map(member => {
+        const memberRows = displayedMembers.map(member => {
             const displayName = (member.user?.firstName || member.user?.lastName)
                 ? `${member.user?.firstName || ''} ${member.user?.lastName || ''}`.trim()
                 : (member.user?.email || member.participation?.email || 'Unknown');
             const displayEmail = member.user?.email || member.participation?.email || '';
-            const roleBadge = member.participation?.isTeamAdmin
+            const roleBadge = member.isRegisteredAdmin || member.participation?.isTeamAdmin
                 ? '<span class="badge full" style="margin-left:6px;">Admin</span>'
                 : '';
 
-            const removeBtn = canDelete
+            const removeBtn = canDelete && !member.isRegisteredAdmin
                 ? `<button class="btn-sm" style="color:#dc2626;border-color:#fca5a5;" onclick="removeTeamMember('${member.participation.id}', '${escapeHtml(displayName).replace(/'/g, "\\'")}', '${team.id}')">Remove</button>`
                 : '';
 
@@ -193,7 +197,7 @@ function renderTeamsTable() {
             `;
         }).join('');
 
-        const totalShown = members.length + pendingInvites.length;
+        const totalShown = displayedMembers.length + pendingInvites.length;
         const detailsHtml = isExpanded ? `
             <tr class="member-details-row">
                 <td colspan="6">
@@ -226,7 +230,18 @@ function renderTeamsTable() {
 }
 
 function getTeamAdminInfo(teamId) {
+    const team = allTeams.find(t => t.id === teamId);
+    const adminUser = team?.adminUserId ? allUsers.find(u => u.id === team.adminUserId) : null;
+    if (adminUser) {
+        return {
+            name: `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim(),
+            email: adminUser.email || ''
+        };
+    }
+
     const adminParticipation = allParticipations.find(p =>
+        p.userId && p.userId === team?.adminUserId
+    ) || allParticipations.find(p =>
         (p.teamMemberships || []).some(m => m.teamId === teamId && m.isAdmin)
     ) || allParticipations.find(p => p.teamId === teamId && p.isTeamAdmin);
 
@@ -243,6 +258,27 @@ function getTeamAdminInfo(teamId) {
     return {
         name: '',
         email: adminParticipation.email || ''
+    };
+}
+
+function getTeamAdminMember(team) {
+    if (!team?.adminUserId) return null;
+
+    const user = allUsers.find(u => u.id === team.adminUserId);
+    const participation = allParticipations.find(p =>
+        p.userId === team.adminUserId && p.eventId === team.eventId
+    );
+
+    if (!user && !participation) return null;
+
+    return {
+        participation: participation || {
+            id: `admin-${team.id}`,
+            userId: team.adminUserId,
+            email: user?.email || ''
+        },
+        user,
+        isRegisteredAdmin: true
     };
 }
 
