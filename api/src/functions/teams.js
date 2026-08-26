@@ -326,10 +326,10 @@ app.http('teams-delete', {
             const participationsStorage = new GenericStorage('participations');
             const allParticipations = await participationsStorage.getAll();
 
-            if (!isTeamAuthorized(auth.user, team, allParticipations)) {
+            if (!auth.user.isPortalAdmin) {
                 return {
                     status: 403,
-                    jsonBody: { message: 'You do not have permission to delete this team' }
+                    jsonBody: { message: 'Only portal administrators can delete teams' }
                 };
             }
 

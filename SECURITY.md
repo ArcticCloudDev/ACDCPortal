@@ -11,6 +11,7 @@ Last verified: 2026-08-26. Enforced by `npm test` (see tests below) — violatio
 | Object-level access | Non-admins only read their own data: own participations (`by-person`, `participations-get`), own queue position, own teams. Event rosters are projected for regular participants (no emails; hotel data only within own team). Admin/judge/committee roles see full records where required. | `tests/data-access-policy.test.js` |
 | Mutation authority | Self-service requests cannot assign privileged roles, alter identity fields, grant team-admin status, or move a participation across teams. Team assignment and team-role changes require the portal admin or authorized team administrator. | `tests/data-access-policy.test.js` |
 | Scheduler | `POST /api/scheduled-emails/run` requires `x-scheduler-secret` (timing-safe compare); fails closed (503) if unconfigured. | posture test |
+| Team deletion | Destructive team deletion is portal-admin-only. Team owners and participants cannot delete teams, even with a valid or guessed team ID. | `tests/team-delete-cascade.test.js` |
 | Rate limiting | `auth-send-otp`, `auth-verify-otp`, and `auth-check-email` all have per-IP and per-email limits. | `tests/otp-rate-limit-separation.test.js` |
 | Injection | All SQL goes through `mssql` parameterized `.input()` bindings. | audited 2026-08 |
 

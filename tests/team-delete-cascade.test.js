@@ -58,19 +58,38 @@ require(path.join(functionsDir, 'teams.js'));
 const endpoint = registrations.find(item => item.name === 'teams-delete');
 assert.ok(endpoint, 'team delete endpoint must be registered');
 
-const token = jwt.sign({ userId: 'user-1', email: 'admin@example.com', isPortalAdmin: true }, process.env.JWT_SECRET, { issuer: 'acdc-portal' });
-const request = {
-    method: 'DELETE',
-    params: { id: 'team-1' },
-    headers: new Headers({ 'x-acdc-token': token }),
-    query: new URLSearchParams(),
-    json: async () => ({})
-};
+function requestFor(user, teamId = 'team-1') {
+    const token = jwt.sign(user, process.env.JWT_SECRET, { issuer: 'acdc-portal' });
+    return {
+        method: 'DELETE',
+        params: { id: teamId },
+        headers: new Headers({ 'x-acdc-token': token }),
+        query: new URLSearchParams(),
+        json: async () => ({})
+    };
+}
 const noop = () => {};
 const context = { log: Object.assign(noop, { error: noop, warn: noop }), error: noop, warn: noop };
 
 (async () => {
-    const response = await endpoint.handler(request, context);
+    const ownerResponse = await endpoint.handler(requestFor({
+        userId: 'user-1', email: 'admin@example.com', isPortalAdmin: false
+    }), context);
+    assert.equal(ownerResponse.status, 403, 'team owner must not delete teams');
+
+    const participantResponse = await endpoint.handler(requestFor({
+        userId: 'user-2', email: 'participant@example.com', isPortalAdmin: false
+    }), context);
+    assert.equal(participantResponse.status, 403, 'participant must not delete teams');
+
+    const guessedIdResponse = await endpoint.handler(requestFor({
+        userId: 'user-2', email: 'participant@example.com', isPortalAdmin: false
+    }, '00000000-0000-4000-8000-000000000000'), context);
+    assert.equal(guessedIdResponse.status, 404, 'guessing a team ID must not grant deletion access');
+
+    const response = await endpoint.handler(requestFor({
+        userId: 'user-1', email: 'admin@example.com', isPortalAdmin: true
+    }), context);
     assert.equal(response.status, 200);
     assert.deepEqual(folderDeletes, ['Events/event-1/team-1']);
     assert.deepEqual(deleted.teams, ['team-1']);
