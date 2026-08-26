@@ -1513,7 +1513,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 hotelNights = currentParticipation?.hotelNights || {};
             }
-            await API.participations.updateHotel(participationId, hotelNights, true);
+            const profileVerification = document.getElementById('edit-data-verified').checked;
+            await API.participations.updateHotel(participationId, hotelNights, profileVerification);
 
             const rolesTab = document.getElementById('tab-roles-btn');
             if (!rolesTab.classList.contains('hidden')) {
