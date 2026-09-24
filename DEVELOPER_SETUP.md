@@ -10,6 +10,26 @@ There is no local database, no local file storage, and no local mail server — 
 
 ---
 
+## 0. Fastest path: mock dev server (frontend work, no Azure at all)
+
+If you only need to work on HTML/CSS/JS, skip everything below and run the mock server. It serves `src/` and answers every `/api/*` call from in-memory sample data.
+
+```powershell
+npm install
+npm run dev
+```
+
+Open **http://localhost:4280/dev-login** and pick a user (portal admin, team admin, participant, judge). Or use the normal login page with any of those emails and the OTP code `123456`.
+
+- Edit anything in `src/`, refresh the browser. No build step.
+- Sample data lives in `dev/mock-api/fixtures.js`. Change it freely; it resets on restart and never reaches Azure.
+- Endpoints the mock does not implement return an empty list, so pages never crash. The server logs each unmocked call.
+- Not covered: sending mail, SharePoint uploads, reCAPTCHA, real OTP. Use the tiers below for those.
+
+The `dev/` folder is not part of the Static Web App build (`app_location` is `/src`), so nothing here is deployed.
+
+---
+
 ## 1. Prerequisites (install these first)
 
 | Tool | Why | Check |
