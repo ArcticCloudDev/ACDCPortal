@@ -4,9 +4,18 @@
   "description": "ACDC Team Registration Portal",
   "scripts": {
     "build": "echo 'No build step required - static files'",
-    "test": "node tests/api-auth-posture.test.js && node tests/data-access-policy.test.js && node tests/team-delete-cascade.test.js && node tests/profile-verification-persistence.test.js && node tests/auth-config.test.js && node tests/auth-session.test.js && node tests/server-auth-transport.test.js && node tests/event-badges-policy.test.js && node tests/participant-interest-access.test.js && node tests/pending-team-contact-policy.test.js && node tests/stale-team-contact-cleanup.test.js && node tests/registration-completion-auth.test.js && node tests/team-registration-redirect.test.js && node tests/otp-rate-limit-separation.test.js && node tests/participant-commitment-capacity.test.js"
+    "test": "node tests/api-auth-posture.test.js && node tests/data-access-policy.test.js && node tests/team-delete-cascade.test.js && node tests/profile-verification-persistence.test.js && node tests/auth-config.test.js && node tests/auth-session.test.js && node tests/server-auth-transport.test.js && node tests/event-badges-policy.test.js && node tests/participant-interest-access.test.js && node tests/pending-team-contact-policy.test.js && node tests/stale-team-contact-cleanup.test.js && node tests/registration-completion-auth.test.js && node tests/team-registration-redirect.test.js && node tests/otp-rate-limit-separation.test.js && node tests/participant-commitment-capacity.test.js",
+    "dev": "node dev/mock-api/server.js"
   },
-  "keywords": ["azure", "static-web-apps", "entra", "otp"],
+  "keywords": [
+    "azure",
+    "static-web-apps",
+    "entra",
+    "otp"
+  ],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "express": "^5.2.1"
+  }
 }
