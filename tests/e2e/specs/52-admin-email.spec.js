@@ -49,15 +49,13 @@ test('admin sends a quick announcement to custom recipients', async ({ page, har
     expect(log).toMatchObject({ RecipientCount: 2, ResultsSent: 2, ResultsFailed: 0, Status: 'completed' });
 });
 
-test('BUG (high): quick email recipients receive the message the admin wrote', async ({ page, harness, loginAs, dialogs }) => {
-    test.fail(true, 'admin-email.html posts {subject, content, ctaUrl, ctaText} at the top level; email.js email-send merges only '
-        + 'body.data, so {{content}} and {{subject}} render empty. The preview uses `data` and looks right.');
+test('quick email recipients receive the message the admin wrote', async ({ page, harness, loginAs, dialogs }) => {
     const w = buildWorld();
     await harness.seed(w.seed());
     await loginAs(w.admin);
     await sendQuickEmail(page, dialogs);
     const mail = await harness.waitForMail('alpha@e2e.test', { subject: 'Doors open at 09:00' });
-    expect(mail.html).toContain('Bring your laptop charger.');  // <- bug
+    expect(mail.html).toContain('Bring your laptop charger.');
 });
 
 test('participant recipients for an event are resolved from team membership', async ({ apiAs, harness }) => {
@@ -163,34 +161,31 @@ test('a failed delivery is recorded and retried on the next scheduled run', asyn
     expect(second.emailsFailed).toBe(0);
 });
 
-test.describe('known broken sequence operations', () => {
-    test('BUG: copying a sequence copies its emails', async ({ apiAs, harness }) => {
-        test.fail(true, 'sequences.js:250 spreads a `stats` object into the insert -> "Invalid column name Stats" -> 500, leaving an orphan "(Copy)"');
+test.describe('sequence and badge deletes respect foreign keys', () => {
+    test('copying a sequence copies its emails', async ({ apiAs, harness }) => {
         const w = buildWorld();
         const { seq, campaign } = sequenceSeed(w.event, { status: 'draft' });
         await harness.seed(mergeSeeds(w.seed(), { sequences: [seq], 'email-campaigns': [campaign] }));
         const res = await (await apiAs(w.admin)).post(`/api/sequences/${seq.id}/copy`);
-        expect(res.status()).toBe(201);  // <- bug
+        expect(res.status()).toBe(201);
         expect((await res.json()).emailCount).toBe(1);
     });
 
-    test('BUG: deleting a sequence that has emails', async ({ apiAs, harness }) => {
-        test.fail(true, 'sequences.js deletes the Sequence before its EmailCampaigns -> FK_EmailCampaigns_Sequences violation -> 500');
+    test('deleting a sequence that has emails', async ({ apiAs, harness }) => {
         const w = buildWorld();
         const { seq, campaign } = sequenceSeed(w.event, { status: 'draft' });
         w.event.sequenceId = null;
         await harness.seed(mergeSeeds(w.seed(), { sequences: [seq], 'email-campaigns': [campaign] }));
         const res = await (await apiAs(w.admin)).delete(`/api/sequences/${seq.id}`);
-        expect(res.status()).toBe(200);  // <- bug
+        expect(res.status()).toBe(200);
         expect(await rows('SELECT * FROM Sequences')).toHaveLength(0);
     });
 
-    test('BUG: deleting a library badge that is assigned to an event', async ({ apiAs, harness }) => {
-        test.fail(true, 'badges.js deletes the Badge before its EventBadges -> FK_EventBadges_Badges violation -> 500');
+    test('deleting a library badge that is assigned to an event', async ({ apiAs, harness }) => {
         const w = buildWorld();
         const b = f.badge();
         await harness.seed(mergeSeeds(w.seed(), { badges: [b], 'event-badges': [f.eventBadge(w.event, b)] }));
         const res = await (await apiAs(w.admin)).delete(`/api/badges/${b.id}`);
-        expect(res.status()).toBe(200);  // <- bug
+        expect(res.status()).toBe(200);
     });
 });

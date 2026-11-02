@@ -2,14 +2,15 @@ const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
+const StorageModule = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
+const { isGuid } = require('../shared/id');
+const { isEmail } = require('../shared/validate');
+const q = require('../shared/admin-queries');
 
 const deliveriesStorage = new Storage('email-deliveries');
 const leadsStorage = new Storage('interest-leads');
 const campaignsStorage = new Storage('email-campaigns');
-const eventsStorage = new Storage('events');
-const usersStorage = new Storage('users');
-const participationsStorage = new Storage('participations');
 
 app.http('deliveries-event', {
     methods: ['GET'],
@@ -24,8 +25,7 @@ app.http('deliveries-event', {
 
             const eventId = request.params.eventId;
 
-            const events = await eventsStorage.getAll();
-            const event = events.find(e => e.id === eventId);
+            const event = isGuid(eventId) ? await StorageModule.events.getById(eventId) : null;
 
             if (!event) {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
@@ -42,28 +42,12 @@ app.http('deliveries-event', {
                 };
             }
 
-            const sequenceCampaigns = (await campaignsStorage.getAll())
-                .filter(c => c.sequenceId === event.sequenceId && c.type === 'sequence')
-                .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
+            const sequenceCampaigns = await q.campaignsForSequence(event.sequenceId, { type: 'sequence' });
+            const eventDeliveries = await q.deliveriesForCampaigns(sequenceCampaigns.map(c => c.id));
+            const eventLeads = await q.verifiedLeadsForEvent(eventId);
+            const eventParticipations = await q.participationsForEvent(eventId);
+            const users = await q.usersByIds(eventParticipations.map(p => p.userId));
 
-            const campaignIds = new Set(
-                sequenceCampaigns
-                    .map(c => (c.id || '').toString().toLowerCase())
-                    .filter(Boolean)
-            );
-
-            const allEventDeliveries = await deliveriesStorage.getAll();
-            const eventDeliveries = allEventDeliveries.filter(d =>
-                campaignIds.has((d.campaignId || '').toString().toLowerCase())
-            );
-
-            const eventLeads = (await leadsStorage.getAll())
-                .filter(l => l.eventId === eventId && l.verified);
-
-            const eventParticipations = (await participationsStorage.getAll())
-                .filter(p => p.eventId === eventId);
-
-            const users = await usersStorage.getAll();
             const recipients = eventParticipations
                 .map(p => {
                     const user = users.find(u => u.id === p.userId);
@@ -103,6 +87,24 @@ app.http('deliveries-event', {
     }
 });
 
+// Deliveries are created for interest leads (leadId), participants (userId) or plain
+// addresses; the greeting name comes from whichever record exists.
+async function recipientFirstName(delivery) {
+    if (delivery.leadId && isGuid(delivery.leadId)) {
+        const lead = await leadsStorage.getById(delivery.leadId);
+        if (lead?.firstName) return lead.firstName;
+    }
+    if (delivery.userId && isGuid(delivery.userId)) {
+        const user = await StorageModule.users.getById(delivery.userId);
+        if (user?.firstName) return user.firstName;
+    }
+    if (delivery.email) {
+        const user = await StorageModule.users.getByEmail(delivery.email);
+        if (user?.firstName) return user.firstName;
+    }
+    return 'Friend';
+}
+
 app.http('deliveries-retry', {
     methods: ['POST'],
     authLevel: 'function',
@@ -115,10 +117,13 @@ app.http('deliveries-retry', {
             }
 
             const body = await request.json();
-            const { deliveryId } = body;
+            const { deliveryId } = body || {};
 
             if (!deliveryId) {
                 return { status: 400, jsonBody: { error: 'deliveryId is required' } };
+            }
+            if (!isGuid(deliveryId)) {
+                return { status: 400, jsonBody: { error: 'deliveryId must be a GUID' } };
             }
 
             const delivery = await deliveriesStorage.getById(deliveryId);
@@ -127,17 +132,16 @@ app.http('deliveries-retry', {
                 return { status: 404, jsonBody: { error: 'Delivery not found' } };
             }
 
-            const campaign = await campaignsStorage.getById(delivery.campaignId);
+            const campaign = isGuid(delivery.campaignId) ? await campaignsStorage.getById(delivery.campaignId) : null;
 
             if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
-
-            const lead = await leadsStorage.getById(delivery.leadId);
-
-            if (!lead) {
-                return { status: 404, jsonBody: { error: 'Lead not found' } };
+            if (!isEmail(delivery.email)) {
+                return { status: 400, jsonBody: { error: 'Delivery has no valid recipient address' } };
             }
+
+            const firstName = await recipientFirstName(delivery);
 
             try {
                 context.log(`[RETRY] Sending email to ${delivery.email}: "${campaign.subject}"`);
@@ -146,7 +150,7 @@ app.http('deliveries-retry', {
                     to: delivery.email,
                     subject: campaign.subject,
                     htmlContent: campaign.content,
-                    firstName: lead.firstName || 'Friend',
+                    firstName,
                     ctaUrl: campaign.ctaUrl,
                     ctaText: campaign.ctaText
                 });
@@ -168,8 +172,7 @@ app.http('deliveries-retry', {
                 };
             } catch (err) {
                 await logError(context, err);
-                context.log(`[RETRY] ERROR sending email: ${err.message}`);
-                context.error(err);
+                context.error(`[RETRY] ERROR sending email: ${err.message}`);
 
                 const failedDelivery = await deliveriesStorage.update(deliveryId, {
                     status: 'failed',
@@ -177,10 +180,10 @@ app.http('deliveries-retry', {
                 });
 
                 return {
-                    status: 500,
+                    status: 502,
                     jsonBody: {
                         error: 'Failed to send email',
-                        message: err.message,
+                        message: 'The mail provider rejected the message; the delivery stays marked as failed.',
                         delivery: failedDelivery
                     }
                 };
@@ -205,24 +208,22 @@ app.http('deliveries-delete-recipient', {
             }
 
             const body = await request.json();
-            const { email } = body;
+            const { email } = body || {};
 
             if (!email) {
                 return { status: 400, jsonBody: { error: 'email is required' } };
             }
-
-            const normalizedEmail = email.toLowerCase().trim();
-            const all = await deliveriesStorage.getAll();
-            const toDelete = all.filter(d => d.email?.toLowerCase() === normalizedEmail);
-
-            for (const d of toDelete) {
-                await deliveriesStorage.delete(d.id);
+            if (!isEmail(email)) {
+                return { status: 400, jsonBody: { error: 'email must be a valid address' } };
             }
 
-            context.log(`Deleted ${toDelete.length} delivery record(s) for ${normalizedEmail}`);
+            const normalizedEmail = email.toLowerCase().trim();
+            const count = await q.deleteDeliveriesForEmail(normalizedEmail);
+
+            context.log(`Deleted ${count} delivery record(s) for ${normalizedEmail}`);
             return {
                 status: 200,
-                jsonBody: { message: `Deleted ${toDelete.length} delivery record(s) for ${normalizedEmail}`, count: toDelete.length }
+                jsonBody: { message: `Deleted ${count} delivery record(s) for ${normalizedEmail}`, count }
             };
         } catch (error) {
             await logError(context, error);

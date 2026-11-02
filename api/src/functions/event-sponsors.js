@@ -1,9 +1,18 @@
 const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
-const { Storage } = require('../shared/storage');
 const { getPool, sql } = require('../shared/sql');
-const { generateId } = require('../shared/id');
+const { generateId, isGuid } = require('../shared/id');
+const { isEmail } = require('../shared/validate');
+const { eventExists } = require('../shared/admin-queries');
+
+const VALID_STATUSES = new Set(['reached-out', 'negotiating', 'declined', 'confirmed']);
+
+function badRequest(message) {
+    const error = new Error(message);
+    error.status = 400;
+    return error;
+}
 
 function mapSponsorFinancial(row) {
     return {
@@ -23,35 +32,56 @@ function mapSponsorFinancial(row) {
     };
 }
 
+function trimmedString(value, name, max) {
+    if (value === undefined || value === null || value === '') return null;
+    if (typeof value !== 'string' && typeof value !== 'number') throw badRequest(`${name} must be a string`);
+    const v = String(value).trim();
+    if (v.length > max) throw badRequest(`${name} must be at most ${max} characters`);
+    return v || null;
+}
+
 function normalizeSponsorPayload(body = {}, { isUpdate = false } = {}) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw badRequest('Request body must be a JSON object');
     const payload = {};
     const has = (k) => !isUpdate || Object.prototype.hasOwnProperty.call(body, k);
 
     if (has('companyName')) {
-        const v = (body.companyName || '').toString().trim();
-        if (!v) throw new Error('companyName is required');
+        const v = trimmedString(body.companyName, 'companyName', 200);
+        if (!v) throw badRequest('companyName is required');
         payload.description = v;
     }
-    if (has('contactPerson'))  payload.contactPerson  = body.contactPerson  ? body.contactPerson.toString().trim()                    : null;
-    if (has('phoneNumber'))    payload.phoneNumber    = body.phoneNumber    ? body.phoneNumber.toString().trim()                      : null;
-    if (has('email'))          payload.contactEmail   = body.email          ? body.email.toString().trim().toLowerCase()              : null;
-    if (has('notes'))          payload.notes          = body.notes          ? body.notes.toString().trim()                            : null;
+    if (has('contactPerson'))  payload.contactPerson  = trimmedString(body.contactPerson, 'contactPerson', 200);
+    if (has('phoneNumber'))    payload.phoneNumber    = trimmedString(body.phoneNumber, 'phoneNumber', 50);
+    if (has('email')) {
+        const v = trimmedString(body.email, 'email', 320);
+        if (v && !isEmail(v)) throw badRequest('email must be a valid email address');
+        payload.contactEmail = v ? v.toLowerCase() : null;
+    }
+    if (has('notes'))          payload.notes          = body.notes === undefined || body.notes === null || body.notes === '' ? null : String(body.notes).trim() || null;
     if (has('amount')) {
         const raw = body.amount;
         if (raw === '' || raw == null) { payload.amount = 0; }
         else {
             const n = Number(raw);
-            if (!Number.isFinite(n) || n < 0) throw new Error('amount must be a non-negative number');
+            if (!Number.isFinite(n) || n < 0 || n > 9999999999) throw badRequest('amount must be a non-negative number');
             payload.amount = n;
         }
     }
     if (has('sponsorStatus') || has('status')) {
-        const validStatuses = new Set(['reached-out', 'negotiating', 'declined', 'confirmed']);
-        const s = ((body.sponsorStatus || body.status) || 'reached-out').toString().trim().toLowerCase();
-        if (!validStatuses.has(s)) throw new Error('Invalid sponsor status');
+        const raw = body.sponsorStatus ?? body.status;
+        const s = (raw === undefined || raw === null || raw === '') ? 'reached-out' : String(raw).trim().toLowerCase();
+        if (!VALID_STATUSES.has(s)) throw badRequest('Invalid sponsor status');
         payload.sponsorStatus = s;
     }
     return payload;
+}
+
+async function failureResponse(context, error, fallback) {
+    if (error && error.status === 400) {
+        return { status: 400, jsonBody: { error: error.message } };
+    }
+    await logError(context, error);
+    return { status: 500, jsonBody: { error: fallback } };
 }
 
 app.http('event-sponsors-list', {
@@ -66,6 +96,7 @@ app.http('event-sponsors-list', {
             }
 
             const eventId = request.params.eventId;
+            if (!isGuid(eventId)) return { status: 404, jsonBody: { error: 'Event not found' } };
             const pool = await getPool();
             const result = await pool.request()
                 .input('eventId', sql.UniqueIdentifier, eventId)
@@ -96,6 +127,9 @@ app.http('event-sponsors-create', {
             }
 
             const eventId = request.params.eventId;
+            if (!isGuid(eventId) || !(await eventExists(eventId))) {
+                return { status: 404, jsonBody: { error: 'Event not found' } };
+            }
             const body = await request.json();
             const payload = normalizeSponsorPayload(body);
             const id = generateId();
@@ -125,9 +159,7 @@ app.http('event-sponsors-create', {
                 .query('SELECT * FROM EventFinancials WHERE Id = @id');
             return { status: 201, jsonBody: mapSponsorFinancial(row.recordset[0]) };
         } catch (error) {
-            const status = /required|Invalid sponsor|amount must/i.test(error.message) ? 400 : 500;
-            if (status === 500) await logError(context, error);
-            return { status, jsonBody: { error: status === 400 ? error.message : 'Failed to create sponsor' } };
+            return failureResponse(context, error, 'Failed to create sponsor');
         }
     }
 });
@@ -144,6 +176,7 @@ app.http('event-sponsors-update', {
             }
 
             const { eventId, sponsorId } = request.params;
+            if (!isGuid(eventId) || !isGuid(sponsorId)) return { status: 404, jsonBody: { error: 'Sponsor not found' } };
             const body = await request.json();
             const payload = normalizeSponsorPayload(body, { isUpdate: true });
             const pool = await getPool();
@@ -193,9 +226,7 @@ app.http('event-sponsors-update', {
                 .query('SELECT * FROM EventFinancials WHERE Id = @id');
             return { status: 200, jsonBody: mapSponsorFinancial(updated.recordset[0]) };
         } catch (error) {
-            const status = /required|Invalid sponsor|amount must/i.test(error.message) ? 400 : 500;
-            if (status === 500) await logError(context, error);
-            return { status, jsonBody: { error: status === 400 ? error.message : 'Failed to update sponsor' } };
+            return failureResponse(context, error, 'Failed to update sponsor');
         }
     }
 });
@@ -212,6 +243,7 @@ app.http('event-sponsors-delete', {
             }
 
             const { eventId, sponsorId } = request.params;
+            if (!isGuid(eventId) || !isGuid(sponsorId)) return { status: 404, jsonBody: { error: 'Sponsor not found' } };
             const pool = await getPool();
             const result = await pool.request()
                 .input('id',      sql.UniqueIdentifier, sponsorId)

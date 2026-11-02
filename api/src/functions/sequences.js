@@ -2,11 +2,21 @@ const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
-const { generateId } = require('../shared/id');
+const { generateId, isGuid } = require('../shared/id');
+const q = require('../shared/admin-queries');
 
 const sequencesStorage = new Storage('sequences');
 const campaignsStorage = new Storage('email-campaigns');
-const deliveriesStorage = new Storage('email-deliveries');
+
+function validateSequenceBody(body, { requireName }) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return 'Request body must be a JSON object';
+    if (requireName || body.name !== undefined) {
+        if (typeof body.name !== 'string' || !body.name.trim()) return 'Name is required';
+        if (body.name.length > 200) return 'Name must be at most 200 characters';
+    }
+    if (body.description !== undefined && body.description !== null && typeof body.description !== 'string') return 'description must be a string';
+    return null;
+}
 
 app.http('sequences-list', {
     methods: ['GET'],
@@ -20,20 +30,16 @@ app.http('sequences-list', {
             }
 
             let sequences = await sequencesStorage.getAll();
-
-            const campaigns = await campaignsStorage.getAll();
+            const stats = await q.sequenceStats();
 
             sequences = sequences.map(seq => {
-                const seqEmails = campaigns.filter(c => c.sequenceId === seq.id);
-                const totalSent = seqEmails.reduce((sum, e) => sum + (e.stats?.sent || 0), 0);
-                const totalFailed = seqEmails.reduce((sum, e) => sum + (e.stats?.failed || 0), 0);
-
+                const s = stats[String(seq.id).toLowerCase()] || { emailCount: 0, sent: 0, failed: 0 };
                 return {
                     ...seq,
-                    emailCount: seqEmails.length,
+                    emailCount: s.emailCount,
                     stats: {
-                        sent: totalSent,
-                        failed: totalFailed
+                        sent: s.sent,
+                        failed: s.failed
                     }
                 };
             });
@@ -62,27 +68,23 @@ app.http('sequences-get', {
 
             const sequenceId = request.params.id;
 
-            const sequence = await sequencesStorage.getById(sequenceId);
+            const sequence = isGuid(sequenceId) ? await sequencesStorage.getById(sequenceId) : null;
 
             if (!sequence) {
                 return { status: 404, jsonBody: { error: 'Sequence not found' } };
             }
 
-            const allCampaigns = await campaignsStorage.getAll();
-            const emails = allCampaigns
-                .filter(c => c.sequenceId === sequenceId)
-                .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
-
-            const deliveries = await deliveriesStorage.getAll();
+            const emails = await q.campaignsForSequence(sequenceId);
+            const stats = await q.deliveryStatsForCampaigns(emails.map(e => e.id));
 
             const emailsWithStats = emails.map(email => {
-                const emailDeliveries = deliveries.filter(d => d.campaignId === email.id);
+                const s = stats[String(email.id).toLowerCase()] || { sent: 0, failed: 0, pending: 0 };
                 return {
                     ...email,
                     stats: {
-                        sent: emailDeliveries.filter(d => d.status === 'sent').length,
-                        failed: emailDeliveries.filter(d => d.status === 'failed').length,
-                        pending: emailDeliveries.filter(d => d.status === 'pending').length
+                        sent: s.sent,
+                        failed: s.failed,
+                        pending: s.pending
                     }
                 };
             });
@@ -114,15 +116,15 @@ app.http('sequences-create', {
             }
 
             const body = await request.json();
-            const { name, description } = body;
-
-            if (!name) {
-                return { status: 400, jsonBody: { error: 'Name is required' } };
+            const validationError = validateSequenceBody(body, { requireName: true });
+            if (validationError) {
+                return { status: 400, jsonBody: { error: validationError } };
             }
+            const { name, description } = body;
 
             const sequence = {
                 id: generateId(),
-                name,
+                name: name.trim(),
                 description: description || '',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
@@ -152,16 +154,20 @@ app.http('sequences-update', {
 
             const sequenceId = request.params.id;
             const body = await request.json();
+            const validationError = validateSequenceBody(body, { requireName: false });
+            if (validationError) {
+                return { status: 400, jsonBody: { error: validationError } };
+            }
             const { name, description } = body;
 
-            const existing = await sequencesStorage.getById(sequenceId);
+            const existing = isGuid(sequenceId) ? await sequencesStorage.getById(sequenceId) : null;
 
             if (!existing) {
                 return { status: 404, jsonBody: { error: 'Sequence not found' } };
             }
 
             const updates = {
-                name: name || existing.name,
+                name: name ? name.trim() : existing.name,
                 description: description !== undefined ? description : existing.description,
                 updatedAt: new Date().toISOString()
             };
@@ -190,12 +196,13 @@ app.http('sequences-delete', {
 
             const sequenceId = request.params.id;
 
-            await sequencesStorage.delete(sequenceId);
-
-            const allCampaignsToDelete = await campaignsStorage.getAll();
-            for (const campaign of allCampaignsToDelete.filter(c => c.sequenceId === sequenceId)) {
-                await campaignsStorage.delete(campaign.id);
+            const existing = isGuid(sequenceId) ? await sequencesStorage.getById(sequenceId) : null;
+            if (!existing) {
+                return { status: 404, jsonBody: { error: 'Sequence not found' } };
             }
+
+            // Deliveries -> campaigns -> sequence (FK order), and detach any event using it.
+            await q.deleteSequenceCascade(sequenceId);
 
             return { status: 200, jsonBody: { message: 'Sequence deleted' } };
         } catch (error) {
@@ -219,39 +226,47 @@ app.http('sequences-copy', {
 
             const sourceId = request.params.id;
 
-            const sourceSequence = await sequencesStorage.getById(sourceId);
+            const sourceSequence = isGuid(sourceId) ? await sequencesStorage.getById(sourceId) : null;
 
             if (!sourceSequence) {
                 return { status: 404, jsonBody: { error: 'Source sequence not found' } };
             }
 
+            const sourceEmails = await q.campaignsForSequence(sourceId);
+
             const newSequence = {
                 id: generateId(),
-                name: sourceSequence.name + ' (Copy)',
+                name: `${sourceSequence.name} (Copy)`.slice(0, 200),
                 description: sourceSequence.description,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
 
-            await sequencesStorage.create(newSequence);
-
-            const allSourceCampaigns = await campaignsStorage.getAll();
-            const sourceEmails = allSourceCampaigns
-                .filter(c => c.sequenceId === sourceId)
-                .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
-
-            const newEmails = sourceEmails.map(email => ({
-                ...email,
+            // Only real EmailCampaigns columns are copied; derived fields (stats) stay out.
+            const newEmails = sourceEmails.map((email, index) => ({
                 id: generateId(),
                 sequenceId: newSequence.id,
-                createdAt: new Date().toISOString(),
+                subject: email.subject,
+                content: email.content,
+                ctaUrl: email.ctaUrl || null,
+                ctaText: email.ctaText || null,
+                type: email.type || 'sequence',
+                sequenceOrder: email.sequenceOrder || index + 1,
                 status: 'draft',
                 scheduledSendTime: null,
-                stats: { sent: 0, failed: 0 }
+                createdAt: new Date().toISOString(),
+                createdBy: auth.user.userId || null
             }));
 
-            for (const email of newEmails) {
-                await campaignsStorage.create(email);
+            await sequencesStorage.create(newSequence);
+            try {
+                for (const email of newEmails) {
+                    await campaignsStorage.create(email);
+                }
+            } catch (error) {
+                // Do not leave an orphan "(Copy)" behind.
+                await q.deleteSequenceCascade(newSequence.id).catch(() => {});
+                throw error;
             }
 
             return {

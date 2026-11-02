@@ -4,12 +4,23 @@ const { logError } = require('../shared/error-log');
 const { readData, writeData } = require('../shared/storage');
 const Storage = require('../shared/storage');
 const { sendEmail, processTemplate } = require('../shared/mail');
-const { uploadFile } = require('../shared/storage');
 const { buildInvitationEmail } = require('../shared/invitation-email');
 const { buildEmailHtml } = require('../shared/email-builder');
-const { generateId } = require('../shared/id');
-const path = require('path');
-const fs = require('fs').promises;
+const { generateId, isGuid } = require('../shared/id');
+const { isEmail } = require('../shared/validate');
+
+const KNOWN_TEMPLATE_KEYS = ['invitation-judge', 'invitation-committee', 'interest-acknowledgment', 'welcome'];
+const MAX_THEME_IMAGE_BYTES = 512 * 1024;
+
+// Image type from the file's leading bytes; the client-supplied type/extension is not trusted.
+function sniffImageType(buffer) {
+    if (buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47
+        && buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a) return 'png';
+    if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpeg';
+    if (buffer.length >= 6 && buffer.toString('latin1', 0, 6).match(/^GIF8[79]a$/)) return 'gif';
+    if (buffer.length >= 12 && buffer.toString('latin1', 0, 4) === 'RIFF' && buffer.toString('latin1', 8, 12) === 'WEBP') return 'webp';
+    return null;
+}
 
 function extractImageSrc(html) {
     if (!html) return '';
@@ -37,36 +48,55 @@ app.http('system-emails-upload-theme', {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
 
-            const formData = await request.formData();
+            let formData;
+            try {
+                formData = await request.formData();
+            } catch (e) {
+                return { status: 400, jsonBody: { error: 'Expected multipart/form-data with an image' } };
+            }
             const imageFile = formData.get('image');
             const eventId = formData.get('eventId');
             const templateType = formData.get('templateType');
 
-            if (!imageFile || !eventId || !templateType) {
+            if (!imageFile || typeof imageFile === 'string' || !eventId || !templateType) {
                 return { status: 400, jsonBody: { error: 'Missing required fields' } };
             }
+            if (!KNOWN_TEMPLATE_KEYS.includes(templateType)) {
+                return { status: 400, jsonBody: { error: `templateType must be one of: ${KNOWN_TEMPLATE_KEYS.join(', ')}` } };
+            }
+            if (!isGuid(eventId)) {
+                return { status: 400, jsonBody: { error: 'eventId must be a GUID' } };
+            }
+            if (typeof imageFile.size === 'number' && imageFile.size > MAX_THEME_IMAGE_BYTES) {
+                return { status: 400, jsonBody: { error: 'Image too large. Maximum size is 512 KB.' } };
+            }
 
-            const ext = path.extname(imageFile.name);
-            const filename = `${templateType}_${eventId}_${Date.now()}${ext}`;
-            const filepath = `email-themes/${filename}`;
+            const event = await Storage.events.getById(eventId);
+            if (!event) {
+                return { status: 404, jsonBody: { error: 'Event not found' } };
+            }
 
             const buffer = Buffer.from(await imageFile.arrayBuffer());
+            if (buffer.length === 0 || buffer.length > MAX_THEME_IMAGE_BYTES) {
+                return { status: 400, jsonBody: { error: 'Image too large. Maximum size is 512 KB.' } };
+            }
+            const imageType = sniffImageType(buffer);
+            if (!imageType) {
+                return { status: 400, jsonBody: { error: 'Image must be a PNG, JPEG, GIF or WebP file' } };
+            }
 
-            const fs = require('fs').promises;
-            const themesDir = path.join(__dirname, '../../data/email-themes');
-
-            await fs.mkdir(themesDir, { recursive: true });
-
-            const fullPath = path.join(themesDir, filename);
-            await fs.writeFile(fullPath, buffer);
-
-            const publicUrl = `/data/email-themes/${filename}`;
+            // Inline data URI: mail.js converts base64 images into CID attachments when sending,
+            // and nothing is written to the (non-durable, unserved) Functions filesystem.
+            const contentType = `image/${imageType}`;
+            const filename = `${templateType}_${eventId.toLowerCase()}_${Date.now()}.${imageType === 'jpeg' ? 'jpg' : imageType}`;
 
             return {
                 status: 200,
                 jsonBody: {
-                    url: publicUrl,
-                    filename: filename
+                    url: `data:${contentType};base64,${buffer.toString('base64')}`,
+                    filename,
+                    contentType,
+                    size: buffer.length
                 }
             };
         } catch (error) {
@@ -97,8 +127,6 @@ app.http('system-emails-config-get', {
         }
     }
 });
-
-const KNOWN_TEMPLATE_KEYS = ['invitation-judge', 'invitation-committee', 'interest-acknowledgment', 'welcome'];
 
 function validateEmailConfig(config) {
     if (!config || typeof config !== 'object' || Array.isArray(config)) return 'Config must be a plain object';
@@ -142,6 +170,23 @@ app.http('system-emails-config-put', {
     }
 });
 
+// Resolves the template + event pair shared by test/preview/send; returns { error } or { template, event }.
+async function resolveTemplateAndEvent(templateType, eventId) {
+    if (typeof templateType !== 'string' || !KNOWN_TEMPLATE_KEYS.includes(templateType)) {
+        return { error: { status: 404, body: { error: 'Template not found' } } };
+    }
+    const config = await readData('system-email-config.json');
+    const template = config.templates[templateType];
+    if (!template) {
+        return { error: { status: 404, body: { error: 'Template not found' } } };
+    }
+    const event = isGuid(eventId) ? await Storage.events.getById(eventId) : null;
+    if (!event) {
+        return { error: { status: 404, body: { error: 'Event not found' } } };
+    }
+    return { template, event };
+}
+
 app.http('system-emails-test', {
     methods: ['POST'],
     authLevel: 'function',
@@ -155,18 +200,15 @@ app.http('system-emails-test', {
 
             const { templateType, eventId, testEmail, data } = await request.json();
 
-            const config = await readData('system-email-config.json');
-            const template = config.templates[templateType];
-
-            if (!template) {
-                return { status: 404, jsonBody: { error: 'Template not found' } };
+            if (!isEmail(testEmail)) {
+                return { status: 400, jsonBody: { error: 'testEmail must be a valid email address' } };
             }
 
-            const event = await Storage.events.getById(eventId);
-
-            if (!event) {
-                return { status: 404, jsonBody: { error: 'Event not found' } };
+            const resolved = await resolveTemplateAndEvent(templateType, eventId);
+            if (resolved.error) {
+                return { status: resolved.error.status, jsonBody: resolved.error.body };
             }
+            const { template, event } = resolved;
 
             let htmlContent, subject;
 
@@ -194,7 +236,7 @@ app.http('system-emails-test', {
                 const globalDefaults = template.editableSections;
 
                 const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
-                    const fakeInviteId = generateId();
+                const fakeInviteId = generateId();
 
                 const baseData = {
                     firstName: data?.fullName?.split(' ')[0] || 'Test',
@@ -202,10 +244,11 @@ app.http('system-emails-test', {
                     ...data,
                     eventName: event.name,
                     portalUrl: portalUrl,
-                    acceptUrl: `${portalUrl}?invite=${fakeInviteId}`,
+                    acceptUrl: `${portalUrl}/accept-invitation.html?invite=${fakeInviteId}`,
                     inviteId: fakeInviteId,
                     inviterName: data?.teamAdminName || 'Event Organizer'
                 };
+                // bodyText/closingText are admin-authored HTML and travel through RAW_HTML_KEYS.
                 const mergeData = {
                     ...baseData,
                     bodyText: processTemplate(eventTheme.body || globalDefaults.body || '', baseData),
@@ -214,7 +257,7 @@ app.http('system-emails-test', {
 
                 htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
-                subject = processTemplate(eventTheme.subject || template.subject, mergeData);
+                subject = processTemplate(eventTheme.subject || template.subject, mergeData, { html: false });
             }
 
             await sendEmail({
@@ -245,15 +288,13 @@ app.http('system-emails-preview', {
 
             const { templateType, eventId, bodyText, closingText } = await request.json();
 
-            const config = await readData('system-email-config.json');
-            const template = config.templates[templateType];
-            if (!template) {
-                return { status: 404, jsonBody: { error: 'Template not found' } };
+            const resolved = await resolveTemplateAndEvent(templateType, eventId);
+            if (resolved.error) {
+                return { status: resolved.error.status, jsonBody: resolved.error.body };
             }
-
-            const event = await Storage.events.getById(eventId);
-            if (!event) {
-                return { status: 404, jsonBody: { error: 'Event not found' } };
+            const { template, event } = resolved;
+            if ((bodyText !== undefined && typeof bodyText !== 'string') || (closingText !== undefined && typeof closingText !== 'string')) {
+                return { status: 400, jsonBody: { error: 'bodyText and closingText must be strings' } };
             }
 
             const eventTheme = template.eventThemes?.[eventId] || {};
@@ -270,7 +311,7 @@ app.http('system-emails-preview', {
                 eventName: event.name,
                 inviterName: 'Event Organizer',
                 portalUrl: portalUrl,
-                acceptUrl: `${portalUrl}?invite=${fakeInviteId}`,
+                acceptUrl: `${portalUrl}/accept-invitation.html?invite=${fakeInviteId}`,
                 inviteId: fakeInviteId,
                 interestLink: `${portalUrl}/event.html`
             };
@@ -312,24 +353,22 @@ app.http('system-emails-send', {
 
             const { templateType, eventId, to, data } = await request.json();
 
-            const config = await readData('system-email-config.json');
-            const template = config.templates[templateType];
-
-            if (!template) {
-                return { status: 404, jsonBody: { error: 'Template not found' } };
+            const recipients = Array.isArray(to) ? to : [to];
+            if (recipients.length === 0 || recipients.length > 100 || !recipients.every(isEmail)) {
+                return { status: 400, jsonBody: { error: 'to must be a valid email address or a list of at most 100 addresses' } };
             }
 
-            const event = await Storage.events.getById(eventId);
-
-            if (!event) {
-                return { status: 404, jsonBody: { error: 'Event not found' } };
+            const resolved = await resolveTemplateAndEvent(templateType, eventId);
+            if (resolved.error) {
+                return { status: resolved.error.status, jsonBody: resolved.error.body };
             }
+            const { template, event } = resolved;
 
             const eventTheme = template.eventThemes[eventId] || {};
             const globalDefaults = template.editableSections;
 
             const baseData = {
-                ...data,
+                ...(data && typeof data === 'object' ? data : {}),
                 eventName: event.name,
                 portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'
             };
@@ -341,7 +380,7 @@ app.http('system-emails-send', {
 
             const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
-            const subject = processTemplate(eventTheme.subject || template.subject, mergeData);
+            const subject = processTemplate(eventTheme.subject || template.subject, mergeData, { html: false });
 
             await sendEmail({
                 to: to,
@@ -357,3 +396,5 @@ app.http('system-emails-send', {
         }
     }
 });
+
+module.exports = { sniffImageType, extractImageSrc };

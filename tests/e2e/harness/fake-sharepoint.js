@@ -34,8 +34,9 @@ const FakeSharePoint = {
         const safeName = fileName.replace(/[<>:"/\\|?*]/g, '_');
         const fullPath = `${normalize(folderPath)}/${safeName}`;
         const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
-        if (buffer.length > 4 * 1024 * 1024) {
-            throw new Error('File too large. Files over 4MB require chunked upload (not yet implemented)');
+        // Same ceiling as shared/sharepoint.js (which uses an upload session above 4 MiB).
+        if (buffer.length > 10 * 1024 * 1024) {
+            throw new Error('File too large. Maximum size is 10MB.');
         }
         addFolderChain(folderPath);
         const now = new Date().toISOString();

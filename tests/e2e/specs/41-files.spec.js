@@ -53,12 +53,11 @@ test('files are scoped to team members', async ({ apiAs, harness }) => {
     expect((await outsider.delete(`/api/files/delete?path=Events/${w.event.id}/${w.team.id}/demo.mp4`)).status()).toBe(403);
 });
 
-test('BUG: files between 4 MB and the advertised 10 MB limit upload cleanly', async ({ apiAs, harness }) => {
-    test.fail(true, 'files.js and the UI allow 10 MB, but sharepoint.js uploadFile throws above 4 MB (no chunked upload) -> 500');
+test('files between 4 MB and the advertised 10 MB limit upload cleanly', async ({ apiAs, harness }) => {
     const w = fileWorld();
     await harness.seed(w.seed());
     const res = await (await apiAs(w.member)).post(`/api/files/upload?eventId=${w.event.id}&teamId=${w.team.id}`, {
         multipart: { file: { name: 'big.zip', mimeType: 'application/zip', buffer: Buffer.alloc(5 * 1024 * 1024, 1) } }
     });
-    expect(res.status()).toBe(200);  // <- bug
+    expect(res.status()).toBe(200);
 });

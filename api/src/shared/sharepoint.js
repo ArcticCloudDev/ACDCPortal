@@ -138,13 +138,106 @@ async function ensureFolder(folderPath) {
     return currentPath;
 }
 
+// Graph's simple PUT .../content accepts at most 4 MiB; above that an upload session is
+// required, fed with sequential byte ranges whose size is a multiple of 320 KiB.
+const SIMPLE_UPLOAD_LIMIT = 4 * 1024 * 1024;
+const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
+const UPLOAD_CHUNK_SIZE = 10 * 320 * 1024;
+
+function describeDriveItem(result) {
+    return {
+        id: result.id,
+        name: result.name,
+        size: result.size,
+        webUrl: result.webUrl,
+        createdDateTime: result.createdDateTime,
+        lastModifiedDateTime: result.lastModifiedDateTime
+    };
+}
+
+async function uploadSmallFile(site, drive, fullPath, fileBuffer) {
+    const token = await getAccessToken();
+    const url = `https://graph.microsoft.com/v1.0/sites/${site}/drives/${drive}/root:/${fullPath}:/content`;
+
+    const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/octet-stream'
+        },
+        body: fileBuffer
+    });
+
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Upload failed (${response.status}): ${error}`);
+    }
+
+    return response.json();
+}
+
+// https://learn.microsoft.com/graph/api/driveitem-createuploadsession
+async function uploadLargeFile(site, drive, fullPath, safeName, fileBuffer) {
+    const session = await graphRequest(`/sites/${site}/drives/${drive}/root:/${fullPath}:/createUploadSession`, {
+        method: 'POST',
+        body: JSON.stringify({
+            item: {
+                '@microsoft.graph.conflictBehavior': 'replace',
+                name: safeName
+            }
+        })
+    });
+    if (!session || !session.uploadUrl) {
+        throw new Error('Upload failed: Graph did not return an upload session');
+    }
+
+    const total = fileBuffer.length;
+    let item = null;
+    for (let start = 0; start < total; start += UPLOAD_CHUNK_SIZE) {
+        const end = Math.min(start + UPLOAD_CHUNK_SIZE, total) - 1;
+        const chunk = fileBuffer.subarray(start, end + 1);
+        // The upload URL is pre-authenticated: no Authorization header on these PUTs.
+        const response = await fetch(session.uploadUrl, {
+            method: 'PUT',
+            headers: {
+                'Content-Length': String(chunk.length),
+                'Content-Range': `bytes ${start}-${end}/${total}`
+            },
+            body: chunk
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Upload failed (${response.status}): ${error}`);
+        }
+        if (response.status === 200 || response.status === 201) {
+            item = await response.json();
+        }
+    }
+
+    if (!item) {
+        throw new Error('Upload failed: upload session ended without a drive item');
+    }
+    return item;
+}
+
 const SharePointStorage = {
     isConfigured() {
         const config = getConfig();
         return !!(config.clientId && config.clientSecret && config.siteUrl && config.tenantId);
     },
 
+    MAX_UPLOAD_SIZE,
+    SIMPLE_UPLOAD_LIMIT,
+    UPLOAD_CHUNK_SIZE,
+
     async uploadFile(content, fileName, folderPath) {
+        const fileBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+
+        if (fileBuffer.length > MAX_UPLOAD_SIZE) {
+            throw new Error('File too large. Maximum size is 10MB.');
+        }
+
         const drive = await getDriveId();
         const site = await getSiteId();
 
@@ -153,39 +246,11 @@ const SharePointStorage = {
         const safeName = fileName.replace(/[<>:"/\\|?*]/g, '_');
         const fullPath = `${folderPath}/${safeName}`;
 
-        const fileBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+        const result = fileBuffer.length > SIMPLE_UPLOAD_LIMIT
+            ? await uploadLargeFile(site, drive, fullPath, safeName, fileBuffer)
+            : await uploadSmallFile(site, drive, fullPath, fileBuffer);
 
-        if (fileBuffer.length > 4 * 1024 * 1024) {
-            throw new Error('File too large. Files over 4MB require chunked upload (not yet implemented)');
-        }
-
-        const token = await getAccessToken();
-        const url = `https://graph.microsoft.com/v1.0/sites/${site}/drives/${drive}/root:/${fullPath}:/content`;
-
-        const response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/octet-stream'
-            },
-            body: fileBuffer
-        });
-
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Upload failed (${response.status}): ${error}`);
-        }
-
-        const result = await response.json();
-
-        return {
-            id: result.id,
-            name: result.name,
-            size: result.size,
-            webUrl: result.webUrl,
-            createdDateTime: result.createdDateTime,
-            lastModifiedDateTime: result.lastModifiedDateTime
-        };
+        return describeDriveItem(result);
     },
 
     async listFiles(folderPath) {

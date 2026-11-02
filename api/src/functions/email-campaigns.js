@@ -2,18 +2,64 @@ const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
+const StorageModule = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
-const { generateId } = require('../shared/id');
+const { generateId, isGuid, sameId } = require('../shared/id');
+const { isHttpUrl, isEmail } = require('../shared/validate');
+const q = require('../shared/admin-queries');
 
 const campaignsStorage = new Storage('email-campaigns');
 const deliveriesStorage = new Storage('email-deliveries');
-const usersStorage = new Storage('users');
-const participationsStorage = new Storage('participations');
-const teamsStorage = new Storage('teams');
+const sequencesStorage = new Storage('sequences');
+
+const CAMPAIGN_STATUSES = ['draft', 'live'];
 
 function generateDeliveryId() {
     return generateId();
 }
+
+// Validates the writable campaign fields present in `body`. Returns an error string or null.
+function validateCampaignBody(body) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return 'Request body must be a JSON object';
+    if (body.subject !== undefined && (typeof body.subject !== 'string' || !body.subject.trim() || body.subject.length > 500)) {
+        return 'subject must be a non-empty string of at most 500 characters';
+    }
+    if (body.content !== undefined && typeof body.content !== 'string') return 'content must be a string';
+    if (body.ctaUrl !== undefined && body.ctaUrl !== null && body.ctaUrl !== '' && !isHttpUrl(body.ctaUrl)) return 'ctaUrl must be an http(s) URL';
+    if (body.ctaText !== undefined && body.ctaText !== null && (typeof body.ctaText !== 'string' || body.ctaText.length > 200)) return 'ctaText must be at most 200 characters';
+    if (body.status !== undefined && !CAMPAIGN_STATUSES.includes(body.status)) return `status must be one of: ${CAMPAIGN_STATUSES.join(', ')}`;
+    if (body.sequenceOrder !== undefined && body.sequenceOrder !== null && !(Number.isInteger(body.sequenceOrder) && body.sequenceOrder >= 0)) {
+        return 'sequenceOrder must be a non-negative integer';
+    }
+    if (body.scheduledSendTime !== undefined && body.scheduledSendTime !== null && body.scheduledSendTime !== '') {
+        if (typeof body.scheduledSendTime !== 'string' || Number.isNaN(new Date(body.scheduledSendTime).getTime())) return 'scheduledSendTime must be an ISO date-time';
+    }
+    if (body.createdBy !== undefined && body.createdBy !== null && !isGuid(body.createdBy)) return 'createdBy must be a GUID';
+    return null;
+}
+
+// Recipients list for send: [{ email, userId?, firstName? }]
+function validateRecipients(recipients) {
+    if (!Array.isArray(recipients) || recipients.length === 0) return 'recipients array is required';
+    if (recipients.length > 2000) return 'recipients: at most 2000 per request';
+    for (const r of recipients) {
+        if (!r || !isEmail(r.email)) return 'Every recipient needs a valid email';
+        if (r.userId !== undefined && r.userId !== null && !isGuid(r.userId)) return 'recipient userId must be a GUID';
+    }
+    return null;
+}
+
+function withUserNames(deliveries, users, fallbackToEmail) {
+    return deliveries.map(d => {
+        const user = users.find(u => (u.email || '').toLowerCase() === (d.email || '').toLowerCase());
+        return {
+            ...d,
+            userName: user ? `${user.firstName} ${user.lastName}` : (fallbackToEmail ? d.email : null)
+        };
+    });
+}
+
+const byRecency = (a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt);
 
 app.http('email-campaigns-list', {
     methods: ['GET'],
@@ -27,24 +73,34 @@ app.http('email-campaigns-list', {
             }
 
             const eventId = request.query.get('eventId');
-            let campaigns = await campaignsStorage.getAll();
+            let campaigns;
 
             if (eventId) {
-                campaigns = campaigns.filter(c => c.eventId === eventId);
+                // Campaigns have no EventId; they belong to the event through its sequence.
+                if (!isGuid(eventId)) {
+                    return { status: 400, jsonBody: { error: 'eventId must be a GUID' } };
+                }
+                const event = await StorageModule.events.getById(eventId);
+                if (!event) {
+                    return { status: 404, jsonBody: { error: 'Event not found' } };
+                }
+                campaigns = event.sequenceId ? await q.campaignsForSequence(event.sequenceId) : [];
+            } else {
+                campaigns = await campaignsStorage.getAll();
             }
 
             campaigns.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-            const deliveries = await deliveriesStorage.getAll();
+            const stats = await q.deliveryStatsForCampaigns(campaigns.map(c => c.id));
             campaigns = campaigns.map(campaign => {
-                const campaignDeliveries = deliveries.filter(d => d.campaignId === campaign.id);
+                const s = stats[String(campaign.id).toLowerCase()] || { total: 0, sent: 0, failed: 0, pending: 0 };
                 return {
                     ...campaign,
                     stats: {
-                        total: campaignDeliveries.length,
-                        sent: campaignDeliveries.filter(d => d.status === 'sent').length,
-                        failed: campaignDeliveries.filter(d => d.status === 'failed').length,
-                        pending: campaignDeliveries.filter(d => d.status === 'pending').length
+                        total: s.total,
+                        sent: s.sent,
+                        failed: s.failed,
+                        pending: s.pending
                     }
                 };
             });
@@ -70,25 +126,15 @@ app.http('email-campaigns-get', {
             }
 
             const campaignId = request.params.id;
-            const campaign = await campaignsStorage.getById(campaignId);
+            const campaign = isGuid(campaignId) ? await campaignsStorage.getById(campaignId) : null;
 
             if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
-            const allDeliveries = await deliveriesStorage.getAll();
-            const deliveries = allDeliveries
-                .filter(d => d.campaignId === campaignId)
-                .sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
-
-            const users = await usersStorage.getAll();
-            const enrichedDeliveries = deliveries.map(d => {
-                const user = users.find(u => u.email === d.email);
-                return {
-                    ...d,
-                    userName: user ? `${user.firstName} ${user.lastName}` : d.email
-                };
-            });
+            const deliveries = (await q.deliveriesForCampaigns([campaignId])).sort(byRecency);
+            const users = await q.usersByEmails(deliveries.map(d => d.email));
+            const enrichedDeliveries = withUserNames(deliveries, users, true);
 
             return {
                 status: 200,
@@ -122,20 +168,30 @@ app.http('email-campaigns-create', {
             }
 
             const body = await request.json();
-            const { sequenceId, subject, content, ctaUrl, ctaText, createdBy, status, scheduledSendTime } = body;
+            const { sequenceId, subject, content, ctaUrl, ctaText, createdBy, status, scheduledSendTime } = body || {};
 
             if (!sequenceId || !subject || !content) {
                 return { status: 400, jsonBody: { error: 'sequenceId, subject, and content are required' } };
             }
+            if (!isGuid(sequenceId)) {
+                return { status: 400, jsonBody: { error: 'sequenceId must be a GUID' } };
+            }
+            const validationError = validateCampaignBody(body);
+            if (validationError) {
+                return { status: 400, jsonBody: { error: validationError } };
+            }
 
-            const allExistingCampaigns = await campaignsStorage.getAll();
-            const sequenceEmails = allExistingCampaigns.filter(c => c.sequenceId === sequenceId);
-            const sequenceOrder = sequenceEmails.length + 1;
+            const sequence = await sequencesStorage.getById(sequenceId);
+            if (!sequence) {
+                return { status: 404, jsonBody: { error: 'Sequence not found' } };
+            }
+
+            const sequenceOrder = await q.nextSequenceOrder(sequenceId);
 
             const campaign = {
                 id: generateId(),
                 sequenceId,
-                subject,
+                subject: subject.trim(),
                 content,
                 ctaUrl: ctaUrl || null,
                 ctaText: ctaText || null,
@@ -144,7 +200,7 @@ app.http('email-campaigns-create', {
                 status: status || 'draft',
                 scheduledSendTime: scheduledSendTime || null,
                 createdAt: new Date().toISOString(),
-                createdBy: createdBy || null
+                createdBy: createdBy || auth.user.userId || null
             };
 
             await campaignsStorage.create(campaign);
@@ -172,19 +228,24 @@ app.http('email-campaigns-update', {
             const campaignId = request.params.id;
             const body = await request.json();
 
-            const campaign = await campaignsStorage.getById(campaignId);
+            const campaign = isGuid(campaignId) ? await campaignsStorage.getById(campaignId) : null;
             if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
+            const validationError = validateCampaignBody(body);
+            if (validationError) {
+                return { status: 400, jsonBody: { error: validationError } };
+            }
+
             const updates = {};
-            if (body.subject !== undefined) updates.subject = body.subject;
+            if (body.subject !== undefined) updates.subject = body.subject.trim();
             if (body.content !== undefined) updates.content = body.content;
-            if (body.ctaUrl !== undefined) updates.ctaUrl = body.ctaUrl;
-            if (body.ctaText !== undefined) updates.ctaText = body.ctaText;
+            if (body.ctaUrl !== undefined) updates.ctaUrl = body.ctaUrl || null;
+            if (body.ctaText !== undefined) updates.ctaText = body.ctaText || null;
             if (body.sequenceOrder !== undefined) updates.sequenceOrder = body.sequenceOrder;
             if (body.status !== undefined) updates.status = body.status;
-            if (body.scheduledSendTime !== undefined) updates.scheduledSendTime = body.scheduledSendTime;
+            if (body.scheduledSendTime !== undefined) updates.scheduledSendTime = body.scheduledSendTime || null;
             updates.updatedAt = new Date().toISOString();
 
             const updated = await campaignsStorage.update(campaignId, updates);
@@ -211,16 +272,14 @@ app.http('email-campaigns-delete', {
 
             const campaignId = request.params.id;
 
-            const existsEmail = await campaignsStorage.getById(campaignId);
+            const existsEmail = isGuid(campaignId) ? await campaignsStorage.getById(campaignId) : null;
             if (!existsEmail) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
-            await campaignsStorage.delete(campaignId);
 
-            const allDeliveriesForEmailCampaign = await deliveriesStorage.getAll();
-            for (const d of allDeliveriesForEmailCampaign.filter(d => d.campaignId === campaignId)) {
-                await deliveriesStorage.delete(d.id);
-            }
+            // Deliveries first (either GUID case), then the campaign.
+            await q.deleteDeliveriesForCampaigns([campaignId]);
+            await campaignsStorage.delete(campaignId);
 
             return { status: 200, jsonBody: { message: 'Campaign deleted' } };
         } catch (error) {
@@ -244,36 +303,38 @@ app.http('email-campaigns-send', {
 
             const campaignId = request.params.id;
             const body = await request.json();
-            const { recipients } = body;
+            const { recipients } = body || {};
 
-            if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-                return { status: 400, jsonBody: { error: 'recipients array is required' } };
+            const recipientsError = validateRecipients(recipients);
+            if (recipientsError) {
+                return { status: 400, jsonBody: { error: recipientsError } };
             }
 
-            const campaign = await campaignsStorage.getById(campaignId);
+            const campaign = isGuid(campaignId) ? await campaignsStorage.getById(campaignId) : null;
             if (!campaign) {
                 return { status: 404, jsonBody: { error: 'Campaign not found' } };
             }
 
-            const existingDeliveries = await deliveriesStorage.getAll();
             const existingEmails = new Set(
-                existingDeliveries
-                    .filter(d => d.campaignId === campaignId && d.status === 'sent')
+                (await q.deliveriesForCampaigns([campaignId]))
+                    .filter(d => d.status === 'sent')
                     .map(d => d.email.toLowerCase())
             );
 
             const results = { sent: 0, failed: 0, skipped: 0, errors: [] };
 
             for (const recipient of recipients) {
-                if (existingEmails.has(recipient.email.toLowerCase())) {
+                const email = recipient.email.trim();
+                if (existingEmails.has(email.toLowerCase())) {
                     results.skipped++;
                     continue;
                 }
+                existingEmails.add(email.toLowerCase());
 
                 const delivery = {
                     id: generateDeliveryId(),
-                    campaignId,
-                    email: recipient.email,
+                    campaignId: campaign.id,
+                    email,
                     userId: recipient.userId || null,
                     status: 'pending',
                     createdAt: new Date().toISOString()
@@ -281,7 +342,7 @@ app.http('email-campaigns-send', {
 
                 try {
                     await sendEmail({
-                        to: recipient.email,
+                        to: email,
                         subject: campaign.subject,
                         htmlContent: campaign.content,
                         firstName: recipient.firstName || 'Participant',
@@ -297,7 +358,7 @@ app.http('email-campaigns-send', {
                     delivery.status = 'failed';
                     delivery.errorMessage = err.message;
                     results.failed++;
-                    results.errors.push({ email: recipient.email, error: err.message });
+                    results.errors.push({ email, error: 'Delivery failed' });
                 }
 
                 await deliveriesStorage.create(delivery);
@@ -324,38 +385,44 @@ app.http('email-trigger-sequence', {
             }
 
             const body = await request.json();
-            const { userId, eventId } = body;
+            const { userId, eventId } = body || {};
 
             if (!userId || !eventId) {
                 return { status: 400, jsonBody: { error: 'userId and eventId are required' } };
             }
+            if (!isGuid(userId) || !isGuid(eventId)) {
+                return { status: 400, jsonBody: { error: 'userId and eventId must be GUIDs' } };
+            }
 
-            const users = await usersStorage.getAll();
-            const user = users.find(u => u.id === userId);
+            const user = await StorageModule.users.getById(userId);
             if (!user) {
                 return { status: 404, jsonBody: { error: 'User not found' } };
             }
 
-            const allCampaignsForEvent = await campaignsStorage.getAll();
-            const sequenceCampaigns = allCampaignsForEvent
-                .filter(c => c.eventId === eventId && c.type === 'sequence')
-                .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
+            const event = await StorageModule.events.getById(eventId);
+            if (!event) {
+                return { status: 404, jsonBody: { error: 'Event not found' } };
+            }
+
+            // Campaigns belong to the event through its sequence; only live ones are sent.
+            const sequenceCampaigns = event.sequenceId
+                ? await q.campaignsForSequence(event.sequenceId, { type: 'sequence', status: 'live' })
+                : [];
 
             if (sequenceCampaigns.length === 0) {
                 return { status: 200, jsonBody: { message: 'No sequence emails for this event', sent: 0 } };
             }
 
-            const existingUserDeliveries = await deliveriesStorage.getAll();
             const userDeliveries = new Set(
-                existingUserDeliveries
-                    .filter(d => d.email.toLowerCase() === user.email.toLowerCase() && d.status === 'sent')
-                    .map(d => d.campaignId)
+                (await q.deliveriesForEmail(user.email))
+                    .filter(d => d.status === 'sent')
+                    .map(d => String(d.campaignId).toLowerCase())
             );
 
             const results = { sent: 0, failed: 0, skipped: 0 };
 
             for (const campaign of sequenceCampaigns) {
-                if (userDeliveries.has(campaign.id)) {
+                if (userDeliveries.has(String(campaign.id).toLowerCase())) {
                     results.skipped++;
                     continue;
                 }
@@ -414,19 +481,12 @@ app.http('email-campaigns-deliveries', {
             }
 
             const campaignId = request.params.id;
-            const allDeliveriesById = await deliveriesStorage.getAll();
-            const deliveries = allDeliveriesById
-                .filter(d => d.campaignId === campaignId)
-                .sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
-
-            const users = await usersStorage.getAll();
-            const enriched = deliveries.map(d => {
-                const user = users.find(u => u.email === d.email);
-                return {
-                    ...d,
-                    userName: user ? `${user.firstName} ${user.lastName}` : null
-                };
-            });
+            if (!isGuid(campaignId)) {
+                return { status: 404, jsonBody: { error: 'Campaign not found' } };
+            }
+            const deliveries = (await q.deliveriesForCampaigns([campaignId])).sort(byRecency);
+            const users = await q.usersByEmails(deliveries.map(d => d.email));
+            const enriched = withUserNames(deliveries, users, false);
 
             return { status: 200, jsonBody: { deliveries: enriched } };
         } catch (error) {

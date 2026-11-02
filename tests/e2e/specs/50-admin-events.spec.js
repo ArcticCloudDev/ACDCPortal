@@ -155,14 +155,13 @@ test('admin starts an event sequence from scratch', async ({ page, harness, logi
 test.describe('known broken admin event actions', () => {
     test.use({ allowServerErrors: true });
 
-    test('BUG: saving budget rates persists them', async ({ page, harness, loginAs, dialogs }) => {
-        test.fail(true, 'saveEventRates() sends hotelNights, which events.js spreads into an Events.HotelNights column that does not exist -> 500');
+    test('saving budget rates persists them', async ({ page, harness, loginAs, dialogs }) => {
         const w = await openAdminEvents(page, harness, loginAs);
         await page.goto(`/admin-events.html?event=${w.event.id}&tab=budget`);
         await page.locator('#budget-hotel-rate').fill('1200');
         await page.locator('#budget-hotel-nights').fill('2');
         await page.locator('button[onclick="saveEventRates()"]').click();
-        await expect.poll(() => dialogs.last()?.message).toContain('Rates saved');  // <- bug
+        await expect.poll(() => dialogs.last()?.message).toContain('Rates saved');
         await expect.poll(async () => Number((await rows('SELECT HotelRatePerNight r FROM Events WHERE Id = @id', { id: w.event.id }))[0].r)).toBe(1200);
     });
 

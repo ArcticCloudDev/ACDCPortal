@@ -3,9 +3,42 @@ const { logError } = require('../shared/error-log');
 const { requireAuth } = require('../shared/auth');
 const { Storage: GenericStorage } = require('../shared/storage');
 const { generateId } = require('../shared/id');
+const { isHttpUrl, toInt } = require('../shared/validate');
+const { deleteBadgeCascade } = require('../shared/admin-queries');
 
 const badgesStorage = new GenericStorage('badges');
-const eventBadgesStorage = new GenericStorage('event-badges');
+
+const VALID_CATEGORIES = ['soft', 'low-code', 'pro-code', 'sponsor'];
+const VALID_CLAIM_TYPES = ['common', 'exclusive'];
+const CATEGORY_ORDER = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3 };
+
+// Validates the writable badge fields present in `body`. Returns an error string or null.
+function validateBadgeBody(body, { requireAll }) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return 'Request body must be a JSON object';
+    if (requireAll || body.name !== undefined) {
+        if (typeof body.name !== 'string' || !body.name.trim()) return 'Badge name is required';
+        if (body.name.length > 200) return 'Badge name must be at most 200 characters';
+    }
+    if (requireAll && !body.category) return 'Badge category is required';
+    if (body.category !== undefined && !VALID_CATEGORIES.includes(body.category)) {
+        return `Category must be one of: ${VALID_CATEGORIES.join(', ')}`;
+    }
+    if (body.claimType !== undefined && body.claimType !== null && !VALID_CLAIM_TYPES.includes(body.claimType)) {
+        return `claimType must be one of: ${VALID_CLAIM_TYPES.join(', ')}`;
+    }
+    if (body.description !== undefined && body.description !== null && typeof body.description !== 'string') return 'description must be a string';
+    if (body.points !== undefined && body.points !== null && body.points !== '' && toInt(body.points, { min: 0, max: 1000000 }) === null) {
+        return 'points must be a non-negative integer';
+    }
+    if (body.imageUrl !== undefined && body.imageUrl !== null && body.imageUrl !== '' && !isHttpUrl(body.imageUrl)) {
+        return 'imageUrl must be an http(s) URL';
+    }
+    return null;
+}
+
+function isValidBadgeId(id) {
+    return typeof id === 'string' && id.length > 0 && id.length <= 100;
+}
 
 app.http('badges-list', {
     methods: ['GET'],
@@ -20,11 +53,10 @@ app.http('badges-list', {
                 badges = badges.filter(b => b.category === category);
             }
 
-            const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3 };
             badges.sort((a, b) => {
-                const catDiff = (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99);
+                const catDiff = (CATEGORY_ORDER[a.category] ?? 99) - (CATEGORY_ORDER[b.category] ?? 99);
                 if (catDiff !== 0) return catDiff;
-                return a.name.localeCompare(b.name);
+                return (a.name || '').localeCompare(b.name || '');
             });
 
             return {
@@ -46,8 +78,7 @@ app.http('badges-get', {
     handler: async (request, context) => {
         try {
             const id = request.params.id;
-            const badges = await badgesStorage.getAll();
-            const badge = badges.find(b => b.id === id);
+            const badge = isValidBadgeId(id) ? await badgesStorage.getById(id) : null;
 
             if (!badge) {
                 return { status: 404, jsonBody: { error: 'Badge not found' } };
@@ -75,32 +106,19 @@ app.http('badges-create', {
 
             const body = await request.json();
 
-            if (!body.name) {
-                return { status: 400, jsonBody: { error: 'Badge name is required' } };
-            }
-            if (!body.category) {
-                return { status: 400, jsonBody: { error: 'Badge category is required' } };
-            }
-
-            const validCategories = ['soft', 'low-code', 'pro-code', 'sponsor'];
-            if (!validCategories.includes(body.category)) {
-                return { status: 400, jsonBody: { error: `Category must be one of: ${validCategories.join(', ')}` } };
-            }
-
-            const validClaimTypes = ['common', 'exclusive'];
-            const claimType = body.claimType || 'common';
-            if (!validClaimTypes.includes(claimType)) {
-                return { status: 400, jsonBody: { error: `claimType must be one of: ${validClaimTypes.join(', ')}` } };
+            const validationError = validateBadgeBody(body, { requireAll: true });
+            if (validationError) {
+                return { status: 400, jsonBody: { error: validationError } };
             }
 
             const newBadge = {
                 id: generateId(),
-                name: body.name,
+                name: body.name.trim(),
                 description: body.description || '',
                 category: body.category,
-                claimType: claimType,
+                claimType: body.claimType || 'common',
                 imageUrl: body.imageUrl || '',
-                points: parseInt(body.points) || 0,
+                points: toInt(body.points, { min: 0, max: 1000000 }) ?? 0,
                 createdAt: new Date().toISOString()
             };
 
@@ -130,33 +148,24 @@ app.http('badges-update', {
             const id = request.params.id;
             const body = await request.json();
 
-            const badge = await badgesStorage.getById(id);
+            const badge = isValidBadgeId(id) ? await badgesStorage.getById(id) : null;
 
             if (!badge) {
                 return { status: 404, jsonBody: { error: 'Badge not found' } };
             }
 
-            if (body.category) {
-                const validCategories = ['soft', 'low-code', 'pro-code', 'sponsor'];
-                if (!validCategories.includes(body.category)) {
-                    return { status: 400, jsonBody: { error: `Category must be one of: ${validCategories.join(', ')}` } };
-                }
-            }
-
-            if (body.claimType) {
-                const validClaimTypes = ['common', 'exclusive'];
-                if (!validClaimTypes.includes(body.claimType)) {
-                    return { status: 400, jsonBody: { error: `claimType must be one of: ${validClaimTypes.join(', ')}` } };
-                }
+            const validationError = validateBadgeBody(body, { requireAll: false });
+            if (validationError) {
+                return { status: 400, jsonBody: { error: validationError } };
             }
 
             const updates = {
-                name: body.name !== undefined ? body.name : badge.name,
-                description: body.description !== undefined ? body.description : badge.description,
+                name: body.name !== undefined ? body.name.trim() : badge.name,
+                description: body.description !== undefined ? (body.description || '') : badge.description,
                 category: body.category !== undefined ? body.category : badge.category,
-                claimType: body.claimType !== undefined ? body.claimType : (badge.claimType || 'common'),
-                imageUrl: body.imageUrl !== undefined ? body.imageUrl : badge.imageUrl,
-                points: body.points !== undefined ? parseInt(body.points) : badge.points,
+                claimType: body.claimType ? body.claimType : (badge.claimType || 'common'),
+                imageUrl: body.imageUrl !== undefined ? (body.imageUrl || '') : badge.imageUrl,
+                points: body.points !== undefined && body.points !== null && body.points !== '' ? toInt(body.points, { min: 0, max: 1000000 }) : badge.points,
                 updatedAt: new Date().toISOString()
             };
 
@@ -185,23 +194,16 @@ app.http('badges-delete', {
 
             const id = request.params.id;
 
-            const badge = await badgesStorage.getById(id);
+            const badge = isValidBadgeId(id) ? await badgesStorage.getById(id) : null;
 
             if (!badge) {
                 return { status: 404, jsonBody: { error: 'Badge not found' } };
             }
 
-            const badgeName = badge.name;
-            await badgesStorage.delete(id);
+            // Claims -> event assignments -> badge, atomically (FK order).
+            await deleteBadgeCascade(id);
 
-            const eventBadges = await eventBadgesStorage.getAll();
-            for (const eb of eventBadges) {
-                if (eb.badgeId === id) {
-                    await eventBadgesStorage.delete(eb.id);
-                }
-            }
-
-            context.log(`Badge deleted: ${badgeName}`);
+            context.log(`Badge deleted: ${badge.name}`);
             return { status: 200, jsonBody: { message: 'Badge deleted' } };
         } catch (error) {
             await logError(context, error);
@@ -210,4 +212,3 @@ app.http('badges-delete', {
         }
     }
 });
-

@@ -4,9 +4,9 @@ const crypto = require('crypto');
 const { sendEmail, processTemplate } = require('./mail');
 const { logError } = require('./error-log');
 const { Storage } = require('./storage');
+const { campaignsForSequence, deliveriesForEmail } = require('./admin-queries');
 
 const eventsStore = new Storage('events');
-const campaignsStore = new Storage('email-campaigns');
 const deliveriesStore = new Storage('email-deliveries');
 
 function renderMessageBlocks(campaigns) {
@@ -47,24 +47,21 @@ async function sendSequenceDigest({ event = null, eventId = null, email, firstNa
             return { sent: 0 };
         }
 
-        const allCampaigns = await campaignsStore.getAll();
-        const sequenceCampaigns = allCampaigns
-            .filter(c => c.sequenceId === resolvedEvent.sequenceId && c.type === 'sequence' && c.status === 'live')
-            .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
+        const sequenceCampaigns = await campaignsForSequence(resolvedEvent.sequenceId, { type: 'sequence', status: 'live' });
 
         if (sequenceCampaigns.length === 0) {
             context.log(`[SEQUENCE] No live sequence campaigns for event ${resolvedEvent.id}`);
             return { sent: 0 };
         }
 
-        const existingDeliveries = await deliveriesStore.getAll();
+        // EmailDeliveries.CampaignId is NVARCHAR and may hold either GUID case.
         const alreadySent = new Set(
-            existingDeliveries
-                .filter(d => d.email.toLowerCase() === email.toLowerCase() && d.status === 'sent')
-                .map(d => d.campaignId)
+            (await deliveriesForEmail(email))
+                .filter(d => d.status === 'sent')
+                .map(d => String(d.campaignId).toLowerCase())
         );
 
-        const campaignsToSend = sequenceCampaigns.filter(c => !alreadySent.has(c.id));
+        const campaignsToSend = sequenceCampaigns.filter(c => !alreadySent.has(String(c.id).toLowerCase()));
         if (campaignsToSend.length === 0) {
             context.log(`[SEQUENCE] All sequence emails already sent to ${email}`);
             return { sent: 0 };
@@ -72,6 +69,7 @@ async function sendSequenceDigest({ event = null, eventId = null, email, firstNa
 
         const templatePath = path.join(__dirname, '../../data/email-templates/sequence-digest.html');
         const digestTemplate = await fs.readFile(templatePath, 'utf-8');
+        // digestContent is already-built HTML and goes through a RAW_HTML_KEYS key; the rest is text.
         const digestHtml = processTemplate(digestTemplate, {
             eventName: resolvedEvent.name,
             firstName,
