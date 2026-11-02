@@ -169,7 +169,7 @@ az staticwebapp functions list --name acdc-portal --resource-group rg-acdc-porta
 - Ensure app_location and api_location paths are correct
 
 ### Site loads but shows 404
-- Check that `staticwebapp.config.json` is in the root of your repository
+- Check that `staticwebapp.config.json` is in `src/` (the workflow's `app_location`). Static Web Apps only reads it from `app_location`; a copy at the repository root is silently ignored.
 - Verify routing configuration
 
 ### API endpoints return 404

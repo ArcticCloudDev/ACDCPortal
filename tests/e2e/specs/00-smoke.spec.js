@@ -20,6 +20,7 @@ test.describe('public pages', () => {
         await expect(page).toHaveURL(/\/events\.html$/);
         expect((await request.get('/missing.html')).status()).toBe(404);
         expect((await request.get('/js/missing.js')).status()).toBe(404);
+        expect((await request.get('/staticwebapp.config.json')).status()).toBe(404);
     });
 
     test('events page shows only open events to anonymous visitors', async ({ page, harness }) => {

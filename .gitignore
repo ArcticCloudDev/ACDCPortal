@@ -30,3 +30,6 @@ obj/
 
 # Playwright E2E artifacts
 tests/e2e/.artifacts/
+
+# Agent worktrees
+.claude/worktrees/

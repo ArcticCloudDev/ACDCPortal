@@ -207,7 +207,9 @@ function findRoute(method, apiPath) {
 // ---------------------------------------------------------------------------
 // 5. Static files, mirroring staticwebapp.config.json.
 // ---------------------------------------------------------------------------
-const swaConfig = JSON.parse(fs.readFileSync(path.join(ROOT, 'staticwebapp.config.json'), 'utf8'));
+// SWA only reads the config from app_location (src/), and never serves it as a file.
+const SWA_CONFIG_FILE = path.join(STATIC_DIR, 'staticwebapp.config.json');
+const swaConfig = JSON.parse(fs.readFileSync(SWA_CONFIG_FILE, 'utf8'));
 const MIME = {
     '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
     '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml',
@@ -224,6 +226,7 @@ function serveStatic(req, res, pathname) {
     if (rel.endsWith('/')) rel += 'index.html';
     let filePath = path.normalize(path.join(STATIC_DIR, rel));
     if (!filePath.startsWith(STATIC_DIR)) return send(res, 403, 'Forbidden');
+    if (filePath === SWA_CONFIG_FILE) return send(res, 404, 'Not Found');
 
     if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
         const excluded = fallbackExcludes.some(rx => rx.test(rel));
