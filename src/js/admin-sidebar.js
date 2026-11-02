@@ -11,11 +11,9 @@ const SIDEBAR_NAV_ITEMS = [
     { page: 'badges', href: 'admin-badges.html', icon: 'award', label: 'Badges' },
 
     { section: 'Communication' },
-    { page: 'email',     href: 'admin-email.html',     icon: 'send', label: 'Quick Email' },
-    { page: 'campaigns', href: 'admin-campaigns.html', icon: 'mail', label: 'Sequences' },
-
-    { section: 'Theme' },
-    { page: 'email-templates', href: 'admin-email-templates.html', icon: 'file-text', label: 'Email Templates' },
+    { page: 'email',     href: 'admin-email.html',     icon: 'send', label: 'Send email' },
+    { page: 'campaigns', href: 'admin-campaigns.html', icon: 'mail', label: 'Email sequences' },
+    { page: 'email-templates', href: 'admin-email-templates.html', icon: 'file-text', label: 'Email templates' },
 ];
 
 function renderAdminSidebar(activePage = '', permissions = null) {
@@ -72,8 +70,8 @@ function renderAdminSidebar(activePage = '', permissions = null) {
                 ${navHTML}
             </nav>
             <div class="sidebar-footer">
-                <a href="index.html" class="nav-item">
-                    ${svg('arrow-left')}<span>Back to Portal</span>
+                <a href="events.html" class="nav-item">
+                    ${svg('arrow-left')}<span>Back to portal</span>
                 </a>
             </div>
         </aside>
