@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     } catch (error) {
         console.error('Error loading page:', error);
-        loadingDiv.innerHTML = `<p class="error-message">Error loading: ${error.message}</p>
+        loadingDiv.innerHTML = `<p class="error-message">Error loading: ${escapeHtml(error.message)}</p>
                                <a href="events.html" class="btn btn-primary">Back to Events</a>`;
     }
 
@@ -569,6 +569,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const userMembership = currentParticipation?.teamMemberships?.find(m => sameId(m.teamId, team.id));
         const isAdmin = userMembership?.isAdmin || false;
+        // Only team admins, committee and portal admins may list a team's invitations.
+        const canSeeInvitations = isAdmin || currentUser.isPortalAdmin
+            || (currentParticipation?.roles || []).includes('committee');
 
         // Member profiles, pending invitations and uploaded files are independent requests.
         // The roster only carries membership data for ordinary participants, so each member's
@@ -585,10 +588,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return null;
                 }
             })),
-            API.invitations.list(team.id).catch(err => {
-                console.error('Error loading invitations for team:', err);
-                return [];
-            }),
+            canSeeInvitations
+                ? API.invitations.list(team.id).catch(err => {
+                    console.error('Error loading invitations for team:', err);
+                    return [];
+                })
+                : Promise.resolve([]),
             currentEvent.sharepointUrl ? buildUploadsSection(team) : Promise.resolve('')
         ]);
 

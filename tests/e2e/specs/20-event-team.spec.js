@@ -179,8 +179,6 @@ test('a participant joins the solo queue', async ({ page, harness, loginAs }) =>
 });
 
 test('BUG: a participant can leave the solo queue', async ({ page, harness, loginAs, dialogs }) => {
-    test.fail(true, 'solo-queue/position returns {position,totalCount} without `entry` for non-admins, so '
-        + 'event-page.js leaveSoloQueue() returns early and the button does nothing');
     const w = buildWorld();
     await harness.seed({ ...w.seed(), 'solo-queue': [{ id: f.id(), userId: w.loner.id, eventId: w.event.id, note: null, status: 'waiting', joinedAt: new Date().toISOString() }] });
     await loginAs(w.loner);
@@ -194,7 +192,6 @@ test('BUG: a participant can leave the solo queue', async ({ page, harness, logi
 });
 
 test('BUG: the queue confirmation reports the real position', async ({ page, harness, loginAs }) => {
-    test.fail(true, 'solo-queue.js computes position from the snapshot taken before the insert, so it is always 0');
     const w = buildWorld();
     await harness.seed(w.seed());
     await loginAs(w.loner);
@@ -208,8 +205,6 @@ test.describe('slot unlock', () => {
     test.use({ allowServerErrors: true });
 
 test('BUG: team admin unlocks one more slot', async ({ page, harness, loginAs }) => {
-    test.fail(true, 'event page sends PUT /api/teams/{id} {committedParticipants}; teams.js writes it as a Teams.CommittedParticipants '
-        + 'column, which no migration ever created (the team size lives in NumberOfParticipants)');
     const w = buildWorld();
     await harness.seed(w.seed());
     await loginAs(w.leader);

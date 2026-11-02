@@ -151,7 +151,6 @@ test.describe('confirmed security defects', () => {
     });
 
     test('BUG (high): a team name cannot inject script into the event page', async ({ page, harness, loginAs }) => {
-        test.fail(true, 'site-header.js renders `<h1>${title}</h1>` via innerHTML and event-page.js passes the participant-chosen team name');
         const w = buildWorld();
         w.team.teamName = '<img src=x onerror="window.__xss=1">';
         await harness.seed(w.seed());
