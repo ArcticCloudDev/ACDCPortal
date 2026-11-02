@@ -232,6 +232,11 @@ function serveStatic(req, res, pathname) {
     }
 
     const headers = { ...(swaConfig.globalHeaders || {}) };
+    // E2E_CSP=enforce turns the report-only policy into an enforcing one, to prove pages comply.
+    if (process.env.E2E_CSP === 'enforce' && headers['Content-Security-Policy-Report-Only']) {
+        headers['Content-Security-Policy'] = headers['Content-Security-Policy-Report-Only'];
+        delete headers['Content-Security-Policy-Report-Only'];
+    }
     headers['Content-Type'] = MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
     headers['Cache-Control'] = 'no-store';
     res.writeHead(200, headers);

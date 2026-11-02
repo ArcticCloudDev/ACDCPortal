@@ -86,6 +86,8 @@ function createHarness(request) {
 const test = base.test.extend({
     allowPageErrors: [false, { option: true }],
     allowServerErrors: [false, { option: true }],
+    // CSP violations fail tests when E2E_CSP=enforce (the target state); otherwise they are only attached.
+    allowCspViolations: [process.env.E2E_CSP !== 'enforce', { option: true }],
 
     harness: async ({ request }, use) => {
         await use(createHarness(request));
@@ -119,7 +121,22 @@ const test = base.test.extend({
                 document.head.appendChild(style);
             });
         }, NO_MOTION_CSS);
+        // Content-Security-Policy violations (enforced or report-only) are reported back here.
+        const cspViolations = [];
+        await context.exposeBinding('__e2eReportCsp', (_source, v) => cspViolations.push(v));
+        await context.addInitScript(() => {
+            document.addEventListener('securitypolicyviolation', e => {
+                window.__e2eReportCsp({
+                    page: location.pathname,
+                    directive: e.violatedDirective,
+                    blocked: e.blockedURI,
+                    source: `${e.sourceFile || ''}:${e.lineNumber || ''}`,
+                    sample: e.sample
+                });
+            });
+        });
         context.__blockedRequests = blocked;
+        context.__cspViolations = cspViolations;
         await use(context);
     },
 
@@ -140,7 +157,7 @@ const test = base.test.extend({
         });
     }, { auto: true }],
 
-    page: async ({ page, allowPageErrors, allowServerErrors }, use, testInfo) => {
+    page: async ({ page, context, allowPageErrors, allowServerErrors, allowCspViolations }, use, testInfo) => {
         const pageErrors = [];
         const serverErrors = [];
         page.on('pageerror', error => pageErrors.push(error.message));
@@ -152,8 +169,11 @@ const test = base.test.extend({
         await use(page);
         if (pageErrors.length) await testInfo.attach('page-errors', { body: pageErrors.join('\n'), contentType: 'text/plain' });
         if (serverErrors.length) await testInfo.attach('api-5xx', { body: serverErrors.join('\n'), contentType: 'text/plain' });
+        const csp = context.__cspViolations || [];
+        if (csp.length) await testInfo.attach('csp-violations', { body: JSON.stringify(csp, null, 2), contentType: 'application/json' });
         if (!allowPageErrors) expect(pageErrors, 'uncaught errors in the page').toEqual([]);
         if (!allowServerErrors) expect(serverErrors, 'API calls that returned 5xx').toEqual([]);
+        if (!allowCspViolations) expect(csp, 'Content-Security-Policy violations').toEqual([]);
     },
 
     // Puts a signed session in localStorage exactly as a real OTP login would.
