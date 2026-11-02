@@ -96,7 +96,10 @@ test('team admin invites a member, who accepts with a code and joins the team', 
 
 test('team admin resends and then cancels a pending invitation', async ({ page, harness, loginAs, dialogs }) => {
     const w = buildWorld();
-    const inv = f.invitation(w.event, w.leader, { teamId: w.team.id, teamName: w.team.teamName, email: 'pending.pia@e2e.test', inviteeFirstName: 'Pia', inviteeLastName: 'Pending' });
+    // Sent two minutes ago: a reminder is refused for 60 s after the last send.
+    const sentAt = Date.now() - 2 * 60_000;
+    const inv = f.invitation(w.event, w.leader, { teamId: w.team.id, teamName: w.team.teamName, email: 'pending.pia@e2e.test', inviteeFirstName: 'Pia', inviteeLastName: 'Pending',
+        createdAt: new Date(sentAt).toISOString(), expiresAt: new Date(sentAt + 7 * 24 * 3600e3).toISOString() });
     await harness.seed({ ...w.seed(), invitations: [inv] });
     await loginAs(w.leader);
     await page.goto(`/event.html?id=${w.event.id}`);
@@ -178,9 +181,7 @@ test('a participant joins the solo queue', async ({ page, harness, loginAs }) =>
     expect(entry).toMatchObject({ EventId: w.event.id, Note: 'Pro-code, likes Power Automate', Status: 'waiting' });
 });
 
-test('BUG: a participant can leave the solo queue', async ({ page, harness, loginAs, dialogs }) => {
-    test.fail(true, 'solo-queue/position returns {position,totalCount} without `entry` for non-admins, so '
-        + 'event-page.js leaveSoloQueue() returns early and the button does nothing');
+test('a participant can leave the solo queue', async ({ page, harness, loginAs, dialogs }) => {
     const w = buildWorld();
     await harness.seed({ ...w.seed(), 'solo-queue': [{ id: f.id(), userId: w.loner.id, eventId: w.event.id, note: null, status: 'waiting', joinedAt: new Date().toISOString() }] });
     await loginAs(w.loner);
@@ -188,34 +189,27 @@ test('BUG: a participant can leave the solo queue', async ({ page, harness, logi
     await expect(page.locator('#queue-position')).toHaveText('1 of 1');
 
     await page.locator('#leave-queue-btn').click();
-    await expect.poll(() => dialogs.last()?.message).toBe('Are you sure you want to leave the solo queue?');  // <- bug
+    await expect.poll(() => dialogs.last()?.message).toBe('Are you sure you want to leave the solo queue?');
     await expect(page.locator('#join-solo-btn')).toBeVisible();
     expect(await rows('SELECT * FROM SoloQueue WHERE UserId = @u', { u: w.loner.id })).toHaveLength(0);
 });
 
-test('BUG: the queue confirmation reports the real position', async ({ page, harness, loginAs }) => {
-    test.fail(true, 'solo-queue.js computes position from the snapshot taken before the insert, so it is always 0');
+test('the queue confirmation reports the real position', async ({ page, harness, loginAs }) => {
     const w = buildWorld();
     await harness.seed(w.seed());
     await loginAs(w.loner);
     await page.goto(`/event.html?id=${w.event.id}`);
     await page.locator('#join-solo-btn').click();
     await page.locator('#join-queue-btn').click();
-    await expect(page.locator('#solo-queue-success')).toContainText('Position: 1', { timeout: 3000 });  // <- bug
+    await expect(page.locator('#solo-queue-success')).toContainText('Position: 1', { timeout: 3000 });
 });
 
-test.describe('slot unlock', () => {
-    test.use({ allowServerErrors: true });
-
-test('BUG: team admin unlocks one more slot', async ({ page, harness, loginAs }) => {
-    test.fail(true, 'event page sends PUT /api/teams/{id} {committedParticipants}; teams.js writes it as a Teams.CommittedParticipants '
-        + 'column, which no migration ever created (the team size lives in NumberOfParticipants)');
+test('team admin unlocks one more slot', async ({ page, harness, loginAs }) => {
     const w = buildWorld();
     await harness.seed(w.seed());
     await loginAs(w.leader);
     await page.goto(`/event.html?id=${w.event.id}`);
     await teamCard(page, w.team).locator('.unlock-slot').click();
-    await expect.poll(async () => (await rows('SELECT NumberOfParticipants n FROM Teams WHERE Id = @id', { id: w.team.id }))[0].n,  // <- bug
+    await expect.poll(async () => (await rows('SELECT NumberOfParticipants n FROM Teams WHERE Id = @id', { id: w.team.id }))[0].n,
         { timeout: 3000 }).toBe(5);
-});
 });

@@ -3,7 +3,8 @@ const { logError } = require('../shared/error-log');
 const jwt = require('jsonwebtoken');
 const Storage = require('../shared/storage');
 const Email = require('../shared/email');
-const { getJwtSecret } = require('../shared/auth');
+const { getJwtSecret, getClientIp } = require('../shared/auth');
+const { isEmail, normalizeEmail } = require('../shared/validate');
 
 const JWT_EXPIRY = '8h';
 
@@ -19,8 +20,13 @@ app.http('auth-verify-otp', {
         context.log('Auth verify OTP called');
 
         try {
-            const body = await request.json();
-            const { email, code } = body;
+            let body;
+            try {
+                body = await request.json();
+            } catch {
+                body = {};
+            }
+            const { email, code } = body || {};
 
             if (!email || !code) {
                 return {
@@ -28,10 +34,16 @@ app.http('auth-verify-otp', {
                     jsonBody: { message: 'Email and code are required' }
                 };
             }
+            if (!isEmail(email) || !/^\d{6}$/.test(String(code).trim())) {
+                return {
+                    status: 400,
+                    jsonBody: { success: false, message: 'Invalid email or code format' }
+                };
+            }
 
-            const normalizedEmail = email.toLowerCase().trim();
-            const clientIp = request.headers.get('x-forwarded-for') ||
-                             request.headers.get('x-client-ip') || 'unknown';
+            const normalizedEmail = normalizeEmail(email);
+            // Right-most X-Forwarded-For hop (appended by the SWA edge), never a client-chosen value.
+            const clientIp = getClientIp(request);
 
             const now = Date.now();
             const ipEntry = verifyRateLimits.get(clientIp);
@@ -82,7 +94,7 @@ app.http('auth-verify-otp', {
                 };
             }
 
-            const isValid = Email.verifyCode(code, otpRecord.codeHash);
+            const isValid = Email.verifyCode(String(code).trim(), otpRecord.codeHash);
 
             if (!isValid) {
                 otpRecord.attempts = (otpRecord.attempts || 0) + 1;
@@ -113,7 +125,7 @@ app.http('auth-verify-otp', {
                 issuer: 'acdc-portal'
             });
 
-            context.log(`Login successful for ${normalizedEmail}`);
+            context.log(`Login successful for user ${user ? user.id : '(no account yet)'}`);
             return {
                 status: 200,
                 jsonBody: {

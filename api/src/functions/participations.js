@@ -1,40 +1,67 @@
 const { app } = require('@azure/functions');
-const { requireAuth, canManageUser, isTeamAuthorized, hasEventRole } = require('../shared/auth');
+const { requireAuth, canManageUser, isTeamAuthorized, isTeamMember, hasEventRole } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
-const { generateId } = require('../shared/id');
+const { generateId, isGuid, sameId } = require('../shared/id');
+const { Validator, readJson, INVALID_JSON } = require('../shared/validate');
 
 const participationsStorage = new Storage('participations');
 const teamsStorage = new Storage('teams');
 const eventsStorage = new Storage('events');
 const usersStorage = new Storage('users');
-const interestQueueStorage = new Storage('interest-queue');
 const deliveriesStorage = new Storage('email-deliveries');
 const invitationsStorage = new Storage('invitations');
-const { sendWelcomeEmail } = require('../shared/welcome-email');
-const { upsertParticipationRow, deleteParticipationRows, syncParticipationToFinancials } = require('../shared/event-financials');
+const soloQueueStorage = new Storage('solo-queue');
+const { deleteParticipationRows } = require('../shared/event-financials');
 const { sendSequenceDigest } = require('../shared/sequence-digest');
 
 const VALID_ROLES = ['interest', 'participant', 'judge', 'committee', 'sponsor'];
+const HOTEL_NIGHT_KEYS = ['mon-tue', 'tue-wed', 'wed-thu', 'thu-fri', 'fri-sat', 'sat-sun', 'sun-mon'];
 
 function isActiveStatus(status) {
     return status === 'pre-registration' || status === 'registration' || status === 'live';
 }
 
-async function enforceParticipantCapacity(participation, teamId, participations, confirmCommitmentIncrease = false) {
-    if (!teamId || participation.roles?.includes('participant')) return null;
+// Deterministic default: the active event that starts first (ties broken by id).
+async function getDefaultEventId() {
+    const events = (await eventsStorage.getAll()).filter(e => isActiveStatus(e.status));
+    events.sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || String(a.id).localeCompare(String(b.id)));
+    return events.length > 0 ? events[0].id : null;
+}
 
-    const teams = await teamsStorage.getAll();
-    const team = teams.find(candidate => candidate.id === teamId);
+// Rows the authorization helpers need: the caller's and the target's participations.
+async function participationsFor(...userIds) {
+    return participationsStorage.findBy({ userId: userIds.filter(Boolean) });
+}
+
+function cleanHotelNights(value, v) {
+    if (value === undefined) return undefined;
+    if (value === null) return {};
+    if (typeof value !== 'object' || Array.isArray(value)) {
+        v.errors.push('hotelNights must be an object');
+        return undefined;
+    }
+    const nights = {};
+    for (const key of HOTEL_NIGHT_KEYS) nights[key] = !!value[key];
+    return nights;
+}
+
+// Returns an error response when adding this participation to `teamId` as a participant
+// would exceed the event's maximum or the team's committed size (409 asks for confirmation).
+async function enforceParticipantCapacity(participation, teamId, confirmCommitmentIncrease = false) {
+    if (!teamId) return null;
+    // Already counted as a participant on this very team: nothing changes.
+    if (participation.roles?.includes('participant') && sameId(participation.teamId, teamId)) return null;
+
+    const team = await teamsStorage.getById(teamId);
     if (!team) return { status: 404, jsonBody: { error: 'Team not found' } };
 
-    const events = await eventsStorage.getAll();
-    const event = events.find(candidate => candidate.id === participation.eventId);
+    const event = await eventsStorage.getById(participation.eventId);
     const maxSize = event?.maxTeamSize || 5;
-    const currentCount = participations.filter(candidate =>
-        candidate.teamId === teamId
-        && candidate.roles?.includes('participant')
-        && candidate.id !== participation.id
+    const teamParticipations = await participationsStorage.findBy({ teamId });
+    const currentCount = teamParticipations.filter(candidate =>
+        candidate.roles?.includes('participant')
+        && !sameId(candidate.id, participation.id)
     ).length;
 
     if (currentCount >= maxSize) {
@@ -67,17 +94,6 @@ async function enforceParticipantCapacity(participation, teamId, participations,
     return null;
 }
 
-async function syncParticipationFinancials(participation, context) {
-    try {
-        const events = await eventsStorage.getAll();
-        const event = events.find(e => e.id === participation.eventId);
-        if (!event) return;
-        await syncParticipationToFinancials(event, participation);
-    } catch (err) {
-        context.error('syncParticipationFinancials failed (non-critical):', err);
-    }
-}
-
 async function triggerSequenceEmails(userId, eventId, context) {
     const user = await usersStorage.getById(userId);
     if (!user || !user.email) {
@@ -87,28 +103,19 @@ async function triggerSequenceEmails(userId, eventId, context) {
     return sendSequenceDigest({ eventId, email: user.email, firstName: user.firstName, userId }, context);
 }
 
-async function removeFromInterestQueue(userId, eventId, context) {
-    try {
-        const users = await usersStorage.getAll();
-        const user = users.find(u => u.id === userId);
-        if (!user || !user.email) return;
-
-        const entries = await interestQueueStorage.getAll();
-        const entry = entries.find(e =>
-            e.email.toLowerCase() === user.email.toLowerCase() && !e.registeredEventId
-        );
-
-        if (entry) {
-            await interestQueueStorage.update(entry.id, {
-                registeredEventId: eventId,
-                registeredAt: new Date().toISOString()
-            });
-            context.log(`Marked interest queue entry for ${user.email} as registered for event ${eventId}`);
-        }
-    } catch (error) {
-        await logError(context, error);
-        context.log(`Warning: Failed to update interest queue: ${error.message}`);
+// Joining a team means leaving the solo queue for that event.
+async function leaveSoloQueue(userId, eventId, context) {
+    if (!userId || !eventId) return;
+    for (const entry of await soloQueueStorage.findBy({ userId, eventId })) {
+        await soloQueueStorage.delete(entry.id);
+        context.log(`Removed solo queue entry ${entry.id} after team assignment`);
     }
+}
+
+async function isEventStaff(user, eventId) {
+    if (user.isPortalAdmin) return true;
+    const own = await participationsStorage.findBy({ userId: user.userId, eventId });
+    return hasEventRole(user, eventId, 'judge', own) || hasEventRole(user, eventId, 'committee', own);
 }
 
 app.http('participations-get-all', {
@@ -153,35 +160,36 @@ app.http('participations-get', {
             if (!userId && !email) {
                 return { status: 400, jsonBody: { error: 'userId or email is required' } };
             }
-
-            const participations = await participationsStorage.getAll();
-
-            let targetEventId = eventId;
-            if (!targetEventId) {
-                const events = await eventsStorage.getAll();
-                const activeEvent = events.find(e => isActiveStatus(e.status));
-                if (activeEvent) targetEventId = activeEvent.id;
+            if (eventId && !isGuid(eventId)) {
+                return { status: 400, jsonBody: { error: 'Invalid event ID' } };
             }
 
-            const participation = participations.find(p => {
-                const matchesUser = userId ? p.userId === userId : p.email?.toLowerCase() === email.toLowerCase();
-                return matchesUser && p.eventId === targetEventId;
-            });
+            const targetEventId = eventId || await getDefaultEventId();
+            if (!targetEventId) {
+                return { status: 200, jsonBody: null };
+            }
+
+            const participation = userId
+                ? await participationsStorage.findOneBy({ userId, eventId: targetEventId })
+                : await participationsStorage.findOneBy({ email, eventId: targetEventId });
 
             if (!participation) {
                 return { status: 200, jsonBody: null };
             }
 
             const isSelf =
-                (participation.userId && participation.userId === auth.user.userId) ||
+                (participation.userId && sameId(participation.userId, auth.user.userId)) ||
                 (participation.email && auth.user.email &&
                     participation.email.toLowerCase() === auth.user.email.toLowerCase());
 
-            if (!isSelf && !canManageUser(auth.user, participation.userId, participations)) {
-                return {
-                    status: 403,
-                    jsonBody: { error: 'You do not have permission to view this participation' }
-                };
+            if (!isSelf) {
+                const related = await participationsFor(auth.user.userId, participation.userId);
+                if (!canManageUser(auth.user, participation.userId, related)) {
+                    return {
+                        status: 403,
+                        jsonBody: { error: 'You do not have permission to view this participation' }
+                    };
+                }
             }
 
             if (!participation.roles) participation.roles = migrateRoles(participation);
@@ -207,7 +215,8 @@ app.http('participations-upsert', {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
 
-            const body = await request.json();
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
             const { userId, email, eventId, hotelNights, roles } = body;
 
             if (!eventId) {
@@ -217,8 +226,8 @@ app.http('participations-upsert', {
                 return { status: 400, jsonBody: { error: 'userId or email is required' } };
             }
 
-            const isSelfById = userId && userId === auth.user.userId;
-            const isSelfByEmail = email && auth.user.email && email.toLowerCase() === auth.user.email.toLowerCase();
+            const isSelfById = userId && sameId(userId, auth.user.userId);
+            const isSelfByEmail = email && auth.user.email && String(email).toLowerCase() === auth.user.email.toLowerCase();
             if (!isSelfById && !isSelfByEmail && !auth.user.isPortalAdmin) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
@@ -228,32 +237,36 @@ app.http('participations-upsert', {
                 return { status: 403, jsonBody: { error: 'Only administrators can assign participation roles' } };
             }
 
-            const requestedUserId = isAdmin ? userId : auth.user.userId;
-            const requestedEmail = isAdmin ? email : auth.user.email;
-            let resolvedEmail = requestedEmail;
+            const v = new Validator();
+            const cleanEventId = v.guid(eventId, 'eventId', { required: true });
+            const requestedUserId = isAdmin ? v.guid(userId, 'userId') : auth.user.userId;
+            const requestedEmail = isAdmin ? (email ? v.email(email, 'email') : undefined) : auth.user.email;
+            const cleanHotel = cleanHotelNights(hotelNights, v);
+            if (v.failed) return v.failure();
+
+            const event = await eventsStorage.getById(cleanEventId);
+            if (!event) {
+                return { status: 404, jsonBody: { error: 'Event not found' } };
+            }
+
+            let resolvedEmail = requestedEmail ? String(requestedEmail).toLowerCase() : undefined;
             if (!resolvedEmail && requestedUserId) {
-                const users = await usersStorage.getAll();
-                const user = users.find(u => u.id === requestedUserId);
+                const user = await usersStorage.getById(requestedUserId);
                 resolvedEmail = user?.email;
             }
 
-            const participations = await participationsStorage.getAll();
-
-            const existingIndex = participations.findIndex(p => {
-                if (requestedUserId && p.userId === requestedUserId && p.eventId === eventId) return true;
-                if (resolvedEmail && p.email?.toLowerCase() === resolvedEmail.toLowerCase() && p.eventId === eventId) return true;
-                return false;
-            });
+            const existing = (requestedUserId && await participationsStorage.findOneBy({ userId: requestedUserId, eventId: cleanEventId }))
+                || (resolvedEmail && await participationsStorage.findOneBy({ email: resolvedEmail, eventId: cleanEventId }))
+                || null;
 
             const now = new Date().toISOString();
 
-            if (existingIndex >= 0) {
-                const existing = participations[existingIndex];
+            if (existing) {
                 const updated = {
                     ...existing,
                     userId: requestedUserId || existing.userId,
                     email: resolvedEmail || existing.email,
-                    hotelNights: hotelNights !== undefined ? hotelNights : existing.hotelNights,
+                    hotelNights: cleanHotel !== undefined ? cleanHotel : existing.hotelNights,
                     roles: existing.roles || migrateRoles(existing),
                     updatedAt: now
                 };
@@ -266,13 +279,16 @@ app.http('participations-upsert', {
                     updatedAt: now
                 });
 
-                context.log(`Participation updated for ${resolvedEmail || userId} in event ${eventId}`);
+                context.log(`Participation ${existing.id} updated for event ${cleanEventId}`);
                 return { status: 200, jsonBody: updated };
             } else {
-                const initialRoles = isAdmin ? [...new Set(roles || [])] : [];
+                const initialRoles = isAdmin ? [...new Set(Array.isArray(roles) ? roles : [])] : [];
                 const invalidRoles = initialRoles.filter(role => !VALID_ROLES.includes(role));
                 if (invalidRoles.length) {
                     return { status: 400, jsonBody: { error: `Invalid roles: ${invalidRoles.join(', ')}` } };
+                }
+                if (!resolvedEmail) {
+                    return { status: 400, jsonBody: { error: 'A user or email is required' } };
                 }
                 const initialHotelPaidBy = initialRoles.includes('committee') || initialRoles.includes('judge')
                     ? 'committee' : null;
@@ -280,20 +296,20 @@ app.http('participations-upsert', {
                 const newParticipation = {
                     id: generateId(),
                     userId: requestedUserId || null,
-                    email: resolvedEmail || null,
-                    eventId,
+                    email: resolvedEmail,
+                    eventId: cleanEventId,
                     roles: initialRoles,
                     teamId: null,
                     isTeamAdmin: false,
-                    hotelNights: hotelNights || {},
+                    hotelNights: cleanHotel || {},
                     hotelPaidBy: initialHotelPaidBy,
                     createdAt: now,
                     updatedAt: now
                 };
-                newParticipation.teamMemberships = [];
                 await participationsStorage.create(newParticipation);
+                newParticipation.teamMemberships = [];
 
-                context.log(`Participation created for ${resolvedEmail || userId} in event ${eventId}`);
+                context.log(`Participation ${newParticipation.id} created for event ${cleanEventId}`);
                 return { status: 201, jsonBody: newParticipation };
             }
         } catch (error) {
@@ -316,18 +332,16 @@ app.http('participations-update', {
             }
 
             const id = request.params.id;
-            const body = await request.json();
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
 
-            const participations = await participationsStorage.getAll();
-            const index = participations.findIndex(p => p.id === id);
-
-            if (index < 0) {
+            const existing = await participationsStorage.getById(id);
+            if (!existing) {
                 return { status: 404, jsonBody: { error: 'Participation not found' } };
             }
 
-            const existing = participations[index];
-
-            if (!canManageUser(auth.user, existing.userId, participations)) {
+            const related = await participationsFor(auth.user.userId, existing.userId);
+            if (!canManageUser(auth.user, existing.userId, related)) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
@@ -335,30 +349,42 @@ app.http('participations-update', {
                 return { status: 403, jsonBody: { error: 'Only administrators can modify participation identity or membership fields' } };
             }
 
-            const updated = {
-                ...existing,
-                ...(body.hotelNights !== undefined && { hotelNights: body.hotelNights }),
-                ...(body.teamId !== undefined && { teamId: body.teamId }),
-                ...(body.isTeamAdmin !== undefined && { isTeamAdmin: body.isTeamAdmin }),
-                ...(body.userId !== undefined && { userId: body.userId }),
-                ...(body.email !== undefined && { email: body.email }),
-                ...(body.interestSource !== undefined && { interestSource: body.interestSource }),
-                ...(body.interestVerified !== undefined && { interestVerified: body.interestVerified }),
-                updatedAt: new Date().toISOString()
-            };
+            const v = new Validator();
+            const changes = {};
+            const hotelNights = cleanHotelNights(body.hotelNights, v);
+            if (hotelNights !== undefined) changes.hotelNights = hotelNights;
+            if (body.teamId !== undefined) {
+                changes.teamId = body.teamId === null ? null : v.guid(body.teamId, 'teamId');
+            }
+            if (body.isTeamAdmin !== undefined) {
+                const flag = v.boolean(body.isTeamAdmin, 'isTeamAdmin');
+                if (flag !== undefined) changes.isTeamAdmin = flag;
+            }
+            if (body.userId !== undefined) {
+                changes.userId = body.userId === null ? null : v.guid(body.userId, 'userId');
+            }
+            if (body.email !== undefined) {
+                const cleanEmail = v.email(body.email, 'email');
+                if (cleanEmail) changes.email = cleanEmail;
+            }
+            if (v.failed) return v.failure();
 
+            if (changes.teamId) {
+                const team = await teamsStorage.getById(changes.teamId);
+                if (!team) return { status: 404, jsonBody: { error: 'Team not found' } };
+                if (!sameId(team.eventId, existing.eventId)) {
+                    return { status: 400, jsonBody: { error: 'Team belongs to a different event' } };
+                }
+            }
+            if (changes.userId && !(await usersStorage.getById(changes.userId))) {
+                return { status: 404, jsonBody: { error: 'User not found' } };
+            }
+
+            changes.updatedAt = new Date().toISOString();
+            await participationsStorage.update(id, changes);
+
+            const updated = { ...existing, ...changes };
             updated.teamMemberships = buildLegacyTeamMemberships(updated);
-            await participationsStorage.update(id, {
-                ...(body.hotelNights !== undefined && { hotelNights: body.hotelNights }),
-                ...(body.teamId !== undefined && { teamId: body.teamId }),
-                ...(body.isTeamAdmin !== undefined && { isTeamAdmin: body.isTeamAdmin }),
-                ...(body.userId !== undefined && { userId: body.userId }),
-                ...(body.email !== undefined && { email: body.email }),
-                ...(body.interestSource !== undefined && { interestSource: body.interestSource }),
-                ...(body.interestVerified !== undefined && { interestVerified: body.interestVerified }),
-                updatedAt: updated.updatedAt
-            });
-
             return { status: 200, jsonBody: updated };
         } catch (error) {
             await logError(context, error);
@@ -380,16 +406,14 @@ app.http('participations-delete', {
             }
 
             const id = request.params.id;
-            const participations = await participationsStorage.getAll();
-            const index = participations.findIndex(p => p.id === id);
+            const participation = await participationsStorage.getById(id);
 
-            if (index < 0) {
+            if (!participation) {
                 return { status: 404, jsonBody: { error: 'Participation not found' } };
             }
 
-            const participation = participations[index];
-
-            if (!canManageUser(auth.user, participation.userId, participations)) {
+            const related = await participationsFor(auth.user.userId, participation.userId);
+            if (!canManageUser(auth.user, participation.userId, related)) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to delete this participation' } };
             }
 
@@ -402,26 +426,27 @@ app.http('participations-delete', {
             let cleaned = { invitations: 0, deliveries: 0 };
 
             try {
-                const allInvitations = await invitationsStorage.getAll();
-                const invToDelete = allInvitations.filter(inv =>
-                    inv.email?.toLowerCase() === email?.toLowerCase() && inv.eventId === eventId
-                );
+                const invToDelete = email ? await invitationsStorage.findBy({ email, eventId }) : [];
                 for (const inv of invToDelete) await invitationsStorage.delete(inv.id);
                 cleaned.invitations = invToDelete.length;
             } catch (e) { context.log(`Warning: invitation cleanup failed: ${e.message}`); }
 
             try {
-                const allDeliveries = await deliveriesStorage.getAll();
-                const delToDelete = allDeliveries.filter(d => {
-                    if (userId && d.userId === userId) return true;
-                    if (email && d.email?.toLowerCase() === email.toLowerCase()) return true;
-                    return false;
-                });
-                for (const d of delToDelete) await deliveriesStorage.delete(d.id);
-                cleaned.deliveries = delToDelete.length;
+                const delToDelete = [
+                    ...(userId ? await deliveriesStorage.findBy({ userId }) : []),
+                    ...(email ? await deliveriesStorage.findBy({ email }) : [])
+                ];
+                const seen = new Set();
+                for (const d of delToDelete) {
+                    const key = String(d.id).toLowerCase();
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    await deliveriesStorage.delete(d.id);
+                    cleaned.deliveries++;
+                }
             } catch (e) { context.log(`Warning: delivery cleanup failed: ${e.message}`); }
 
-            context.log(`Deleted participation ${id} (${email}). Cleaned: ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries`);
+            context.log(`Deleted participation ${id}. Cleaned: ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries`);
 
             deleteParticipationRows(id).catch(err => context.warn('Financial cleanup after participation delete failed:', err?.message));
 
@@ -446,32 +471,30 @@ app.http('participations-update-roles-v2', {
             }
 
             const id = request.params.id;
-            const body = await request.json();
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
             const { add, remove, set, confirmCommitmentIncrease = false } = body;
 
-            const participations = await participationsStorage.getAll();
-            const index = participations.findIndex(p => p.id === id);
-
-            if (index < 0) {
+            const participation = await participationsStorage.getById(id);
+            if (!participation) {
                 return { status: 404, jsonBody: { error: 'Participation not found' } };
             }
 
-            const participation = participations[index];
-
-            if (!canManageUser(auth.user, participation.userId, participations)) {
+            const related = await participationsFor(auth.user.userId, participation.userId);
+            if (!canManageUser(auth.user, participation.userId, related)) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            const requestedTeamId = teamId || participation.teamId;
+            // Roles of a team member may only be changed by that team's administrator.
+            const requestedTeamId = participation.teamId;
             if (!auth.user.isPortalAdmin && requestedTeamId) {
-                const teams = await teamsStorage.getAll();
-                const team = teams.find(t => t.id === requestedTeamId);
-                if (!team || !isTeamAuthorized(auth.user, team, participations)) {
+                const team = await teamsStorage.getById(requestedTeamId);
+                if (!team || !isTeamAuthorized(auth.user, team, related)) {
                     return { status: 403, jsonBody: { error: 'Only the team administrator can change team assignment' } };
                 }
             }
 
-            const requestedRoles = [...(set || []), ...(add || [])];
+            const requestedRoles = [...(Array.isArray(set) ? set : []), ...(Array.isArray(add) ? add : [])];
             const grantsPrivilegedRole = requestedRoles.some(r => ['judge', 'committee'].includes(r));
             if (grantsPrivilegedRole && !auth.user.isPortalAdmin) {
                 return { status: 403, jsonBody: { error: 'Only portal admins can grant judge or committee roles' } };
@@ -502,7 +525,6 @@ app.http('participations-update-roles-v2', {
                 const capacityError = await enforceParticipantCapacity(
                     participation,
                     participation.teamId,
-                    participations,
                     confirmCommitmentIncrease
                 );
                 if (capacityError) return capacityError;
@@ -511,20 +533,16 @@ app.http('participations-update-roles-v2', {
             participation.roles = roles;
             participation.updatedAt = new Date().toISOString();
 
-            const addedActionableRole = add?.some(r => ['participant', 'judge', 'committee'].includes(r));
-            if (addedActionableRole && participation.userId) {
-                await removeFromInterestQueue(participation.userId, participation.eventId, context);
-                await triggerSequenceEmails(participation.userId, participation.eventId, context);
-
-                if (participation.email) {
-                }
-            }
-
             participation.teamMemberships = buildLegacyTeamMemberships(participation);
             await participationsStorage.update(id, {
                 roles: participation.roles,
                 updatedAt: participation.updatedAt
             });
+
+            const addedActionableRole = Array.isArray(add) && add.some(r => ['participant', 'judge', 'committee'].includes(r));
+            if (addedActionableRole && participation.userId) {
+                await triggerSequenceEmails(participation.userId, participation.eventId, context);
+            }
 
             context.log(`Roles updated for participation ${id}: [${roles.join(', ')}]`);
             return { status: 200, jsonBody: participation };
@@ -548,42 +566,44 @@ app.http('participations-assign-team', {
             }
 
             const id = request.params.id;
-            const body = await request.json();
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
             const { teamId, isTeamAdmin, isParticipant = true, confirmCommitmentIncrease = false } = body;
 
-            const participations = await participationsStorage.getAll();
-            const index = participations.findIndex(p => p.id === id);
-
-            if (index < 0) {
+            const participation = await participationsStorage.getById(id);
+            if (!participation) {
                 return { status: 404, jsonBody: { error: 'Participation not found' } };
             }
 
-            const participation = participations[index];
-
-            if (!canManageUser(auth.user, participation.userId, participations)) {
+            const related = await participationsFor(auth.user.userId, participation.userId);
+            if (!canManageUser(auth.user, participation.userId, related)) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
             const assignedTeamId = teamId || participation.teamId;
             if (!auth.user.isPortalAdmin && assignedTeamId) {
-                const teams = await teamsStorage.getAll();
-                const team = teams.find(t => t.id === assignedTeamId);
-                if (!team || !isTeamAuthorized(auth.user, team, participations)) {
+                const team = await teamsStorage.getById(assignedTeamId);
+                if (!team || !isTeamAuthorized(auth.user, team, related)) {
                     return { status: 403, jsonBody: { error: 'Only the team administrator can change team assignment' } };
                 }
             }
 
             if (teamId) {
-                const teams = await teamsStorage.getAll();
-                const team = teams.find(t => t.id === teamId);
+                if (!isGuid(teamId)) {
+                    return { status: 400, jsonBody: { error: 'Invalid team ID' } };
+                }
+                const team = await teamsStorage.getById(teamId);
                 if (!team) {
                     return { status: 404, jsonBody: { error: 'Team not found' } };
+                }
+                if (!sameId(team.eventId, participation.eventId)) {
+                    return { status: 400, jsonBody: { error: 'Team belongs to a different event' } };
                 }
 
                 if (!participation.roles) participation.roles = [];
                 if (isParticipant) {
                     const capacityError = await enforceParticipantCapacity(
-                        participation, teamId, participations, confirmCommitmentIncrease
+                        participation, teamId, confirmCommitmentIncrease
                     );
                     if (capacityError) return capacityError;
                     if (!participation.roles.includes('participant')) participation.roles.push('participant');
@@ -593,7 +613,7 @@ app.http('participations-assign-team', {
             }
 
             participation.teamId = teamId || null;
-            participation.isTeamAdmin = isTeamAdmin || false;
+            participation.isTeamAdmin = !!isTeamAdmin;
             participation.updatedAt = new Date().toISOString();
 
             participation.teamMemberships = buildLegacyTeamMemberships(participation);
@@ -605,11 +625,8 @@ app.http('participations-assign-team', {
             });
 
             if (teamId && participation.userId) {
-                await removeFromInterestQueue(participation.userId, participation.eventId, context);
+                await leaveSoloQueue(participation.userId, participation.eventId, context);
                 await triggerSequenceEmails(participation.userId, participation.eventId, context);
-
-                if (participation.email) {
-                }
             }
 
             context.log(`Team assignment updated for participation ${id}: team=${teamId}`);
@@ -634,7 +651,8 @@ app.http('participations-update-hotel', {
             }
 
             const id = request.params.id;
-            const body = await request.json();
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
             const { hotelNights, profileVerification } = body;
 
             const participation = await participationsStorage.getById(id);
@@ -642,15 +660,22 @@ app.http('participations-update-hotel', {
                 return { status: 404, jsonBody: { error: 'Participation not found' } };
             }
 
-            const hotelParticipations = await participationsStorage.getAll();
+            const hotelParticipations = await participationsFor(auth.user.userId, participation.userId);
             if (!canManageUser(auth.user, participation.userId, hotelParticipations)) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
+            const v = new Validator();
+            const cleanNights = cleanHotelNights(hotelNights, v);
+            if (profileVerification !== undefined && typeof profileVerification !== 'boolean') {
+                v.errors.push('profileVerification must be true or false');
+            }
+            if (v.failed) return v.failure();
+
             const updatedAt = new Date().toISOString();
             const changes = { updatedAt };
 
-            if (hotelNights !== undefined) changes.hotelNights = hotelNights;
+            if (cleanNights !== undefined) changes.hotelNights = cleanNights;
             if (profileVerification !== undefined) changes.profileVerification = profileVerification;
 
             await participationsStorage.update(id, changes);
@@ -679,8 +704,7 @@ app.http('participations-by-event', {
             const eventId = request.params.eventId;
             const role = request.query.get('role');
 
-            const participations = await participationsStorage.getAll();
-            let results = participations.filter(p => p.eventId === eventId);
+            let results = await participationsStorage.findBy({ eventId });
 
             results.forEach(p => {
                 if (!p.roles) p.roles = migrateRoles(p);
@@ -691,19 +715,17 @@ app.http('participations-by-event', {
                 results = results.filter(p => p.roles.includes(role));
             }
 
-            const isStaff = auth.user.isPortalAdmin
-                || hasEventRole(auth.user, eventId, 'judge', participations)
-                || hasEventRole(auth.user, eventId, 'committee', participations);
+            const isStaff = await isEventStaff(auth.user, eventId);
 
             if (!isStaff) {
                 const callerTeamIds = new Set(
                     results
-                        .filter(p => p.userId === auth.user.userId)
-                        .flatMap(p => (p.teamMemberships || []).map(m => m.teamId))
+                        .filter(p => sameId(p.userId, auth.user.userId))
+                        .flatMap(p => (p.teamMemberships || []).map(m => String(m.teamId).toLowerCase()))
                 );
                 // Regular participants only get membership data, never other people's contact or hotel details.
                 results = results.map(p => {
-                    const sharesTeam = (p.teamMemberships || []).some(m => callerTeamIds.has(m.teamId));
+                    const sharesTeam = (p.teamMemberships || []).some(m => callerTeamIds.has(String(m.teamId).toLowerCase()));
                     return {
                         id: p.id,
                         userId: p.userId,
@@ -744,29 +766,26 @@ app.http('participations-by-person', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to view these participations' } };
             }
 
-            const participations = await participationsStorage.getAll();
-            const personParticipations = participations.filter(p =>
-                p.email?.toLowerCase() === email.toLowerCase()
-            );
+            const personParticipations = await participationsStorage.findBy({ email });
 
-            const users = await usersStorage.getAll();
-            const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+            const user = await usersStorage.findOneBy({ email });
             if (user) {
-                participations.forEach(p => {
-                    if (p.userId === user.id && !personParticipations.find(pp => pp.id === p.id)) {
+                for (const p of await participationsStorage.findBy({ userId: user.id })) {
+                    if (!personParticipations.find(pp => sameId(pp.id, p.id))) {
                         personParticipations.push(p);
                     }
-                });
+                }
             }
 
             personParticipations.forEach(p => {
                 if (!p.roles) p.roles = migrateRoles(p);
             });
 
-            const events = await eventsStorage.getAll();
+            const eventIds = [...new Set(personParticipations.map(p => p.eventId).filter(Boolean))];
+            const events = eventIds.length > 0 ? await eventsStorage.findBy({ id: eventIds }) : [];
             const enriched = personParticipations.map(p => ({
                 ...p,
-                eventName: events.find(e => e.id === p.eventId)?.name || 'Unknown Event'
+                eventName: events.find(e => sameId(e.id, p.eventId))?.name || 'Unknown Event'
             }));
 
             return { status: 200, jsonBody: enriched };
@@ -790,27 +809,38 @@ app.http('participations-team-count', {
             }
 
             const teamId = request.params.teamId;
-            const participations = await participationsStorage.getAll();
+            const team = await teamsStorage.getById(teamId);
+            if (!team) {
+                return { status: 404, jsonBody: { error: 'Team not found' } };
+            }
 
+            // Team members and event staff only.
+            const own = await participationsStorage.findBy({ userId: auth.user.userId, eventId: team.eventId });
+            const allowed = isTeamMember(auth.user, teamId, own)
+                || hasEventRole(auth.user, team.eventId, 'judge', own)
+                || hasEventRole(auth.user, team.eventId, 'committee', own);
+            if (!allowed) {
+                return { status: 403, jsonBody: { error: 'You do not have permission to view this team' } };
+            }
+
+            const members = await participationsStorage.findBy({ teamId });
             let adminCount = 0;
             let participantCount = 0;
-
-            for (const p of participations) {
-                if (p.teamId === teamId && p.roles?.includes('participant')) {
+            for (const p of members) {
+                if (p.roles?.includes('participant')) {
                     participantCount++;
                     if (p.isTeamAdmin) adminCount++;
-                    continue;
-                }
-                const membership = (p.teamMemberships || []).find(m => m.teamId === teamId);
-                if (membership) {
-                    if (membership.isAdmin) adminCount++;
-                    if (membership.isParticipant) participantCount++;
+                } else if (p.isTeamAdmin) {
+                    adminCount++;
                 }
             }
 
+            const event = await eventsStorage.getById(team.eventId);
+            const maxParticipants = event?.maxTeamSize || 5;
+
             return {
                 status: 200,
-                jsonBody: { teamId, adminCount, participantCount, maxParticipants: 5 }
+                jsonBody: { teamId, adminCount, participantCount, maxParticipants }
             };
         } catch (error) {
             await logError(context, error);
@@ -833,30 +863,30 @@ app.http('participations-update-team-roles', {
 
             const id = request.params.id;
             const teamId = request.params.teamId;
-            const body = await request.json();
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
             const { isAdmin, isParticipant, confirmCommitmentIncrease = false } = body;
 
-            const participations = await participationsStorage.getAll();
-            const index = participations.findIndex(p => p.id === id);
-
-            if (index < 0) {
+            const participation = await participationsStorage.getById(id);
+            if (!participation) {
                 return { status: 404, jsonBody: { error: 'Participation not found' } };
             }
 
-            const participation = participations[index];
-
-            if (!canManageUser(auth.user, participation.userId, participations)) {
+            const related = await participationsFor(auth.user.userId, participation.userId);
+            if (!canManageUser(auth.user, participation.userId, related)) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            const teams = await teamsStorage.getAll();
-            const team = teams.find(t => t.id === teamId);
-            if (!team || (!auth.user.isPortalAdmin && !isTeamAuthorized(auth.user, team, participations))) {
+            const team = await teamsStorage.getById(teamId);
+            if (!team || (!auth.user.isPortalAdmin && !isTeamAuthorized(auth.user, team, related))) {
                 return { status: 403, jsonBody: { error: 'Only the team administrator can change team roles' } };
+            }
+            if (!sameId(team.eventId, participation.eventId)) {
+                return { status: 400, jsonBody: { error: 'Team belongs to a different event' } };
             }
 
             if (isParticipant && !participation.roles?.includes('participant')) {
-                if (participation.teamId && participation.teamId !== teamId) {
+                if (participation.teamId && !sameId(participation.teamId, teamId)) {
                     return {
                         status: 400,
                         jsonBody: { error: 'Already a participant on another team', existingTeamId: participation.teamId }
@@ -864,27 +894,19 @@ app.http('participations-update-team-roles', {
                 }
 
                 const capacityError = await enforceParticipantCapacity(
-                    participation, teamId, participations, confirmCommitmentIncrease
+                    participation, teamId, confirmCommitmentIncrease
                 );
                 if (capacityError) return capacityError;
             }
 
             participation.teamId = teamId;
-            participation.isTeamAdmin = isAdmin;
+            participation.isTeamAdmin = !!isAdmin;
             if (!participation.roles) participation.roles = [];
             if (isParticipant && !participation.roles.includes('participant')) {
                 participation.roles.push('participant');
             } else if (!isParticipant) {
                 participation.roles = participation.roles.filter(r => r !== 'participant');
             }
-
-            const memberships = participation.teamMemberships || [];
-            const membershipIndex = memberships.findIndex(m => m.teamId === teamId);
-            if (membershipIndex >= 0) {
-                memberships[membershipIndex].isAdmin = isAdmin;
-                memberships[membershipIndex].isParticipant = isParticipant;
-            }
-            participation.teamMemberships = memberships;
 
             participation.updatedAt = new Date().toISOString();
             await participationsStorage.update(id, {
@@ -893,8 +915,9 @@ app.http('participations-update-team-roles', {
                 roles: participation.roles,
                 updatedAt: participation.updatedAt
             });
+            participation.teamMemberships = buildLegacyTeamMemberships(participation);
 
-            context.log(`Legacy team roles updated for participation ${id}, team ${teamId}`);
+            context.log(`Team roles updated for participation ${id}, team ${teamId}`);
             return { status: 200, jsonBody: participation };
         } catch (error) {
             await logError(context, error);
@@ -927,10 +950,6 @@ function migrateRoles(participation) {
 }
 
 function buildLegacyTeamMemberships(participation) {
-    if (participation.teamMemberships && participation.teamMemberships.length > 0) {
-        return participation.teamMemberships;
-    }
-
     if (participation.teamId) {
         return [{
             teamId: participation.teamId,
@@ -941,4 +960,3 @@ function buildLegacyTeamMemberships(participation) {
 
     return [];
 }
-

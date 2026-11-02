@@ -17,10 +17,24 @@ const data = {
 const deleted = {};
 const folderDeletes = [];
 
+// Mirrors storage-sql.js findBy(): equality per key, arrays as IN lists, null as IS NULL,
+// strings compared case-insensitively.
+function matches(row, where) {
+    return Object.entries(where).every(([key, expected]) => {
+        if (expected === undefined) return true;
+        const actual = row[key];
+        if (expected === null) return actual === null || actual === undefined;
+        const wanted = (Array.isArray(expected) ? expected : [expected]).map(x => String(x).toLowerCase());
+        return actual !== null && actual !== undefined && wanted.includes(String(actual).toLowerCase());
+    });
+}
+
 function store(name) {
     return {
         getAll: async () => [...(data[name] || [])],
         getById: async id => (data[name] || []).find(row => row.id === id) || null,
+        findBy: async where => (data[name] || []).filter(row => matches(row, where)),
+        findOneBy: async where => (data[name] || []).find(row => matches(row, where)) || null,
         update: async (id, updates) => {
             const row = (data[name] || []).find(item => item.id === id);
             if (row) Object.assign(row, updates);
@@ -44,6 +58,7 @@ const registrations = [];
 const storage = new Proxy({}, {
     get: (_target, prop) => {
         if (prop === 'Storage') return function MockStorage(name) { return store(name); };
+        if (prop === 'withTransaction') return async work => work();
         if (prop === 'then') return undefined;
         return store(String(prop));
     }

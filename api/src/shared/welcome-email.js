@@ -24,8 +24,7 @@ async function sendWelcomeEmail(recipientEmail, eventId, context, opts = {}) {
             return { success: false, reason: 'Template not configured' };
         }
 
-        const users = await Storage.users.getAll();
-        const user = users.find(u => u.email?.toLowerCase() === recipientEmail.toLowerCase());
+        const user = await Storage.users.getByEmail(recipientEmail);
         const fullName = user
             ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
             : recipientEmail.split('@')[0];
@@ -50,7 +49,7 @@ async function sendWelcomeEmail(recipientEmail, eventId, context, opts = {}) {
         };
 
         const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
-        const subject = processTemplate(eventTheme.subject || template.subject, mergeData);
+        const subject = processTemplate(eventTheme.subject || template.subject, mergeData, { html: false });
 
         await sendEmail({ to: recipientEmail, subject, htmlContent });
 

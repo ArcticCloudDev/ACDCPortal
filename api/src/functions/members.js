@@ -1,10 +1,113 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { requireAuth, isTeamAuthorized } = require('../shared/auth');
+const { isGuid, sameId } = require('../shared/id');
 const Storage = require('../shared/storage');
-const { Storage: GenericStorage } = require('../shared/storage');
-const Email = require('../shared/email');
-const { sendWelcomeEmail } = require('../shared/welcome-email');
+const { Storage: GenericStorage, withTransaction } = require('../shared/storage');
+const { readJson } = require('../shared/validate');
+
+const participationsStorage = new GenericStorage('participations');
+const invitationsStorage = new GenericStorage('invitations');
+const deliveriesStorage = new GenericStorage('email-deliveries');
+const interestLeadsStorage = new GenericStorage('interest-leads');
+const soloQueueStorage = new GenericStorage('solo-queue');
+const teamsStorage = new GenericStorage('teams');
+
+// A person's participations: rows linked by user id plus legacy rows linked by email only.
+async function participationsOf(user) {
+    const byUser = await participationsStorage.findBy({ userId: user.id });
+    const byEmail = user.email ? await participationsStorage.findBy({ email: user.email }) : [];
+    const seen = new Set(byUser.map(p => String(p.id).toLowerCase()));
+    return [...byUser, ...byEmail.filter(p => !seen.has(String(p.id).toLowerCase()))];
+}
+
+function teamIdsOf(participations) {
+    const ids = new Set();
+    for (const p of participations) {
+        if (p.teamId) ids.add(String(p.teamId).toLowerCase());
+        for (const m of p.teamMemberships || []) if (m.teamId) ids.add(String(m.teamId).toLowerCase());
+    }
+    return ids;
+}
+
+function isProvisional(user) {
+    return !!user.invitationPending && !user.profileComplete;
+}
+
+// Self or portal admin: the whole account goes, child rows first so no FK can block it.
+async function removeAccount(user, participations) {
+    const cleaned = { participations: 0, invitations: 0, deliveries: 0, interestLeads: 0, soloQueue: 0, teamsReleased: 0 };
+
+    for (const p of participations) {
+        if (await participationsStorage.delete(p.id)) cleaned.participations++;
+    }
+    for (const inv of await invitationsStorage.findBy({ email: user.email })) {
+        if (await invitationsStorage.delete(inv.id)) cleaned.invitations++;
+    }
+    const deliveries = [
+        ...await deliveriesStorage.findBy({ userId: user.id }),
+        ...await deliveriesStorage.findBy({ email: user.email })
+    ];
+    const seenDeliveries = new Set();
+    for (const d of deliveries) {
+        const key = String(d.id).toLowerCase();
+        if (seenDeliveries.has(key)) continue;
+        seenDeliveries.add(key);
+        if (await deliveriesStorage.delete(d.id)) cleaned.deliveries++;
+    }
+    for (const lead of await interestLeadsStorage.findBy({ email: user.email })) {
+        if (await interestLeadsStorage.delete(lead.id)) cleaned.interestLeads++;
+    }
+    for (const entry of await soloQueueStorage.findBy({ userId: user.id })) {
+        if (await soloQueueStorage.delete(entry.id)) cleaned.soloQueue++;
+    }
+    for (const team of await teamsStorage.findBy({ adminUserId: user.id })) {
+        await Storage.teams.update(team.id, { adminUserId: null, updatedAt: new Date().toISOString() });
+        cleaned.teamsReleased++;
+    }
+    await Storage.allowedEmails.remove(user.email);
+    await Storage.users.delete(user.id);
+
+    return { message: 'Member removed successfully', cleaned };
+}
+
+// Team administrator: the person leaves the team(s) the caller administers. Their account
+// survives unless it is a provisional stub created by the invitation, with nothing else.
+async function detachFromTeams(user, participations, teamIds) {
+    const cleaned = { participations: 0, invitations: 0, accountRemoved: false };
+    const inScope = participations.filter(p => teamIds.some(t => sameId(p.teamId, t)));
+    const outOfScope = participations.filter(p => !inScope.includes(p));
+    const now = new Date().toISOString();
+
+    const removeStub = isProvisional(user) && outOfScope.length === 0;
+
+    for (const p of inScope) {
+        if (removeStub) {
+            await participationsStorage.delete(p.id);
+        } else {
+            await participationsStorage.update(p.id, { teamId: null, isTeamAdmin: false, updatedAt: now });
+        }
+        cleaned.participations++;
+    }
+    for (const teamId of teamIds) {
+        for (const inv of await invitationsStorage.findBy({ email: user.email, teamId, status: 'pending' })) {
+            if (await invitationsStorage.delete(inv.id)) cleaned.invitations++;
+        }
+    }
+
+    if (removeStub) {
+        await Storage.allowedEmails.remove(user.email);
+        await Storage.users.delete(user.id);
+        cleaned.accountRemoved = true;
+    } else {
+        const userUpdates = { updatedAt: now };
+        if (user.teamId && teamIds.some(t => sameId(user.teamId, t))) userUpdates.teamId = null;
+        if (user.invitationPending) userUpdates.invitationPending = false;
+        await Storage.users.update(user.id, userUpdates);
+    }
+
+    return { message: 'Member removed from team', cleaned };
+}
 
 app.http('members-remove', {
     methods: ['DELETE'],
@@ -14,160 +117,54 @@ app.http('members-remove', {
         try {
             const auth = requireAuth(request, context);
             if (!auth.authorized) {
-                return {
-                    status: auth.status,
-                    jsonBody: auth.jsonBody
-                };
+                return { status: auth.status, jsonBody: auth.jsonBody };
             }
 
             const memberId = request.params.id;
-            let teamId = null;
-
-            try {
-                const body = await request.json();
-                teamId = body?.teamId || null;
-            } catch {
+            if (!isGuid(memberId)) {
+                return { status: 400, jsonBody: { message: 'Invalid member ID' } };
             }
 
-            if (!memberId) {
-                return {
-                    status: 400,
-                    jsonBody: { message: 'Member ID required' }
-                };
+            const body = (await readJson(request)) || {};
+            const teamId = body.teamId ?? null;
+            if (teamId !== null && !isGuid(teamId)) {
+                return { status: 400, jsonBody: { message: 'Invalid team ID' } };
             }
 
             const user = await Storage.users.getById(memberId);
             if (!user) {
-                return {
-                    status: 404,
-                    jsonBody: { message: 'Member not found' }
-                };
+                return { status: 404, jsonBody: { message: 'Member not found' } };
             }
 
-            let team = null;
-            if (teamId) {
-                team = await Storage.teams.getById(teamId);
-            } else if (user.teamId) {
-                team = await Storage.teams.getById(user.teamId);
-                teamId = user.teamId;
+            const targetParticipations = await participationsOf(user);
+            const targetTeamIds = teamIdsOf(targetParticipations);
+
+            if (teamId && !targetTeamIds.has(teamId.toLowerCase())) {
+                return { status: 400, jsonBody: { message: 'This user is not a member of that team' } };
             }
 
-            const participationsStorage = new GenericStorage('participations');
-            const allParticipations = await participationsStorage.getAll();
-            const isSelfRemoval = auth.user.userId && auth.user.userId === memberId;
-            if (!isSelfRemoval && team && !isTeamAuthorized(auth.user, team, allParticipations)) {
-                return {
-                    status: 403,
-                    jsonBody: { message: 'You do not have permission to remove this member' }
-                };
+            const isSelf = sameId(auth.user.userId, memberId);
+            const isAdmin = !!auth.user.isPortalAdmin;
+            let scopeTeamIds = teamId ? [teamId] : [...targetTeamIds];
+
+            if (!isSelf && !isAdmin) {
+                // Only an administrator of a team the target actually belongs to may act.
+                const forbidden = { status: 403, jsonBody: { message: 'You do not have permission to remove this member' } };
+                if (scopeTeamIds.length === 0) return forbidden;
+                const callerParticipations = await participationsStorage.findBy({ userId: auth.user.userId });
+                const teams = await teamsStorage.findBy({ id: scopeTeamIds });
+                const authorizedTeams = teams.filter(team => isTeamAuthorized(auth.user, team, callerParticipations));
+                if (authorizedTeams.length === 0) return forbidden;
+                scopeTeamIds = authorizedTeams.map(team => team.id);
             }
 
-            const eventId = team?.eventId || null;
-
-            const invitationsStorage = new GenericStorage('invitations');
-            const deliveriesStorage = new GenericStorage('email-deliveries');
-            const sequenceProgressStorage = new GenericStorage('sequence-progress');
-            const interestLeadsStorage = new GenericStorage('interest-leads');
-
-            const matchedParticipations = allParticipations.filter(p => {
-                const byUserId = p.userId && p.userId === memberId;
-                const byEmail = user.email && p.email &&
-                    p.email.toLowerCase() === user.email.toLowerCase();
-                if (!byUserId && !byEmail) return false;
-                if (teamId && (p.teamId === teamId || (p.teamMemberships || []).some(m => m.teamId === teamId))) return true;
-                if (eventId && p.eventId === eventId) return true;
-                return !teamId && !eventId;
+            const result = await withTransaction(async () => {
+                if (isSelf || isAdmin) return removeAccount(user, targetParticipations);
+                return detachFromTeams(user, targetParticipations, scopeTeamIds);
             });
 
-            const cleaned = {
-                participations: 0,
-                invitations: 0,
-                deliveries: 0,
-                sequenceProgress: 0,
-                interestLeads: 0
-            };
-
-            for (const participation of matchedParticipations) {
-                await participationsStorage.delete(participation.id);
-                cleaned.participations += 1;
-
-                const pEmail = participation.email;
-                const pUserId = participation.userId;
-                const pEventId = participation.eventId;
-
-                const invitations = await invitationsStorage.getAll();
-                const removedInvitations = invitations.filter(inv => {
-                    const emailMatch = pEmail && inv.email && inv.email.toLowerCase() === pEmail.toLowerCase();
-                    return emailMatch && inv.eventId === pEventId;
-                });
-                if (removedInvitations.length > 0) {
-                    cleaned.invitations += removedInvitations.length;
-                    for (const inv of removedInvitations) {
-                        await invitationsStorage.delete(inv.id);
-                    }
-                }
-
-                const deliveries = await deliveriesStorage.getAll();
-                const removedDeliveries = deliveries.filter(d => {
-                    if (pUserId && d.userId === pUserId) return true;
-                    if (pEmail && d.email && d.email.toLowerCase() === pEmail.toLowerCase()) return true;
-                    return false;
-                });
-                if (removedDeliveries.length > 0) {
-                    cleaned.deliveries += removedDeliveries.length;
-                    for (const d of removedDeliveries) {
-                        await deliveriesStorage.delete(d.id);
-                    }
-                }
-
-                const progressRows = await sequenceProgressStorage.getAll();
-                if (Array.isArray(progressRows) && progressRows.length > 0) {
-                    const removedProgress = progressRows.filter(p => p.userId === pUserId && p.eventId === pEventId);
-                    if (removedProgress.length > 0) {
-                        cleaned.sequenceProgress += removedProgress.length;
-                        for (const prog of removedProgress) {
-                            await sequenceProgressStorage.delete(prog.id);
-                        }
-                    }
-                }
-            }
-
-            const allLeads = await interestLeadsStorage.getAll();
-            const removedLeads = allLeads.filter(lead =>
-                lead.email && lead.email.toLowerCase() === user.email.toLowerCase()
-            );
-            if (removedLeads.length > 0) {
-                cleaned.interestLeads = removedLeads.length;
-                for (const lead of removedLeads) {
-                    await interestLeadsStorage.delete(lead.id);
-                }
-            }
-
-            if (cleaned.participations === 0) {
-                const allDeliveries = await deliveriesStorage.getAll();
-                const removedDeliveries = allDeliveries.filter(d =>
-                    d.email && d.email.toLowerCase() === user.email.toLowerCase()
-                );
-                if (removedDeliveries.length > 0) {
-                    cleaned.deliveries += removedDeliveries.length;
-                    for (const d of removedDeliveries) {
-                        await deliveriesStorage.delete(d.id);
-                    }
-                }
-            }
-
-            await Storage.allowedEmails.remove(user.email);
-
-            await Storage.users.delete(memberId);
-
-            context.log(`Member ${memberId} removed. Cleaned ${cleaned.participations} participations, ${cleaned.invitations} invitations, ${cleaned.deliveries} deliveries, ${cleaned.sequenceProgress} sequence-progress rows, ${cleaned.interestLeads} interest leads.`);
-            return {
-                status: 200,
-                jsonBody: {
-                    message: 'Member removed successfully',
-                    cleaned
-                }
-            };
+            context.log(`Member ${memberId} removed by ${auth.user.userId || 'unknown'}: ${JSON.stringify(result.cleaned)}`);
+            return { status: 200, jsonBody: result };
 
         } catch (error) {
             await logError(context, error);

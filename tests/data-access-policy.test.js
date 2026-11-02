@@ -38,12 +38,27 @@ const DATA = {
     ]
 };
 
+// Mirrors storage-sql.js findBy(): equality per key, arrays as IN lists, null as IS NULL,
+// strings compared case-insensitively.
+function matches(row, where) {
+    return Object.entries(where).every(([key, expected]) => {
+        if (expected === undefined) return true;
+        const actual = row[key];
+        if (expected === null) return actual === null || actual === undefined;
+        const wanted = (Array.isArray(expected) ? expected : [expected]).map(x => String(x).toLowerCase());
+        return actual !== null && actual !== undefined && wanted.includes(String(actual).toLowerCase());
+    });
+}
+
 function store(collection) {
     const rows = () => DATA[collection] || [];
+    const clone = x => JSON.parse(JSON.stringify(x));
     return {
-        getAll: async () => JSON.parse(JSON.stringify(rows())),
-        getById: async (id) => JSON.parse(JSON.stringify(rows().find(r => r.id === id) || null)),
-        getByEmail: async (email) => JSON.parse(JSON.stringify(rows().find(r => r.email === email) || null)),
+        getAll: async () => clone(rows()),
+        getById: async (id) => clone(rows().find(r => r.id === id) || null),
+        getByEmail: async (email) => clone(rows().find(r => r.email === email) || null),
+        findBy: async (where) => clone(rows().filter(r => matches(r, where))),
+        findOneBy: async (where) => clone(rows().find(r => matches(r, where)) || null),
         create: async (row) => row,
         update: async (_id, updates) => updates,
         delete: async () => {}
@@ -67,6 +82,7 @@ mockModule(path.join(SHARED_DIR, 'storage.js'), new Proxy({}, {
     get: (_t, prop) => {
         if (prop === 'Storage') return function MockStorage(collection) { return store(collection); };
         if (prop === 'readData' || prop === 'writeData') return async () => ({});
+        if (prop === 'withTransaction') return async work => work();
         if (prop === 'then') return undefined;
         return store(String(prop));
     }

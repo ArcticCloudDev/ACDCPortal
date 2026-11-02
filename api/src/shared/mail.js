@@ -128,17 +128,21 @@ async function sendBulkEmail({ to, subject, htmlContent }) {
     return results;
 }
 
-function processTemplate(template, data = {}) {
-    let result = template;
+// Merge keys whose values are trusted, already-built HTML fragments. Everything else
+// (names, team names, messages, URLs...) is user-supplied text and gets HTML-escaped.
+const RAW_HTML_KEYS = ['content', 'bodyText', 'closingText', 'digestContent', 'actionItems', 'teamBoxHtml'];
 
-    console.log('[processTemplate] ===== MERGE DATA =====');
-    for (const [key, value] of Object.entries(data)) {
-        const display = typeof value === 'string' && value.length > 80 ? value.substring(0, 80) + '...' : value;
-        console.log(`[processTemplate]   ${key} = "${display}"`);
-    }
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
-    const placeholders = template.match(/{{(\w+)}}/g) || [];
-    console.log(`[processTemplate] Placeholders in template: ${placeholders.join(', ')}`);
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+}
+
+// Replaces {{key}} placeholders and {{#if key}}...{{/if}} blocks. Values are HTML-escaped
+// unless the key is in RAW_HTML_KEYS; pass { html: false } for plain-text output (subjects).
+function processTemplate(template, data = {}, options = {}) {
+    const escape = options.html !== false;
+    let result = String(template ?? '');
 
     result = result.replace(/{{#if (\w+)}}([\s\S]*?){{\/if}}/g, (match, key, content) => {
         return data[key] ? content : '';
@@ -146,10 +150,7 @@ function processTemplate(template, data = {}) {
 
     result = result.replace(/{{(\w+)}}/g, (match, key) => {
         const val = data[key] !== undefined && data[key] !== null ? String(data[key]) : '';
-        if (key === 'acceptUrl' || key === 'inviteId') {
-            console.log(`[processTemplate] REPLACING {{${key}}} => "${val}"`);
-        }
-        return val;
+        return escape && !RAW_HTML_KEYS.includes(key) ? escapeHtml(val) : val;
     });
 
     return result;
@@ -159,5 +160,8 @@ module.exports = {
     sendEmail,
     sendBulkEmail,
     processTemplate,
+    escapeHtml,
+    extractInlineImages,
+    RAW_HTML_KEYS,
     get SENDER_EMAIL() { return process.env.MAIL_SENDER || 'no-reply@acdc.blog'; }
 };

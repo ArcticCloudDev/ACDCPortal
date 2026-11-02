@@ -2,6 +2,9 @@
 
 const { processTemplate } = require('./mail');
 
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+
 function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
     const features = templateConfig.features || [];
 
@@ -14,19 +17,21 @@ function buildEmailHtml(templateConfig, mergeData, eventOverrides = {}) {
         ? processTemplate(resolvedButtonText, mergeData)
         : null;
     const buttonUrl = templateConfig.buttonUrlField
-        ? (mergeData[templateConfig.buttonUrlField] || '#')
+        ? esc(mergeData[templateConfig.buttonUrlField] || '#')
         : null;
 
-    const bodyText = processTemplate(mergeData.bodyText || '', mergeData);
-    const closingText = processTemplate(mergeData.closingText || '', mergeData);
+    // bodyText / closingText arrive already merged (and escaped) by the caller; running them
+    // through processTemplate again would let user text containing "{{...}}" pull in merge data.
+    const bodyText = mergeData.bodyText || '';
+    const closingText = mergeData.closingText || '';
 
     const teamBoxHtml = features.includes('teamBox') ? `
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 0 0 24px 0;">
                         <tr>
                             <td style="padding: 20px; background-color: #f0f9ff; border-radius: 8px; border-left: 4px solid #1a365d;">
                                 <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Participation Details</p>
-                                <p style="margin: 0 0 4px 0; font-size: 18px; font-weight: 600; color: #1e293b;">${mergeData.teamName || ''}</p>
-                                <p style="margin: 0; font-size: 14px; color: #475569;">${mergeData.committedParticipants || ''} committed participants</p>
+                                <p style="margin: 0 0 4px 0; font-size: 18px; font-weight: 600; color: #1e293b;">${esc(mergeData.teamName || '')}</p>
+                                <p style="margin: 0; font-size: 14px; color: #475569;">${esc(mergeData.committedParticipants || '')} committed participants</p>
                             </td>
                         </tr>
                     </table>` : '';
