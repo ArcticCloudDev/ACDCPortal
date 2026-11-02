@@ -114,6 +114,12 @@ Also fully testable offline:
 
 ---
 
+### End-to-end tests (Docker, still no Azure access)
+
+`npm run test:e2e` runs a Playwright suite against the real frontend and the real API handlers on a throwaway local SQL Server container, with mail, SharePoint and reCAPTCHA faked and all Azure access blocked. It needs Docker Desktop. See [tests/e2e/README.md](tests/e2e/README.md).
+
+---
+
 ## 6. What needs *some* Azure access, but can use a shared "dev" tier (Tier 2)
 
 These require real Azure resources, but ones that can safely be shared with the whole team using a **separate dev copy**, not production:

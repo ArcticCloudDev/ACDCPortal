@@ -27,3 +27,6 @@ Thumbs.db
 # Azure Functions
 bin/
 obj/
+
+# Playwright E2E artifacts
+tests/e2e/.artifacts/
