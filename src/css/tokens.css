@@ -1,0 +1,165 @@
+/* ==========================================================================
+   ACDC Portal design tokens. The single source of colour, type, spacing, shape,
+   depth and motion values for every page (portal and admin). Load this first.
+   See docs/design/DESIGN.md.
+   ========================================================================== */
+
+:root {
+    color-scheme: light;
+
+    /* Brand */
+    --color-navy: #0b1b2e;
+    --color-navy-raised: #13273f;
+    --color-navy-line: #22385a;
+    --color-on-navy: #e2e8f0;
+    --color-on-navy-muted: #94a3b8;
+
+    /* Surfaces & text */
+    --color-bg: #f5f7fa;
+    --color-surface: #ffffff;
+    --color-surface-muted: #f1f5f9;
+    --color-surface-hover: #f8fafc;
+    --color-border: #e2e8f0;
+    --color-border-strong: #cbd5e1;
+    --color-text: #0f172a;
+    --color-text-muted: #475569;
+    --color-text-subtle: #5b6b80;
+    --color-overlay: rgb(15 23 42 / 0.55);
+
+    /* Accent (aurora teal) */
+    --color-accent: #0f766e;
+    --color-accent-hover: #115e59;
+    --color-accent-subtle: #e6f7f5;
+    --color-accent-text: #115e59;
+    --color-on-accent: #ffffff;
+    --color-accent-bright: #14b8a6;
+
+    /* Status */
+    --color-success: #15803d;
+    --color-success-subtle: #ecfdf3;
+    --color-success-text: #166534;
+    --color-warning: #b45309;
+    --color-warning-subtle: #fff7e6;
+    --color-warning-text: #92400e;
+    --color-danger: #b91c1c;
+    --color-danger-hover: #991b1b;
+    --color-danger-subtle: #fef2f2;
+    --color-danger-text: #991b1b;
+    --color-info: #1d4ed8;
+    --color-info-subtle: #eff6ff;
+    --color-info-text: #1e40af;
+    --color-violet: #6d28d9;
+    --color-violet-subtle: #f3eeff;
+    --color-violet-text: #5b21b6;
+
+    /* Typography */
+    --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.125rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.5rem;
+    --text-3xl: 1.875rem;
+    --text-4xl: 2.25rem;
+    --leading-tight: 1.25;
+    --leading-normal: 1.55;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+    --weight-bold: 700;
+
+    /* Spacing (4px grid) */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-10: 2.5rem;
+    --space-12: 3rem;
+    --space-16: 4rem;
+
+    /* Shape & depth */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 20px;
+    --radius-full: 999px;
+    --shadow-xs: 0 1px 2px rgb(15 23 42 / 0.05);
+    --shadow-sm: 0 1px 3px rgb(15 23 42 / 0.08), 0 1px 2px rgb(15 23 42 / 0.04);
+    --shadow-md: 0 6px 16px rgb(15 23 42 / 0.08), 0 2px 4px rgb(15 23 42 / 0.04);
+    --shadow-lg: 0 18px 40px rgb(15 23 42 / 0.16);
+    --focus-ring: 0 0 0 3px rgb(20 184 166 / 0.45);
+
+    /* Motion */
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --duration-fast: 120ms;
+    --duration: 200ms;
+
+    /* Layout */
+    --container-narrow: 600px;
+    --container: 1120px;
+    --topbar-height: 60px;
+
+    /* Legacy names (pre-2026-11). Kept as aliases so pages not yet migrated keep working.
+       New code uses the --color-* / --radius-* tokens above. */
+    --primary-color: var(--color-accent);
+    --primary-hover: var(--color-accent-hover);
+    --secondary-color: var(--color-text-subtle);
+    --success-color: var(--color-success);
+    --error-color: var(--color-danger);
+    --background: var(--color-bg);
+    --card-bg: var(--color-surface);
+    --text-color: var(--color-text);
+    --text-muted: var(--color-text-muted);
+    --border-color: var(--color-border);
+    --border-radius: var(--radius-md);
+}
+
+/* Dark mode follows the device setting on pages that opt in with <html data-theme="auto">.
+   Pages opt in once they are migrated to the tokens (hardcoded colours would clash). */
+@media (prefers-color-scheme: dark) {
+    :root[data-theme="auto"] {
+        color-scheme: dark;
+        --color-navy: #060d18;
+        --color-navy-raised: #0e1a2c;
+        --color-navy-line: #1d2c45;
+        --color-bg: #0a1220;
+        --color-surface: #101a2b;
+        --color-surface-muted: #16223a;
+        --color-surface-hover: #14203a;
+        --color-border: #23324d;
+        --color-border-strong: #2f4163;
+        --color-text: #e6edf7;
+        --color-text-muted: #a9b6cb;
+        --color-text-subtle: #8494ad;
+        --color-overlay: rgb(2 6 15 / 0.7);
+        --color-accent: #2dd4bf;
+        --color-accent-hover: #5eead4;
+        --color-accent-subtle: #0d2f2d;
+        --color-accent-text: #5eead4;
+        --color-on-accent: #04201e;
+        --color-success: #4ade80;
+        --color-success-subtle: #0f2a1c;
+        --color-success-text: #86efac;
+        --color-warning: #fbbf24;
+        --color-warning-subtle: #2d2410;
+        --color-warning-text: #fcd34d;
+        --color-danger: #dc2626;
+        --color-danger-hover: #ef4444;
+        --color-danger-subtle: #331418;
+        --color-danger-text: #fca5a5;
+        --color-info: #60a5fa;
+        --color-info-subtle: #13223f;
+        --color-info-text: #93c5fd;
+        --color-violet: #a78bfa;
+        --color-violet-subtle: #221a3d;
+        --color-violet-text: #c4b5fd;
+        --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+        --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.45);
+        --shadow-md: 0 6px 16px rgb(0 0 0 / 0.45);
+        --shadow-lg: 0 18px 40px rgb(0 0 0 / 0.6);
+    }
+}

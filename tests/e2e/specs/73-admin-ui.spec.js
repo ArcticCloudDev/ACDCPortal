@@ -418,7 +418,8 @@ test.describe('admin-side contract fixes', () => {
         await loginAs(w.admin);
         await page.goto('/admin-dashboard.html');
         await expect(page.locator('#stat-participants')).toHaveText('2');
-        await expect(page.locator('#teams-table-body .badge.count')).toHaveText('2');
+        // Members column shows filled / committed places (redesign 2026-11).
+        await expect(page.locator('#teams-table-body .badge.count')).toHaveText('2 / 4');
         const countCalls = page.waitForRequest(r => r.url().includes('/participations/team/'), { timeout: 1000 }).catch(() => null);
         expect(await countCalls).toBeNull();
         await page.locator('#events-list .event-row').getByText('Edit').click();

@@ -73,11 +73,11 @@ async function loadDashboardData() {
         ]);
 
         allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
-        document.getElementById('stat-events').textContent = allEvents.length;
-        renderEventsList();
-
         allTeams = Permissions.filterByEvent(currentPermissions, teams);
+        document.getElementById('stat-events').textContent = allEvents.length;
         document.getElementById('stat-teams').textContent = allTeams.length;
+        // Teams must be loaded first: each event row shows its team count.
+        renderEventsList();
 
         const userMap = {};
         for (const u of usersResult || []) { userMap[String(u.id).toLowerCase()] = u; }
@@ -111,7 +111,6 @@ function renderEventsList() {
     if (allEvents.length === 0) {
         eventsList.innerHTML = `
             <div class="empty-state">
-                <div class="icon">📅</div>
                 <p>No events yet. <a href="admin-events.html?action=create">Create one</a></p>
             </div>
         `;
@@ -136,20 +135,19 @@ function renderEventsList() {
             'completed': 'Completed'
         };
 
+        const teamCount = `${eventTeams.length} ${eventTeams.length === 1 ? 'team' : 'teams'}`;
         return `
             <div class="event-row">
                 <div class="event-info">
                     <div class="event-name">${escapeHtml(event.name)}</div>
                     <div class="event-meta">
-                        <span>📍 ${escapeHtml(event.location || 'TBD')}</span>
-                        <span>📅 ${startDate}</span>
-                        <span class="badge count">${eventTeams.length} teams</span>
+                        <span>${icon('map-pin')}${escapeHtml(event.location || 'TBD')}</span>
+                        <span>${icon('calendar')}${startDate}</span>
+                        <span>${icon('users')}${teamCount}</span>
                     </div>
                 </div>
-                <span class="badge ${escapeHtml(status)}">
-                    ${escapeHtml(statusLabels[status] || status)}
-                </span>
-                <div style="margin-left: 12px; display: flex; gap: 6px;">
+                <span class="badge ${escapeHtml(status)}">${escapeHtml(statusLabels[status] || status)}</span>
+                <div class="row-actions">
                     <a href="event.html?id=${encodeURIComponent(event.id)}" class="btn-sm">View</a>
                     <a href="admin-events.html?event=${encodeURIComponent(event.id)}" class="btn-sm">Edit</a>
                 </div>
@@ -186,11 +184,11 @@ function renderTeamsTable(userMap = {}, memberCounts = {}) {
 
         return `
             <tr>
-                <td>${escapeHtml(team.teamName)}</td>
-                <td style="color: var(--admin-text-muted); font-size: 0.8rem;">${escapeHtml(adminLabel)}</td>
-                <td><span class="badge count" title="Committed team size: ${Number(team.numberOfParticipants) || 0}">${memberCounts[team.id] ?? 0}</span></td>
+                <td><strong>${escapeHtml(team.teamName)}</strong></td>
+                <td class="text-muted">${escapeHtml(adminLabel)}</td>
+                <td><span class="badge count" title="Committed team size: ${Number(team.numberOfParticipants) || 0}">${memberCounts[team.id] ?? 0} / ${Number(team.numberOfParticipants) || 0}</span></td>
                 <td>${event ? escapeHtml(event.name) : '—'}</td>
-                <td style="color: var(--admin-text-muted);">${createdDate}</td>
+                <td class="text-muted">${createdDate}</td>
                 <td><a href="event.html?id=${encodeURIComponent(team.eventId)}" class="btn-sm">View</a></td>
             </tr>
         `;
@@ -202,9 +200,9 @@ document.addEventListener('click', async (e) => {
         e.preventDefault();
 
         const btn = e.target.closest('#export-data');
-        const iconEl = btn.querySelector('.icon');
-        const originalIcon = iconEl.textContent;
-        iconEl.textContent = '⏳';
+        const labelEl = btn.querySelector('.quick-action-label');
+        const originalLabel = labelEl.textContent;
+        labelEl.textContent = 'Exporting…';
 
         try {
             const data = {
@@ -223,13 +221,13 @@ document.addEventListener('click', async (e) => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            iconEl.textContent = '✓';
-            setTimeout(() => { iconEl.textContent = originalIcon; }, 1500);
+            labelEl.textContent = 'Exported';
+            setTimeout(() => { labelEl.textContent = originalLabel; }, 1500);
 
         } catch (error) {
             console.error('Export error:', error);
-            iconEl.textContent = '✗';
-            setTimeout(() => { iconEl.textContent = originalIcon; }, 1500);
+            labelEl.textContent = 'Export failed';
+            setTimeout(() => { labelEl.textContent = originalLabel; }, 1500);
         }
     }
 });

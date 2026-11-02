@@ -37,7 +37,7 @@ test.describe('admin page gates', () => {
         await loginAs(w.member);
         for (const p of ['admin-dashboard.html', 'admin-users.html', 'admin-events.html', 'admin-badges.html']) {
             await page.goto(`/${p}`);
-            await expect(page.getByText(/Access Denied/).first()).toBeVisible();
+            await expect(page.getByText(/Access denied/i).first()).toBeVisible();
         }
     });
 
@@ -51,7 +51,7 @@ test.describe('admin page gates', () => {
         await expect(page.locator('.tab-btn[data-tab="master"]')).toBeHidden();
         await expect(page.getByText('No badge claims found')).toBeVisible();
         await page.goto('/admin-users.html');
-        await expect(page.getByText(/Access Denied/).first()).toBeVisible();
+        await expect(page.getByText(/Access denied/i).first()).toBeVisible();
     });
 
     test('a committee member reaches event admin but not people admin', async ({ page, harness, loginAs }) => {
@@ -61,7 +61,7 @@ test.describe('admin page gates', () => {
         await page.goto('/admin-events.html');
         await expect(page.locator('#events-table-body')).toContainText('ACDC 2027');
         await page.goto('/admin-users.html');
-        await expect(page.getByText(/Access Denied/).first()).toBeVisible();
+        await expect(page.getByText(/Access denied/i).first()).toBeVisible();
     });
 
     test('the header shows the admin link only to staff', async ({ page, harness, loginAs }) => {

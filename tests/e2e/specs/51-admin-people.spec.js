@@ -137,3 +137,9 @@ test('admin removes an interest lead', async ({ page, harness, loginAs, apiAs })
     await page.locator('#queue-table-body tr', { hasText: 'keen.kari@e2e.test' }).getByRole('button', { name: 'Remove' }).click();
     await expect(page.locator('#queue-table-body')).not.toContainText('keen.kari@e2e.test', { timeout: 4000 });
 });
+
+test('dashboard shows each event with its team count', async ({ page, harness, loginAs }) => {
+    // Regression: event rows rendered before teams loaded, so every event said "0 teams".
+    await asAdmin(page, harness, loginAs, '/admin-dashboard.html');
+    await expect(page.locator('#events-list .event-row', { hasText: 'ACDC 2027' })).toContainText('1 team');
+});

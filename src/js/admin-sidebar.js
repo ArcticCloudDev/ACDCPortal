@@ -1,34 +1,33 @@
 const SIDEBAR_NAV_ITEMS = [
     { section: 'Main' },
-    { page: 'dashboard', href: 'admin-dashboard.html', icon: '📊', label: 'Dashboard' },
-    { page: 'events',    href: 'admin-events.html',    icon: '📅', label: 'Events' },
+    { page: 'dashboard', href: 'admin-dashboard.html', icon: 'layout-dashboard', label: 'Dashboard' },
+    { page: 'events',    href: 'admin-events.html',    icon: 'calendar-days',    label: 'Events' },
 
     { section: 'Participants' },
-    { page: 'teams',    href: 'admin-teams.html',    icon: '👥', label: 'Teams',  darkIcon: true },
-    { page: 'users',    href: 'admin-users.html',    icon: '👤', label: 'People', darkIcon: true },
+    { page: 'teams', href: 'admin-teams.html', icon: 'users',      label: 'Teams' },
+    { page: 'users', href: 'admin-users.html', icon: 'user-round', label: 'People' },
 
     { section: 'Competition' },
-    { page: 'badges', href: 'admin-badges.html', icon: '🏅', label: 'Badges' },
+    { page: 'badges', href: 'admin-badges.html', icon: 'award', label: 'Badges' },
 
     { section: 'Communication' },
-    { page: 'email',     href: 'admin-email.html',     icon: '✉️', label: 'Quick Email' },
-    { page: 'campaigns', href: 'admin-campaigns.html', icon: '📧', label: 'Sequences' },
+    { page: 'email',     href: 'admin-email.html',     icon: 'send', label: 'Quick Email' },
+    { page: 'campaigns', href: 'admin-campaigns.html', icon: 'mail', label: 'Sequences' },
 
     { section: 'Theme' },
-    { page: 'email-templates', href: 'admin-email-templates.html', icon: '📝', label: 'Email Templates' },
+    { page: 'email-templates', href: 'admin-email-templates.html', icon: 'file-text', label: 'Email Templates' },
 ];
 
 function renderAdminSidebar(activePage = '', permissions = null) {
     const allowedPages = permissions ? permissions.allowedPages : null;
+    const svg = name => (typeof icon === 'function' ? icon(name) : '');
 
     let navHTML = '';
-    let lastSectionHadItems = false;
     let pendingSection = null;
 
     for (const item of SIDEBAR_NAV_ITEMS) {
         if (item.section) {
             pendingSection = `<div class="nav-section">${item.section}</div>`;
-            lastSectionHadItems = false;
         } else if (item.page) {
             if (allowedPages && !allowedPages.includes(item.page)) continue;
 
@@ -36,12 +35,10 @@ function renderAdminSidebar(activePage = '', permissions = null) {
                 navHTML += pendingSection;
                 pendingSection = null;
             }
-            lastSectionHadItems = true;
 
-            const activeClass = activePage === item.page ? 'active' : '';
-            const iconClass = item.darkIcon ? 'icon icon-invert' : 'icon';
-            navHTML += `<a href="${item.href}" class="nav-item ${activeClass}">
-                    <span class="${iconClass}">${item.icon}</span><span>${item.label}</span>
+            const isActive = activePage === item.page;
+            navHTML += `<a href="${item.href}" class="nav-item${isActive ? ' active' : ''}"${isActive ? ' aria-current="page"' : ''}>
+                    ${svg(item.icon)}<span>${item.label}</span>
                 </a>`;
         }
     }
@@ -54,31 +51,70 @@ function renderAdminSidebar(activePage = '', permissions = null) {
         roleIndicator = `<div class="sidebar-role-label">${escapeHtml(roleLabel)}</div>`;
     }
 
+    const brand = `
+        <a class="sidebar-brand" href="admin-dashboard.html" aria-label="ACDC Admin home">
+            <img src="/images/ACDCLogo.png" alt="ACDC" width="78" height="22">
+            <span class="sidebar-brand-tag">Admin</span>
+        </a>`;
+
     const sidebarHTML = `
-        <aside class="sidebar">
+        <div class="admin-mobilebar">
+            <button type="button" class="admin-menu-btn" aria-label="Open menu" aria-controls="admin-sidebar" aria-expanded="false">${svg('menu')}</button>
+            ${brand}
+        </div>
+        <div class="sidebar-backdrop" hidden></div>
+        <aside class="sidebar" id="admin-sidebar">
             <div class="sidebar-header">
-                <span class="logo">🏔️</span>
-                <span class="title">ACDC Admin</span>
+                ${brand}
                 ${roleIndicator}
             </div>
-            <nav class="sidebar-nav">
+            <nav class="sidebar-nav" aria-label="Admin">
                 ${navHTML}
             </nav>
             <div class="sidebar-footer">
                 <a href="index.html" class="nav-item">
-                    <span class="icon">🏠</span><span>Back to Portal</span>
+                    ${svg('arrow-left')}<span>Back to Portal</span>
                 </a>
             </div>
         </aside>
     `;
 
     const adminLayout = document.querySelector('.admin-layout');
-    if (adminLayout) {
-        const existingSidebar = adminLayout.querySelector('.sidebar');
-        if (existingSidebar) {
-            existingSidebar.remove();
-        }
-        adminLayout.insertAdjacentHTML('afterbegin', sidebarHTML);
+    if (!adminLayout) return;
+
+    adminLayout.querySelectorAll(':scope > .sidebar, :scope > .admin-mobilebar, :scope > .sidebar-backdrop').forEach(el => el.remove());
+    adminLayout.insertAdjacentHTML('afterbegin', sidebarHTML);
+
+    const sidebar = adminLayout.querySelector('.sidebar');
+    const backdrop = adminLayout.querySelector('.sidebar-backdrop');
+    const menuBtn = adminLayout.querySelector('.admin-menu-btn');
+
+    const setOpen = (open) => {
+        sidebar.classList.toggle('open', open);
+        backdrop.hidden = !open;
+        menuBtn.setAttribute('aria-expanded', String(open));
+        document.body.classList.toggle('sidebar-open', open);
+        if (open) sidebar.querySelector('.nav-item')?.focus();
+    };
+
+    menuBtn.addEventListener('click', () => setOpen(!sidebar.classList.contains('open')));
+    backdrop.addEventListener('click', () => setOpen(false));
+    sidebar.addEventListener('click', (e) => {
+        if (e.target.closest('a.nav-item')) setOpen(false);
+    });
+
+    if (!window.__acdcSidebarKeysBound) {
+        window.__acdcSidebarKeysBound = true;
+        document.addEventListener('keydown', (e) => {
+            const open = document.querySelector('.sidebar.open');
+            if (e.key === 'Escape' && open) {
+                open.classList.remove('open');
+                document.querySelector('.sidebar-backdrop')?.setAttribute('hidden', '');
+                const btn = document.querySelector('.admin-menu-btn');
+                btn?.setAttribute('aria-expanded', 'false');
+                document.body.classList.remove('sidebar-open');
+                btn?.focus();
+            }
+        });
     }
 }
-
