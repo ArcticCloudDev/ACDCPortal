@@ -217,10 +217,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const status = currentEvent.status || 'draft';
         let statusText = 'Coming Soon';
-        if (status === 'live') statusText = '🚀 Live';
-        else if (status === 'registration') statusText = '✓ Registration Open';
-        else if (status === 'pre-registration') statusText = '🔔 Pre-Registration';
-        else if (status === 'completed') statusText = '✓ Completed';
+        if (status === 'live') statusText = 'Live';
+        else if (status === 'registration') statusText = 'Registration Open';
+        else if (status === 'pre-registration') statusText = 'Pre-Registration';
+        else if (status === 'completed') statusText = 'Completed';
+        // Status colours as on the events list: open = success, upcoming = info, live = violet.
+        const statusTone = { 'registration': 'badge-success', 'pre-registration': 'badge-info', 'live': 'badge-violet' }[status] || '';
 
         SiteHeader.render({
             title: headerTitle,
@@ -238,10 +240,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const infoStrip = document.getElementById('event-info-strip');
         if (infoStrip) {
             const stripItems = [
-                `<span class="info-item">📅 ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}</span>`,
-                currentEvent.location ? `<span class="info-item">📍 ${escapeHtml(currentEvent.location)}</span>` : '',
-                currentEvent.costPerParticipant != null ? `<span class="info-item">💰 ${currentEvent.costPerParticipant.toLocaleString(currencyLocale(currentEvent.currency))}\u00a0${currentEvent.currency || ''} / person</span>` : '',
-                `<span class="status-chip">${escapeHtml(statusText)}</span>`,
+                `<span class="info-item meta-item">${icon('calendar')}${formatDateRange(currentEvent.startDate, currentEvent.endDate)}</span>`,
+                currentEvent.location ? `<span class="info-item meta-item">${icon('map-pin')}${escapeHtml(currentEvent.location)}</span>` : '',
+                currentEvent.costPerParticipant != null ? `<span class="info-item meta-item">${icon('wallet')}${currentEvent.costPerParticipant.toLocaleString(currencyLocale(currentEvent.currency))}\u00a0${currentEvent.currency || ''} / person</span>` : '',
+                `<span class="status-chip badge badge-dot ${statusTone}">${escapeHtml(statusText)}</span>`,
             ].filter(Boolean).join('');
             infoStrip.innerHTML = stripItems;
             infoStrip.classList.remove('hidden');
@@ -254,8 +256,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const hasTeam = userHasTeam();
         const isInterest = userRoles.includes('interest') && !hasTeam;
         const hasSpecialRole = isJudge || isCommittee || isInterest;
-        const eventMeta = `📅 ${escapeHtml(formatDateRange(currentEvent.startDate, currentEvent.endDate))}`
-            + (currentEvent.location ? ` &nbsp;•&nbsp; 📍 ${escapeHtml(currentEvent.location)}` : '');
+        const eventMeta = `<div class="meta-list"><span class="meta-item">${icon('calendar')}${escapeHtml(formatDateRange(currentEvent.startDate, currentEvent.endDate))}</span>`
+            + (currentEvent.location ? `<span class="meta-item">${icon('map-pin')}${escapeHtml(currentEvent.location)}</span>` : '')
+            + '</div>';
 
         if (hasSpecialRole) {
             banner.classList.remove('inactive');
@@ -279,41 +282,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (isJudge) {
                     roleSection.classList.add('judge');
-                    document.getElementById('role-confirmed-icon').textContent = '⚖️';
+                    document.getElementById('role-confirmed-icon').innerHTML = icon('scale');
                     document.getElementById('role-confirmed-title').textContent = `You're a Judge for ${currentEvent.name}`;
                     document.getElementById('role-confirmed-message').textContent =
                         `You've been registered as a judge for this event. We'll notify you when judging details are available.`;
                     document.getElementById('role-confirmed-badge').textContent = '✓ Judge — Confirmed';
                     document.getElementById('role-confirmed-details').innerHTML = eventMeta +
-                        `<br><span style="margin-top: 8px; display: inline-block;">We'll be in touch with judging criteria, schedules, and logistics closer to the event.</span>`;
+                        `<p class="role-note">We'll be in touch with judging criteria, schedules, and logistics closer to the event.</p>`;
                     const adminLink = document.getElementById('role-admin-link');
                     if (adminLink) {
-                        adminLink.textContent = '⚖️ Open Judge Portal';
+                        adminLink.innerHTML = `${icon('scale')}Open Judge Portal`;
                         adminLink.classList.remove('hidden');
                     }
                 } else if (isCommittee) {
                     roleSection.classList.add('committee');
-                    document.getElementById('role-confirmed-icon').textContent = '🏛️';
+                    document.getElementById('role-confirmed-icon').innerHTML = icon('landmark');
                     document.getElementById('role-confirmed-title').textContent = `You're on the Committee for ${currentEvent.name}`;
                     document.getElementById('role-confirmed-message').textContent =
                         `You've been registered as a committee member for this event. We'll notify you as things progress.`;
                     document.getElementById('role-confirmed-badge').textContent = '✓ Committee Member — Confirmed';
                     document.getElementById('role-confirmed-details').innerHTML = eventMeta +
-                        `<br><span style="margin-top: 8px; display: inline-block;">You'll receive updates as the event planning progresses.</span>`;
+                        `<p class="role-note">You'll receive updates as the event planning progresses.</p>`;
                     const adminLink = document.getElementById('role-admin-link');
                     if (adminLink) {
-                        adminLink.textContent = '🏛️ Open Committee Portal';
+                        adminLink.innerHTML = `${icon('landmark')}Open Committee Portal`;
                         adminLink.classList.remove('hidden');
                     }
                 } else if (isInterest) {
                     roleSection.classList.add('interest');
-                    document.getElementById('role-confirmed-icon').textContent = '🔔';
+                    document.getElementById('role-confirmed-icon').innerHTML = icon('bell');
                     document.getElementById('role-confirmed-title').textContent = `You've registered interest for ${currentEvent.name}`;
                     document.getElementById('role-confirmed-message').textContent =
                         `We'll notify you when registration opens. You'll be among the first to know!`;
                     document.getElementById('role-confirmed-badge').textContent = '✓ Interest Registered';
                     document.getElementById('role-confirmed-details').innerHTML = eventMeta +
-                        `<br><span style="margin-top: 8px; display: inline-block;">Keep an eye on your inbox — we'll send updates as the event takes shape.</span>`;
+                        `<p class="role-note">Keep an eye on your inbox — we'll send updates as the event takes shape.</p>`;
 
                     const eventStatus = currentEvent.status || 'draft';
                     if (eventStatus === 'registration' || eventStatus === 'pre-registration' || currentEvent.registrationOpen) {
@@ -421,11 +424,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     try {
                         await API.invitations.resend(btn.dataset.inviteId);
                         btn.textContent = '✓ Sent';
-                        setTimeout(() => { btn.disabled = false; btn.textContent = '🔄 Resend'; }, 2000);
+                        setTimeout(() => { btn.disabled = false; btn.textContent = 'Resend'; }, 2000);
                     } catch (err) {
                         alert('Failed to resend: ' + err.message);
                         btn.disabled = false;
-                        btn.textContent = '🔄 Resend';
+                        btn.textContent = 'Resend';
                     }
                 });
             });
@@ -496,7 +499,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             if (progressEl) {
                 progressEl.classList.remove('hidden');
-                progressEl.textContent = `⏳ Uploading "${file.name}"…`;
+                progressEl.textContent = `Uploading "${file.name}"…`;
             }
             if (uploadBtn) uploadBtn.disabled = true;
 
@@ -521,7 +524,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             if (progressEl) {
-                progressEl.textContent = `✅ "${file.name}" uploaded successfully!`;
+                progressEl.textContent = `"${file.name}" uploaded successfully!`;
                 setTimeout(() => progressEl.classList.add('hidden'), 3000);
             }
 
@@ -531,7 +534,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             console.error('File upload error:', error);
             if (progressEl) {
-                progressEl.textContent = `❌ Upload failed: ${error.message}`;
+                progressEl.textContent = `Upload failed: ${error.message}`;
                 progressEl.classList.remove('hidden');
             }
             alert('Failed to upload file: ' + error.message);
@@ -628,17 +631,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (legacyPendingInvitations.length > 0) {
             pendingCardsHtml = legacyPendingInvitations.map(inv => `
                 <div class="participant-card pending-card" data-invite-id="${escapeHtml(inv.id)}">
-                    <div class="pending-icon">✉️</div>
-                    <div class="name">Invitation Sent</div>
-                    <div class="detail-row email">${escapeHtml(inv.email)}</div>
-                    <div class="roles">
-                        <span class="role-tag pending">⏳ Pending</span>
+                    <div class="participant-head">
+                        <span class="avatar avatar-muted pending-icon" aria-hidden="true">${icon('mail')}</span>
+                        <div class="participant-ident">
+                            <div class="name">Invitation Sent</div>
+                        </div>
                     </div>
-                    <div class="pending-date">Sent ${new Date(inv.createdAt).toLocaleDateString()}</div>
+                    <div class="roles">
+                        <span class="role-tag pending badge badge-warning">Pending</span>
+                    </div>
+                    <div class="participant-details">
+                        <div class="detail-row email">${icon('mail')}<span>${escapeHtml(inv.email)}</span></div>
+                        <div class="detail-row pending-date">${icon('clock')}<span>Sent ${new Date(inv.createdAt).toLocaleDateString()}</span></div>
+                    </div>
                     ${isAdmin ? `
-                    <div class="pending-actions" style="display:flex;gap:6px;margin-top:10px;justify-content:center;">
-                        <button type="button" class="btn btn-small btn-secondary resend-invite-btn" data-invite-id="${escapeHtml(inv.id)}" style="padding:4px 10px;font-size:0.75rem;">🔄 Resend</button>
-                        <button type="button" class="btn btn-small btn-danger cancel-invite-btn" data-invite-id="${escapeHtml(inv.id)}" data-invite-email="${escapeHtml(inv.email)}" style="padding:4px 10px;font-size:0.75rem;">✕ Cancel</button>
+                    <div class="pending-actions">
+                        <button type="button" class="btn btn-small btn-ghost resend-invite-btn" data-invite-id="${escapeHtml(inv.id)}">Resend</button>
+                        <button type="button" class="btn btn-small btn-danger-ghost cancel-invite-btn" data-invite-id="${escapeHtml(inv.id)}" data-invite-email="${escapeHtml(inv.email)}">Cancel</button>
                     </div>` : ''}
                 </div>
             `).join('');
@@ -647,30 +656,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         let emptySlotsHtml = '';
         if (isAdmin && emptyCommittedSlots > 0) {
             emptySlotsHtml = Array(emptyCommittedSlots).fill(`
-                <div class="empty-slot add-member-slot" data-team-id="${escapeHtml(team.id)}" role="button" tabindex="0">
-                    <span class="add-icon">+</span>
+                <button type="button" class="empty-slot add-member-slot" data-team-id="${escapeHtml(team.id)}">
+                    <span class="add-icon">${icon('user-plus')}</span>
                     <span class="add-text">Add Member</span>
-                </div>
+                </button>
             `).join('');
         }
 
         let unlockSlotsHtml = '';
         if (isAdmin && unlockSlots > 0) {
             unlockSlotsHtml = `
-                <div class="unlock-slot" data-team-id="${escapeHtml(team.id)}" role="button" tabindex="0">
-                    <span class="unlock-icon">🔓</span>
+                <button type="button" class="unlock-slot" data-team-id="${escapeHtml(team.id)}">
+                    <span class="unlock-icon">${icon('lock-open')}</span>
                     <span class="unlock-text">Unlock 1 more</span>
-                </div>
+                </button>
             `;
         }
 
         return `
             <div class="team-card" data-team-id="${escapeHtml(team.id)}">
                 <div class="team-card-body">
-                    <div class="team-stats">
-                        <span>👥 ${realParticipantCount}/${committedParticipants} committed</span>
-                        ${legacyPendingInvitations.length > 0 ? `<span>✉️ ${legacyPendingInvitations.length} pending</span>` : ''}
-                        <span>${emptyCommittedSlots > 0 ? `📋 ${emptyCommittedSlots} open` : '✓ Full'}</span>
+                    <div class="team-card-header">
+                        <h2>${escapeHtml(team.teamName)}</h2>
+                        <div class="team-stats meta-list">
+                            <span class="meta-item">${icon('users')}${realParticipantCount}/${committedParticipants} committed</span>
+                            ${legacyPendingInvitations.length > 0 ? `<span class="meta-item">${icon('mail')}${legacyPendingInvitations.length} pending</span>` : ''}
+                            <span class="meta-item">${emptyCommittedSlots > 0 ? `${icon('circle-dot')}${emptyCommittedSlots} open` : `${icon('circle-check')}Full`}</span>
+                        </div>
                     </div>
                     <div class="participants-grid">
                         ${participantCards.join('')}
@@ -709,31 +721,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                         : `<span class="file-name">${escapeHtml(f.name)}</span>`;
                     return `
                     <div class="uploaded-file-row">
-                        <span class="file-category-badge">${escapeHtml(f.category || 'General')}</span>
+                        <span class="file-category-badge badge">${escapeHtml(f.category || 'General')}</span>
                         ${nameHtml}
                         <span class="file-size">${formatFileSize(f.size)}</span>
-                        <button type="button" class="btn-remove" data-team-id="${teamIdAttr}" data-file-path="${escapeHtml(`Events/${currentEvent.id}/${team.id}/${f.name}`)}" title="Remove" aria-label="Remove file">✕</button>
+                        <button type="button" class="btn-remove btn btn-icon btn-small btn-danger-ghost" data-team-id="${teamIdAttr}" data-file-path="${escapeHtml(`Events/${currentEvent.id}/${team.id}/${f.name}`)}" title="Remove" aria-label="Remove file">${icon('trash-2')}</button>
                     </div>
                 `; }).join('')}
               </div>`
-            : '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">No files uploaded yet.</p>';
+            : '<p class="uploads-empty">No files uploaded yet.</p>';
 
         return `
-            <div class="team-uploads">
-                <h4>📁 Team Deliverables</h4>
+            <div class="team-uploads card">
+                <h3>${icon('folder')}Team Deliverables</h3>
                 ${filesHtml}
                 <div class="upload-box">
                     <div class="upload-row">
-                        <label for="file-cat-${teamIdAttr}" class="hidden">File category</label>
-                        <select id="file-cat-${teamIdAttr}" class="upload-category-select">
+                        <label for="file-cat-${teamIdAttr}" class="visually-hidden">File category</label>
+                        <select id="file-cat-${teamIdAttr}" class="upload-category-select input">
                             ${categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
                         </select>
-                        <input type="file" id="file-${teamIdAttr}" style="display:none;" accept="*/*" aria-label="Choose a file to upload">
-                        <button type="button" class="btn btn-secondary btn-upload" id="upload-btn-${teamIdAttr}" data-team-id="${teamIdAttr}">📎 Upload File</button>
+                        <input type="file" id="file-${teamIdAttr}" class="hidden" accept="*/*" aria-label="Choose a file to upload">
+                        <button type="button" class="btn btn-secondary btn-upload" id="upload-btn-${teamIdAttr}" data-team-id="${teamIdAttr}">${icon('upload')}Upload File</button>
                     </div>
                     <div id="upload-progress-${teamIdAttr}" class="upload-progress hidden"></div>
                 </div>
-                <small style="color: var(--text-muted); display: block; margin-top: 6px;">Max 10 MB per file.</small>
+                <small class="upload-hint">Max 10 MB per file.</small>
             </div>
         `;
     }
@@ -749,7 +761,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const container = document.getElementById('badges-section');
         if (!container) return;
         if (!eventBadges || eventBadges.length === 0) {
-            container.innerHTML = '<p style="color: var(--text-muted); text-align:center; padding:32px;">No badges available for this event.</p>';
+            container.innerHTML = `<div class="empty-state">${icon('award')}<p>No badges available for this event.</p></div>`;
             return;
         }
 
@@ -780,7 +792,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
 
         const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3, 'exclusive': 4 };
-        const categoryLabels = { 'soft': '🤝 Soft Skills', 'low-code': '⚡ Low-Code', 'pro-code': '💻 Pro-Code', 'sponsor': '🏢 Sponsor', 'exclusive': '🏆 Exclusive' };
+        const categoryLabels = { 'soft': 'Soft Skills', 'low-code': 'Low-Code', 'pro-code': 'Pro-Code', 'sponsor': 'Sponsor', 'exclusive': 'Exclusive' };
+        const categoryIcons = { 'soft': 'handshake', 'low-code': 'zap', 'pro-code': 'laptop', 'sponsor': 'building-2', 'exclusive': 'trophy' };
+        const categoryIcon = cat => categoryIcons[cat] ? icon(categoryIcons[cat], 'icon-sm') : '';
 
         const teamClaims = teamId ? badgeClaims.filter(c => sameId(c.teamId, teamId)) : [];
 
@@ -836,14 +850,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return badgeClaims.some(c => c.eventBadgeId === eventBadge.id && c.status === 'approved');
                 }).length;
                 return `<button type="button" class="badge-tab ${i === 0 ? 'active' : ''}" data-cat="${escapeHtml(cat)}">
-                    ${escapeHtml(label)} <span class="badge-tab-count">${awardedCount}/${catBadges.length}</span>
+                    ${categoryIcon(cat)}${escapeHtml(label)} <span class="badge-tab-count">${awardedCount}/${catBadges.length}</span>
                 </button>`;
             }
             const catClaimed = catBadges.filter(({ eventBadge }) => {
                 return teamClaims.some(c => c.eventBadgeId === eventBadge.id && (c.status === 'pending' || c.status === 'approved'));
             }).length;
             return `<button type="button" class="badge-tab ${i === 0 ? 'active' : ''}" data-cat="${escapeHtml(cat)}">
-                ${escapeHtml(label)} <span class="badge-tab-count">${catClaimed}/${catBadges.length}</span>
+                ${categoryIcon(cat)}${escapeHtml(label)} <span class="badge-tab-count">${catClaimed}/${catBadges.length}</span>
             </button>`;
         }).join('');
 
@@ -887,37 +901,37 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const claimAttrs = `data-eb-id="${escapeHtml(eventBadge.id)}" data-team-id="${escapeHtml(teamId)}" data-badge-name="${escapeHtml(badge.name)}"`;
                 const blogLink = claim ? safeHttpUrl(claim.blogUrl) : '';
                 const blogHtml = blogLink
-                    ? `<a href="${escapeHtml(blogLink)}" target="_blank" rel="noopener noreferrer" class="btn-badge-blog" title="View blog post">📝 Blog</a>`
+                    ? `<a href="${escapeHtml(blogLink)}" target="_blank" rel="noopener noreferrer" class="btn-badge-blog btn btn-small btn-ghost" title="View blog post">${icon('external-link', 'icon-sm')}Blog</a>`
                     : '';
 
                 if (claim && claim.status === 'approved') {
-                    statusHtml = `<span class="badge-claim-status approved" title="Approved">Approved</span>`;
+                    statusHtml = `<span class="badge-claim-status approved badge badge-success" title="Approved">Approved</span>`;
                     actionHtml = blogHtml;
                 } else if (claim && claim.status === 'pending') {
-                    statusHtml = `<span class="badge-claim-status submitted" title="Submitted — awaiting review">Submitted</span>`;
+                    statusHtml = `<span class="badge-claim-status submitted badge badge-info" title="Submitted — awaiting review">Submitted</span>`;
                     actionHtml = blogHtml;
                 } else if (claim && claim.status === 'declined') {
-                    statusHtml = `<span class="badge-claim-status rejected" title="Rejected">Rejected</span>`;
+                    statusHtml = `<span class="badge-claim-status rejected badge badge-danger" title="Rejected">Rejected</span>`;
                     if (teamId && isEventLive) {
-                        actionHtml = `<button type="button" class="btn-badge-claim" ${claimAttrs}>Re-claim</button>`;
+                        actionHtml = `<button type="button" class="btn-badge-claim btn btn-small btn-secondary" ${claimAttrs}>Re-claim</button>`;
                     }
                 } else if (isExclusive) {
-                    statusHtml = `<span class="badge-claim-status exclusive" title="Exclusive — awarded by judges">🏆</span>`;
+                    statusHtml = `<span class="badge-claim-status exclusive badge badge-outline" title="Exclusive — awarded by judges">${icon('trophy', 'icon-sm')}Exclusive</span>`;
                     if (canAward) {
-                        actionHtml = `<button type="button" class="btn-badge-award" ${claimAttrs}>Award</button>`;
+                        actionHtml = `<button type="button" class="btn-badge-award btn btn-small btn-secondary" ${claimAttrs}>${icon('trophy', 'icon-sm')}Award</button>`;
                     }
                 } else {
                     if (teamId && isEventLive) {
-                        actionHtml = `<button type="button" class="btn-badge-claim" ${claimAttrs}>Claim</button>`;
+                        actionHtml = `<button type="button" class="btn-badge-claim btn btn-small btn-secondary" ${claimAttrs}>Claim</button>`;
                     }
                 }
 
                 let assignedHtml = '';
                 if (isExclusive && claim && claim.status === 'approved') {
                     const awardedTeam = eventTeams.find(t => sameId(t.id, claim.teamId));
-                    assignedHtml = `<span class="badge-assigned-name" style="color: #d97706; font-weight: 600;">🏆 ${awardedTeam ? escapeHtml(awardedTeam.teamName) : 'Unknown team'}</span>`;
+                    assignedHtml = `<span class="badge-assigned-name">${icon('trophy', 'icon-sm')}${awardedTeam ? escapeHtml(awardedTeam.teamName) : 'Unknown team'}</span>`;
                 } else if (isExclusive) {
-                    assignedHtml = `<span class="badge-assigned-name" style="color: #94a3b8; font-style: italic;">Awaiting award...</span>`;
+                    assignedHtml = `<span class="badge-assigned-name is-awaiting">Awaiting award...</span>`;
                 } else if (!isExclusive && teamId) {
                     const isApproved = claim && claim.status === 'approved';
                     assignedHtml = `
@@ -936,11 +950,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const examplesUrl = safeHttpUrl(badge.imageUrl);
                 const examplesLink = examplesUrl
-                    ? `<a href="${escapeHtml(examplesUrl)}" target="_blank" rel="noopener noreferrer" class="btn-badge-examples" title="${escapeHtml(badge.description)}">Examples</a>`
+                    ? `<a href="${escapeHtml(examplesUrl)}" target="_blank" rel="noopener noreferrer" class="btn-badge-examples btn btn-small btn-ghost" title="${escapeHtml(badge.description)}">${icon('external-link', 'icon-sm')}Examples</a>`
                     : '';
 
                 const rejectionHtml = (claim && claim.status === 'declined' && claim.declineReason)
-                    ? `<div class="badge-reject-reason">💬 ${escapeHtml(claim.declineReason)}</div>`
+                    ? `<div class="badge-reject-reason">${icon('message-square', 'icon-sm')}<span>${escapeHtml(claim.declineReason)}</span></div>`
                     : '';
 
                 panelsHtml += `
@@ -969,7 +983,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         container.innerHTML = `
             <div class="badges-section-header">
-                <h3>🏅 Badges <span class="badge-stats">${claimedCount}/${totalBadges} claimed · ${earnedPoints}/${totalPoints} points</span></h3>
+                <h2>Badges</h2>
+                <span class="badge-stats">${claimedCount}/${totalBadges} claimed · ${earnedPoints}/${totalPoints} points</span>
             </div>
             <div class="badge-tabs">
                 ${tabsHtml}
@@ -987,16 +1002,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                  data-participation-id="${escapeHtml(participation.id)}"
                  data-team-id="${escapeHtml(teamId)}"
                  data-can-edit="${canEdit}">
-                <div class="name">${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</div>
-                <div class="detail-row email">${escapeHtml(user.email)}</div>
-                <div class="detail-row">📱 ${escapeHtml(user.phone || 'N/A')}</div>
-                ${user.allergies ? `<div class="detail-row">⚠️ ${escapeHtml(user.allergies)}</div>` : ''}
-                <div class="roles">
-                    ${membership.isAdmin ? '<span class="role-tag admin">Admin</span>' : ''}
-                    ${membership.isParticipant ? '<span class="role-tag participant">Participant</span>' : ''}
-                    ${!participation.profileVerification ? '<span class="role-tag verify-needed" title="Confirm your information to continue">Confirm information</span>' : ''}
+                <div class="participant-head">
+                    <span class="avatar" aria-hidden="true">${escapeHtml(getInitials(user.firstName, user.lastName))}</span>
+                    <div class="participant-ident">
+                        <div class="name">${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</div>
+                    </div>
+                    ${canEdit ? `<button type="button" class="btn btn-small btn-ghost edit-participant-btn">${icon('pencil', 'icon-sm')}Edit</button>` : ''}
                 </div>
-                ${canEdit ? '<button type="button" class="btn btn-small btn-secondary edit-participant-btn">✏️ Edit</button>' : ''}
+                <div class="roles">
+                    ${membership.isAdmin ? '<span class="role-tag admin badge badge-accent">Admin</span>' : ''}
+                    ${membership.isParticipant ? '<span class="role-tag participant badge">Participant</span>' : ''}
+                    ${!participation.profileVerification ? `<span class="role-tag verify-needed badge badge-warning" title="Confirm your information to continue">${icon('circle-alert', 'icon-sm')}Confirm information</span>` : ''}
+                </div>
+                <div class="participant-details">
+                    <div class="detail-row email">${icon('mail')}<span>${escapeHtml(user.email)}</span></div>
+                    <div class="detail-row">${icon('phone')}<span>${escapeHtml(user.phone || 'N/A')}</span></div>
+                    ${user.allergies ? `<div class="detail-row allergies">${icon('utensils')}<span>${escapeHtml(user.allergies)}</span></div>` : ''}
+                </div>
             </div>
         `;
     }
@@ -1077,30 +1099,34 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (isAdmin) {
                 hotelAlert.innerHTML = `
                     <div class="hotel-urgency-alert">
-                        <div class="alert-icon">🏨</div>
-                        <div class="alert-title">Hotel Booking Needed!</div>
-                        <div class="alert-message">
-                            Please select your hotel nights as soon as possible so we can finalize room reservations.
-                            <br>Rooms fill up quickly — don't miss out!
+                        <div class="alert-icon">${icon('bed-double')}</div>
+                        <div class="alert-body">
+                            <div class="alert-title">Hotel Booking Needed!</div>
+                            <div class="alert-message">
+                                Please select your hotel nights as soon as possible so we can finalize room reservations.
+                                Rooms fill up quickly — don't miss out!
+                            </div>
+                            <button type="button" id="role-hotel-select-btn" class="btn btn-secondary btn-small">${icon('moon', 'icon-sm')}Select Hotel Nights Now</button>
                         </div>
-                        <button type="button" id="role-hotel-select-btn">🛏️ Select Hotel Nights Now</button>
                     </div>
                 `;
                 hotelAlert.querySelector('#role-hotel-select-btn').addEventListener('click', openSelfEditHotel);
             } else {
                 hotelAlert.innerHTML = `
-                    <div class="hotel-urgency-alert">
-                        <div class="alert-icon">🏨</div>
-                        <div class="alert-title">Hotel Not Yet Assigned</div>
-                        <div class="alert-message">Your hotel nights will be arranged by the event organizers. No action needed.</div>
+                    <div class="hotel-urgency-alert is-info">
+                        <div class="alert-icon">${icon('bed-double')}</div>
+                        <div class="alert-body">
+                            <div class="alert-title">Hotel Not Yet Assigned</div>
+                            <div class="alert-message">Your hotel nights will be arranged by the event organizers. No action needed.</div>
+                        </div>
                     </div>
                 `;
             }
         } else {
             const nightCount = Object.values(hotelNights).filter(v => v === true).length;
             hotelAlert.innerHTML = `
-                <div class="hotel-ok-badge">
-                    ✅ Hotel: ${nightCount} night${nightCount !== 1 ? 's' : ''} booked
+                <div class="hotel-ok-badge badge badge-success">
+                    ${icon('circle-check', 'icon-sm')}Hotel: ${nightCount} night${nightCount !== 1 ? 's' : ''} booked
                 </div>
             `;
         }
@@ -1288,7 +1314,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             errorDiv.classList.remove('hidden');
         } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = '🏆 Award Badge';
+            submitBtn.textContent = 'Award Badge';
         }
     }
 
@@ -1440,8 +1466,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <input type="checkbox" id="edit-hotel-${nightId}" data-night-id="${nightId}"
                                ${isChecked ? 'checked' : ''}${disabledAttr}${titleAttr}>
                         <label for="edit-hotel-${nightId}" class="night-checkbox">
-                            <span class="night-icon">🌙</span>
-                            ${isLocked ? '<span class="lock-badge">🔒</span>' : ''}
+                            <span class="night-icon">${icon('moon')}</span>
+                            ${isLocked ? `<span class="lock-badge">${icon('lock')}</span>` : ''}
                         </label>
                     </div>
                 `;
@@ -1685,18 +1711,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     function showResendOption(email, invitationId, errorDiv, successDiv) {
         errorDiv.replaceChildren();
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+        wrap.style.cssText = 'display: flex; flex-direction: column; gap: var(--space-3);';
         const message = document.createElement('div');
-        message.append('📧 An invitation is already pending for ');
+        message.append('An invitation is already pending for ');
         const strong = document.createElement('strong');
         strong.textContent = email;
         message.appendChild(strong);
         const actions = document.createElement('div');
-        actions.style.cssText = 'display: flex; gap: 8px;';
+        actions.style.cssText = 'display: flex; gap: var(--space-2);';
         const resendBtn = document.createElement('button');
         resendBtn.type = 'button';
         resendBtn.className = 'btn btn-small btn-secondary';
-        resendBtn.textContent = '🔄 Resend Invitation';
+        resendBtn.textContent = 'Resend Invitation';
         resendBtn.addEventListener('click', () => resendExistingInvitation(invitationId));
         const dismissBtn = document.createElement('button');
         dismissBtn.type = 'button';
@@ -1707,9 +1733,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         wrap.append(message, actions);
         errorDiv.appendChild(wrap);
         errorDiv.classList.remove('hidden');
-        errorDiv.style.background = '#fef3c7';
-        errorDiv.style.color = '#92400e';
-        errorDiv.style.borderColor = '#f59e0b';
+        errorDiv.style.background = 'var(--color-warning-subtle)';
+        errorDiv.style.color = 'var(--color-warning-text)';
+        errorDiv.style.borderColor = 'color-mix(in srgb, var(--color-warning) 30%, transparent)';
     }
 
     async function resendExistingInvitation(invitationId) {
@@ -1724,7 +1750,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             errorDiv.style.color = '';
             errorDiv.style.borderColor = '';
 
-            successDiv.textContent = '✅ Invitation resent successfully!';
+            successDiv.textContent = 'Invitation resent successfully!';
             successDiv.classList.remove('hidden');
 
             document.getElementById('invite-email').value = '';
@@ -1750,7 +1776,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const membersList = document.getElementById('team-members-list');
         const adminActions = document.getElementById('team-admin-actions');
 
-        title.textContent = `👥 ${team.teamName}`;
+        title.textContent = team.teamName;
         membersList.innerHTML = '<p>Loading members...</p>';
 
         modal.classList.add('active');
@@ -1798,17 +1824,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 html += validMembers.map(m => {
                     const initials = getInitials(m.user.firstName, m.user.lastName);
                     return `
-                        <div class="member-row">
+                        <div class="member-row member-item">
                             <div class="member-info">
-                                <div class="avatar">${initials}</div>
+                                <span class="avatar" aria-hidden="true">${escapeHtml(initials)}</span>
                                 <div>
-                                    <div class="name">${escapeHtml(m.user.firstName)} ${escapeHtml(m.user.lastName)}</div>
-                                    <div class="email">${escapeHtml(m.user.email)}</div>
+                                    <div class="name member-name">${escapeHtml(m.user.firstName)} ${escapeHtml(m.user.lastName)}</div>
+                                    <div class="email member-email">${escapeHtml(m.user.email)}</div>
                                 </div>
                             </div>
                             <div class="member-roles">
-                                ${m.membership.isAdmin ? '<span class="role-badge admin">⭐ Admin</span>' : ''}
-                                ${m.membership.isParticipant ? '<span class="role-badge participant">👤 Participant</span>' : ''}
+                                ${m.membership.isAdmin ? '<span class="role-badge admin badge badge-accent">Admin</span>' : ''}
+                                ${m.membership.isParticipant ? '<span class="role-badge participant badge">Participant</span>' : ''}
                             </div>
                         </div>
                     `;
@@ -1816,23 +1842,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             if (pendingInvitations.length > 0) {
-                html += `<div class="pending-invitations-section" style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed #e2e8f0;">
-                    <p style="color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">📧 Pending Invitations</p>
+                html += `<div class="pending-invitations-section member-section">
+                    <p class="member-section-title">Pending Invitations</p>
                 `;
                 html += pendingInvitations.map(inv => {
                     const sentDate = new Date(inv.createdAt).toLocaleDateString();
                     return `
-                        <div class="member-row invitation-pending" style="background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%); border-radius: 8px; margin-bottom: 8px;">
+                        <div class="member-row member-item invitation-pending">
                             <div class="member-info">
-                                <div class="avatar" style="background: #f59e0b; color: white;">📧</div>
+                                <span class="avatar avatar-muted" aria-hidden="true">${icon('mail')}</span>
                                 <div>
-                                    <div class="name" style="color: #92400e;">${escapeHtml(inv.email)}</div>
-                                    <div class="email" style="color: #a16207;">Invited ${sentDate} • Awaiting response</div>
+                                    <div class="name member-name">${escapeHtml(inv.email)}</div>
+                                    <div class="email member-email">Invited ${sentDate} • Awaiting response</div>
                                 </div>
                             </div>
                             <div class="member-roles">
-                                <span class="role-badge" style="background: #fef3c7; color: #92400e; border: 1px solid #f59e0b;">⏳ Pending</span>
-                                <button type="button" class="btn btn-small btn-ghost cancel-pending-invite-btn" data-invite-id="${escapeHtml(inv.id)}" title="Cancel invitation" aria-label="Cancel invitation" style="padding: 4px 8px; margin-left: 8px;">✕</button>
+                                <span class="role-badge badge badge-warning">Pending</span>
+                                <button type="button" class="btn btn-small btn-icon btn-danger-ghost cancel-pending-invite-btn" data-invite-id="${escapeHtml(inv.id)}" title="Cancel invitation" aria-label="Cancel invitation">${icon('x')}</button>
                             </div>
                         </div>
                     `;
@@ -1846,17 +1872,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             const remainingSpots = Math.max(0, committedSpots - filledSpots - pendingSpots);
 
             if (isTeamAdmin && remainingSpots > 0) {
-                html += `<div class="empty-spots-section" style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed #e2e8f0;">
-                    <p style="color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">🪑 Available Spots (${remainingSpots})</p>
+                html += `<div class="empty-spots-section member-section">
+                    <p class="member-section-title">Available Spots (${remainingSpots})</p>
                 `;
                 for (let i = 0; i < remainingSpots; i++) {
                     html += `
-                        <div class="member-row empty-spot" style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; margin-bottom: 8px;">
+                        <div class="member-row member-item empty-spot">
                             <div class="member-info">
-                                <div class="avatar" style="background: #e2e8f0; color: #94a3b8;">?</div>
+                                <span class="avatar avatar-muted" aria-hidden="true">${icon('user')}</span>
                                 <div>
-                                    <div class="name" style="color: #94a3b8;">Empty Spot</div>
-                                    <div class="email" style="color: #cbd5e1;">Invite a team member</div>
+                                    <div class="name member-name">Empty Spot</div>
+                                    <div class="email member-email">Invite a team member</div>
                                 </div>
                             </div>
                         </div>

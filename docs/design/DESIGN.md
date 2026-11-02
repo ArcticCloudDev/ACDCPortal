@@ -80,6 +80,8 @@ block in `tokens.css`. Check every migrated page in both schemes.
 | Loading | `.acdc-loader`, `.spinner`, `.skeleton` |
 | Layout helpers | `.stack`, `.cluster`, `.meta-list` > `.meta-item`, `.section-heading`, `.container-wide` |
 | App shell | `#site-header.app-header` > `.topbar` + `.page-hero` (rendered by `site-header.js`) |
+| Event page (`portal.css`) | `.event-info-strip` (facts band under the hero: status badge, date, place, cost), `.participants-grid` > `.participant-card` (avatar, name, role badges, ghost Edit, contact meta), `.add-member-slot` / `.unlock-slot` (dashed placeholder tiles), `.event-panel-icon` (icon circle in centred panels), `.hotel-urgency-alert` (+ `.is-info`), `.badge-modal` (claim/award dialogs toggled with `.hidden`) |
+| Filter pills (`portal.css`) | Second-level navigation under `.tabs` (badge categories: `#tab-content-badges .badge-tab`). Never stack two underline tab bars |
 
 Reuse an existing component before inventing one. Status colours mean the same everywhere:
 success = done/open, info = upcoming, violet = live, warning = needs attention, danger = destructive/error.
@@ -131,3 +133,9 @@ Headings use `--weight-bold` and slight negative letter spacing.
 - 2026-11-02: Tokens split into `tokens.css` so admin pages share the palette without the portal's element
   rules. Admin shell is responsive: below 960px the sidebar becomes an off-canvas drawer (menu button,
   backdrop, Escape to close); tables scroll inside their panel, never the page.
+- 2026-11-02: Event page migrated (inline `<style>` removed). Event facts sit in a band under the page hero.
+  Status colours on this page: registration open / approved = success, pre-registration / submitted = info,
+  live = violet, pending invitation / "Confirm information" = warning, rejected = danger; roles: Admin =
+  accent, Participant = neutral. Placeholders (add member, unlock slot) are dashed neutral tiles, not tinted.
+- 2026-11-02: `:has()` is allowed as a progressive enhancement (checked option rows, joining an empty state
+  with its call to action). Without it the page must still work and read correctly.
