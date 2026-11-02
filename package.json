@@ -9,6 +9,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report tests/e2e/.artifacts/report",
     "e2e:harness": "node tests/e2e/harness/server.js",
+    "e2e:seed-demo": "node tests/e2e/support/seed-demo.js",
     "e2e:db:stop": "docker stop acdc-e2e-sql"
   },
   "keywords": [

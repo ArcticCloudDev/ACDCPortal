@@ -24,7 +24,7 @@ The real `mail.js` still builds the Graph payload (inline images, batching), so 
 
 ## Running
 
-Prerequisites: Docker Desktop running, Node 18+, `npm install` in the repo root **and** in `api/`, then once:
+Prerequisites: Docker Desktop running, Node 22+, `npm ci` in the repo root **and** `npm ci --prefix api`, then once:
 
 ```powershell
 npx playwright install chromium
@@ -38,7 +38,8 @@ npx playwright install chromium
 | `npm run test:e2e:ui` | Playwright UI mode (watch, time-travel debugging). |
 | `npm run test:e2e:report` | Open the HTML report (traces, videos, screenshots of failures). |
 | `node tests/e2e/support/audit-bug-pins.js` | Verify every BUG pin failed at its symptom line (run after a suite run). |
-| `npm run e2e:harness` | Run the harness alone on :4280 to click around manually. |
+| `npm run e2e:harness` | Run the harness alone on :4280 to click around manually; see [DEVELOPER_SETUP.md](../../DEVELOPER_SETUP.md) for seeding and local sign-in. |
+| `npm run e2e:seed-demo` | Add a demo event/team and print a local admin login code (requires the manual harness on :4280). |
 | `npm run e2e:db:stop` | Stop the SQL container. |
 
 Artifacts (report, traces, `harness.log` with every function's log output) go to `tests/e2e/.artifacts/` (gitignored).
