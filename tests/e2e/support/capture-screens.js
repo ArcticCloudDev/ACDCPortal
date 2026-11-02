@@ -32,16 +32,18 @@ function richWorld() {
         f.badge({ name: 'Pro Coder', category: 'pro-code' }),
         f.badge({ name: 'Best in Show', category: 'sponsor', claimType: 'exclusive' })
     ];
+    const newcomer = f.user({ profileComplete: false, firstName: '', lastName: '', phone: '', email: 'new.nora@e2e.test' });
+    const invite = f.invitation(w.event, w.leader, { teamId: w.team.id, teamName: w.team.teamName, email: 'pending.pia@e2e.test', inviteeFirstName: 'Pia', inviteeLastName: 'Pending' });
     const seed = mergeSeeds(w.seed(), {
         events: [soon],
-        users: [judge],
         teams: extraTeams,
-        participations: [f.participation(judge, w.event, { roles: ['judge'] })],
         badges,
         'event-badges': badges.map(b => f.eventBadge(w.event, b)),
-        invitations: [f.invitation(w.event, w.leader, { teamId: w.team.id, teamName: w.team.teamName, email: 'pending.pia@e2e.test', inviteeFirstName: 'Pia', inviteeLastName: 'Pending' })]
+        invitations: [invite],
+        users: [judge, newcomer],
+        participations: [f.participation(judge, w.event, { roles: ['judge'] }), f.participation(w.loner, soon, { roles: ['interest'] })]
     });
-    return { w, judge, seed };
+    return { w, judge, newcomer, invite, seed };
 }
 
 async function login(page, user) {
@@ -53,13 +55,15 @@ async function login(page, user) {
 async function main() {
     fs.mkdirSync(OUT, { recursive: true });
     await post('/__test/reset');
-    const { w, judge, seed } = richWorld();
+    const { w, judge, newcomer, invite, seed } = richWorld();
     await post('/__test/seed', seed);
 
     const shots = [
         ['anon', null, 'events', '/events.html'],
         ['anon', null, 'register', '/register.html'],
         ['anon', null, 'register-team', `/register.html?intent=team&eventId=${w.event.id}`],
+        ['anon', null, 'accept-invitation', `/accept-invitation.html?invite=${invite.id}`],
+        ['newcomer', newcomer, 'complete-registration', '/complete-registration.html'],
         ['leader', w.leader, 'events', '/events.html'],
         ['leader', w.leader, 'event-team', `/event.html?id=${w.event.id}`],
         ['leader', w.leader, 'event-badges', `/event.html?id=${w.event.id}#badges`],
@@ -68,11 +72,17 @@ async function main() {
         ['admin', w.admin, 'admin-dashboard', '/admin-dashboard.html'],
         ['admin', w.admin, 'admin-events', '/admin-events.html'],
         ['admin', w.admin, 'admin-event-edit', `/admin-events.html?event=${w.event.id}`],
+        ...['committee', 'judges', 'leads', 'sponsors', 'budget', 'teams', 'sequence'].map(tab =>
+            ['admin', w.admin, `admin-event-edit-${tab}`, `/admin-events.html?event=${w.event.id}&tab=${tab}`]),
         ['admin', w.admin, 'admin-teams', '/admin-teams.html'],
         ['admin', w.admin, 'admin-users', '/admin-users.html'],
         ['admin', w.admin, 'admin-badges', '/admin-badges.html'],
         ['admin', w.admin, 'admin-email', '/admin-email.html'],
-        ['admin', w.admin, 'admin-participants', `/admin-event-participants.html?id=${w.event.id}`]
+        ['admin', w.admin, 'admin-participants', `/admin-event-participants.html?id=${w.event.id}`],
+        ['admin', w.admin, 'admin-interest', '/admin-interest.html'],
+        ['admin', w.admin, 'admin-person', `/admin-person.html?email=${encodeURIComponent(w.leader.email)}`],
+        ['admin', w.admin, 'admin-email-templates', '/admin-email-templates.html'],
+        ['admin', w.admin, 'admin-campaigns', '/admin-campaigns.html']
     ];
 
     const browser = await chromium.launch();
