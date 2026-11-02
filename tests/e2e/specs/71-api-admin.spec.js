@@ -177,7 +177,8 @@ test.describe('sequences', () => {
 
         const created = await admin.post('/api/email/campaigns', { data: { sequenceId: seq.id.toLowerCase(), subject: 'Second', content: '<p>2</p>' } });
         expect(created.status()).toBe(201);
-        expect((await created.json()).sequenceOrder).toBe(2);
+        const second = await created.json();
+        expect(second.sequenceOrder).toBe(2);
         expect((await admin.post('/api/email/campaigns', { data: { sequenceId: seq.id, subject: 'x', content: 'y', ctaUrl: 'javascript:alert(1)' } })).status()).toBe(400);
         expect((await admin.post('/api/email/campaigns', { data: { sequenceId: f.id(), subject: 'x', content: 'y' } })).status()).toBe(404);
 
@@ -191,8 +192,9 @@ test.describe('sequences', () => {
         expect(trigger).toMatchObject({ sent: 1, skipped: 0 });
         expect((await (await admin.post('/api/email/trigger-sequence', { data: { userId: w.member.id, eventId: w.event.id } })).json()).skipped).toBe(1);
 
+        // Both the seeded campaign and the one created above belong to the event's sequence (ordered by sequenceOrder).
         const deliveriesView = await (await admin.get(`/api/deliveries/event/${w.event.id}`)).json();
-        expect(deliveriesView.campaigns.map(c => c.id)).toEqual([campaign.id]);
+        expect(deliveriesView.campaigns.map(c => c.id.toUpperCase())).toEqual([campaign.id, second.id.toUpperCase()]);
         expect(deliveriesView.deliveries).toHaveLength(2);
     });
 });
