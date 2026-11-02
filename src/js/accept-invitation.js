@@ -117,12 +117,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         emailField.readOnly = false;
         emailField.required = true;
 
-        // The public invitation projection carries no personal data; signed-in users see their own.
-        firstNameField.value = currentUser?.firstName || invitation.inviteeFirstName || '';
-        lastNameField.value = currentUser?.lastName || invitation.inviteeLastName || '';
-        phoneField.value = currentUser?.phone || invitation.inviteePhone || '';
-        gamertagField.value = currentUser?.gamertag || invitation.inviteeGamertag || '';
-        allergiesField.value = currentUser?.allergies || invitation.inviteeAllergies || '';
+        // What the invitee already typed wins (the form is shown again after the OTP step);
+        // otherwise the signed-in user's profile. The public invitation projection carries no
+        // personal data.
+        firstNameField.value = pendingProfile.firstName || currentUser?.firstName || invitation.inviteeFirstName || '';
+        lastNameField.value = pendingProfile.lastName || currentUser?.lastName || invitation.inviteeLastName || '';
+        phoneField.value = pendingProfile.phone || currentUser?.phone || invitation.inviteePhone || '';
+        gamertagField.value = pendingProfile.gamertag || currentUser?.gamertag || invitation.inviteeGamertag || '';
+        allergiesField.value = pendingProfile.allergies || currentUser?.allergies || invitation.inviteeAllergies || '';
+        if (pendingProfile.email) emailField.value = pendingProfile.email;
 
         firstNameField.focus();
     }
