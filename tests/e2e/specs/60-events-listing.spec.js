@@ -48,7 +48,7 @@ test('a signed-in team member sees their status and can open the event', async (
     await loginAs(w.member);
     await page.goto('/events.html');
     const c = card(page, 'ACDC 2027');
-    await expect(c.locator('.my-status-pill.team')).toHaveText('✓ Team Registered');
+    await expect(c.locator('.my-status-pill.team')).toHaveText('Team Registered');
     await c.locator('a.btn-event.primary', { hasText: 'Open' }).click();
     await expect(page).toHaveURL(new RegExp(`/event\\.html\\?id=${w.event.id}`));
 });
@@ -102,4 +102,19 @@ test('BUG: an invited judge can accept the invitation', async ({ page, harness }
     expect(p.Roles).toContain('judge');
     await expect(page).toHaveURL(new RegExp(`/event\\.html\\?id=${w.event.id}`), { timeout: 10000 });
     await expect(page.locator('#role-confirmed-badge')).toHaveText('✓ Judge — Confirmed');
+});
+
+test('a visitor sees their status on every open event, not just one', async ({ page, harness, loginAs }) => {
+    // Regression: the page used to load a single participation for a server-chosen "default" event,
+    // so with two open events the status pill appeared on one card at random.
+    const w = buildWorld();
+    const other = f.event({ name: 'ACDC 2028', status: 'pre-registration', registrationOpen: false });
+    await harness.seed(mergeSeeds(w.seed(), {
+        events: [other],
+        participations: [f.participation(w.member, other, { roles: ['interest'] })]
+    }));
+    await loginAs(w.member);
+    await page.goto('/events.html');
+    await expect(card(page, 'ACDC 2027').locator('.my-status-pill.team')).toBeVisible();
+    await expect(card(page, 'ACDC 2028').locator('.my-status-pill.interest')).toBeVisible();
 });

@@ -39,3 +39,10 @@ function safeHttpUrl(value) {
     }
 }
 
+
+// Inline SVG icon from the Lucide sprite (src/images/icons.svg). Decorative by default;
+// give the surrounding control an accessible name.
+function icon(name, className = '') {
+    const cls = className ? `icon ${className}` : 'icon';
+    return `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="/images/icons.svg#${name}"></use></svg>`;
+}

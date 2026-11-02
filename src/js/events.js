@@ -45,7 +45,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (currentUser?.id) {
                 try {
-                    const participationData = await API.participations.getOrNull(currentUser.id);
+                    // Every participation (one per event). The ?userId= endpoint only returns the one for a
+                    // default event, which hid the visitor's status on all other open events.
+                    const participationData = await API.participations.getByPerson(authUser.email);
                     if (participationData) {
                         const participationList = Array.isArray(participationData) ? participationData : [participationData];
                         participationList.filter(Boolean).forEach(participation => {
@@ -99,10 +101,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (activeEvents.length === 0) {
                 section.innerHTML = `
-                    <div class="no-events-message">
-                        <h2 style="margin-bottom: 12px;">Welcome!</h2>
+                    <div class="no-events-message empty-state">
+                        ${icon('calendar-days')}
+                        <h3>Nothing open right now</h3>
                         <p>No events are currently open for registration.</p>
-                        <p style="margin-top: 8px;">Check back later or sign in to see your profile.</p>
+                        <p>Check back later or sign in to see your profile.</p>
                     </div>
                 `;
                 return null;
@@ -121,15 +124,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const isPreReg = event.status === 'pre-registration';
                 const isLive = event.status === 'live';
-                const statusIcon = isPreReg ? '🔔' : (isLive ? '🚀' : '✅');
                 const statusText = isPreReg ? 'Coming Soon' : (isLive ? 'Live' : 'Registration Open');
+                const statusTone = isPreReg ? 'badge-info' : (isLive ? 'badge-violet' : 'badge-success');
                 const statusPill = hasTeam
-                    ? '<div class="my-status-pill team">✓ Team Registered</div>'
+                    ? `<span class="my-status-pill team badge badge-accent">${icon('circle-check', 'icon-sm')}<span>Team Registered</span></span>`
                     : isInterestRegistered
-                        ? '<div class="my-status-pill interest">✓ Interest Registered</div>'
+                        ? `<span class="my-status-pill interest badge badge-accent">${icon('bell', 'icon-sm')}<span>Interest Registered</span></span>`
                         : '';
 
-                const meta = `📅 ${escapeHtml(formatDateRange(event.startDate, event.endDate))}${event.location ? ` · 📍 ${escapeHtml(event.location)}` : ''}`;
+                const meta = `<span class="meta-item">${icon('calendar')}${escapeHtml(formatDateRange(event.startDate, event.endDate))}</span>`
+                    + (event.location ? `<span class="meta-item">${icon('map-pin')}${escapeHtml(event.location)}</span>` : '');
                 const desc = event.description ? `<p class="description">${escapeHtml(event.description)}</p>` : '';
 
                 const hasRelationship = hasTeam || isJudge || isCommittee || isInterestRegistered;
@@ -138,35 +142,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let helperText = '';
 
                 if (hasRelationship) {
-                    actions = `<a href="event.html?id=${eventIdAttr}" class="btn-event primary">Open</a>`;
+                    actions = `<a href="event.html?id=${eventIdAttr}" class="btn-event primary btn btn-primary">Open${icon('arrow-right')}</a>`;
                 } else if (isLive) {
                     helperText = '<p class="helper-text">Registration is closed — the event is in progress.</p>';
                 } else if (isPreReg) {
-                    actions = `<a href="register.html?intent=interest&eventId=${eventIdAttr}" class="btn-event interest-only">Register Interest</a>`;
-                    helperText = '<p class="helper-text">Be the first to know when registration opens!</p>';
+                    actions = `<a href="register.html?intent=interest&eventId=${eventIdAttr}" class="btn-event interest-only btn btn-secondary">${icon('bell')}Register Interest</a>`;
+                    helperText = '<p class="helper-text">Be the first to know when registration opens.</p>';
                 } else {
                     actions = `
-                        <a href="register.html?intent=team&eventId=${eventIdAttr}" class="btn-event primary">Register Team</a>
-                        <a href="register.html?intent=interest&eventId=${eventIdAttr}" class="btn-event secondary">Register Interest</a>
+                        <a href="register.html?intent=team&eventId=${eventIdAttr}" class="btn-event primary btn btn-primary">${icon('users')}Register Team</a>
+                        <a href="register.html?intent=interest&eventId=${eventIdAttr}" class="btn-event secondary btn btn-secondary">${icon('bell')}Register Interest</a>
                     `;
-                    helperText = '<p class="helper-text">Register your team or express interest to stay informed</p>';
+                    helperText = '<p class="helper-text">Register your team, or register interest to stay informed.</p>';
                 }
 
                 const cardClass = isPreReg ? 'pre-registration' : (isLive ? 'live' : 'registration');
                 return `
-                    <div class="event-card ${cardClass}" data-event-id="${escapeHtml(eventId)}">
+                    <article class="event-card ${cardClass}" data-event-id="${escapeHtml(eventId)}">
                         <div class="event-status-row">
-                            <div class="status-badge">${statusIcon} ${statusText}</div>
+                            <span class="status-badge badge badge-dot ${statusTone}">${statusText}</span>
                             ${statusPill}
                         </div>
                         <h3>${escapeHtml(event.name)}</h3>
                         ${desc}
-                        <p class="event-meta">${meta}</p>
-                        <div class="btn-row">
-                            ${actions}
-                        </div>
+                        <p class="event-meta meta-list">${meta}</p>
+                        <div class="btn-row">${actions.trim()}</div>
                         ${helperText}
-                    </div>
+                    </article>
                 `;
             }).join('') + '</div>';
 
@@ -177,8 +179,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             clearTimeout(wakeupTimer);
             console.error('Error loading events:', error);
             section.innerHTML = `
-                <div class="no-events-message">
-                    <h2 style="margin-bottom: 12px;">Welcome!</h2>
+                <div class="no-events-message empty-state">
+                    ${icon('triangle-alert')}
+                    <h3>Something went wrong</h3>
                     <p>Unable to load events. Please try again later.</p>
                 </div>
             `;

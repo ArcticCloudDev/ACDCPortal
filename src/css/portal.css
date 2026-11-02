@@ -1,0 +1,141 @@
+/* ==========================================================================
+   Participant portal components (events list, event page, registration).
+   Built only from tokens in styles.css. Replaces per-page <style> blocks.
+   ========================================================================== */
+
+/* Welcome hero on the events list */
+.page-hero-welcome {
+    background:
+        radial-gradient(1200px 300px at 85% -40%, color-mix(in srgb, var(--color-accent-bright) 22%, transparent), transparent 70%),
+        var(--color-surface);
+}
+
+.page-hero-eyebrow {
+    color: var(--color-accent-text);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.02em;
+    margin-bottom: var(--space-2);
+}
+
+.page-hero-lead {
+    color: var(--color-text-muted);
+    font-size: var(--text-lg);
+    margin-top: var(--space-2);
+    max-width: 52ch;
+}
+
+/* Main content area under the app header */
+.portal-main {
+    padding-top: var(--space-8);
+}
+
+.section-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.section-heading h2 {
+    font-size: var(--text-xl);
+}
+
+/* Events list ------------------------------------------------------------- */
+.landing.portal-main {
+    text-align: left;
+}
+
+.events-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    gap: var(--space-5);
+}
+
+.event-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-6);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xs);
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+    transition: border-color var(--duration), box-shadow var(--duration), transform var(--duration) var(--ease-out);
+}
+
+.event-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: var(--color-border-strong);
+}
+
+.event-card.registration::before { background: var(--color-accent); }
+.event-card.live::before { background: var(--color-violet); }
+.event-card.pre-registration::before { background: var(--color-info); }
+
+.event-card:hover {
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.event-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.event-card h3 {
+    font-size: var(--text-xl);
+    margin: 0;
+}
+
+.event-card .description {
+    color: var(--color-text-muted);
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.event-card .event-meta {
+    margin: 0;
+}
+
+.event-card .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: auto;
+    padding-top: var(--space-3);
+}
+
+.event-card .btn-row .btn {
+    flex: 1 1 auto;
+    white-space: nowrap;
+}
+
+.event-card .btn-row:empty {
+    display: none;
+}
+
+.event-card .helper-text {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--color-text-subtle);
+}
+
+.no-events-message {
+    text-align: center;
+}
+

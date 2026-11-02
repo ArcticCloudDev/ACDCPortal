@@ -13,10 +13,24 @@ const SiteHeader = (() => {
             .replace(/'/g, '&#39;');
     }
 
+    function _icon(name) {
+        return typeof icon === 'function' ? icon(name) : '';
+    }
+
+    function _initials(user) {
+        const parts = [user?.firstName, user?.lastName].filter(Boolean);
+        if (parts.length) return parts.map(p => p.trim()[0] || '').join('').slice(0, 2);
+        return (user?.email || '?').trim()[0] || '?';
+    }
+
+    let _documentListenersBound = false;
+
+    // Renders the navy top bar and, when a title is given, the page hero below it.
+    // Called with no title by the page's own script; logoUrl mode (events list) shows the welcome hero.
     function render(config = {}) {
         _config = Object.assign({
-            title: '🏔️ ACDC Portal',
-            subtitle: 'Arctic Cloud Developer Challenge',
+            title: null,
+            subtitle: null,
             logoUrl: null,
             infoBadges: null,
             containerId: 'site-header',
@@ -33,54 +47,73 @@ const SiteHeader = (() => {
         let infoHTML = '';
         if (_config.infoBadges && _config.infoBadges.length) {
             const spans = _config.infoBadges.map(b => {
-                const cls = b.className ? ` class="${_esc(b.className)}"` : '';
-                const idAttr = b.id ? ` id="${_esc(b.id)}"` : '';
-                const icon = b.icon ? _esc(b.icon) + ' ' : '';
-                if (b.icon && b.id) {
-                    return `<span${cls}>${icon}<span id="${_esc(b.id)}">${_esc(b.text || '')}</span></span>`;
-                }
-                return `<span${idAttr}${cls}>${icon}${_esc(b.text || '')}</span>`;
-            }).join('\n                        ');
-            infoHTML = `
-                    <div class="event-info">
-                        ${spans}
-                    </div>`;
+                const cls = b.className ? ` class="meta-item ${_esc(b.className)}"` : ' class="meta-item"';
+                const text = b.id ? `<span id="${_esc(b.id)}">${_esc(b.text || '')}</span>` : _esc(b.text || '');
+                return `<span${cls}>${b.icon ? _esc(b.icon) + ' ' : ''}${text}</span>`;
+            }).join('');
+            infoHTML = `<div class="event-info">${spans}</div>`;
         } else if (_config.subtitle) {
-            infoHTML = `
-                    <div class="event-info">
-                        <span>${_esc(_config.subtitle)}</span>
-                    </div>`;
+            infoHTML = `<div class="event-info"><span>${_esc(_config.subtitle)}</span></div>`;
         }
 
-        const inactiveClass = _config.inactive ? ' inactive' : '';
-        const signInHTML = _config.showSignIn
-            ? `<a href="register.html" id="header-signin-btn" class="banner-btn">🔑 Sign In</a>`
-            : '';
+        let heroHTML = '';
+        if (_config.title) {
+            heroHTML = `
+            <div class="page-hero${_config.inactive ? ' inactive' : ''}">
+                <div class="page-hero-inner">
+                    <h1>${_esc(_config.title)}</h1>
+                    ${infoHTML}
+                </div>
+            </div>`;
+        } else if (_config.logoUrl) {
+            heroHTML = `
+            <div class="page-hero page-hero-welcome">
+                <div class="page-hero-inner">
+                    <p class="page-hero-eyebrow">Arctic Cloud Developer Challenge</p>
+                    <h1>Build, hack and compete in the Arctic</h1>
+                    <p class="page-hero-lead">Register your team, follow your event and claim badges, all in one place.</p>
+                </div>
+            </div>`;
+        }
 
-        _containerEl.className = 'event-banner' + inactiveClass;
-        const titleHTML = _config.logoUrl
-            ? `<img src="${_esc(_config.logoUrl)}" alt="ACDC Logo" style="height: 48px; display: block;">`
-            : `<h1>${_esc(_config.title)}</h1>${infoHTML}`;
+        const signInHTML = _config.showSignIn
+            ? `<a href="register.html" id="header-signin-btn" class="banner-btn">${_icon('log-in')}<span>Sign in</span></a>`
+            : '';
+        const onEvents = /\/(events|event)\.html$/.test(location.pathname) || location.pathname === '/';
+
+        _containerEl.className = 'app-header';
         _containerEl.innerHTML = `
-            <div class="event-banner-left">
-                ${titleHTML}
-            </div>
-            <div class="banner-controls">
-                ${signInHTML}
-                <div id="header-user-menu" class="user-menu hidden">
-                    <button type="button" id="header-user-btn" class="banner-btn user-menu-toggle" aria-haspopup="true" aria-expanded="false">👤 Profile</button>
-                    <div id="header-user-dropdown" class="user-menu-dropdown hidden">
-                        <button type="button" id="header-profile-link" class="user-menu-item">📝 Update Profile</button>
-                        <a id="header-dashboard-link" href="admin-dashboard.html" class="user-menu-item hidden">📊 Admin Portal</a>
-                        <button type="button" id="header-logout-menuitem" class="user-menu-item logout">↩ Log Out</button>
+            <div class="topbar">
+                <div class="topbar-inner">
+                    <a class="topbar-brand" href="/events.html" aria-label="ACDC Portal home">
+                        <img src="/images/ACDCLogo.png" alt="ACDC" width="92" height="26">
+                        <span class="topbar-brand-tag">Portal</span>
+                    </a>
+                    <nav class="topbar-nav" aria-label="Main">
+                        <a class="topbar-link" href="/events.html"${onEvents ? ' aria-current="page"' : ''}>Events</a>
+                    </nav>
+                    <div class="banner-controls">
+                        ${signInHTML}
+                        <div id="header-user-menu" class="user-menu hidden">
+                            <button type="button" id="header-user-btn" class="user-menu-toggle" aria-haspopup="true" aria-expanded="false">
+                                <span class="avatar avatar-sm" aria-hidden="true">?</span>
+                                <span class="user-menu-name">Profile</span>
+                                ${_icon('chevron-down')}
+                            </button>
+                            <div id="header-user-dropdown" class="user-menu-dropdown hidden">
+                                <button type="button" id="header-profile-link" class="user-menu-item">${_icon('user-round')}Update profile</button>
+                                <a id="header-dashboard-link" href="admin-dashboard.html" class="user-menu-item hidden">${_icon('layout-dashboard')}Admin portal</a>
+                                <button type="button" id="header-logout-menuitem" class="user-menu-item logout">${_icon('log-out')}Log out</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+            ${heroHTML}
         `;
 
         _ensureProfileModal();
 
-        const userMenu = document.getElementById('header-user-menu');
         const userBtn = document.getElementById('header-user-btn');
         const userDropdown = document.getElementById('header-user-dropdown');
 
@@ -108,12 +141,35 @@ const SiteHeader = (() => {
             });
         }
 
-        document.addEventListener('click', (e) => {
-            if (userMenu && !userMenu.contains(e.target)) {
-                userDropdown.classList.add('hidden');
-                if (userBtn) userBtn.setAttribute('aria-expanded', 'false');
-            }
-        });
+        if (!_documentListenersBound) {
+            _documentListenersBound = true;
+            const closeMenu = () => {
+                const dropdown = document.getElementById('header-user-dropdown');
+                const btn = document.getElementById('header-user-btn');
+                if (dropdown) dropdown.classList.add('hidden');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            };
+            document.addEventListener('click', (e) => {
+                const menu = document.getElementById('header-user-menu');
+                if (menu && !menu.contains(e.target)) closeMenu();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeMenu();
+            });
+        }
+
+        if (_user || _lastUpdate) update(_lastUpdate || {});
+    }
+
+    function _setUserButton(user) {
+        const userBtn = document.getElementById('header-user-btn');
+        if (!userBtn) return;
+        const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
+        const nameEl = userBtn.querySelector('.user-menu-name');
+        const avatarEl = userBtn.querySelector('.avatar');
+        if (nameEl) nameEl.textContent = fullName || 'Profile';
+        if (avatarEl) avatarEl.textContent = _initials(user);
+        userBtn.setAttribute('aria-label', fullName ? `Account menu for ${fullName}` : 'Account menu');
     }
 
     function _ensureProfileModal() {
@@ -124,7 +180,7 @@ const SiteHeader = (() => {
         <div id="sh-profile-modal" class="modal-overlay">
             <div class="modal">
                 <div class="modal-header">
-                    <h2>👤 Your Profile</h2>
+                    <h2>Your profile</h2>
                     <button type="button" class="modal-close" id="sh-close-profile" aria-label="Close">&times;</button>
                 </div>
                 <form id="sh-profile-form">
@@ -229,12 +285,7 @@ const SiteHeader = (() => {
         try {
             await API.users.update(_user.id, formData);
             _user = { ..._user, ...formData };
-
-            const userBtn = document.getElementById('header-user-btn');
-            if (userBtn) {
-                const fullName = [_user.firstName, _user.lastName].filter(Boolean).join(' ').trim();
-                userBtn.textContent = fullName ? `👤 ${fullName}` : '👤 Profile';
-            }
+            _setUserButton(_user);
 
             successDiv.textContent = 'Profile saved!';
             successDiv.classList.remove('hidden');
@@ -252,12 +303,14 @@ const SiteHeader = (() => {
         }
     }
 
+    let _lastUpdate = null;
+
     function update({ authUser = null, user = null, isAdmin = false } = {}) {
+        _lastUpdate = { authUser, user, isAdmin };
         _user = user;
 
         const signInBtn = document.getElementById('header-signin-btn');
         const userMenu = document.getElementById('header-user-menu');
-        const userBtn = document.getElementById('header-user-btn');
         const dashboardLink = document.getElementById('header-dashboard-link');
 
         const isLoggedIn = !!authUser;
@@ -265,13 +318,7 @@ const SiteHeader = (() => {
         if (signInBtn) signInBtn.classList.toggle('hidden', isLoggedIn);
         if (userMenu) userMenu.classList.toggle('hidden', !isLoggedIn);
 
-        if (userBtn) {
-            const fullName = [user?.firstName, user?.lastName]
-                .filter(Boolean)
-                .join(' ')
-                .trim();
-            userBtn.textContent = fullName ? `👤 ${fullName}` : '👤 Profile';
-        }
+        _setUserButton(user || authUser);
 
         const showAdmin = isAdmin || !!user?.isPortalAdmin;
         if (dashboardLink) {
@@ -292,3 +339,9 @@ const SiteHeader = (() => {
 
     return { render, update, getElements };
 })();
+
+// Show the top bar straight away; the page script re-renders it with its title once data loads.
+document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('site-header');
+    if (el && !el.hasChildNodes()) SiteHeader.render();
+});
