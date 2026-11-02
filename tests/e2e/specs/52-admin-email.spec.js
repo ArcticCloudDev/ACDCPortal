@@ -50,8 +50,6 @@ test('admin sends a quick announcement to custom recipients', async ({ page, har
 });
 
 test('BUG (high): quick email recipients receive the message the admin wrote', async ({ page, harness, loginAs, dialogs }) => {
-    test.fail(true, 'admin-email.html posts {subject, content, ctaUrl, ctaText} at the top level; email.js email-send merges only '
-        + 'body.data, so {{content}} and {{subject}} render empty. The preview uses `data` and looks right.');
     const w = buildWorld();
     await harness.seed(w.seed());
     await loginAs(w.admin);

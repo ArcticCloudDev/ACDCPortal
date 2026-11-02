@@ -90,7 +90,6 @@ test.describe('fresh database', () => {
     test.use({ allowPageErrors: true });
 
     test('BUG: the email templates page works before any template config is saved', async ({ page, harness, loginAs }) => {
-        test.fail(true, 'admin-email-templates.html:378/395 dereferences templateConfig.templates[currentTemplate] when the saved config is empty');
         const w = buildWorld();
         const { 'system-email-config': _omit, ...seed } = w.seed();
         await harness.seed(seed);

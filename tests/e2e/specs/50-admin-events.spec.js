@@ -156,7 +156,6 @@ test.describe('known broken admin event actions', () => {
     test.use({ allowServerErrors: true });
 
     test('BUG: saving budget rates persists them', async ({ page, harness, loginAs, dialogs }) => {
-        test.fail(true, 'saveEventRates() sends hotelNights, which events.js spreads into an Events.HotelNights column that does not exist -> 500');
         const w = await openAdminEvents(page, harness, loginAs);
         await page.goto(`/admin-events.html?event=${w.event.id}&tab=budget`);
         await page.locator('#budget-hotel-rate').fill('1200');
@@ -167,7 +166,6 @@ test.describe('known broken admin event actions', () => {
     });
 
     test('BUG: copying a sequence from another event works', async ({ page, harness, loginAs, dialogs }) => {
-        test.fail(true, 'admin-events.js:1767 calls API.sequences.duplicate(), which does not exist (api.js has copy())');
         const source = f.event({ name: 'ACDC 2026', status: 'completed' });
         const seq = { id: f.id(), name: 'ACDC 2026 drip', description: null, createdAt: new Date().toISOString() };
         source.sequenceId = seq.id;
@@ -181,7 +179,6 @@ test.describe('known broken admin event actions', () => {
     });
 
     test('BUG: an admin can add an email to an event sequence', async ({ page, harness, loginAs }) => {
-        test.fail(true, 'admin-email.html sequence mode saves to POST /api/campaigns, but the route is /api/email/campaigns -> 404');
         const seq = { id: f.id(), name: 'Drip', description: null, createdAt: new Date().toISOString() };
         const w = await openAdminEvents(page, harness, loginAs, { sequences: [seq] });
         await page.goto(`/admin-email.html?mode=sequence&sequenceId=${seq.id}&eventId=${w.event.id}&order=1`);

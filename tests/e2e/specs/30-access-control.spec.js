@@ -162,7 +162,6 @@ test.describe('confirmed security defects', () => {
     });
 
     test('BUG (high): an anonymous interest sign-up cannot inject script into admin pages', async ({ page, harness, loginAs, apiAs }) => {
-        test.fail(true, 'admin-events.js recipient overview renders lead names unescaped; names come from the public interest/record endpoint');
         const w = buildWorld();
         const seq = { id: f.id(), name: 'Pre-reg drip', description: null, createdAt: new Date().toISOString() };
         w.event.sequenceId = seq.id;

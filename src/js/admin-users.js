@@ -533,11 +533,13 @@ function closeDrawer() {
 }
 
 function exportCSV() {
-    if (!displayRows.length) return;
+    // Rendering is debounced; export always reflects the filters as they are right now.
+    const exportRows = buildRows();
+    if (!exportRows.length) return;
     const q = s => `"${String(s || '').replace(/"/g, '""')}"`;
     const lines = [
         'Name,Email,Event,Roles,Team,Account,Since',
-        ...displayRows.map(r => [
+        ...exportRows.map(r => [
             q(r.displayName), q(r.email), q(r.eventName),
             q(r.roles.join(';')), q(r.teamName || ''),
             r.hasAccount ? 'Yes' : 'No',
