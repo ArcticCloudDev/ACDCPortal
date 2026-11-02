@@ -106,6 +106,15 @@ const test = base.test.extend({
             if (/google\.com\/recaptcha\/api\.js/.test(url)) {
                 return route.fulfill({ status: 200, contentType: 'text/javascript', body: RECAPTCHA_STUB });
             }
+            const externalUrl = new URL(url);
+            if (externalUrl.hostname === 'mango-ocean-075da8303.2.azurestaticapps.net'
+                && externalUrl.pathname === '/images/ACDCLogo.png') {
+                return route.fulfill({
+                    status: 200,
+                    contentType: 'image/png',
+                    body: fs.readFileSync(path.join(ROOT, 'src', 'images', 'ACDCLogo.png'))
+                });
+            }
             for (const [pattern, file, contentType] of LOCAL_ASSETS) {
                 if (pattern.test(url)) return route.fulfill({ status: 200, contentType, body: fs.readFileSync(path.join(ROOT, file)) });
             }

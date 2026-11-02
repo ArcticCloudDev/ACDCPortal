@@ -54,9 +54,7 @@ test('persists the user, the team and an admin participation', async ({ page, ha
     expect(await rows("SELECT * FROM PendingRegistrations WHERE Email = @e", { e: email })).toHaveLength(0);
 });
 
-test('BUG: the new captain sees their team right after registering', async ({ page, harness }) => {
-    test.fail(true, 'verify-otp ran before the user existed, so the session JWT has userId:null and register/complete '
-        + 'issues no new token; teams-list filters the team out and the page says "not part of any team"');
+test('the new captain sees their team right after registering', async ({ page, harness }) => {
     const event = f.event({ name: 'ACDC 2027' });
     await harness.seed({ events: [event] });
     await registerTeamThroughUi(page, harness, event, 'captain@e2e.test');

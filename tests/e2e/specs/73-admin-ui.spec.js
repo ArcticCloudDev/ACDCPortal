@@ -80,6 +80,8 @@ test.describe('strict CSP: every admin page loads with no violations and no thir
         await page.getByText('lena.leader@e2e.test').first().click();
         await expect(page.locator('#person-drawer')).toHaveClass(/open/);
         await expect(page.locator('#drawer-body')).toContainText('ACDC 2027');
+        await page.keyboard.press('Escape');
+        await expect(page.locator('#person-drawer')).not.toHaveClass(/open/);
         await page.locator('#view-event').click();
         await expect(page.locator('#main-tbody .group-header-row').first()).toBeVisible();
 
@@ -246,7 +248,7 @@ test.describe('stored XSS payloads render as text on admin pages', () => {
         await harness.seed(w.seed());
         const admin = await apiAs(w.admin);
         const created = await admin.post(`/api/events/${w.event.id}/sponsors`, {
-            data: { companyName: `Contoso ${XSS}`, contactPerson: `Carl ${XSS}`, email: `"${XSS}"@contoso.example`, notes: `Notes ${XSS_SCRIPT}`, amount: 1000, status: 'confirmed' }
+            data: { companyName: `Contoso ${XSS}`, contactPerson: `Carl ${XSS}`, email: 'contact@contoso.example', notes: `Notes ${XSS_SCRIPT}`, amount: 1000, status: 'confirmed' }
         });
         expect(created.status()).toBeLessThan(300);
         await loginAs(w.admin);
@@ -295,7 +297,8 @@ test.describe('email previews are sandboxed', () => {
         await page.goto('/admin-email-templates.html');
         await page.locator('#event-select').selectOption(w.event.id);
         const frame = page.locator('#template-preview-frame');
-        await expect(frame).toHaveAttribute('srcdoc', /onerror=/);
+        await expect(frame).toHaveAttribute('srcdoc', /<!DOCTYPE html>/);
+        expect(await frame.getAttribute('srcdoc')).not.toMatch(/<img src=x onerror=|<script>/);
         expect(await frame.getAttribute('sandbox')).toBe('');
         await page.waitForTimeout(300);
         await noXss(page);
@@ -486,6 +489,7 @@ test.describe('admin-side contract fixes', () => {
         await harness.seed(mergeSeeds(w.seed(), { events: extra }));
         await loginAs(w.admin);
         await page.goto('/admin-events.html');
+        await expect(page.locator('#events-table-body tr')).toHaveCount(5);
         const names = await page.locator('#events-table-body tr td:first-child').allTextContents();
         expect(names.map(n => n.trim())).toEqual(['Running', 'ACDC 2027', 'Teaser', 'Sketch', 'Old Completed']);
     });

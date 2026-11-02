@@ -1325,7 +1325,8 @@ function renderSponsorsTable() {
         const parts = [];
         if (row.contactPerson) parts.push(`<span style="font-weight:600">${escapeHtml(row.contactPerson)}</span>`);
         if (row.phoneNumber)   parts.push(`<span style="color:var(--admin-text-muted);font-size:0.82rem">📞 ${escapeHtml(row.phoneNumber)}</span>`);
-        if (row.email)         parts.push(`<a href="mailto:${escapeHtml(row.email)}" style="font-size:0.82rem">✉️ ${escapeHtml(row.email)}</a>`);
+        const contactEmail = row.contactEmail || row.email;
+        if (contactEmail)      parts.push(`<a href="mailto:${escapeHtml(contactEmail)}" style="font-size:0.82rem">✉️ ${escapeHtml(contactEmail)}</a>`);
         if (row.notes) {
             const preview = row.notes.length > 80 ? row.notes.slice(0, 80) + '…' : row.notes;
             parts.push(`<span style="color:var(--admin-text-muted);font-size:0.8rem;font-style:italic" title="${escapeHtml(row.notes)}">${escapeHtml(preview)}</span>`);
@@ -1360,7 +1361,7 @@ function startEditSponsor(sponsorId) {
     document.getElementById('sponsor-company-name').value = row.description || '';
     document.getElementById('sponsor-contact-person').value = row.contactPerson || '';
     document.getElementById('sponsor-phone-number').value = row.phoneNumber || '';
-    document.getElementById('sponsor-email').value = row.email || '';
+    document.getElementById('sponsor-email').value = row.contactEmail || row.email || '';
     document.getElementById('sponsor-amount').value = row.amount == null || row.amount === 0 ? '' : row.amount;
     document.getElementById('sponsor-status').value = row.sponsorStatus || 'reached-out';
     document.getElementById('sponsor-notes').value = row.notes || '';
