@@ -14,7 +14,7 @@ There is no local database, no local file storage, and no local mail server — 
 
 | Tool | Why | Check |
 |---|---|---|
-| [Node.js 18+ LTS](https://nodejs.org/) | Runs the API and any scripts | `node -v` |
+| [Node.js 22 LTS](https://nodejs.org/) | Runs the API and any scripts (production runs `node:22`, pinned in `src/staticwebapp.config.json`) | `node -v` |
 | [Git](https://git-scm.com/) | Clone the repo | `git --version` |
 | [Azure Functions Core Tools v4](https://learn.microsoft.com/azure/azure-functions/functions-run-local) | Runs `api/` locally (`func start`) | `func --version` (`npm i -g azure-functions-core-tools@4 --unsafe-perm true`) |
 | [Azure Static Web Apps CLI](https://azure.github.io/static-web-apps-cli/) | Serves `src/` + proxies `/api/*` to Functions Core Tools, mimics production routing/`staticwebapp.config.json` | `swa --version` (`npm i -g @azure/static-web-apps-cli`) |

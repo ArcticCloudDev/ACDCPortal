@@ -35,7 +35,7 @@
     "exclude": ["/css/*", "/js/*", "/api/*", "/data/*", "/images/*", "/vendor/*", "*.html"]
   },
   "platform": {
-    "apiRuntime": "node:20"
+    "apiRuntime": "node:22"
   },
   "mimeTypes": {
     ".json": "application/json",
