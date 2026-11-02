@@ -1,0 +1,626 @@
+let quill;
+let selectedTemplate = 'announcement';
+let recipients = [];
+let allEvents = [];
+let currentPermissions = null;
+
+const urlParams = new URLSearchParams(window.location.search);
+const isSequenceMode = urlParams.get('mode') === 'sequence';
+const sequenceId = urlParams.get('sequenceId');
+const eventId = urlParams.get('eventId');
+const emailId = urlParams.get('emailId');
+const emailOrder = parseInt(urlParams.get('order')) || 1;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    currentPermissions = await Permissions.initAdminPage('email');
+
+    if (!currentPermissions) return;
+
+    quill = new Quill('#editor-container', {
+        theme: 'snow',
+        placeholder: 'Write your message here...',
+        modules: {
+            toolbar: [
+                ['bold', 'italic', 'underline'],
+                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                ['link'],
+                ['clean']
+            ]
+        }
+    });
+
+    document.querySelectorAll('.template-card').forEach(card => {
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedTemplate = card.dataset.template;
+            previewEmail();
+        });
+    });
+
+    document.getElementById('event-select').addEventListener('change', () => {
+        if (!isSequenceMode) {
+            loadRecipients();
+        }
+    });
+
+    document.getElementById('recipient-filter').addEventListener('change', (e) => {
+        const customRecipients = document.getElementById('custom-recipients');
+        customRecipients.classList.toggle('visible', e.target.value === 'custom');
+
+        if (e.target.value !== 'custom' && !isSequenceMode) {
+            loadRecipients();
+        }
+    });
+
+    document.getElementById('custom-emails').addEventListener('input', parseCustomEmails);
+
+    document.querySelectorAll('input[name="email-status"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            if (e.target.value === 'live') {
+                document.getElementById('schedule-group').style.display = 'block';
+                displayUserTimezone();
+            } else {
+                document.getElementById('schedule-group').style.display = 'none';
+                lockFormFields(false);
+            }
+        });
+    });
+
+    document.getElementById('scheduled-send-time').addEventListener('change', updateSchedulePreview);
+    document.getElementById('scheduled-send-time').addEventListener('input', updateSchedulePreview);
+
+    document.getElementById('preview-btn').addEventListener('click', previewEmail);
+    document.getElementById('send-btn').addEventListener('click', sendEmail);
+    document.getElementById('cancel-btn').addEventListener('click', cancelSequenceEdit);
+
+    const debouncedPreview = debounce(previewEmail, 500);
+    quill.on('text-change', debouncedPreview);
+    document.getElementById('subject').addEventListener('input', debouncedPreview);
+    document.getElementById('cta-url').addEventListener('input', debouncedPreview);
+    document.getElementById('cta-text').addEventListener('input', debouncedPreview);
+
+    await loadEvents();
+
+    if (isSequenceMode) {
+        await loadSequenceEmail();
+
+        const sendBtn = document.getElementById('send-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        sendBtn.textContent = emailId ? '💾 Update Email' : '💾 Save Email';
+        cancelBtn.style.display = 'inline-block';
+    } else {
+        // Quick emails go out immediately; draft/live scheduling only applies to sequence emails.
+        document.getElementById('status-group').style.display = 'none';
+        await loadRecipients();
+    }
+
+    await loadHistory();
+
+    previewEmail();
+});
+
+function cancelSequenceEdit() {
+    window.location.href = `admin-events.html?event=${encodeURIComponent(eventId || '')}&tab=sequence`;
+}
+
+async function loadSequenceEmail() {
+    try {
+        const eventSelect = document.getElementById('event-select');
+        eventSelect.value = eventId;
+        if (eventSelect.value !== eventId) {
+            const match = Array.from(eventSelect.options).find(o => sameId(o.value, eventId));
+            if (match) eventSelect.value = match.value;
+        }
+        eventSelect.disabled = true;
+        eventSelect.style.background = 'var(--admin-bg)';
+        eventSelect.style.cursor = 'not-allowed';
+
+        const recipientFilter = document.getElementById('recipient-filter');
+        recipientFilter.innerHTML = '<option value="event-contacts">Event Contacts (All)</option>';
+        recipientFilter.disabled = true;
+        recipientFilter.style.background = 'var(--admin-bg)';
+        recipientFilter.style.cursor = 'not-allowed';
+
+        await loadRecipients();
+
+        if (emailId) {
+            const response = await fetch(`${CONFIG.api.baseUrl}/email/campaigns/${encodeURIComponent(emailId)}`);
+            if (response.ok) {
+                const data = await response.json();
+                const email = data.campaign;
+                const sentCount = data.stats?.sent || 0;
+
+                document.getElementById('subject').value = email.subject;
+                quill.clipboard.dangerouslyPasteHTML(email.content || '');
+
+                selectedTemplate = email.template || email.type || 'announcement';
+                if (selectedTemplate === 'sequence') {
+                    selectedTemplate = 'announcement';
+                }
+                const card = Array.from(document.querySelectorAll('.template-card')).find(c => c.dataset.template === selectedTemplate);
+                if (card) {
+                    document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                }
+
+                if (email.ctaUrl) document.getElementById('cta-url').value = email.ctaUrl;
+                if (email.ctaText) document.getElementById('cta-text').value = email.ctaText;
+
+                if (email.status) {
+                    const statusRadio = Array.from(document.querySelectorAll('input[name="email-status"]')).find(r => r.value === email.status);
+                    if (statusRadio) statusRadio.checked = true;
+                    if (email.status === 'live') {
+                        document.getElementById('schedule-group').style.display = 'block';
+                        displayUserTimezone();
+                        if (sentCount > 0) {
+                            lockFormFields(true);
+                        }
+                    }
+                }
+
+                if (email.scheduledSendTime) {
+                    const localDate = new Date(email.scheduledSendTime);
+                    const offset = localDate.getTimezoneOffset();
+                    const localISO = new Date(localDate.getTime() - offset * 60000).toISOString().slice(0, 16);
+                    document.getElementById('scheduled-send-time').value = localISO;
+                    updateSchedulePreview();
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading sequence email:', error);
+        showStatus('Error loading email data', 'error');
+    }
+}
+
+async function loadEvents() {
+    const select = document.getElementById('event-select');
+    try {
+        const response = await fetch(`${CONFIG.api.baseUrl}/events`);
+        if (response.ok) {
+            let events = await response.json();
+            allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
+
+            allEvents.sort((a, b) => {
+                if (a.isActive && !b.isActive) return -1;
+                if (!a.isActive && b.isActive) return 1;
+                return new Date(b.startDate) - new Date(a.startDate);
+            });
+
+            select.innerHTML = '';
+            allEvents.forEach(event => {
+                const option = document.createElement('option');
+                option.value = event.id;
+                option.textContent = `${event.name}${event.isActive ? ' (Active)' : ''}`;
+                option.selected = !!event.isActive;
+                select.appendChild(option);
+            });
+
+            if (allEvents.length === 0) {
+                select.innerHTML = '<option value="">No events found</option>';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading events:', error);
+        select.innerHTML = '<option value="">Error loading events</option>';
+    }
+}
+
+function setRecipients(list) {
+    recipients = Array.isArray(list) ? list : [];
+    document.getElementById('recipient-count').textContent = recipients.length;
+}
+
+async function loadRecipients() {
+    const selectedEventId = document.getElementById('event-select').value;
+    const filter = document.getElementById('recipient-filter').value;
+
+    if (filter === 'event-contacts') {
+        if (!selectedEventId) {
+            setRecipients([]);
+            return;
+        }
+        try {
+            const response = await fetch(`${CONFIG.api.baseUrl}/email/recipients?eventId=${encodeURIComponent(selectedEventId)}&filter=all-event-contacts`);
+            if (!response.ok) throw new Error('Failed to load');
+            setRecipients(await response.json());
+        } catch (error) {
+            console.error('Error loading event contacts:', error);
+            setRecipients([]);
+        }
+        return;
+    }
+
+    if (filter === 'interest-queue') {
+        try {
+            const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads`);
+            if (!response.ok) throw new Error('Failed to load');
+            const data = await response.json();
+            const leads = data.leads || [];
+            setRecipients(leads
+                .filter(l => l.verified)
+                .map(l => ({
+                    email: l.email,
+                    firstName: l.firstName,
+                    lastName: l.lastName,
+                    displayName: [l.firstName, l.lastName].filter(Boolean).join(' ') || l.email
+                })));
+        } catch (error) {
+            console.error('Error loading interest leads:', error);
+            setRecipients([]);
+        }
+        return;
+    }
+
+    if (filter === 'custom') {
+        parseCustomEmails();
+        return;
+    }
+
+    if (!selectedEventId) {
+        setRecipients([]);
+        return;
+    }
+
+    try {
+        const response = await fetch(`${CONFIG.api.baseUrl}/email/recipients?eventId=${encodeURIComponent(selectedEventId)}&filter=${encodeURIComponent(filter)}`);
+        if (!response.ok) throw new Error('Failed to load');
+        setRecipients(await response.json());
+    } catch (error) {
+        console.error('Error loading recipients:', error);
+        setRecipients([]);
+    }
+}
+
+function parseCustomEmails() {
+    const text = document.getElementById('custom-emails').value;
+    const emails = text.split('\n')
+        .map(e => e.trim())
+        .filter(e => e && e.includes('@'));
+    setRecipients(emails.map(email => ({ email })));
+}
+
+function composeData() {
+    return {
+        subject: document.getElementById('subject').value,
+        content: quill.root.innerHTML,
+        ctaUrl: document.getElementById('cta-url').value,
+        ctaText: document.getElementById('cta-text').value || 'Learn More'
+    };
+}
+
+async function previewEmail() {
+    const data = composeData();
+
+    try {
+        const response = await fetch(`${CONFIG.api.baseUrl}/email/preview`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                templateId: selectedTemplate,
+                data: {
+                    ...data,
+                    subject: data.subject || 'Email Subject',
+                    firstName: 'Preview User'
+                }
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            renderSandboxedHtml(document.getElementById('preview-frame'), result.html);
+        }
+    } catch (error) {
+        console.error('Error previewing email:', error);
+    }
+}
+
+async function sendEmail() {
+    const sendBtn = document.getElementById('send-btn');
+
+    if (isSequenceMode) {
+        return withBusy(sendBtn, '💾 Saving...', saveSequenceEmail);
+    }
+
+    if (recipients.length === 0) {
+        showStatus('Please select recipients', 'error');
+        return;
+    }
+
+    const data = composeData();
+    if (!data.subject) {
+        showStatus('Please enter a subject', 'error');
+        return;
+    }
+
+    if (!confirm(`Send email to ${recipients.length} recipient(s)?`)) {
+        return;
+    }
+
+    await withBusy(sendBtn, '📤 Sending...', async () => {
+        try {
+            // Contract: templateId + subject + recipients at the top level, the template merge
+            // fields (subject, content, ctaUrl, ctaText) under `data`.
+            const response = await fetch(`${CONFIG.api.baseUrl}/email/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateId: selectedTemplate,
+                    subject: data.subject,
+                    recipients: recipients.map(r => {
+                        const out = { email: r.email };
+                        if (r.firstName) out.firstName = r.firstName;
+                        if (r.lastName) out.lastName = r.lastName;
+                        return out;
+                    }),
+                    data
+                })
+            });
+
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(result.error || result.message || `HTTP ${response.status}`);
+            }
+
+            if (result.results.failed === 0) {
+                showStatus(`✅ Successfully sent to ${result.results.sent} recipient(s)`, 'success');
+            } else {
+                showStatus(`⚠️ Sent: ${result.results.sent}, Failed: ${result.results.failed}`, 'warning');
+            }
+
+            await loadHistory();
+        } catch (error) {
+            console.error('Error sending email:', error);
+            showStatus('Error sending email: ' + error.message, 'error');
+        }
+    });
+}
+
+async function saveSequenceEmail() {
+    const subject = document.getElementById('subject').value;
+    if (!subject) {
+        showStatus('Please enter a subject', 'error');
+        return;
+    }
+
+    const content = quill.root.innerHTML;
+    if (!content || content === '<p><br></p>') {
+        showStatus('Please enter email content', 'error');
+        return;
+    }
+
+    const status = document.querySelector('input[name="email-status"]:checked').value;
+    const scheduleInput = document.getElementById('scheduled-send-time').value;
+    const scheduledSendTime = scheduleInput ? new Date(scheduleInput).toISOString() : null;
+
+    const emailData = {
+        sequenceId: sequenceId,
+        subject: subject,
+        content: content,
+        template: selectedTemplate,
+        type: 'sequence',
+        status: status,
+        scheduledSendTime: scheduledSendTime,
+        ctaUrl: document.getElementById('cta-url').value,
+        ctaText: document.getElementById('cta-text').value || 'Learn More'
+    };
+    if (!emailId) {
+        emailData.sequenceOrder = emailOrder;
+    }
+
+    try {
+        let response;
+        if (emailId) {
+            response = await fetch(`${CONFIG.api.baseUrl}/email/campaigns/${encodeURIComponent(emailId)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(emailData)
+            });
+        } else {
+            response = await fetch(`${CONFIG.api.baseUrl}/email/campaigns`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(emailData)
+            });
+        }
+
+        if (response.ok) {
+            showStatus('✅ Email saved successfully', 'success');
+
+            setTimeout(() => {
+                window.location.href = `admin-events.html?event=${encodeURIComponent(eventId || '')}&tab=sequence`;
+            }, 1000);
+        } else {
+            const error = await response.json().catch(() => ({}));
+            showStatus('❌ Failed to save: ' + (error.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error saving sequence email:', error);
+        showStatus('❌ Error saving email: ' + error.message, 'error');
+    }
+}
+
+async function loadHistory() {
+    const tbody = document.getElementById('history-body');
+    const thead = document.getElementById('history-header');
+    try {
+        if (isSequenceMode && emailId) {
+
+            thead.innerHTML = `
+                <tr>
+                    <th>Date & Time</th>
+                    <th>Recipient</th>
+                    <th>Send Type</th>
+                    <th></th>
+                    <th>Status</th>
+                </tr>
+            `;
+
+            const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${encodeURIComponent(eventId)}`);
+
+            if (!response.ok) {
+                throw new Error(`Deliveries not available: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            const thisEmailDeliveries = (data.deliveries || []).filter(d => sameId(d.campaignId, emailId));
+
+            if (thisEmailDeliveries.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Not sent yet</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = thisEmailDeliveries.map(delivery => {
+                const date = new Date(delivery.sentAt || delivery.createdAt).toLocaleDateString();
+                const time = new Date(delivery.sentAt || delivery.createdAt).toLocaleTimeString();
+                const statusClass = delivery.status === 'sent' ? 'success' :
+                                  delivery.status === 'failed' ? 'error' : 'warning';
+                const statusText = delivery.status === 'sent' ? 'Sent' :
+                                 delivery.status === 'failed' ? 'Failed' : 'Pending';
+
+                return `
+                    <tr>
+                        <td>${date} ${time}</td>
+                        <td>${escapeHtml(delivery.email)}</td>
+                        <td>Sequence</td>
+                        <td></td>
+                        <td><span class="badge badge-${statusClass}">${statusText}</span></td>
+                    </tr>
+                `;
+            }).join('');
+
+            return;
+        }
+
+        thead.innerHTML = `
+            <tr>
+                <th>Date</th>
+                <th>Subject</th>
+                <th>Template</th>
+                <th>Recipients</th>
+                <th>Status</th>
+            </tr>
+        `;
+
+        const response = await fetch(`${CONFIG.api.baseUrl}/email/history`);
+
+        if (!response.ok) {
+            throw new Error(`History not available: ${response.status}`);
+        }
+
+        const history = await response.json();
+
+        if (!history || history.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No emails sent yet</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = history.slice(0, 10).map(email => {
+            const date = new Date(email.sentAt).toLocaleDateString();
+            const statusClass = email.status === 'completed' ? 'success' :
+                               email.status === 'completed-with-errors' ? 'warning' : 'error';
+            const statusText = email.status === 'completed' ? 'Sent' :
+                              email.status === 'completed-with-errors' ? 'Partial' : email.status;
+
+            return `
+                <tr>
+                    <td>${date}</td>
+                    <td>${escapeHtml(email.subject || '-')}</td>
+                    <td>${escapeHtml(email.templateId || '-')}</td>
+                    <td>${Number(email.results?.sent) || 0}/${Number(email.recipientCount) || 0}</td>
+                    <td><span class="badge badge-${statusClass}">${escapeHtml(statusText)}</span></td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('[loadHistory] Error loading history:', error);
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No emails sent yet</td></tr>`;
+    }
+}
+
+function displayUserTimezone() {
+    const offset = new Date().getTimezoneOffset();
+    const hours = Math.abs(Math.floor(offset / 60));
+    const minutes = Math.abs(offset % 60);
+    const sign = offset <= 0 ? '+' : '-';
+    const tzDisplay = `(GMT${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')})`;
+    const tzElement = document.getElementById('timezone-display');
+    if (tzElement) {
+        tzElement.textContent = tzDisplay;
+    }
+}
+
+function updateSchedulePreview() {
+    const scheduleInput = document.getElementById('scheduled-send-time').value;
+    const preview = document.getElementById('schedule-preview');
+
+    if (!scheduleInput) {
+        preview.style.display = 'none';
+        return;
+    }
+
+    const localDate = new Date(scheduleInput);
+    if (Number.isNaN(localDate.getTime())) {
+        preview.style.display = 'none';
+        return;
+    }
+    const utcDate = localDate.toISOString();
+
+    const offset = localDate.getTimezoneOffset();
+    const hours = Math.abs(Math.floor(offset / 60));
+    const minutes = Math.abs(offset % 60);
+    const sign = offset <= 0 ? '+' : '-';
+    const gmtOffset = `GMT${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+    preview.innerHTML = `📅 Will send on: <strong>${escapeHtml(localDate.toLocaleString())}</strong> (${gmtOffset})<br>UTC: ${utcDate}`;
+    preview.style.display = 'block';
+}
+
+function lockFormFields(lock) {
+    document.getElementById('subject').readOnly = lock;
+    document.getElementById('cta-url').readOnly = lock;
+    document.getElementById('cta-text').readOnly = lock;
+    document.getElementById('scheduled-send-time').disabled = lock;
+    quill.enable(!lock);
+
+    const editorContainer = document.getElementById('editor-container');
+    if (lock) {
+        editorContainer.style.opacity = '1';
+        editorContainer.style.background = '';
+        let overlay = document.getElementById('editor-lock-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'editor-lock-overlay';
+            overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;z-index:10;cursor:not-allowed;';
+            editorContainer.style.position = 'relative';
+            editorContainer.appendChild(overlay);
+        }
+        overlay.style.display = 'block';
+    } else {
+        const overlay = document.getElementById('editor-lock-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    document.querySelectorAll('.template-card').forEach(card => {
+        card.style.pointerEvents = lock ? 'none' : 'auto';
+        card.style.opacity = lock ? '0.6' : '1';
+    });
+
+    if (lock) {
+        showStatus('Email is live — switch to Draft to make changes', 'warning');
+    }
+}
+
+function showStatus(message, type) {
+    const bar = document.getElementById('status-bar');
+    bar.textContent = message;
+    bar.className = `status-bar ${type}`;
+
+    if (type === 'success') {
+        setTimeout(() => {
+            bar.className = 'status-bar';
+        }, 5000);
+    }
+}

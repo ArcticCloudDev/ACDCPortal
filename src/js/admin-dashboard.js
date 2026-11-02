@@ -36,48 +36,67 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.error('Dashboard error:', error);
         loadingDiv.innerHTML = `
-            <p style="color: #ef4444;">Error: ${error.message}</p>
+            <p style="color: #ef4444;">Error: ${escapeHtml(error.message)}</p>
             <a href="events.html" class="btn-sm primary" style="margin-top: 16px;">Go to Events</a>
         `;
     }
 });
 
+// Mirrors GET /participations/team/{id}/count, computed once from the full participation list
+// instead of one request per team.
+function countTeamMembers(participations) {
+    const counts = {};
+    for (const p of participations || []) {
+        if (p.teamId && (p.roles || []).includes('participant')) {
+            const key = String(p.teamId).toLowerCase();
+            counts[key] = (counts[key] || 0) + 1;
+            continue;
+        }
+        for (const m of p.teamMemberships || []) {
+            if (m.teamId && m.isParticipant) {
+                const key = String(m.teamId).toLowerCase();
+                counts[key] = (counts[key] || 0) + 1;
+            }
+        }
+    }
+    return counts;
+}
+
 async function loadDashboardData() {
     try {
-        let events = await API.events.list();
+        const [events, teams, usersResult, participationsResult, invitationsResult] = await Promise.all([
+            API.events.list(),
+            API.teams.list(),
+            API.users.list().catch(() => []),
+            API.participations.list().catch(() => []),
+            API.invitations.list().catch(() => null)
+        ]);
+
         allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
         document.getElementById('stat-events').textContent = allEvents.length;
         renderEventsList();
 
-        let teams = await API.teams.list();
         allTeams = Permissions.filterByEvent(currentPermissions, teams);
         document.getElementById('stat-teams').textContent = allTeams.length;
 
-        let allUsers = [];
-        try { allUsers = await API.users.list(); } catch (e) { }
         const userMap = {};
-        for (const u of allUsers) { userMap[u.id] = u; }
+        for (const u of usersResult || []) { userMap[String(u.id).toLowerCase()] = u; }
 
+        const countsByTeam = countTeamMembers(participationsResult);
         const memberCounts = {};
         let totalParticipants = 0;
         for (const team of allTeams) {
-            try {
-                const count = await API.participations.getTeamCount(team.id);
-                memberCounts[team.id] = count.participantCount || 0;
-                totalParticipants += memberCounts[team.id];
-            } catch (e) {
-                memberCounts[team.id] = 0;
-            }
+            memberCounts[team.id] = countsByTeam[String(team.id).toLowerCase()] || 0;
+            totalParticipants += memberCounts[team.id];
         }
         document.getElementById('stat-participants').textContent = totalParticipants;
 
         renderTeamsTable(userMap, memberCounts);
 
-        try {
-            const invitations = await API.invitations.list();
-            const pending = invitations.filter(inv => inv.status === 'pending');
+        if (Array.isArray(invitationsResult)) {
+            const pending = invitationsResult.filter(inv => inv.status === 'pending');
             document.getElementById('stat-pending').textContent = pending.length;
-        } catch (e) {
+        } else {
             document.getElementById('stat-pending').textContent = '0';
         }
 
@@ -103,12 +122,11 @@ function renderEventsList() {
 
     eventsList.innerHTML = displayEvents.map(event => {
         const status = event.status || 'draft';
-        const isActive = status === 'pre-registration' || status === 'registration' || status === 'live';
         const startDate = new Date(event.startDate + 'T12:00:00').toLocaleDateString('en-US', {
             month: 'short', day: 'numeric', year: 'numeric'
         });
 
-        const eventTeams = allTeams.filter(t => t.eventId === event.id);
+        const eventTeams = allTeams.filter(t => sameId(t.eventId, event.id));
 
         const statusLabels = {
             'draft': 'Draft',
@@ -128,12 +146,12 @@ function renderEventsList() {
                         <span class="badge count">${eventTeams.length} teams</span>
                     </div>
                 </div>
-                <span class="badge ${status}">
-                    ${statusLabels[status] || status}
+                <span class="badge ${escapeHtml(status)}">
+                    ${escapeHtml(statusLabels[status] || status)}
                 </span>
                 <div style="margin-left: 12px; display: flex; gap: 6px;">
-                    <a href="event.html?id=${event.id}" class="btn-sm">View</a>
-                    <a href="admin-events.html?edit=${event.id}" class="btn-sm">Edit</a>
+                    <a href="event.html?id=${encodeURIComponent(event.id)}" class="btn-sm">View</a>
+                    <a href="admin-events.html?event=${encodeURIComponent(event.id)}" class="btn-sm">Edit</a>
                 </div>
             </div>
         `;
@@ -160,16 +178,20 @@ function renderTeamsTable(userMap = {}, memberCounts = {}) {
         const createdDate = new Date(team.createdAt).toLocaleDateString('en-US', {
             month: 'short', day: 'numeric'
         });
-        const event = allEvents.find(e => e.id === team.eventId);
+        const event = allEvents.find(e => sameId(e.id, team.eventId));
+        const adminUser = team.adminUserId ? userMap[String(team.adminUserId).toLowerCase()] : null;
+        const adminLabel = adminUser
+            ? (adminUser.firstName && adminUser.lastName ? `${adminUser.firstName} ${adminUser.lastName}` : adminUser.email)
+            : (team.adminEmail || '—');
 
         return `
             <tr>
                 <td>${escapeHtml(team.teamName)}</td>
-                <td style="color: var(--admin-text-muted); font-size: 0.8rem;">${escapeHtml((() => { const u = userMap[team.adminUserId]; return u ? (u.firstName && u.lastName ? u.firstName + ' ' + u.lastName : u.email) : team.adminEmail || '�'; })())}</td>
-                <td><span class="badge count">${memberCounts[team.id] ?? team.committedParticipants ?? 0}</span></td>
-                <td>${event ? escapeHtml(event.name) : '�'}</td>
+                <td style="color: var(--admin-text-muted); font-size: 0.8rem;">${escapeHtml(adminLabel)}</td>
+                <td><span class="badge count" title="Committed team size: ${Number(team.numberOfParticipants) || 0}">${memberCounts[team.id] ?? 0}</span></td>
+                <td>${event ? escapeHtml(event.name) : '—'}</td>
                 <td style="color: var(--admin-text-muted);">${createdDate}</td>
-                <td><a href="event.html?id=${team.eventId}" class="btn-sm">View</a></td>
+                <td><a href="event.html?id=${encodeURIComponent(team.eventId)}" class="btn-sm">View</a></td>
             </tr>
         `;
     }).join('');
@@ -211,11 +233,3 @@ document.addEventListener('click', async (e) => {
         }
     }
 });
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-

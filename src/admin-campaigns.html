@@ -6,7 +6,6 @@
     <title>Sequences - ACDC Admin</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <style>        .page-title { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
         .page-subtitle { font-size: 0.9rem; color: var(--admin-text-muted); margin-top: 8px; }
 
@@ -261,7 +260,7 @@
 
             <div id="view-sequence-detail" class="view hidden">
                 <div class="breadcrumb">
-                    <a href="#" onclick="showSequencesList()">← Back to Sequences</a>
+                    <a href="admin-campaigns.html" id="back-to-sequences">← Back to Sequences</a>
                 </div>
 
                 <div class="page-header">
@@ -298,131 +297,13 @@
                 </div>
             </div>
 
-            <div id="view-email-form" class="view hidden">
-                <div class="breadcrumb">
-                    <a href="#" onclick="showSequenceDetail(currentSequenceId)">← Back to Sequence</a>
-                </div>
-
-                <div class="panel">
-                    <div class="panel-header">
-                        <span class="panel-title" id="email-form-title">Create Email</span>
-                    </div>
-                    <div class="panel-body">
-                        <input type="hidden" id="email-id">
-                        <input type="hidden" id="email-sequence-id">
-                        <input type="hidden" id="email-sequence-order">
-
-                        <div class="form-group">
-                            <label>Email Order</label>
-                            <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;" id="email-order-info">
-                                This will be email #<span id="email-number">1</span> in the sequence.
-                            </p>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Subject *</label>
-                            <input type="text" id="email-subject" placeholder="Welcome to ACDC 2026!" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Content *</label>
-                            <div id="editor"></div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>CTA Button URL (optional)</label>
-                                <input type="url" id="email-cta-url" placeholder="https://...">
-                            </div>
-                            <div class="form-group">
-                                <label>CTA Button Text (optional)</label>
-                                <input type="text" id="email-cta-text" placeholder="View Details">
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Status *</label>
-                                <div style="display: flex; gap: 16px; margin-top: 8px;">
-                                    <label style="display: flex; align-items: center; cursor: pointer;">
-                                        <input type="radio" name="email-status" value="draft" id="status-draft" checked style="margin-right: 6px;">
-                                        <span>📝 Draft (won't send)</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; cursor: pointer;">
-                                        <input type="radio" name="email-status" value="live" id="status-live" style="margin-right: 6px;">
-                                        <span>✅ Live (will send)</span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group" id="schedule-group" style="display: none;">
-                            <label>Send On (optional) <span id="user-timezone-display" style="font-weight: normal; color: var(--admin-text-muted);"></span></label>
-                            <input type="datetime-local" id="email-schedule" style="width: 100%; padding: 8px; border: 1px solid var(--admin-border); border-radius: 4px;">
-                            <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;">
-                                💡 <strong>Timezone note:</strong> The time you select will be in YOUR local timezone.
-                                The system will automatically convert and send at the correct time for you.
-                            </p>
-                            <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;">
-                                Leave empty to send immediately when status changes to Live.
-                            </p>
-                            <p id="schedule-preview" style="font-size: 0.85rem; color: var(--admin-accent); margin-top: 8px; padding: 8px; background: var(--admin-bg-secondary); border-radius: 4px; display: none;"></p>
-                        </div>
-
-                        <div class="btn-row">
-                            <button class="btn btn-primary" onclick="saveEmail()">💾 Save Email</button>
-                            <button class="btn btn-secondary" onclick="previewEmail()">👁️ Preview</button>
-                            <button class="btn btn-secondary" onclick="cancelEmailEdit()">Cancel</button>
-                            <button class="btn btn-danger hidden" id="delete-email-btn" onclick="deleteEmail()">🗑️ Delete</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="panel">
-                    <div class="panel-header">Preview</div>
-                    <div class="panel-body">
-                        <iframe id="preview-frame" class="preview-frame"></iframe>
-                    </div>
-                </div>
-            </div>
         </main>
     </div>
 
-    <div id="create-sequence-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="sequence-modal-title">📧 Create New Sequence</h3>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="sequence-id">
-
-                <div class="form-group">
-                    <label>Sequence Name *</label>
-                    <input type="text" id="sequence-name" placeholder="e.g., Standard Interest Follow-up" required>
-                    <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin-top: 4px;">
-                        Give this sequence a descriptive name - it can be reused across multiple events
-                    </p>
-                </div>
-
-                <div class="form-group">
-                    <label>Description (optional)</label>
-                    <textarea id="sequence-description" rows="3" placeholder="Brief description of this email sequence..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeSequenceModal()">Cancel</button>
-                <button class="btn btn-danger hidden" id="delete-sequence-btn" onclick="deleteSequence()">🗑️ Delete</button>
-                <button class="btn btn-primary" onclick="saveSequence()">💾 Save Sequence</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
-    <script src="https://unpkg.com/quill-image-resize-module@3.0.0/image-resize.min.js"></script>
-    <script src="https://unpkg.com/quill-image-drop-module@1.0.3/image-drop.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/admin-utils.js"></script>
     <script src="js/admin-sidebar.js"></script>
     <script src="js/permissions.js"></script>
     <script src="js/admin-campaigns.js"></script>

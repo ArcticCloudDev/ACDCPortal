@@ -91,16 +91,22 @@ const Permissions = {
         return perms && perms.allowedPages.includes(pageName);
     },
 
+    // IDs are compared case-insensitively: SQL returns GUIDs upper-case, some responses echo lower-case.
+    _hasEventId(permissions, eventId) {
+        const wanted = String(eventId || '').toLowerCase();
+        return permissions.allowedEventIds.some(id => String(id || '').toLowerCase() === wanted);
+    },
+
     canAccessEvent(permissions, eventId) {
         if (!permissions) return false;
         if (!permissions.eventScoped) return true;
-        return permissions.allowedEventIds.includes(eventId);
+        return this._hasEventId(permissions, eventId);
     },
 
     filterByEvent(permissions, items, eventIdField = 'eventId') {
         if (!permissions) return [];
         if (!permissions.eventScoped) return items;
-        return items.filter(item => permissions.allowedEventIds.includes(item[eventIdField]));
+        return (items || []).filter(item => this._hasEventId(permissions, item[eventIdField]));
     },
 
     getRoleLabel(permissions) {
@@ -113,9 +119,9 @@ const Permissions = {
             : 'Member';
 
         if (eventNames.length === 1) {
-            return `${roleLabel} � ${eventNames[0]}`;
+            return `${roleLabel} · ${eventNames[0]}`;
         } else if (eventNames.length > 1) {
-            return `${roleLabel} � ${eventNames.length} events`;
+            return `${roleLabel} · ${eventNames.length} events`;
         }
         return roleLabel;
     },
@@ -170,7 +176,11 @@ const Permissions = {
         } catch (error) {
             console.error(`Permissions: Error initializing ${pageName}:`, error);
             if (loadingEl) {
-                loadingEl.innerHTML = `<p class="error-message">Error: ${error.message}</p>`;
+                loadingEl.textContent = '';
+                const msg = document.createElement('p');
+                msg.className = 'error-message';
+                msg.textContent = `Error: ${error.message}`;
+                loadingEl.appendChild(msg);
             }
             return null;
         }
