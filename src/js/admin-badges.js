@@ -141,9 +141,34 @@ function setupEventListeners() {
     });
 
     document.getElementById('filter-category').addEventListener('change', renderBadgeLibrary);
-    document.getElementById('filter-search').addEventListener('input', renderBadgeLibrary);
+    document.getElementById('filter-search').addEventListener('input', debounce(renderBadgeLibrary, 250));
 
     document.getElementById('add-badge-btn').addEventListener('click', () => openBadgeModal());
+    document.getElementById('badge-save-btn').addEventListener('click', saveBadge);
+    document.getElementById('close-badge-modal-btn').addEventListener('click', closeBadgeModal);
+    document.getElementById('cancel-badge-modal-btn').addEventListener('click', closeBadgeModal);
+    document.getElementById('close-review-modal-btn').addEventListener('click', closeReviewModal);
+    document.getElementById('cancel-review-modal-btn').addEventListener('click', closeReviewModal);
+    document.getElementById('submit-review-btn').addEventListener('click', submitReview);
+
+    // Generated markup only carries data-action attributes; these listeners dispatch them.
+    document.getElementById('badges-container').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        if (btn.dataset.action === 'edit-badge') openBadgeModal(btn.dataset.badgeId);
+        if (btn.dataset.action === 'delete-badge') deleteBadge(btn.dataset.badgeId, btn);
+    });
+    document.getElementById('event-badges-list').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action="toggle-category"]');
+        if (btn) toggleAllCategory(btn.dataset.category, btn.dataset.checked === 'true');
+    });
+    document.getElementById('claims-grouped-container').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        if (btn.dataset.action === 'review-claim') openReviewModal(btn.dataset.claimId);
+        if (btn.dataset.action === 'view-comments') viewDeclineComments(btn.dataset.claimId);
+        if (btn.dataset.action === 'award-badge') awardBadgeInline(btn.dataset.eventBadgeId, btn);
+    });
 
     document.getElementById('event-badge-selector').addEventListener('change', async (e) => {
         selectedEventId = e.target.value;
@@ -196,8 +221,8 @@ function renderBadgeLibrary() {
     }
     if (filterSearch) {
         badges = badges.filter(b =>
-            b.name.toLowerCase().includes(filterSearch) ||
-            b.description.toLowerCase().includes(filterSearch)
+            (b.name || '').toLowerCase().includes(filterSearch) ||
+            (b.description || '').toLowerCase().includes(filterSearch)
         );
     }
 
@@ -243,15 +268,15 @@ function renderBadgeCard(badge) {
         <div class="badge-card">
             <div class="badge-header">
                 <span class="badge-name">${escapeHtml(badge.name)}</span>
-                <span class="category-pill ${badge.category}">${catConfig.label}</span>
+                <span class="category-pill ${escapeHtml(badge.category)}">${escapeHtml(catConfig.label)}</span>
             </div>
             <div class="badge-desc">${escapeHtml(badge.description)}</div>
             <div class="badge-footer">
-                <span class="badge-points">🏆 ${badge.points} pts</span>
+                <span class="badge-points">🏆 ${Number(badge.points) || 0} pts</span>
                 <span style="font-size: 0.75rem; color: var(--admin-text-muted);">${claimLabel}</span>
                 <div class="badge-actions">
-                    <button class="btn-sm" onclick="openBadgeModal('${badge.id}')" title="Edit">✏️</button>
-                    <button class="btn-sm danger" onclick="deleteBadge('${badge.id}')" title="Delete">🗑️</button>
+                    <button type="button" class="btn-sm" data-action="edit-badge" data-badge-id="${escapeHtml(badge.id)}" title="Edit">✏️</button>
+                    <button type="button" class="btn-sm danger" data-action="delete-badge" data-badge-id="${escapeHtml(badge.id)}" title="Delete">🗑️</button>
                 </div>
             </div>
         </div>
@@ -290,8 +315,8 @@ function renderEventBadges() {
                 <div class="panel-header">
                     <span class="panel-title">${catConfig.icon} ${catConfig.label} <span class="category-count">(${assignedInCat}/${catBadges.length} assigned)</span></span>
                     <div>
-                        <button class="btn-sm" onclick="toggleAllCategory('${cat}', true)">Select All</button>
-                        <button class="btn-sm" onclick="toggleAllCategory('${cat}', false)">Deselect All</button>
+                        <button type="button" class="btn-sm" data-action="toggle-category" data-category="${cat}" data-checked="true">Select All</button>
+                        <button type="button" class="btn-sm" data-action="toggle-category" data-category="${cat}" data-checked="false">Deselect All</button>
                     </div>
                 </div>
                 <div class="panel-body">
@@ -304,16 +329,16 @@ function renderEventBadges() {
 
             html += `
                 <div class="event-badge-row">
-                    <input type="checkbox" class="event-badge-toggle" data-badge-id="${badge.id}"
+                    <input type="checkbox" class="event-badge-toggle" data-badge-id="${escapeHtml(badge.id)}"
                         ${isAssigned ? 'checked' : ''} style="width: auto; cursor: pointer;">
                     <div class="event-badge-info">
-                        <div class="name">${escapeHtml(badge.name)} <span style="color: var(--admin-primary); font-size: 0.75rem;">${badge.points} pts</span></div>
+                        <div class="name">${escapeHtml(badge.name)} <span style="color: var(--admin-primary); font-size: 0.75rem;">${Number(badge.points) || 0} pts</span></div>
                         <div class="desc">${escapeHtml(badge.description)}</div>
                     </div>
                     <div class="event-badge-judge">
-                        <select data-badge-id="${badge.id}" class="judge-select" ${!isAssigned ? 'disabled' : ''}>
+                        <select data-badge-id="${escapeHtml(badge.id)}" class="judge-select" ${!isAssigned ? 'disabled' : ''}>
                             <option value="">No judge</option>
-                            ${judges.map(j => `<option value="${j.id}" ${currentJudge === j.id ? 'selected' : ''}>${escapeHtml(j.name)}</option>`).join('')}
+                            ${judges.map(j => `<option value="${escapeHtml(j.id)}" ${sameId(currentJudge, j.id) ? 'selected' : ''}>${escapeHtml(j.name)}</option>`).join('')}
                         </select>
                     </div>
                 </div>
@@ -328,7 +353,7 @@ function renderEventBadges() {
     container.querySelectorAll('.event-badge-toggle').forEach(cb => {
         cb.addEventListener('change', (e) => {
             const badgeId = e.target.dataset.badgeId;
-            const judgeSelect = container.querySelector(`.judge-select[data-badge-id="${badgeId}"]`);
+            const judgeSelect = Array.from(container.querySelectorAll('.judge-select')).find(s => s.dataset.badgeId === badgeId);
             if (judgeSelect) {
                 judgeSelect.disabled = !e.target.checked;
                 if (!e.target.checked) judgeSelect.value = '';
@@ -340,10 +365,10 @@ function renderEventBadges() {
 function toggleAllCategory(category, checked) {
     const catBadges = allBadges.filter(b => b.category === category);
     for (const badge of catBadges) {
-        const cb = document.querySelector(`.event-badge-toggle[data-badge-id="${badge.id}"]`);
+        const cb = Array.from(document.querySelectorAll('.event-badge-toggle')).find(el => el.dataset.badgeId === badge.id);
         if (cb) {
             cb.checked = checked;
-            const judgeSelect = document.querySelector(`.judge-select[data-badge-id="${badge.id}"]`);
+            const judgeSelect = Array.from(document.querySelectorAll('.judge-select')).find(el => el.dataset.badgeId === badge.id);
             if (judgeSelect) {
                 judgeSelect.disabled = !checked;
                 if (!checked) judgeSelect.value = '';
@@ -371,7 +396,7 @@ async function saveEventBadges() {
         await loadEventBadges(selectedEventId);
 
         for (const eb of allEventBadges) {
-            const judgeSelect = document.querySelector(`.judge-select[data-badge-id="${eb.badgeId}"]`);
+            const judgeSelect = Array.from(document.querySelectorAll('.judge-select')).find(el => el.dataset.badgeId === eb.badgeId);
             if (judgeSelect) {
                 const judgeUserId = judgeSelect.value || null;
                 if (judgeUserId !== eb.judgeUserId) {
@@ -550,16 +575,16 @@ function renderClaimRow(claim, canReview) {
     return `
         <tr>
             <td><strong>${escapeHtml(badgeName)}</strong></td>
-            <td><span class="category-pill ${badgeCategory}">${catConfig.label || badgeCategory}</span></td>
+            <td><span class="category-pill ${escapeHtml(badgeCategory)}">${escapeHtml(catConfig.label || badgeCategory)}</span></td>
             <td>${escapeHtml(teamName)}</td>
-            <td class="claim-evidence" title="${escapeHtml(claim.evidence || '')}">${escapeHtml(claim.evidence || '�')}</td>
-            <td><span class="status-pill ${claim.status}">${statusIcon(claim.status)} ${capitalize(claim.status)}</span></td>
+            <td class="claim-evidence" title="${escapeHtml(claim.evidence || '')}">${escapeHtml(claim.evidence || '—')}</td>
+            <td><span class="status-pill ${escapeHtml(claim.status)}">${statusIcon(claim.status)} ${escapeHtml(capitalize(claim.status))}</span></td>
             <td style="font-size: 0.8rem; color: var(--admin-text-muted);">${claimedDate}</td>
             <td>
                 <div class="claim-actions">
-                    ${claim.status === 'pending' && canReview ? `<button class="btn-sm primary" onclick="openReviewModal('${claim.id}')">Review</button>` : ''}
+                    ${claim.status === 'pending' && canReview ? `<button type="button" class="btn-sm primary" data-action="review-claim" data-claim-id="${escapeHtml(claim.id)}">Review</button>` : ''}
                     ${claim.status === 'pending' && !canReview ? `<span style="font-size: 0.75rem; color: var(--admin-text-muted);">Awaiting review</span>` : ''}
-                    ${claim.status === 'declined' && claim.declineReason ? `<button class="btn-sm" style="font-size: 0.7rem; padding: 2px 8px;" onclick="viewDeclineComments('${claim.id}')">💬 Comments</button>` : ''}
+                    ${claim.status === 'declined' && claim.declineReason ? `<button type="button" class="btn-sm" style="font-size: 0.7rem; padding: 2px 8px;" data-action="view-comments" data-claim-id="${escapeHtml(claim.id)}">💬 Comments</button>` : ''}
                     ${claim.status === 'approved' ? `<span style="font-size: 0.75rem; color: var(--admin-success);">✅</span>` : ''}
                 </div>
             </td>
@@ -572,7 +597,7 @@ function openBadgeModal(badgeId = null) {
     const title = document.getElementById('badge-modal-title');
 
     if (badgeId) {
-        const badge = allBadges.find(b => b.id === badgeId);
+        const badge = allBadges.find(b => sameId(b.id, badgeId));
         if (!badge) return;
 
         title.textContent = 'Edit Badge';
@@ -580,7 +605,7 @@ function openBadgeModal(badgeId = null) {
         document.getElementById('badge-name').value = badge.name;
         document.getElementById('badge-category').value = badge.category;
         document.getElementById('badge-claimType').value = badge.claimType || 'common';
-        document.getElementById('badge-description').value = badge.description;
+        document.getElementById('badge-description').value = badge.description || '';
         document.getElementById('badge-points').value = badge.points;
         document.getElementById('badge-imageUrl').value = badge.imageUrl || '';
     } else {
@@ -637,23 +662,25 @@ async function saveBadge() {
     }
 }
 
-async function deleteBadge(badgeId) {
-    const badge = allBadges.find(b => b.id === badgeId);
+async function deleteBadge(badgeId, button) {
+    const badge = allBadges.find(b => sameId(b.id, badgeId));
     if (!badge) return;
 
     if (!confirm(`Delete "${badge.name}"? This will also remove it from all event assignments.`)) return;
 
-    try {
-        await API.request(`/badges/${badgeId}`, { method: 'DELETE' });
-        await loadAllData();
-        renderBadgeLibrary();
-    } catch (error) {
-        alert('Failed to delete: ' + error.message);
-    }
+    await withBusy(button, '⏳', async () => {
+        try {
+            await API.request(`/badges/${encodeURIComponent(badge.id)}`, { method: 'DELETE' });
+            await loadAllData();
+            renderBadgeLibrary();
+        } catch (error) {
+            alert('Failed to delete: ' + error.message);
+        }
+    });
 }
 
 function openReviewModal(claimId) {
-    const claim = allClaims.find(c => c.id === claimId);
+    const claim = allClaims.find(c => sameId(c.id, claimId));
     if (!claim) return;
 
     document.getElementById('review-claim-id').value = claimId;
@@ -679,7 +706,7 @@ function openReviewModal(claimId) {
 }
 
 function viewDeclineComments(claimId) {
-    const claim = allClaims.find(c => c.id === claimId);
+    const claim = allClaims.find(c => sameId(c.id, claimId));
     if (!claim || !claim.declineReason) return;
 
     document.getElementById('review-claim-id').value = claimId;
@@ -714,22 +741,24 @@ async function submitReview() {
     if (!status) return alert('Please select a decision');
     if (status === 'declined' && !declineReason) return alert('Please provide a reason for declining');
 
-    try {
-        await API.request(`/badge-claims/${claimId}/review`, {
-            method: 'PUT',
-            body: JSON.stringify({
-                status,
-                declineReason: status === 'declined' ? declineReason : null,
-                reviewedBy: currentUser.id
-            })
-        });
+    await withBusy(document.getElementById('submit-review-btn'), 'Submitting...', async () => {
+        try {
+            await API.request(`/badge-claims/${encodeURIComponent(claimId)}/review`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    status,
+                    declineReason: status === 'declined' ? declineReason : null,
+                    reviewedBy: currentUser.id
+                })
+            });
 
-        await loadAllData();
-        renderClaims();
-        closeReviewModal();
-    } catch (error) {
-        alert('Failed to submit review: ' + error.message);
-    }
+            await loadAllData();
+            renderClaims();
+            closeReviewModal();
+        } catch (error) {
+            alert('Failed to submit review: ' + error.message);
+        }
+    });
 }
 
 let awardTeamsCache = {};
@@ -774,8 +803,8 @@ function renderExclusiveRow(badge) {
         return `
             <tr>
                 <td><strong>${escapeHtml(badge.badgeName)}</strong></td>
-                <td><span class="category-pill ${badge.category}">${catConfig.label || badge.category}</span></td>
-                <td>${badge.points}p</td>
+                <td><span class="category-pill ${escapeHtml(badge.category)}">${escapeHtml(catConfig.label || badge.category)}</span></td>
+                <td>${Number(badge.points) || 0}p</td>
                 <td><span style="color: #d97706; font-weight: 600;">🏆 ${escapeHtml(badge.awardedTeamName || 'Unknown')}</span></td>
                 <td><span style="font-size: 0.75rem; color: var(--admin-success);">✅ Awarded</span></td>
             </tr>
@@ -785,15 +814,15 @@ function renderExclusiveRow(badge) {
     return `
         <tr>
             <td><strong>${escapeHtml(badge.badgeName)}</strong></td>
-            <td><span class="category-pill ${badge.category}">${catConfig.label || badge.category}</span></td>
-            <td>${badge.points}p</td>
+            <td><span class="category-pill ${escapeHtml(badge.category)}">${escapeHtml(catConfig.label || badge.category)}</span></td>
+            <td>${Number(badge.points) || 0}p</td>
             <td>
-                <select class="award-team-select" id="award-team-${badge.eventBadgeId}" style="font-size: 0.8rem; padding: 4px 8px; border: 1px solid var(--admin-border); border-radius: 4px;">
+                <select class="award-team-select" data-event-badge-id="${escapeHtml(badge.eventBadgeId)}" style="font-size: 0.8rem; padding: 4px 8px; border: 1px solid var(--admin-border); border-radius: 4px;">
                     <option value="">Select team...</option>
                 </select>
             </td>
             <td>
-                <button class="btn-sm primary" style="font-size: 0.75rem;" onclick="awardBadgeInline('${badge.eventBadgeId}')">🏆 Award</button>
+                <button type="button" class="btn-sm primary" style="font-size: 0.75rem;" data-action="award-badge" data-event-badge-id="${escapeHtml(badge.eventBadgeId)}">🏆 Award</button>
             </td>
         </tr>
     `;
@@ -824,7 +853,7 @@ async function loadTeamsForExclusiveDropdowns() {
     const exclusiveBadges = getExclusiveBadgesForUser(document.getElementById('claims-event-filter').value);
     for (const badge of exclusiveBadges) {
         if (badge.awardedTeamId) continue;
-        const select = document.getElementById(`award-team-${badge.eventBadgeId}`);
+        const select = findAwardSelect(badge.eventBadgeId);
         if (!select) continue;
         const teams = awardTeamsCache[badge.eventId] || [];
         teams.forEach(t => {
@@ -833,8 +862,12 @@ async function loadTeamsForExclusiveDropdowns() {
     }
 }
 
-async function awardBadgeInline(eventBadgeId) {
-    const teamSelect = document.getElementById(`award-team-${eventBadgeId}`);
+function findAwardSelect(eventBadgeId) {
+    return Array.from(document.querySelectorAll('.award-team-select')).find(s => sameId(s.dataset.eventBadgeId, eventBadgeId)) || null;
+}
+
+async function awardBadgeInline(eventBadgeId, btn) {
+    const teamSelect = findAwardSelect(eventBadgeId);
     if (!teamSelect) return;
     const teamId = teamSelect.value;
 
@@ -843,32 +876,23 @@ async function awardBadgeInline(eventBadgeId) {
         return;
     }
 
-    const btn = teamSelect.closest('tr').querySelector('.btn-sm.primary');
-    btn.disabled = true;
-    btn.textContent = 'Awarding...';
+    await withBusy(btn, 'Awarding...', async () => {
+        try {
+            await API.request('/badge-claims/award', {
+                method: 'POST',
+                body: JSON.stringify({
+                    eventBadgeId,
+                    teamId,
+                    awardedBy: currentUser?.id
+                })
+            });
 
-    try {
-        await API.request('/badge-claims/award', {
-            method: 'POST',
-            body: JSON.stringify({
-                eventBadgeId,
-                teamId,
-                awardedBy: currentUser?.id
-            })
-        });
-
-        await loadAllData();
-        renderClaims();
-    } catch (error) {
-        alert('Failed to award badge: ' + (error.message || 'Unknown error'));
-        btn.disabled = false;
-        btn.textContent = '🏆 Award';
-    }
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            await loadAllData();
+            renderClaims();
+        } catch (error) {
+            alert('Failed to award badge: ' + (error.message || 'Unknown error'));
+        }
+    });
 }
 
 function capitalize(str) {

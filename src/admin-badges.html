@@ -353,7 +353,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h2 id="badge-modal-title">Add Badge</h2>
-                <button class="modal-close" onclick="closeBadgeModal()">✕</button>
+                <button type="button" class="modal-close" id="close-badge-modal-btn">✕</button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="badge-edit-id">
@@ -392,8 +392,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-sm" onclick="closeBadgeModal()">Cancel</button>
-                <button class="btn-sm primary" id="badge-save-btn" onclick="saveBadge()">Save Badge</button>
+                <button type="button" class="btn-sm" id="cancel-badge-modal-btn">Cancel</button>
+                <button type="button" class="btn-sm primary" id="badge-save-btn">Save Badge</button>
             </div>
         </div>
     </div>
@@ -402,7 +402,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h2>Review Badge Claim</h2>
-                <button class="modal-close" onclick="closeReviewModal()">✕</button>
+                <button type="button" class="modal-close" id="close-review-modal-btn">✕</button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="review-claim-id">
@@ -426,8 +426,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-sm" onclick="closeReviewModal()">Cancel</button>
-                <button class="btn-sm primary" onclick="submitReview()">Submit Review</button>
+                <button type="button" class="btn-sm" id="cancel-review-modal-btn">Cancel</button>
+                <button type="button" class="btn-sm primary" id="submit-review-btn">Submit Review</button>
             </div>
         </div>
     </div>

@@ -59,9 +59,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const tab = urlParams.get('tab');
 
         if (eventId) {
-            const event = allEvents.find(e => e.id === eventId);
+            const event = allEvents.find(e => sameId(e.id, eventId));
             if (event) {
-                currentEventId = eventId;
+                currentEventId = event.id;
                 currentEvent = event;
                 showForm(event);
                 if (tab && tab !== 'general') {
@@ -105,14 +105,12 @@ function renderEventsList() {
         return;
     }
 
-    const statusPriority = { live: 0, registration: 1, waitlist: 2, draft: 3 };
+    const statusPriority = { live: 0, registration: 1, 'pre-registration': 2, waitlist: 2, draft: 3, completed: 4 };
+    const priorityOf = (e) => statusPriority[e.status || 'draft'] ?? 5;
     const sortedEvents = [...allEvents].sort((a, b) => {
-        const statusA = a.status || 'draft';
-        const statusB = b.status || 'draft';
-        if (statusPriority[statusA] !== statusPriority[statusB]) {
-            return statusPriority[statusA] - statusPriority[statusB];
-        }
-        return new Date(b.startDate) - new Date(a.startDate);
+        const diff = priorityOf(a) - priorityOf(b);
+        if (diff !== 0) return diff;
+        return (new Date(b.startDate) - new Date(a.startDate)) || 0;
     });
 
     eventsTableBody.innerHTML = sortedEvents.map(event => {
@@ -134,13 +132,13 @@ function renderEventsList() {
                 <td>
                     <strong>${escapeHtml(event.name)}</strong>
                 </td>
-                <td><span class="badge ${regType}">${regTypeLabel}</span></td>
+                <td><span class="badge ${escapeHtml(regType)}">${regTypeLabel}</span></td>
                 <td>${startDate} - ${endDate}</td>
                 <td>${escapeHtml(event.location || 'TBD')}</td>
-                <td><span class="badge ${status}">${statusLabel}</span></td>
+                <td><span class="badge ${escapeHtml(status)}">${escapeHtml(statusLabel)}</span></td>
                 <td>
-                    <a href="admin-event-participants.html?id=${event.id}" class="btn-sm">👥 Participants</a>
-                    <button class="btn-sm primary edit-event-btn" data-id="${event.id}">✏️ Edit</button>
+                    <a href="admin-event-participants.html?id=${encodeURIComponent(event.id)}" class="btn-sm">👥 Participants</a>
+                    <button type="button" class="btn-sm primary edit-event-btn" data-id="${escapeHtml(event.id)}">✏️ Edit</button>
                 </td>
             </tr>
         `;
@@ -198,6 +196,64 @@ function setupEventListeners() {
     document.getElementById('financial-form').addEventListener('submit', handleFinancialSubmit);
     document.getElementById('financial-modal').addEventListener('click', (e) => {
         if (e.target.id === 'financial-modal') closeFinancialModal();
+    });
+
+    document.getElementById('verify-sharepoint-btn').addEventListener('click', verifySharePointUrl);
+    document.getElementById('save-rates-btn').addEventListener('click', saveEventRates);
+    document.getElementById('recalculate-btn').addEventListener('click', recalculateFinancials);
+    document.getElementById('open-financial-modal-btn').addEventListener('click', openFinancialModal);
+    document.getElementById('close-financial-modal-btn').addEventListener('click', closeFinancialModal);
+    document.getElementById('financial-type').addEventListener('change', toggleFinancialPaidBy);
+    ['budget-hotel-rate', 'budget-hotel-nights'].forEach(id =>
+        document.getElementById(id).addEventListener('input', () => updateRatePreview('hotel')));
+    ['budget-food-rate', 'budget-food-days'].forEach(id =>
+        document.getElementById(id).addEventListener('input', () => updateRatePreview('food')));
+    document.getElementById('close-create-sequence-btn').addEventListener('click', closeCreateSequenceModal);
+    document.getElementById('confirm-create-sequence-btn').addEventListener('click', confirmCreateSequence);
+
+    // Generated rows carry data-action attributes; one listener per container dispatches them.
+    const onAction = (containerId, handlers) => {
+        document.getElementById(containerId).addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn || !handlers[btn.dataset.action]) return;
+            handlers[btn.dataset.action](btn.dataset, btn);
+        });
+    };
+    const staffActions = {
+        'revoke-invite': (d, btn) => revokeInvite(d.inviteId, d.role, btn),
+        'remove-member': (d, btn) => removeRegisteredMember(d.participationId, d.role, btn)
+    };
+    onAction('committee-members-body', staffActions);
+    onAction('judges-members-body', staffActions);
+    onAction('leads-table-body', {
+        'restart-sequence': (d, btn) => restartSequence(d.leadId, null, btn),
+        'delete-lead': (d, btn) => deleteLead(d.leadId, btn)
+    });
+    onAction('sponsors-table-body', {
+        'edit-sponsor': (d) => startEditSponsor(d.sponsorId),
+        'delete-sponsor': (d, btn) => deleteSponsor(d.sponsorId, btn)
+    });
+    document.getElementById('sponsors-table-body').addEventListener('change', (e) => {
+        const select = e.target.closest('select.sponsor-status-select');
+        if (select) saveSponsorStatus(select.dataset.sponsorId, select.value, select);
+    });
+    onAction('sequence-emails-list', {
+        'move-up': (d, btn) => reorderEmail(d.emailId, -1, btn),
+        'move-down': (d, btn) => reorderEmail(d.emailId, 1, btn),
+        'edit-email': (d) => editSequenceEmailInline(d.emailId)
+    });
+    onAction('recipient-overview-body', {
+        'restart-lead': (d, btn) => restartSequence(d.leadId, null, btn),
+        'restart-user': (d, btn) => restartSequence(null, d.userId, btn),
+        'clear-deliveries': (d, btn) => clearRecipientDeliveries(d.email, btn)
+    });
+    onAction('budget-table-body', {
+        'edit-financial': (d) => startEditFinancial(d.rowId),
+        'delete-financial': (d, btn) => deleteFinancialRow(d.rowId, btn)
+    });
+    document.getElementById('budget-table-body').addEventListener('change', (e) => {
+        const select = e.target.closest('select.paidby-select[data-row-id]');
+        if (select) savePaidBy(select.dataset.rowId, select.value, select);
     });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && document.getElementById('financial-modal').classList.contains('active')) {
@@ -340,24 +396,10 @@ function showForm(event = null) {
     const committeeTab = document.getElementById('committee-tab-btn');
     const judgesTab = document.getElementById('judges-tab-btn');
     const leadsTab = document.getElementById('leads-tab-btn');
-    const sponsorsTab = document.getElementById('sponsors-tab-btn');
-    const budgetTab = document.getElementById('budget-tab-btn');
     const form = document.getElementById('event-form');
 
-    if (event) {
-        committeeTab.disabled = false;
-        judgesTab.disabled = false;
-        leadsTab.disabled = false;
-        sponsorsTab.disabled = false;
-        budgetTab.disabled = false;
-    } else {
-        committeeTab.disabled = true;
-        judgesTab.disabled = true;
-        leadsTab.disabled = true;
-        sponsorsTab.disabled = true;
-        budgetTab.disabled = true;
-        resetSponsorForm();
-    }
+    setDataTabsEnabled(!!event);
+    if (!event) resetSponsorForm();
 
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
@@ -378,7 +420,7 @@ function showForm(event = null) {
         document.getElementById('min-team-size').value = event.minTeamSize || 3;
         document.getElementById('max-team-size').value = event.maxTeamSize || 5;
         document.getElementById('event-cost-per-participant').value = event.costPerParticipant != null ? event.costPerParticipant : '';
-        document.getElementById('event-currency').value = event.currency || '';
+        document.getElementById('event-currency').value = event.currency || 'NOK';
         document.getElementById('event-file-categories').value = (event.fileCategories || []).join(', ');
         document.getElementById('event-sharepoint-url').value = event.sharepointUrl || '';
         document.getElementById('sharepoint-verify-result').innerHTML = '';
@@ -428,6 +470,13 @@ function showForm(event = null) {
     }
 }
 
+// Committee, judges, leads, sponsors, budget, teams and sequence all need a saved event.
+function setDataTabsEnabled(enabled) {
+    document.querySelectorAll('.tab-btn[data-tab]:not([data-tab="general"])').forEach(btn => {
+        btn.disabled = !enabled;
+    });
+}
+
 function updateURL() {
     if (currentEventId) {
         const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab || 'general';
@@ -460,7 +509,7 @@ async function verifySharePointUrl() {
 
     try {
         const parsed = new URL(url);
-        if (!parsed.hostname.endsWith('.sharepoint.com')) {
+        if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.sharepoint.com')) {
             resultDiv.innerHTML = '<span style="color: var(--admin-danger-color, #e74c3c);">❌ URL must be a SharePoint domain (*.sharepoint.com)</span>';
             return;
         }
@@ -489,7 +538,7 @@ async function verifySharePointUrl() {
                 resultDiv.innerHTML = '<span style="color: var(--admin-success-color, #27ae60);">✅ URL opened for verification. FileCategory column ensured on SharePoint library.</span>';
             } else {
                 const err = await res.json().catch(() => ({}));
-                resultDiv.innerHTML = `<span style="color: var(--admin-warning-color, #e67e22);">⚠️ URL opened, but column setup failed: ${err.error || err.details || 'Unknown error'}. Check SharePoint configuration.</span>`;
+                resultDiv.innerHTML = `<span style="color: var(--admin-warning-color, #e67e22);">⚠️ URL opened, but column setup failed: ${escapeHtml(err.error || err.details || 'Unknown error')}. Check SharePoint configuration.</span>`;
             }
         } catch (err) {
             resultDiv.innerHTML = `<span style="color: var(--admin-warning-color, #e67e22);">⚠️ URL opened, but could not reach the API to set up columns. Is the API running?</span>`;
@@ -503,9 +552,9 @@ async function verifySharePointUrl() {
 }
 
 function editEvent(eventId) {
-    const event = allEvents.find(e => e.id === eventId);
+    const event = allEvents.find(e => sameId(e.id, eventId));
     if (event) {
-        currentEventId = eventId;
+        currentEventId = event.id;
         currentEvent = event;
         showForm(event);
         updateURL();
@@ -574,12 +623,9 @@ async function handleFormSubmit(e) {
             currentEventId = savedEvent.id;
 
             if (!eventId) {
-                document.getElementById('committee-tab-btn').disabled = false;
-                document.getElementById('judges-tab-btn').disabled = false;
-                document.getElementById('leads-tab-btn').disabled = false;
-                document.getElementById('sponsors-tab-btn').disabled = false;
-                document.getElementById('budget-tab-btn').disabled = false;
+                setDataTabsEnabled(true);
                 document.getElementById('event-id').value = savedEvent.id;
+                updateURL();
             }
         } else {
             hideForm();
@@ -602,21 +648,16 @@ async function handleDelete() {
         return;
     }
 
-    try {
-        await API.events.delete(eventId);
-        await loadEvents();
-        hideForm();
-    } catch (error) {
-        console.error('Error deleting event:', error);
-        alert('Error deleting event: ' + error.message);
-    }
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    await withBusy(document.getElementById('delete-btn'), '⏳ Deleting...', async () => {
+        try {
+            await API.events.delete(eventId);
+            await loadEvents();
+            hideForm();
+        } catch (error) {
+            console.error('Error deleting event:', error);
+            alert('Error deleting event: ' + error.message);
+        }
+    });
 }
 
 function setupTabs() {
@@ -647,8 +688,6 @@ function setupTabs() {
                 loadEventSponsors();
             } else if (targetTab === 'teams') {
                 loadEventTeams();
-            } else if (targetTab === 'deliveries') {
-                loadDeliveries();
             } else if (targetTab === 'sequence') {
                 loadEventSequence();
             } else if (targetTab === 'budget') {
@@ -711,20 +750,20 @@ function renderCommitteeMembers() {
     const tbody = document.getElementById('committee-members-body');
 
     const committeeParticipations = allParticipations.filter(p =>
-        p.eventId === currentEventId &&
+        sameId(p.eventId, currentEventId) &&
         p.roles?.includes('committee')
     );
 
     const pendingInvites = allInvitations.filter(i =>
         i.status === 'pending' &&
         i.role === 'committee' &&
-        i.eventId === currentEventId
+        sameId(i.eventId, currentEventId)
     );
 
     const members = [];
 
     committeeParticipations.forEach(p => {
-        const user = allUsers.find(u => u.id === p.userId);
+        const user = allUsers.find(u => sameId(u.id, p.userId));
         if (user) {
             members.push({
                 name: `${user.firstName} ${user.lastName}`,
@@ -761,11 +800,11 @@ function renderCommitteeMembers() {
             <td>${escapeHtml(m.name)}</td>
             <td>${escapeHtml(m.email)}</td>
             <td><span class="badge ${m.status === 'registered' ? 'live' : 'waitlist'}">${m.status}</span></td>
-            <td>${m.registeredDate}</td>
+            <td>${escapeHtml(m.registeredDate)}</td>
             <td>
                 ${m.type === 'invite' ?
-                    `<button class="btn-sm danger" onclick="revokeInvite('${m.id}', 'committee')">✕ Revoke</button>` :
-                    (canDelete ? `<button class="btn-sm danger" onclick="removeRegisteredMember('${m.participationId}', '${escapeHtml(m.name)}', 'committee')">🗑️ Remove</button>` : '')}
+                    `<button type="button" class="btn-sm danger" data-action="revoke-invite" data-invite-id="${escapeHtml(m.id)}" data-role="committee">✕ Revoke</button>` :
+                    (canDelete ? `<button type="button" class="btn-sm danger" data-action="remove-member" data-participation-id="${escapeHtml(m.participationId)}" data-role="committee">🗑️ Remove</button>` : '')}
             </td>
         </tr>
     `).join('');
@@ -775,20 +814,20 @@ function renderJudgesMembers() {
     const tbody = document.getElementById('judges-members-body');
 
     const judgesParticipations = allParticipations.filter(p =>
-        p.eventId === currentEventId &&
+        sameId(p.eventId, currentEventId) &&
         p.roles?.includes('judge')
     );
 
     const pendingInvites = allInvitations.filter(i =>
         i.status === 'pending' &&
         i.role === 'judge' &&
-        i.eventId === currentEventId
+        sameId(i.eventId, currentEventId)
     );
 
     const members = [];
 
     judgesParticipations.forEach(p => {
-        const user = allUsers.find(u => u.id === p.userId);
+        const user = allUsers.find(u => sameId(u.id, p.userId));
         if (user) {
             members.push({
                 name: `${user.firstName} ${user.lastName}`,
@@ -825,11 +864,11 @@ function renderJudgesMembers() {
             <td>${escapeHtml(m.name)}</td>
             <td>${escapeHtml(m.email)}</td>
             <td><span class="badge ${m.status === 'registered' ? 'live' : 'waitlist'}">${m.status}</span></td>
-            <td>${m.registeredDate}</td>
+            <td>${escapeHtml(m.registeredDate)}</td>
             <td>
                 ${m.type === 'invite' ?
-                    `<button class="btn-sm danger" onclick="revokeInvite('${m.id}', 'judge')">✕ Revoke</button>` :
-                    (canDelete ? `<button class="btn-sm danger" onclick="removeRegisteredMember('${m.participationId}', '${escapeHtml(m.name)}', 'judge')">🗑️ Remove</button>` : '')}
+                    `<button type="button" class="btn-sm danger" data-action="revoke-invite" data-invite-id="${escapeHtml(m.id)}" data-role="judge">✕ Revoke</button>` :
+                    (canDelete ? `<button type="button" class="btn-sm danger" data-action="remove-member" data-participation-id="${escapeHtml(m.participationId)}" data-role="judge">🗑️ Remove</button>` : '')}
             </td>
         </tr>
     `).join('');
@@ -855,77 +894,87 @@ async function sendInvitation(role) {
         return;
     }
 
-    try {
-        await API.invitations.create({
-            email: email,
-            eventId: currentEventId,
-            role: role,
-            inviterId: currentUser.id,
-            inviterName: `${currentUser.firstName} ${currentUser.lastName}`,
-            inviterEmail: currentUser.email,
-            message: `You've been invited to join as ${role} for ${currentEvent.name}`
-        });
+    const inviteBtn = document.getElementById(role === 'committee' ? 'invite-committee-btn' : 'invite-judge-btn');
+    await withBusy(inviteBtn, '⏳ Sending...', async () => {
+        try {
+            await API.invitations.create({
+                email: email,
+                eventId: currentEventId,
+                role: role,
+                inviterId: currentUser.id,
+                inviterName: `${currentUser.firstName} ${currentUser.lastName}`,
+                inviterEmail: currentUser.email,
+                message: `You've been invited to join as ${role} for ${currentEvent.name}`
+            });
 
-        alert(`Invitation sent to ${email}`);
-        emailInput.value = '';
+            alert(`Invitation sent to ${email}`);
+            emailInput.value = '';
 
-        allParticipations = [];
+            allParticipations = [];
 
-        if (role === 'committee') {
-            await loadCommitteeMembers();
-        } else {
-            await loadJudgesMembers();
+            if (role === 'committee') {
+                await loadCommitteeMembers();
+            } else {
+                await loadJudgesMembers();
+            }
+
+        } catch (error) {
+            console.error('Error sending invitation:', error);
+            alert('Error sending invitation: ' + error.message);
         }
-
-    } catch (error) {
-        console.error('Error sending invitation:', error);
-        alert('Error sending invitation: ' + error.message);
-    }
+    });
 }
 
-async function revokeInvite(inviteId, role) {
+async function revokeInvite(inviteId, role, button) {
     if (!confirm('Are you sure you want to revoke this invitation?')) {
         return;
     }
 
-    try {
-        await API.invitations.delete(inviteId);
+    await withBusy(button, '⏳', async () => {
+        try {
+            await API.invitations.delete(inviteId);
 
-        allParticipations = [];
+            allParticipations = [];
 
-        if (role === 'committee') {
-            await loadCommitteeMembers();
-        } else {
-            await loadJudgesMembers();
+            if (role === 'committee') {
+                await loadCommitteeMembers();
+            } else {
+                await loadJudgesMembers();
+            }
+
+        } catch (error) {
+            console.error('Error revoking invitation:', error);
+            alert('Error revoking invitation: ' + error.message);
         }
-
-    } catch (error) {
-        console.error('Error revoking invitation:', error);
-        alert('Error revoking invitation: ' + error.message);
-    }
+    });
 }
 
-async function removeRegisteredMember(participationId, name, role) {
+async function removeRegisteredMember(participationId, role, button) {
     const roleLabel = role === 'committee' ? 'committee member' : 'judge';
+    const participation = allParticipations.find(p => sameId(p.id, participationId));
+    const user = participation ? allUsers.find(u => sameId(u.id, participation.userId)) : null;
+    const name = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'this person';
     if (!confirm(`Remove ${roleLabel} "${name}" from this event?\n\nThis will delete their participation record including hotel bookings.`)) {
         return;
     }
 
-    try {
-        await API.participations.delete(participationId);
+    await withBusy(button, '⏳', async () => {
+        try {
+            await API.participations.delete(participationId);
 
-        allParticipations = [];
+            allParticipations = [];
 
-        if (role === 'committee') {
-            await loadCommitteeMembers();
-        } else {
-            await loadJudgesMembers();
+            if (role === 'committee') {
+                await loadCommitteeMembers();
+            } else {
+                await loadJudgesMembers();
+            }
+
+        } catch (error) {
+            console.error('Error removing member:', error);
+            alert('Error removing member: ' + error.message);
         }
-
-    } catch (error) {
-        console.error('Error removing member:', error);
-        alert('Error removing member: ' + error.message);
-    }
+    });
 }
 
 let allLeads = [];
@@ -939,7 +988,7 @@ async function loadInterestLeads() {
     }
 
     try {
-        const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads?eventId=${currentEventId}`);
+        const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads?eventId=${encodeURIComponent(currentEventId)}`);
         if (!response.ok) throw new Error('Failed to load leads');
 
         const data = await response.json();
@@ -950,11 +999,11 @@ async function loadInterestLeads() {
         if (allUsers.length === 0) loaders.push(API.users.list().then(r => { allUsers = r; }));
         if (allTeams.length === 0) loaders.push(
             fetch(`${CONFIG.api.baseUrl}/teams`).then(r => r.json()).then(teams => {
-                allTeams = (Array.isArray(teams) ? teams : (teams.teams || [])).filter(t => t.eventId === currentEventId);
+                allTeams = (Array.isArray(teams) ? teams : (teams.teams || [])).filter(t => sameId(t.eventId, currentEventId));
             })
         );
         loaders.push(
-            fetch(`${CONFIG.api.baseUrl}/solo-queue?eventId=${currentEventId}`)
+            fetch(`${CONFIG.api.baseUrl}/solo-queue?eventId=${encodeURIComponent(currentEventId)}`)
                 .then(r => r.json())
                 .then(entries => { allSoloQueueForEvent = Array.isArray(entries) ? entries : []; })
                 .catch(() => { allSoloQueueForEvent = []; })
@@ -978,7 +1027,7 @@ function renderLeadsTable() {
     }
 
     tbody.innerHTML = allLeads.map(lead => {
-        const matchedUser = allUsers.find(u => u.email.toLowerCase() === lead.email.toLowerCase());
+        const matchedUser = allUsers.find(u => (u.email || '').toLowerCase() === (lead.email || '').toLowerCase());
         const displayFirst = lead.firstName || matchedUser?.firstName || '';
         const displayLast = lead.lastName || matchedUser?.lastName || '';
 
@@ -988,7 +1037,7 @@ function renderLeadsTable() {
 
         if (matchedUser) {
             const participation = allParticipations.find(p =>
-                p.userId === matchedUser.id && p.eventId === currentEventId
+                sameId(p.userId, matchedUser.id) && sameId(p.eventId, currentEventId)
             );
             if (participation) {
                 const roles = participation.roles || [];
@@ -996,7 +1045,7 @@ function renderLeadsTable() {
                 isConverted = roles.includes('committee') || roles.includes('judge') || !!teamMembership;
 
                 if (isConverted) {
-                    const team = teamMembership ? allTeams.find(t => t.id === teamMembership.teamId) : null;
+                    const team = teamMembership ? allTeams.find(t => sameId(t.id, teamMembership.teamId)) : null;
                     const teamName = team ? (team.teamName || team.name || '') : '';
                     let roleLabel = 'Participant';
                     if (roles.includes('committee')) roleLabel = 'Committee';
@@ -1007,11 +1056,11 @@ function renderLeadsTable() {
             }
 
             if (!isConverted) {
-                const inQueue = allSoloQueueForEvent.find(q => q.userId === matchedUser.id);
+                const inQueue = allSoloQueueForEvent.find(q => sameId(q.userId, matchedUser.id));
                 if (inQueue) {
                     const pos = allSoloQueueForEvent
                         .sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt))
-                        .findIndex(q => q.userId === matchedUser.id) + 1;
+                        .findIndex(q => sameId(q.userId, matchedUser.id)) + 1;
                     statusCell = `<span class="lead-status-pill status-queued">🎲 In Queue</span><br><small style="color:var(--admin-text-muted);">Position ${pos} of ${allSoloQueueForEvent.length}</small>`;
                 }
             }
@@ -1028,54 +1077,62 @@ function renderLeadsTable() {
             <td>${new Date(lead.verifiedAt || lead.createdAt).toLocaleDateString()}</td>
             <td>${statusCell}</td>
             <td>
-                <button class="btn-sm" onclick="restartSequence('${lead.id}')">🔄 Restart Sequence</button>
-                <button class="btn-sm danger" onclick="deleteLead('${lead.id}')">🗑️</button>
+                <button type="button" class="btn-sm" data-action="restart-sequence" data-lead-id="${escapeHtml(lead.id)}">🔄 Restart Sequence</button>
+                <button type="button" class="btn-sm danger" data-action="delete-lead" data-lead-id="${escapeHtml(lead.id)}">🗑️</button>
             </td>
         </tr>
     `;
     }).join('');
 }
 
-async function deleteLead(leadId) {
+async function deleteLead(leadId, button) {
     if (!confirm('Are you sure you want to delete this lead?')) {
         return;
     }
 
-    try {
-        const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads/${leadId}`, {
-            method: 'DELETE'
-        });
+    await withBusy(button, '⏳', async () => {
+        try {
+            const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads/${encodeURIComponent(leadId)}`, {
+                method: 'DELETE'
+            });
 
-        if (!response.ok) throw new Error('Failed to delete lead');
+            if (!response.ok) throw new Error('Failed to delete lead');
 
-        await loadInterestLeads();
-    } catch (error) {
-        console.error('Error deleting lead:', error);
-        alert('Error deleting lead: ' + error.message);
-    }
+            await loadInterestLeads();
+        } catch (error) {
+            console.error('Error deleting lead:', error);
+            alert('Error deleting lead: ' + error.message);
+        }
+    });
 }
 
-async function clearRecipientDeliveries(email) {
+async function clearRecipientDeliveries(email, button) {
     if (!confirm(`Clear all sequence delivery records for ${email}?\n\nThis will NOT resend emails. Use this to remove stale records so the recipient shows as fresh.`)) return;
-    try {
-        const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/recipient`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to clear deliveries');
-        alert(`Cleared ${result.count} delivery record(s) for ${email}`);
-        loadRecipientDeliveryOverview();
-    } catch (error) {
-        console.error('Error clearing deliveries:', error);
-        alert('Failed to clear deliveries: ' + error.message);
-    }
+    await withBusy(button, '⏳', async () => {
+        try {
+            const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/recipient`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to clear deliveries');
+            alert(`Cleared ${result.count} delivery record(s) for ${email}`);
+            loadRecipientDeliveryOverview();
+        } catch (error) {
+            console.error('Error clearing deliveries:', error);
+            alert('Failed to clear deliveries: ' + error.message);
+        }
+    });
 }
 
-async function restartSequence(leadId, userId) {
+async function restartSequence(leadId, userId, button) {
     if (!confirm('Restart sequence emails for this recipient?\n\nThis will send all unsent sequence emails. Check the browser console for detailed logs.')) return;
 
+    await withBusy(button, '⏳', () => restartSequenceRequest(leadId, userId));
+}
+
+async function restartSequenceRequest(leadId, userId) {
     try {
         const payload = leadId ? { leadId } : { userId, eventId: currentEventId };
         const response = await fetch(`${CONFIG.api.baseUrl}/interest/restart-sequence`, {
@@ -1129,9 +1186,9 @@ async function loadEventTeams() {
         if (!response.ok) throw new Error('Failed to load teams');
 
         const teams = await response.json();
-        allTeams = teams.filter(t => t.eventId === currentEventId);
+        allTeams = (Array.isArray(teams) ? teams : []).filter(t => sameId(t.eventId, currentEventId));
 
-        const partResponse = await fetch(`${CONFIG.api.baseUrl}/participations/event/${currentEventId}`);
+        const partResponse = await fetch(`${CONFIG.api.baseUrl}/participations/event/${encodeURIComponent(currentEventId)}`);
         if (partResponse.ok) {
             allParticipations = await partResponse.json();
         }
@@ -1160,15 +1217,15 @@ function renderTeamsTable() {
 
     tbody.innerHTML = allTeams.map(team => {
         const memberships = allParticipations.filter(p =>
-            (p.teamMemberships || []).some(m => m.teamId === team.id && m.isParticipant)
+            (p.teamMemberships || []).some(m => sameId(m.teamId, team.id) && m.isParticipant)
         );
         const memberCount = memberships.length;
 
         const adminMembership = allParticipations.find(p =>
-            (p.teamMemberships || []).some(m => m.teamId === team.id && m.isAdmin)
+            (p.teamMemberships || []).some(m => sameId(m.teamId, team.id) && m.isAdmin)
         );
 
-        const adminUser = adminMembership ? allUsers.find(u => u.id === adminMembership.userId) : null;
+        const adminUser = adminMembership ? allUsers.find(u => sameId(u.id, adminMembership.userId)) : null;
         const adminName = adminUser
             ? `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || adminUser.email || 'N/A'
             : (adminMembership?.email || 'N/A');
@@ -1183,7 +1240,7 @@ function renderTeamsTable() {
                 <td>${memberCount} / ${maxMembers}</td>
                 <td>${createdDate}</td>
                 <td>
-                    <a href="admin-teams.html?team=${team.id}" class="btn-sm" style="text-decoration: none;">View →</a>
+                    <a href="admin-teams.html?team=${encodeURIComponent(team.id)}" class="btn-sm" style="text-decoration: none;">View →</a>
                 </td>
             </tr>
         `;
@@ -1194,8 +1251,12 @@ function formatSponsorAmount(amount) {
     if (amount === null || amount === undefined || amount === '') return '-';
     const numeric = Number(amount);
     if (!Number.isFinite(numeric)) return '-';
-    const currency = currentEvent?.currency;
-    return numeric.toLocaleString(currencyLocale(currency), { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + '\u00a0' + (currency || '');
+    const currency = eventCurrency();
+    return numeric.toLocaleString(currencyLocale(currency), { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + '\u00a0' + currency;
+}
+
+function eventCurrency() {
+    return currentEvent?.currency || 'NOK';
 }
 
 function resetSponsorForm() {
@@ -1255,8 +1316,8 @@ function renderSponsorsTable() {
         { value: 'confirmed',    label: 'Confirmed' },
         { value: 'declined',     label: 'Declined' }
     ];
-    const currency = currentEvent?.currency;
-    const fmt = (val) => val != null && Number(val) !== 0 ? Number(val).toLocaleString(currencyLocale(currency)) + '\u00a0' + (currency || '') : '\u2014';
+    const currency = eventCurrency();
+    const fmt = (val) => val != null && Number(val) !== 0 ? Number(val).toLocaleString(currencyLocale(currency)) + '\u00a0' + currency : '\u2014';
 
     tbody.innerHTML = sponsorRows.map((row) => {
         const status = row.sponsorStatus || 'reached-out';
@@ -1271,7 +1332,7 @@ function renderSponsorsTable() {
         }
         const contactCell = parts.length ? parts.join('<br>') : '<span style="color:var(--admin-text-muted)">—</span>';
 
-        const statusSelect = `<select class="paidby-select sponsor-status-select ${status}" onchange="saveSponsorStatus('${row.id}', this.value)">
+        const statusSelect = `<select class="paidby-select sponsor-status-select ${escapeHtml(status)}" data-sponsor-id="${escapeHtml(row.id)}">
             ${statusOptions.map(o => `<option value="${o.value}"${o.value === status ? ' selected' : ''}>${o.label}</option>`).join('')}
         </select>`;
 
@@ -1282,8 +1343,8 @@ function renderSponsorsTable() {
                 <td>${fmt(row.amount)}</td>
                 <td>${statusSelect}</td>
                 <td style="white-space:nowrap">
-                    <button class="btn-sm" onclick="startEditSponsor('${row.id}')">✏️ Edit</button>
-                    <button class="btn-sm danger" onclick="deleteSponsor('${row.id}')">🗑️</button>
+                    <button type="button" class="btn-sm" data-action="edit-sponsor" data-sponsor-id="${escapeHtml(row.id)}">✏️ Edit</button>
+                    <button type="button" class="btn-sm danger" data-action="delete-sponsor" data-sponsor-id="${escapeHtml(row.id)}">🗑️</button>
                 </td>
             </tr>
         `;
@@ -1291,7 +1352,7 @@ function renderSponsorsTable() {
 }
 
 function startEditSponsor(sponsorId) {
-    const row = (allFinancials || []).find(r => r.id === sponsorId);
+    const row = (allFinancials || []).find(r => sameId(r.id, sponsorId));
     if (!row) return;
 
     document.getElementById('sponsor-modal-title').textContent = '✏️ Edit Sponsor';
@@ -1353,25 +1414,28 @@ async function handleSponsorSubmit(e) {
     }
 }
 
-async function deleteSponsor(sponsorId) {
+async function deleteSponsor(sponsorId, button) {
     if (!confirm('Delete this sponsor entry?')) return;
 
-    try {
-        await API.events.sponsors.delete(currentEventId, sponsorId);
-        await loadEventSponsors();
-        renderBudgetTable();
-        const editingId = document.getElementById('sponsor-id').value;
-        const modal = document.getElementById('sponsor-modal');
-        if (editingId === sponsorId && modal.classList.contains('active')) {
-            closeSponsorModal();
+    await withBusy(button, '⏳', async () => {
+        try {
+            await API.events.sponsors.delete(currentEventId, sponsorId);
+            await loadEventSponsors();
+            renderBudgetTable();
+            const editingId = document.getElementById('sponsor-id').value;
+            const modal = document.getElementById('sponsor-modal');
+            if (sameId(editingId, sponsorId) && modal.classList.contains('active')) {
+                closeSponsorModal();
+            }
+        } catch (error) {
+            console.error('Error deleting sponsor:', error);
+            alert(`Error deleting sponsor: ${error.message}`);
         }
-    } catch (error) {
-        console.error('Error deleting sponsor:', error);
-        alert(`Error deleting sponsor: ${error.message}`);
-    }
+    });
 }
 
-async function saveSponsorStatus(sponsorId, status) {
+async function saveSponsorStatus(sponsorId, status, select) {
+    if (select) select.disabled = true;
     try {
         await API.events.sponsors.update(currentEventId, sponsorId, { sponsorStatus: status });
         allFinancials = await API.events.financials.list(currentEventId) || [];
@@ -1454,19 +1518,20 @@ function renderSequenceEmails() {
             const isLive = email.status === 'live';
             const editButtonText = isLive ? '👁️ View' : '✏️ Edit';
 
+            const emailIdAttr = escapeHtml(email.id);
             return `
                 <div class="email-card">
                     <div class="email-card-header">
                         <div>
-                            <div class="email-card-title">#${order}: ${email.subject}</div>
+                            <div class="email-card-title">#${Number(order) || 1}: ${escapeHtml(email.subject)}</div>
                             <div class="email-card-meta">
-                                ${statusBadge} ${scheduleText} ${deliveryBadge}
+                                ${statusBadge} ${escapeHtml(scheduleText)} ${deliveryBadge}
                             </div>
                         </div>
                         <div class="email-card-actions">
-                            ${order > 1 ? `<button class="btn-sm" onclick="moveEmailUp('${email.id}')">↑</button>` : ''}
-                            ${order < emails.length ? `<button class="btn-sm" onclick="moveEmailDown('${email.id}')">↓</button>` : ''}
-                            <button class="btn-sm" onclick="editSequenceEmailInline('${email.id}')">${editButtonText}</button>
+                            ${order > 1 ? `<button type="button" class="btn-sm" data-action="move-up" data-email-id="${emailIdAttr}">↑</button>` : ''}
+                            ${order < emails.length ? `<button type="button" class="btn-sm" data-action="move-down" data-email-id="${emailIdAttr}">↓</button>` : ''}
+                            <button type="button" class="btn-sm" data-action="edit-email" data-email-id="${emailIdAttr}">${editButtonText}</button>
                         </div>
                     </div>
                 </div>
@@ -1477,49 +1542,17 @@ function renderSequenceEmails() {
     loadRecipientDeliveryOverview();
 }
 
-async function loadSequenceStatsForEvent() {
-    const statsContainer = document.getElementById('sequence-stats-section');
-
-    if (!currentEvent) {
-        statsContainer.innerHTML = '';
-        return;
-    }
-
-    try {
-        const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads?eventId=${currentEvent.id}`);
-        if (!response.ok) throw new Error('Failed to load leads');
-
-        const data = await response.json();
-        const leads = data.leads || [];
-        const verifiedCount = leads.filter(l => l.isVerified).length;
-        const unverifiedCount = leads.filter(l => !l.isVerified).length;
-
-        statsContainer.innerHTML = `
-            <div style="background: var(--admin-bg); padding: 16px; border-radius: 6px; border: 1px solid var(--admin-border);">
-                <div style="font-size: 0.85rem; color: var(--admin-text-muted); margin-bottom: 8px;">📊 Sequence Recipients for this Event</div>
-                <div style="font-size: 0.9rem; color: var(--admin-sidebar);">
-                    ✅ ${verifiedCount} verified leads will receive these emails
-                    ${unverifiedCount > 0 ? `<span style="color: var(--admin-text-muted);"> (${unverifiedCount} unverified won't receive)</span>` : ''}
-                </div>
-            </div>
-        `;
-    } catch (error) {
-        console.error('Failed to load sequence stats:', error);
-        statsContainer.innerHTML = '';
-    }
-}
-
 async function loadEmailDeliveryStats(emails) {
     if (!currentEvent || !emails || emails.length === 0) {
         return {};
     }
 
     try {
-        const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${currentEvent.id}`);
+        const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${encodeURIComponent(currentEvent.id)}`);
         if (!response.ok) return {};
 
         const data = await response.json();
-        const { deliveries, leads, recipients = [] } = data;
+        const { deliveries = [], leads = [], recipients = [] } = data;
         const verifiedLeads = leads.filter(l => l.verified);
         const totalRecipients = verifiedLeads.length + recipients.length;
 
@@ -1552,11 +1585,11 @@ async function loadRecipientDeliveryOverview() {
     }
 
     try {
-        const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${currentEvent.id}`);
+        const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${encodeURIComponent(currentEvent.id)}`);
         if (!response.ok) throw new Error('Failed to load deliveries');
 
         const data = await response.json();
-        const { deliveries, leads, recipients = [], campaigns } = data;
+        const { deliveries = [], leads = [], recipients = [], campaigns } = data;
 
         if (!campaigns || campaigns.length === 0) {
             overviewSection.style.display = 'none';
@@ -1603,7 +1636,7 @@ async function loadRecipientDeliveryOverview() {
 
         const rows = allRecipients.map(recipient => {
             const recipientDeliveries = deliveries.filter(d =>
-                d.email?.toLowerCase() === recipient.email.toLowerCase()
+                (d.email || '').toLowerCase() === (recipient.email || '').toLowerCase()
             );
 
             const emailStatuses = sortedCampaigns.map(campaign => {
@@ -1642,20 +1675,21 @@ async function loadRecipientDeliveryOverview() {
 
         rows.sort((a, b) => a.completion - b.completion);
 
+        // Names and emails come from the public interest form: always rendered as text.
         bodyEl.innerHTML = rows.map(row => `
             <tr>
                 <td style="text-align: left;">
-                    <div style="font-weight: 500;">${row.name}${row.typeLabel || ''}</div>
-                    <div style="font-size: 0.85rem; color: var(--admin-text-muted);">${row.email}</div>
+                    <div style="font-weight: 500;">${escapeHtml(row.name)}${row.typeLabel || ''}</div>
+                    <div style="font-size: 0.85rem; color: var(--admin-text-muted);">${escapeHtml(row.email)}</div>
                 </td>
                 ${row.statuses.map(s => `<td style="text-align: center; ${s.style}">${s.symbol}</td>`).join('')}
                 <td style="text-align: center; font-weight: 600;">${row.sentCount}/${row.totalCount}</td>
                 <td style="text-align: center;">
                     <div style="display:flex;gap:4px;justify-content:center;">
                     ${row.leadId
-                        ? `<button class="btn-sm" onclick="restartSequence('${row.leadId}')">🔄 Restart</button>`
-                        : `<button class="btn-sm" onclick="restartSequence(null, '${row.userId}')">🔄 Restart</button>`}
-                    <button class="btn-sm" style="background:var(--admin-danger,#dc2626);color:#fff;" onclick="clearRecipientDeliveries('${row.email}')">🗑 Clear</button>
+                        ? `<button type="button" class="btn-sm" data-action="restart-lead" data-lead-id="${escapeHtml(row.leadId)}">🔄 Restart</button>`
+                        : `<button type="button" class="btn-sm" data-action="restart-user" data-user-id="${escapeHtml(row.userId)}">🔄 Restart</button>`}
+                    <button type="button" class="btn-sm" style="background:var(--admin-danger,#dc2626);color:#fff;" data-action="clear-deliveries" data-email="${escapeHtml(row.email)}">🗑 Clear</button>
                     </div>
                 </td>
             </tr>
@@ -1688,19 +1722,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    document.querySelectorAll('input[name="edit-email-status"]').forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            const scheduleGroup = document.getElementById('edit-email-schedule-group');
-            if (e.target.value === 'live') {
-                scheduleGroup.style.display = 'block';
-                updateSchedulePreviewInline();
-            } else {
-                scheduleGroup.style.display = 'none';
-            }
-        });
-    });
-
-    document.getElementById('edit-email-schedule')?.addEventListener('input', updateSchedulePreviewInline);
 });
 
 function showCreateSequenceModal() {
@@ -1716,15 +1737,20 @@ async function loadEventsWithSequences() {
     select.innerHTML = '<option value="">Loading events...</option>';
 
     try {
-        const eventsWithSeq = allEvents.filter(e => e.sequenceId && e.id !== currentEvent.id);
+        const eventsWithSeq = allEvents.filter(e => e.sequenceId && !sameId(e.id, currentEvent.id));
 
         if (eventsWithSeq.length === 0) {
             select.innerHTML = '<option value="">No other events have sequences yet</option>';
             return;
         }
 
-        select.innerHTML = '<option value="">Select an event...</option>' +
-            eventsWithSeq.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+        select.innerHTML = '<option value="">Select an event...</option>';
+        eventsWithSeq.forEach(e => {
+            const option = document.createElement('option');
+            option.value = e.id;
+            option.textContent = e.name;
+            select.appendChild(option);
+        });
     } catch (error) {
         console.error('Failed to load events:', error);
         select.innerHTML = '<option value="">Error loading events</option>';
@@ -1732,6 +1758,10 @@ async function loadEventsWithSequences() {
 }
 
 async function confirmCreateSequence() {
+    await withBusy(document.getElementById('confirm-create-sequence-btn'), '⏳ Creating...', createSequenceFromModal);
+}
+
+async function createSequenceFromModal() {
     const option = document.querySelector('input[name="sequence-create-option"]:checked').value;
 
     try {
@@ -1758,13 +1788,14 @@ async function confirmCreateSequence() {
                 return;
             }
 
-            const sourceEvent = allEvents.find(e => e.id === sourceEventId);
+            const sourceEvent = allEvents.find(e => sameId(e.id, sourceEventId));
             if (!sourceEvent || !sourceEvent.sequenceId) {
                 alert('Selected event has no sequence');
                 return;
             }
 
-            const response = await API.sequences.duplicate(sourceEvent.sequenceId);
+            // POST /sequences/{id}/copy duplicates the sequence and its emails for the target event.
+            const response = await API.sequences.copy(sourceEvent.sequenceId, currentEvent.id);
 
             await API.sequences.update(response.sequence.id, {
                 name: `${currentEvent.name} ${currentEvent.startDate} - ${currentEvent.endDate}`,
@@ -1788,7 +1819,7 @@ async function confirmCreateSequence() {
 
     } catch (error) {
         console.error('Failed to create sequence:', error);
-        alert('Failed to create sequence. Please try again.');
+        alert(`Failed to create sequence: ${error.message || 'Please try again.'}`);
     }
 }
 
@@ -1799,27 +1830,19 @@ function showAddEmailModal() {
 }
 
 function editSequenceEmailInline(emailId) {
-    const email = currentEventSequence.emails.find(e => e.id === emailId);
+    const email = currentEventSequence.emails.find(e => sameId(e.id, emailId));
     if (!email) return;
 
-    const url = `admin-email.html?mode=sequence&sequenceId=${currentEventSequence.id}&eventId=${currentEvent.id}&emailId=${emailId}`;
+    const url = `admin-email.html?mode=sequence&sequenceId=${encodeURIComponent(currentEventSequence.id)}&eventId=${encodeURIComponent(currentEvent.id)}&emailId=${encodeURIComponent(email.id)}`;
     window.location.href = url;
 }
 
-async function moveEmailUp(emailId) {
-    await reorderEmail(emailId, -1);
-}
-
-async function moveEmailDown(emailId) {
-    await reorderEmail(emailId, 1);
-}
-
-async function reorderEmail(emailId, direction) {
+async function reorderEmail(emailId, direction, button) {
     const sorted = [...currentEventSequence.emails].sort(
         (a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0)
     );
 
-    const idx = sorted.findIndex(e => e.id === emailId);
+    const idx = sorted.findIndex(e => sameId(e.id, emailId));
     if (idx === -1) return;
 
     const swapIdx = idx + direction;
@@ -1827,21 +1850,23 @@ async function reorderEmail(emailId, direction) {
 
     [sorted[idx], sorted[swapIdx]] = [sorted[swapIdx], sorted[idx]];
 
-    try {
-        await Promise.all([
-            API.campaigns.update(sorted[idx].id,    { sequenceOrder: idx + 1 }),
-            API.campaigns.update(sorted[swapIdx].id, { sequenceOrder: swapIdx + 1 })
-        ]);
+    await withBusy(button, '⏳', async () => {
+        try {
+            await Promise.all([
+                API.campaigns.update(sorted[idx].id,    { sequenceOrder: idx + 1 }),
+                API.campaigns.update(sorted[swapIdx].id, { sequenceOrder: swapIdx + 1 })
+            ]);
 
-        sorted[idx].sequenceOrder    = idx + 1;
-        sorted[swapIdx].sequenceOrder = swapIdx + 1;
-        currentEventSequence.emails = sorted;
-        renderSequenceEmails();
+            sorted[idx].sequenceOrder    = idx + 1;
+            sorted[swapIdx].sequenceOrder = swapIdx + 1;
+            currentEventSequence.emails = sorted;
+            renderSequenceEmails();
 
-    } catch (error) {
-        console.error('Failed to reorder emails:', error);
-        alert('Failed to reorder emails. Please try again.');
-    }
+        } catch (error) {
+            console.error('Failed to reorder emails:', error);
+            alert('Failed to reorder emails. Please try again.');
+        }
+    });
 }
 
 
@@ -1856,7 +1881,7 @@ async function loadEventBudget() {
 
     if (currentEvent) {
         document.getElementById('budget-hotel-rate').value = currentEvent.hotelRatePerNight ?? '';
-        document.getElementById('budget-hotel-nights').value = currentEvent.hotelNights ?? '';
+        document.getElementById('budget-hotel-nights').value = '';
         document.getElementById('budget-food-rate').value = currentEvent.foodRatePerDay ?? '';
         document.getElementById('budget-food-days').value = currentEvent.foodDays ?? '';
         updateRatePreview('hotel');
@@ -1878,7 +1903,7 @@ async function loadEventBudget() {
 }
 
 function renderBudgetSummary(summary) {
-    const currency = currentEvent?.currency;
+    const currency = eventCurrency();
     const fmt = (val) => val != null ? Number(val).toLocaleString(currencyLocale(currency), { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0';
     document.getElementById('budget-total-income').textContent = fmt(summary?.totalIncome);
     document.getElementById('budget-total-org-expense').textContent = fmt(summary?.totalOrgExpense);
@@ -1897,7 +1922,7 @@ function renderBudgetTable() {
         return;
     }
 
-    const currency = currentEvent?.currency;
+    const currency = eventCurrency();
     const fmt = (val) => val != null ? Number(val).toLocaleString(currencyLocale(currency)) : '\u2014';
 
     const paidBySelect = (row) => {
@@ -1905,7 +1930,7 @@ function renderBudgetTable() {
             `<option value="participant"${row.paidBy === 'participant' ? ' selected' : ''}>Participant pays</option>`,
             `<option value="event"${row.paidBy === 'event' ? ' selected' : ''}>Event pays</option>`
         ].join('');
-        return `<select class="paidby-select" onchange="savePaidBy('${row.id}', this.value)">${opts}</select>`;
+        return `<select class="paidby-select" data-row-id="${escapeHtml(row.id)}">${opts}</select>`;
     };
 
     const typeLabel = (row) => row.type === 'income'
@@ -1915,13 +1940,13 @@ function renderBudgetTable() {
     const amountCell = (row) => {
         const sign = row.type === 'income' ? '+' : '−';
         const cls = row.type === 'income' ? 'financial-amount-income' : 'financial-amount-expense';
-        return `<span class="${cls}">${sign}${fmt(row.amount)} ${currency}</span>`;
+        return `<span class="${cls}">${sign}${fmt(row.amount)} ${escapeHtml(currency)}</span>`;
     };
 
     const actionCell = (row) => {
         if (row.source === 'manual') {
-            return `<button class="btn-sm" onclick="startEditFinancial('${row.id}')">✏️</button>
-                    <button class="btn-sm danger" onclick="deleteFinancialRow('${row.id}')">🗑️</button>`;
+            return `<button type="button" class="btn-sm" data-action="edit-financial" data-row-id="${escapeHtml(row.id)}">✏️</button>
+                    <button type="button" class="btn-sm danger" data-action="delete-financial" data-row-id="${escapeHtml(row.id)}">🗑️</button>`;
         }
         return `<span style="color:var(--admin-text-muted);font-size:0.75rem;">auto</span>`;
     };
@@ -1929,12 +1954,12 @@ function renderBudgetTable() {
     const descCell = (row) => {
         let desc = escapeHtml(row.description || '');
         if (row.unitCost != null && row.days != null) {
-            desc += `<span style="color:var(--admin-text-muted);font-size:0.75rem;margin-left:6px;">(${fmt(row.unitCost)} × ${row.days})</span>`;
+            desc += `<span style="color:var(--admin-text-muted);font-size:0.75rem;margin-left:6px;">(${fmt(row.unitCost)} × ${Number(row.days) || 0})</span>`;
         }
         if (row.category === 'sponsorship' && row.sponsorStatus && row.sponsorStatus !== 'confirmed') {
             const statusColors = { 'reached-out': '#64748b', negotiating: '#d97706', declined: '#dc2626' };
             const color = statusColors[row.sponsorStatus] || '#64748b';
-            desc += ` <span style="color:${color};font-size:0.75rem;font-style:italic;white-space:nowrap">(${row.sponsorStatus})</span>`;
+            desc += ` <span style="color:${color};font-size:0.75rem;font-style:italic;white-space:nowrap">(${escapeHtml(row.sponsorStatus)})</span>`;
         }
         return desc;
     };
@@ -1972,7 +1997,7 @@ function renderBudgetTable() {
         for (const r of rows) net += r.type === 'income' ? r.amount : -r.amount;
         const cls = net >= 0 ? 'financial-amount-income' : 'financial-amount-expense';
         const sign = net >= 0 ? '+' : '−';
-        return `<span class="${cls}">${sign}${fmt(Math.abs(net))} ${currency}</span>`;
+        return `<span class="${cls}">${sign}${fmt(Math.abs(net))} ${escapeHtml(currency)}</span>`;
     };
 
     let html = '';
@@ -2022,7 +2047,7 @@ function toggleFinancialPaidBy() {
 }
 
 function startEditFinancial(rowId) {
-    const row = allFinancials.find(r => r.id === rowId);
+    const row = allFinancials.find(r => sameId(r.id, rowId));
     if (!row) return;
 
     document.getElementById('financial-modal-title').textContent = '✏️ Edit Financial Row';
@@ -2074,24 +2099,28 @@ async function handleFinancialSubmit(e) {
     }
 }
 
-async function deleteFinancialRow(rowId) {
+async function deleteFinancialRow(rowId, button) {
     if (!confirm('Delete this financial row?')) return;
-    try {
-        await API.events.financials.delete(currentEventId, rowId);
-        await loadEventBudget();
-    } catch (error) {
-        console.error('Error deleting financial row:', error);
-        alert(`Error deleting row: ${error.message}`);
-    }
+    await withBusy(button, '⏳', async () => {
+        try {
+            await API.events.financials.delete(currentEventId, rowId);
+            await loadEventBudget();
+        } catch (error) {
+            console.error('Error deleting financial row:', error);
+            alert(`Error deleting row: ${error.message}`);
+        }
+    });
 }
 
-async function savePaidBy(rowId, paidBy) {
+async function savePaidBy(rowId, paidBy, select) {
+    if (select) select.disabled = true;
     try {
         await API.events.financials.patchPaidBy(currentEventId, rowId, paidBy);
-        const row = allFinancials.find(r => r.id === rowId);
+        const row = allFinancials.find(r => sameId(r.id, rowId));
         if (row) row.paidBy = paidBy;
         const summary = await API.events.financials.summary(currentEventId);
         renderBudgetSummary(summary);
+        if (select) select.disabled = false;
     } catch (error) {
         console.error('Error updating paidBy:', error);
         alert(`Error: ${error.message}`);
@@ -2126,41 +2155,42 @@ async function recalculateFinancials() {
 async function saveEventRates() {
     if (!currentEventId) return;
     const hotelRate   = document.getElementById('budget-hotel-rate').value;
-    const hotelNights = document.getElementById('budget-hotel-nights').value;
     const foodRate    = document.getElementById('budget-food-rate').value;
     const foodDays    = document.getElementById('budget-food-days').value;
 
+    // Only Events columns are sent; the "default nights" field drives the per-person preview only.
     const payload = {
-        hotelRatePerNight: hotelRate   !== '' ? parseFloat(hotelRate)   : null,
-        hotelNights:       hotelNights !== '' ? parseInt(hotelNights, 10) : null,
-        foodRatePerDay:    foodRate    !== '' ? parseFloat(foodRate)    : null,
-        foodDays:          foodDays    !== '' ? parseInt(foodDays, 10)  : null
+        hotelRatePerNight: hotelRate !== '' ? parseFloat(hotelRate) : null,
+        foodRatePerDay:    foodRate  !== '' ? parseFloat(foodRate)  : null,
+        foodDays:          foodDays  !== '' ? parseInt(foodDays, 10) : null
     };
 
-    try {
-        const updated = await API.events.update(currentEventId, payload);
-        if (updated) {
-            currentEvent = { ...currentEvent, ...payload };
+    await withBusy(document.getElementById('save-rates-btn'), '⏳ Saving...', async () => {
+        try {
+            const updated = await API.events.update(currentEventId, payload);
+            if (updated) {
+                currentEvent = { ...currentEvent, ...payload };
+            }
+            alert('Rates saved. Click Recalculate to regenerate the auto rows with the new rates.');
+        } catch (error) {
+            console.error('Error saving rates:', error);
+            alert(`Error saving rates: ${error.message}`);
         }
-        alert('Rates saved. Auto rows will update on next participation sync.');
-    } catch (error) {
-        console.error('Error saving rates:', error);
-        alert(`Error saving rates: ${error.message}`);
-    }
+    });
 }
 
 function updateRatePreview(type) {
-    const currency = currentEvent?.currency;
+    const currency = eventCurrency();
     const locale = currencyLocale(currency);
     if (type === 'hotel') {
         const rate = parseFloat(document.getElementById('budget-hotel-rate').value) || 0;
         const nights = parseInt(document.getElementById('budget-hotel-nights').value, 10) || 0;
         const el = document.getElementById('hotel-rate-preview');
-        if (el) el.textContent = rate && nights ? `${(rate * nights).toLocaleString(locale)}\u00a0${currency || ''} per person` : '';
+        if (el) el.textContent = rate && nights ? `${(rate * nights).toLocaleString(locale)}\u00a0${currency} per person` : '';
     } else {
         const rate = parseFloat(document.getElementById('budget-food-rate').value) || 0;
         const days = parseInt(document.getElementById('budget-food-days').value, 10) || 0;
         const el = document.getElementById('food-rate-preview');
-        if (el) el.textContent = rate && days ? `${(rate * days).toLocaleString(locale)}\u00a0${currency || ''} per person` : '';
+        if (el) el.textContent = rate && days ? `${(rate * days).toLocaleString(locale)}\u00a0${currency} per person` : '';
     }
 }

@@ -110,7 +110,7 @@ test('admin records, edits and deletes a sponsor', async ({ page, harness, login
 test('admin adds a manual budget row and the summary updates', async ({ page, harness, loginAs }) => {
     const w = await openAdminEvents(page, harness, loginAs);
     await page.goto(`/admin-events.html?event=${w.event.id}&tab=budget`);
-    await page.locator('button[onclick="openFinancialModal()"]').click();
+    await page.locator('#open-financial-modal-btn').click();
     await page.locator('#financial-type').selectOption('expense');
     await page.locator('#financial-category').selectOption('venue');
     await page.locator('#financial-description').fill('Venue rental');
@@ -161,7 +161,7 @@ test.describe('known broken admin event actions', () => {
         await page.goto(`/admin-events.html?event=${w.event.id}&tab=budget`);
         await page.locator('#budget-hotel-rate').fill('1200');
         await page.locator('#budget-hotel-nights').fill('2');
-        await page.locator('button[onclick="saveEventRates()"]').click();
+        await page.locator('#save-rates-btn').click();
         await expect.poll(() => dialogs.last()?.message).toContain('Rates saved');  // <- bug
         await expect.poll(async () => Number((await rows('SELECT HotelRatePerNight r FROM Events WHERE Id = @id', { id: w.event.id }))[0].r)).toBe(1200);
     });
