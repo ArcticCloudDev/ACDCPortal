@@ -4,6 +4,7 @@ const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
 const { generateId } = require('../shared/id');
+const q = require('../shared/admin-queries');
 
 function safeEqual(a, b) {
     if (typeof a !== 'string' || typeof b !== 'string') return false;
@@ -13,14 +14,9 @@ function safeEqual(a, b) {
     return crypto.timingSafeEqual(bufA, bufB);
 }
 
-const campaignsStorage = new Storage('email-campaigns');
-const leadsStorage = new Storage('interest-leads');
 const deliveriesStorage = new Storage('email-deliveries');
-const eventsStorage = new Storage('events');
 const runsStorage = new Storage('scheduled-runs');
 const emailLogStorage = new Storage('email-log');
-const participationsStorage = new Storage('participations');
-const usersStorage = new Storage('users');
 
 app.http('scheduled-emails-run', {
     methods: ['POST'],
@@ -47,6 +43,8 @@ app.http('scheduled-emails-run', {
     }
 });
 
+const deliveryKey = (campaignId, email) => `${String(campaignId).toLowerCase()}|${String(email).toLowerCase()}`;
+
 async function processScheduledEmails(context) {
     const startTime = new Date();
     context.log(`[SCHEDULED] Starting scheduled email check at ${startTime.toISOString()}`);
@@ -57,14 +55,7 @@ async function processScheduledEmails(context) {
         let emailsFailed = 0;
         const processedCampaigns = [];
 
-        const campaigns = await campaignsStorage.getAll();
-
-        const dueCampaigns = campaigns.filter(c =>
-            c.status === 'live' &&
-            c.scheduledSendTime &&
-            new Date(c.scheduledSendTime) <= now &&
-            c.type === 'sequence'
-        );
+        const dueCampaigns = await q.dueCampaigns(now);
 
         context.log(`[SCHEDULED] Found ${dueCampaigns.length} campaigns due to send`);
 
@@ -73,53 +64,43 @@ async function processScheduledEmails(context) {
             return result;
         }
 
-        const leads = (await leadsStorage.getAll()).filter(l => l.verified);
-        context.log(`[SCHEDULED] Found ${leads.length} verified leads`);
-
-        const allParticipations = await participationsStorage.getAll();
-        const allUsers = await usersStorage.getAll();
-
-        const existingDeliveries = await deliveriesStorage.getAll();
-
-        const events = await eventsStorage.getAll();
+        // Campaign ids are matched case-insensitively (EmailDeliveries.CampaignId is NVARCHAR).
+        const alreadySent = await q.sentDeliveryKeys(dueCampaigns.map(c => c.id));
 
         for (const campaign of dueCampaigns) {
             context.log(`[SCHEDULED] Processing campaign: ${campaign.subject}`);
 
-            const event = events.find(e => e.sequenceId === campaign.sequenceId);
+            const event = campaign.sequenceId ? await q.eventBySequenceId(campaign.sequenceId) : null;
             if (!event) {
                 context.log(`[SCHEDULED] No event found for sequence ${campaign.sequenceId}`);
                 continue;
             }
 
-            const eventParticipations = allParticipations.filter(p => p.eventId === event.id);
+            const eventParticipations = await q.participationsForEvent(event.id);
+            const users = await q.usersByIds(eventParticipations.map(p => p.userId));
             const eventParticipants = eventParticipations
                 .map(p => {
-                    const user = allUsers.find(u => u.id === p.userId);
+                    const user = users.find(u => u.id === p.userId);
                     if (!user) return null;
-                    return { email: user.email, firstName: user.firstName, lastName: user.lastName, leadId: null };
+                    return { email: user.email, firstName: user.firstName, lastName: user.lastName, leadId: null, userId: user.id };
                 })
                 .filter(Boolean);
 
             const participantEmails = new Set(eventParticipants.map(p => p.email.toLowerCase()));
 
-            const eligibleLeads = leads
-                .filter(l => l.eventId === event.id)
+            const eligibleLeads = (await q.verifiedLeadsForEvent(event.id))
                 .filter(l => new Date(l.createdAt) <= new Date(campaign.scheduledSendTime))
                 .filter(l => !participantEmails.has(l.email.toLowerCase()))
-                .map(l => ({ email: l.email, firstName: l.firstName, lastName: l.lastName, leadId: l.id }));
+                .map(l => ({ email: l.email, firstName: l.firstName, lastName: l.lastName, leadId: l.id, userId: null }));
 
             const allEventRecipients = [...eventParticipants, ...eligibleLeads];
 
-            const recipientsToSend = allEventRecipients.filter(recipient => {
-                return !existingDeliveries.some(d =>
-                    d.campaignId === campaign.id &&
-                    d.email.toLowerCase() === recipient.email.toLowerCase() &&
-                    d.status === 'sent'
-                );
-            });
+            const recipientsToSend = allEventRecipients.filter(recipient => !alreadySent.has(deliveryKey(campaign.id, recipient.email)));
 
             context.log(`[SCHEDULED] ${recipientsToSend.length} recipients need this email (${eventParticipants.length} participants + ${eligibleLeads.length} leads)`);
+
+            let campaignSent = 0;
+            let campaignFailed = 0;
 
             for (const recipient of recipientsToSend) {
                 const delivery = {
@@ -127,6 +108,7 @@ async function processScheduledEmails(context) {
                     campaignId: campaign.id,
                     email: recipient.email,
                     leadId: recipient.leadId || null,
+                    userId: recipient.userId || null,
                     status: 'pending',
                     createdAt: new Date().toISOString(),
                     scheduledSend: true
@@ -144,26 +126,29 @@ async function processScheduledEmails(context) {
 
                     delivery.status = 'sent';
                     delivery.sentAt = new Date().toISOString();
-                    emailsSent++;
+                    campaignSent++;
+                    alreadySent.add(deliveryKey(campaign.id, recipient.email));
                     context.log(`[SCHEDULED] Sent to ${recipient.email}`);
                 } catch (err) {
                     await logError(context, err);
                     delivery.status = 'failed';
                     delivery.errorMessage = err.message;
-                    emailsFailed++;
+                    campaignFailed++;
                     context.error(`[SCHEDULED] Failed to send to ${recipient.email}:`, err);
                 }
 
                 await deliveriesStorage.create(delivery);
-                existingDeliveries.push(delivery);
             }
+
+            emailsSent += campaignSent;
+            emailsFailed += campaignFailed;
 
             processedCampaigns.push({
                 id: campaign.id,
                 subject: campaign.subject,
                 recipients: recipientsToSend.length,
-                sent: recipientsToSend.filter((_, i) => i < emailsSent).length,
-                failed: recipientsToSend.filter((_, i) => i < emailsFailed).length,
+                sent: campaignSent,
+                failed: campaignFailed,
                 template: campaign.template || campaign.type
             });
         }
@@ -200,7 +185,7 @@ async function processScheduledEmails(context) {
     } catch (error) {
         await logError(context, error);
         context.error('[SCHEDULED] ERROR:', error);
-        const result = await recordRun(startTime, 0, 0, [], context, error.message);
+        const result = await recordRun(startTime, 0, 0, [], context, 'Scheduled run failed');
         return result;
     }
 }
@@ -239,4 +224,3 @@ async function recordRun(startTime, sent, failed, campaigns, context, error = nu
         return null;
     }
 }
-

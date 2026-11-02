@@ -122,9 +122,8 @@ test('BUG: badge search survives a badge without a description', async ({ page, 
     await expect(page.locator('#badges-container .badge-card')).toHaveCount(1);  // <- bug
 });
 
-test('BUG: soft badges sort first in the library API', async ({ apiAs, harness }) => {
-    test.fail(true, "badges.js:25 uses `categoryOrder[c] || 99`, and soft's order is 0, so soft sorts last");
+test('soft badges sort first in the library API', async ({ apiAs, harness }) => {
     await harness.seed({ badges: [f.badge({ name: 'Zeta', category: 'pro-code' }), f.badge({ name: 'Alpha', category: 'soft' })] });
     const list = await (await (await apiAs(null)).get('/api/badges')).json();
-    expect(list[0].category).toBe('soft');  // <- bug
+    expect(list[0].category).toBe('soft');
 });

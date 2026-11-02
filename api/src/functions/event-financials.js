@@ -1,11 +1,22 @@
 const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
-const { Storage } = require('../shared/storage');
+const StorageModule = require('../shared/storage');
+const { isGuid } = require('../shared/id');
+const { participationsForEvent, eventExists } = require('../shared/admin-queries');
 const { listByEvent, createManual, updateManual, updatePaidBy, deleteManual, getSummary, syncParticipationToFinancials } = require('../shared/event-financials');
 
-const eventsStorage = new Storage('events');
-const participationsStorage = new Storage('participations');
+// Validation errors from shared/event-financials carry .status (400/404); anything else is a 500.
+async function failureResponse(context, error, fallback) {
+    if (error && (error.status === 400 || error.status === 404)) {
+        return { status: error.status, jsonBody: { error: error.message } };
+    }
+    await logError(context, error);
+    return { status: 500, jsonBody: { error: fallback } };
+}
+
+const notFound = { status: 404, jsonBody: { error: 'Event not found' } };
+const rowNotFound = { status: 404, jsonBody: { error: 'Financial row not found' } };
 
 app.http('event-financials-list', {
     methods: ['GET'],
@@ -19,6 +30,7 @@ app.http('event-financials-list', {
             }
 
             const eventId = request.params.eventId;
+            if (!isGuid(eventId)) return notFound;
             const rows = await listByEvent(eventId);
             return { status: 200, jsonBody: rows };
         } catch (error) {
@@ -40,6 +52,7 @@ app.http('event-financials-summary', {
             }
 
             const eventId = request.params.eventId;
+            if (!isGuid(eventId)) return notFound;
             const summary = await getSummary(eventId);
             return { status: 200, jsonBody: summary };
         } catch (error) {
@@ -61,13 +74,15 @@ app.http('event-financials-create', {
             }
 
             const eventId = request.params.eventId;
+            if (!isGuid(eventId) || !(await eventExists(eventId))) return notFound;
             const body = await request.json();
+            if (!body || typeof body !== 'object' || Array.isArray(body)) {
+                return { status: 400, jsonBody: { error: 'Request body must be a JSON object' } };
+            }
             const row = await createManual(eventId, body);
             return { status: 201, jsonBody: row };
         } catch (error) {
-            const status = /Invalid type|Invalid category|Invalid paidBy|amount must/i.test(error.message) ? 400 : 500;
-            if (status === 500) await logError(context, error);
-            return { status, jsonBody: { error: status === 400 ? error.message : 'Failed to create financial row' } };
+            return failureResponse(context, error, 'Failed to create financial row');
         }
     }
 });
@@ -84,13 +99,15 @@ app.http('event-financials-update', {
             }
 
             const { eventId, rowId } = request.params;
+            if (!isGuid(eventId) || !isGuid(rowId)) return rowNotFound;
             const body = await request.json();
+            if (!body || typeof body !== 'object' || Array.isArray(body)) {
+                return { status: 400, jsonBody: { error: 'Request body must be a JSON object' } };
+            }
             const row = await updateManual(rowId, eventId, body);
             return { status: 200, jsonBody: row };
         } catch (error) {
-            const status = /not found|Invalid type|Invalid category|Invalid paidBy|amount must/i.test(error.message) ? 400 : 500;
-            if (status === 500) await logError(context, error);
-            return { status, jsonBody: { error: status === 400 ? error.message : 'Failed to update financial row' } };
+            return failureResponse(context, error, 'Failed to update financial row');
         }
     }
 });
@@ -107,6 +124,7 @@ app.http('event-financials-delete', {
             }
 
             const { eventId, rowId } = request.params;
+            if (!isGuid(eventId) || !isGuid(rowId)) return { status: 404, jsonBody: { error: 'Row not found or not deletable' } };
             const deleted = await deleteManual(rowId, eventId);
             if (!deleted) return { status: 404, jsonBody: { error: 'Row not found or not deletable' } };
             return { status: 200, jsonBody: { success: true } };
@@ -129,14 +147,13 @@ app.http('event-financials-patch', {
             }
 
             const { eventId, rowId } = request.params;
-            const { paidBy } = await request.json();
+            if (!isGuid(eventId) || !isGuid(rowId)) return rowNotFound;
+            const { paidBy } = (await request.json()) || {};
             if (!paidBy) return { status: 400, jsonBody: { error: 'paidBy is required' } };
             await updatePaidBy(rowId, eventId, paidBy);
             return { status: 200, jsonBody: { success: true } };
         } catch (error) {
-            const status = /Invalid paidBy|not found/i.test(error.message) ? 400 : 500;
-            if (status === 500) await logError(context, error);
-            return { status, jsonBody: { error: status === 400 ? error.message : 'Failed to update row' } };
+            return failureResponse(context, error, 'Failed to update row');
         }
     }
 });
@@ -154,12 +171,10 @@ app.http('event-financials-recalculate', {
 
             const { eventId } = request.params;
 
-            const events = await eventsStorage.getAll();
-            const event = events.find(e => e.id === eventId);
-            if (!event) return { status: 404, jsonBody: { error: 'Event not found' } };
+            const event = isGuid(eventId) ? await StorageModule.events.getById(eventId) : null;
+            if (!event) return notFound;
 
-            const allParticipations = await participationsStorage.getAll();
-            const eventParticipations = allParticipations.filter(p => p.eventId === eventId);
+            const eventParticipations = await participationsForEvent(eventId);
 
             let updated = 0;
             const errors = [];
@@ -168,7 +183,7 @@ app.http('event-financials-recalculate', {
                     await syncParticipationToFinancials(event, participation);
                     updated++;
                 } catch (err) {
-                    errors.push({ participationId: participation.id, error: err.message });
+                    errors.push({ participationId: participation.id, error: 'Sync failed' });
                     context.warn(`Recalculate: failed for participation ${participation.id}: ${err.message}`);
                 }
             }

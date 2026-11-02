@@ -1,14 +1,132 @@
 const { app } = require('@azure/functions');
-const { requireAuth } = require('../shared/auth');
+const { requireAuth, getTokenFromRequest, verifyToken } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const StorageModule = require('../shared/storage');
 const { Storage } = StorageModule;
-const { generateId } = require('../shared/id');
+const { generateId, isGuid } = require('../shared/id');
+const { isHttpUrl, isIsoDate, toInt, toNumber } = require('../shared/validate');
+const { eventDependants, completeOtherActiveEvents, deleteEventLooseRows } = require('../shared/admin-queries');
 
 const eventsStorage = new Storage('events');
 
+const STATUSES = ['draft', 'pre-registration', 'registration', 'live', 'completed'];
+const REGISTRATION_TYPES = ['team', 'single', 'solo'];
+
+// Real Events columns a client may set. Anything else in the body is ignored, so a stray
+// key (the budget page sends hotelNights) can no longer turn into "Invalid column name".
+const STRING_FIELDS = ['name', 'description', 'location', 'currency', 'teamRegistrationTerms', 'soloQueueTerms',
+    'singleRegistrationTerms', 'eventImage', 'eventImageData', 'sharepointUrl'];
+const BOOL_FIELDS = ['sequenceEnabled', 'sendWelcomeEmail', 'sendInterestAcknowledgment', 'sendJudgeInvitationEmail',
+    'sendCommitteeInvitationEmail', 'sendTeamRegistrationEmail', 'hotelEnabled', 'hotelMandatory'];
+const GUID_FIELDS = ['sequenceId', 'teamWelcomeEmailId', 'committeeTeamId', 'judgesTeamId'];
+const MAX_LENGTH = { name: 200, location: 500, currency: 10, sharepointUrl: 2000, eventImage: 2000 };
+
 function isActiveStatus(status) {
     return status === 'pre-registration' || status === 'registration' || status === 'live';
+}
+
+function isAdminRequest(request) {
+    const token = getTokenFromRequest(request);
+    if (!token) return false;
+    const result = verifyToken(token);
+    return result.valid && !!result.payload.isPortalAdmin;
+}
+
+// Shape returned to anyone who is not a portal admin.
+function toPublicEvent(event) {
+    const { eventImageData, ...publicEvent } = event;
+    return publicEvent;
+}
+
+// Picks the allow-listed fields out of `body`, coerces their types and validates them.
+// Returns { fields } or { error }. `existing` supplies the other half of cross-field checks on PUT.
+function pickEventFields(body, existing = null) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'Request body must be a JSON object' };
+    const fields = {};
+    const has = key => body[key] !== undefined;
+
+    for (const key of STRING_FIELDS) {
+        if (!has(key)) continue;
+        if (body[key] === null) { fields[key] = null; continue; }
+        if (typeof body[key] !== 'string') return { error: `${key} must be a string` };
+        if (MAX_LENGTH[key] && body[key].length > MAX_LENGTH[key]) return { error: `${key} must be at most ${MAX_LENGTH[key]} characters` };
+        fields[key] = body[key];
+    }
+    if (has('name') && !(fields.name || '').trim()) return { error: 'name is required' };
+    if (fields.sharepointUrl && !isHttpUrl(fields.sharepointUrl, { httpsOnly: true })) return { error: 'sharepointUrl must be an https:// URL' };
+    if (fields.eventImage && !isHttpUrl(fields.eventImage) && !/^data:image\/(png|jpeg|jpg|gif|webp);base64,/i.test(fields.eventImage)) {
+        return { error: 'eventImage must be an http(s) URL' };
+    }
+
+    for (const key of BOOL_FIELDS) {
+        if (has(key)) fields[key] = body[key] === true || body[key] === 'true' || body[key] === 1;
+    }
+
+    for (const key of GUID_FIELDS) {
+        if (!has(key)) continue;
+        if (body[key] === null || body[key] === '') { fields[key] = null; continue; }
+        if (!isGuid(body[key])) return { error: `${key} must be a GUID` };
+        fields[key] = body[key];
+    }
+
+    if (has('status')) {
+        if (!STATUSES.includes(body.status)) return { error: `status must be one of: ${STATUSES.join(', ')}` };
+        fields.status = body.status;
+    }
+    if (has('registrationType')) {
+        if (!REGISTRATION_TYPES.includes(body.registrationType)) return { error: `registrationType must be one of: ${REGISTRATION_TYPES.join(', ')}` };
+        fields.registrationType = body.registrationType;
+    }
+
+    for (const key of ['startDate', 'endDate']) {
+        if (!has(key)) continue;
+        if (!isIsoDate(body[key])) return { error: `${key} must be a date in YYYY-MM-DD format` };
+        fields[key] = body[key];
+    }
+    const startDate = fields.startDate ?? existing?.startDate;
+    const endDate = fields.endDate ?? existing?.endDate;
+    if (startDate && endDate && startDate > endDate) return { error: 'endDate must not be before startDate' };
+
+    for (const key of ['minTeamSize', 'maxTeamSize']) {
+        if (!has(key)) continue;
+        if (body[key] === null) { fields[key] = null; continue; }
+        const n = toInt(body[key], { min: 1, max: 100 });
+        if (n === null) return { error: `${key} must be an integer between 1 and 100` };
+        fields[key] = n;
+    }
+    const minTeamSize = fields.minTeamSize ?? existing?.minTeamSize;
+    const maxTeamSize = fields.maxTeamSize ?? existing?.maxTeamSize;
+    if (minTeamSize != null && maxTeamSize != null && minTeamSize > maxTeamSize) return { error: 'minTeamSize must not exceed maxTeamSize' };
+
+    for (const key of ['hotelDaysBefore', 'hotelDaysAfter']) {
+        if (!has(key)) continue;
+        const n = toInt(body[key], { min: 0, max: 30 });
+        if (n === null) return { error: `${key} must be an integer between 0 and 30` };
+        fields[key] = n;
+    }
+    for (const key of ['costPerParticipant', 'hotelRatePerNight', 'foodRatePerDay']) {
+        if (!has(key)) continue;
+        if (body[key] === null || body[key] === '') { fields[key] = null; continue; }
+        const n = toNumber(body[key], { min: 0, max: 9999999999 });
+        if (n === null) return { error: `${key} must be a non-negative number` };
+        fields[key] = n;
+    }
+    if (has('foodDays')) {
+        if (body.foodDays === null || body.foodDays === '') fields.foodDays = null;
+        else {
+            const n = toInt(body.foodDays, { min: 0, max: 365 });
+            if (n === null) return { error: 'foodDays must be a non-negative integer' };
+            fields.foodDays = n;
+        }
+    }
+    if (has('fileCategories')) {
+        if (body.fileCategories === null) fields.fileCategories = null;
+        else if (!Array.isArray(body.fileCategories) || !body.fileCategories.every(c => typeof c === 'string' && c.length <= 100)) {
+            return { error: 'fileCategories must be an array of strings' };
+        } else fields.fileCategories = body.fileCategories;
+    }
+
+    return { fields };
 }
 
 function generateHotelDates(startDate, endDate, daysBefore = 0, daysAfter = 0) {
@@ -62,7 +180,8 @@ function generateDefaultHotelNights(hotelDates, eventStartDate, eventEndDate) {
         }
     }
 
-    return defaults;
+    // Events longer than a week repeat weekday labels; EventDefaultNights is UNIQUE (EventId, NightLabel).
+    return [...new Set(defaults)];
 }
 
 app.http('events-list', {
@@ -72,9 +191,12 @@ app.http('events-list', {
     handler: async (request, context) => {
         try {
             const events = await eventsStorage.getAll();
+            if (isAdminRequest(request)) {
+                return { status: 200, jsonBody: events };
+            }
             return {
                 status: 200,
-                jsonBody: events
+                jsonBody: events.filter(e => e.status !== 'draft').map(toPublicEvent)
             };
         } catch (error) {
             await logError(context, error);
@@ -103,10 +225,9 @@ app.http('events-active', {
                 };
             }
 
-            const { eventImageData, ...activeEventPublic } = activeEvent;
             return {
                 status: 200,
-                jsonBody: activeEvent
+                jsonBody: toPublicEvent(activeEvent)
             };
         } catch (error) {
             await logError(context, error);
@@ -126,9 +247,10 @@ app.http('events-get', {
     handler: async (request, context) => {
         try {
             const id = request.params.id;
-            const event = await StorageModule.events.getById(id);
+            const event = isGuid(id) ? await StorageModule.events.getById(id) : null;
+            const admin = isAdminRequest(request);
 
-            if (!event) {
+            if (!event || (event.status === 'draft' && !admin)) {
                 return {
                     status: 404,
                     jsonBody: { error: 'Event not found' }
@@ -137,7 +259,7 @@ app.http('events-get', {
 
             return {
                 status: 200,
-                jsonBody: event
+                jsonBody: admin ? event : toPublicEvent(event)
             };
         } catch (error) {
             await logError(context, error);
@@ -163,56 +285,57 @@ app.http('events-create', {
 
             const body = await request.json();
 
-            if (!body.name || !body.startDate || !body.endDate) {
+            if (!body || !body.name || !body.startDate || !body.endDate) {
                 return {
                     status: 400,
                     jsonBody: { error: 'name, startDate, and endDate are required' }
                 };
             }
 
-            const events = await eventsStorage.getAll();
+            const picked = pickEventFields(body);
+            if (picked.error) {
+                return { status: 400, jsonBody: { error: picked.error } };
+            }
+            const fields = picked.fields;
 
-            const newStatus = body.status || 'draft';
+            const newStatus = fields.status || 'draft';
             if (isActiveStatus(newStatus)) {
-                for (const e of events) {
-                    if (isActiveStatus(e.status)) {
-                        await eventsStorage.update(e.id, { status: 'completed' });
-                    }
-                }
+                await completeOtherActiveEvents();
             }
 
-            const daysBefore = body.hotelDaysBefore !== undefined ? parseInt(body.hotelDaysBefore) : 0;
-            const daysAfter = body.hotelDaysAfter !== undefined ? parseInt(body.hotelDaysAfter) : 0;
-            const hotelDates = generateHotelDates(body.startDate, body.endDate, daysBefore, daysAfter);
-            const hotelDefaultNights = generateDefaultHotelNights(hotelDates, body.startDate, body.endDate);
+            const daysBefore = fields.hotelDaysBefore ?? 0;
+            const daysAfter = fields.hotelDaysAfter ?? 0;
+            const hotelDates = generateHotelDates(fields.startDate, fields.endDate, daysBefore, daysAfter);
+            const hotelDefaultNights = generateDefaultHotelNights(hotelDates, fields.startDate, fields.endDate);
 
             const newEventId = generateId();
             const newEvent = {
                 id: newEventId,
-                name: body.name,
-                description: body.description || '',
-                startDate: body.startDate,
-                endDate: body.endDate,
-                location: body.location || '',
+                ...fields,
+                name: fields.name,
+                description: fields.description || '',
+                startDate: fields.startDate,
+                endDate: fields.endDate,
+                location: fields.location || '',
                 status: newStatus,
-                registrationType: body.registrationType || 'team',
-                minTeamSize: body.minTeamSize || 3,
-                maxTeamSize: body.maxTeamSize || 5,
-                sequenceId: body.sequenceId || null,
-                sequenceEnabled: body.sequenceEnabled !== undefined ? body.sequenceEnabled : (body.sequenceId ? true : false),
-                teamWelcomeEmailId: body.teamWelcomeEmailId || null,
-                sendTeamRegistrationEmail: body.sendTeamRegistrationEmail !== undefined ? body.sendTeamRegistrationEmail : true,
-                sendWelcomeEmail: body.sendWelcomeEmail !== undefined ? body.sendWelcomeEmail : (body.teamWelcomeEmailId ? true : false),
-                sendInterestAcknowledgment: body.sendInterestAcknowledgment || false,
-                sendJudgeInvitationEmail: body.sendJudgeInvitationEmail !== undefined ? body.sendJudgeInvitationEmail : true,
-                sendCommitteeInvitationEmail: body.sendCommitteeInvitationEmail !== undefined ? body.sendCommitteeInvitationEmail : true,
-                teamRegistrationTerms: body.teamRegistrationTerms || null,
-                soloQueueTerms: body.soloQueueTerms || null,
-                singleRegistrationTerms: body.singleRegistrationTerms || null,
-                hotelEnabled: body.hotelEnabled || false,
-                hotelMandatory: body.hotelMandatory || false,
-                hotelDaysBefore: body.hotelDaysBefore !== undefined ? parseInt(body.hotelDaysBefore) : 0,
-                hotelDaysAfter: body.hotelDaysAfter !== undefined ? parseInt(body.hotelDaysAfter) : 0,
+                registrationType: fields.registrationType || 'team',
+                minTeamSize: fields.minTeamSize || 3,
+                maxTeamSize: fields.maxTeamSize || 5,
+                sequenceId: fields.sequenceId || null,
+                sequenceEnabled: fields.sequenceEnabled !== undefined ? fields.sequenceEnabled : !!fields.sequenceId,
+                teamWelcomeEmailId: fields.teamWelcomeEmailId || null,
+                sendTeamRegistrationEmail: fields.sendTeamRegistrationEmail !== undefined ? fields.sendTeamRegistrationEmail : true,
+                sendWelcomeEmail: fields.sendWelcomeEmail !== undefined ? fields.sendWelcomeEmail : !!fields.teamWelcomeEmailId,
+                sendInterestAcknowledgment: fields.sendInterestAcknowledgment || false,
+                sendJudgeInvitationEmail: fields.sendJudgeInvitationEmail !== undefined ? fields.sendJudgeInvitationEmail : true,
+                sendCommitteeInvitationEmail: fields.sendCommitteeInvitationEmail !== undefined ? fields.sendCommitteeInvitationEmail : true,
+                teamRegistrationTerms: fields.teamRegistrationTerms || null,
+                soloQueueTerms: fields.soloQueueTerms || null,
+                singleRegistrationTerms: fields.singleRegistrationTerms || null,
+                hotelEnabled: fields.hotelEnabled || false,
+                hotelMandatory: fields.hotelMandatory || false,
+                hotelDaysBefore: daysBefore,
+                hotelDaysAfter: daysAfter,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 createdAt: new Date().toISOString()
@@ -251,8 +374,7 @@ app.http('events-update', {
             const id = request.params.id;
             const body = await request.json();
 
-            const events = await eventsStorage.getAll();
-            const existingEvent = events.find(e => e.id === id);
+            const existingEvent = isGuid(id) ? await StorageModule.events.getById(id) : null;
 
             if (!existingEvent) {
                 return {
@@ -261,44 +383,42 @@ app.http('events-update', {
                 };
             }
 
-            delete body.isActive;
-            delete body.registrationOpen;
+            const picked = pickEventFields(body, existingEvent);
+            if (picked.error) {
+                return { status: 400, jsonBody: { error: picked.error } };
+            }
+            const fields = picked.fields;
 
-            const datesChanged = (body.startDate && body.startDate !== existingEvent.startDate) ||
-                                 (body.endDate && body.endDate !== existingEvent.endDate);
-            const hotelConfigChanged = (body.hotelDaysBefore !== undefined && body.hotelDaysBefore !== existingEvent.hotelDaysBefore) ||
-                                       (body.hotelDaysAfter !== undefined && body.hotelDaysAfter !== existingEvent.hotelDaysAfter);
+            const datesChanged = (fields.startDate && fields.startDate !== existingEvent.startDate) ||
+                                 (fields.endDate && fields.endDate !== existingEvent.endDate);
+            const hotelConfigChanged = (fields.hotelDaysBefore !== undefined && fields.hotelDaysBefore !== existingEvent.hotelDaysBefore) ||
+                                       (fields.hotelDaysAfter !== undefined && fields.hotelDaysAfter !== existingEvent.hotelDaysAfter);
 
-            const finalStartDate = body.startDate || existingEvent.startDate;
-            const finalEndDate = body.endDate || existingEvent.endDate;
+            const finalStartDate = fields.startDate || existingEvent.startDate;
+            const finalEndDate = fields.endDate || existingEvent.endDate;
+            const finalDaysBefore = fields.hotelDaysBefore !== undefined ? fields.hotelDaysBefore : (existingEvent.hotelDaysBefore ?? 0);
+            const finalDaysAfter = fields.hotelDaysAfter !== undefined ? fields.hotelDaysAfter : (existingEvent.hotelDaysAfter ?? 0);
 
             let hotelDates = existingEvent.hotelDates;
             let hotelDefaultNights = existingEvent.hotelDefaultNights;
 
             if (datesChanged || hotelConfigChanged || !hotelDates || hotelDates.length === 0) {
-                const finalDaysBefore = body.hotelDaysBefore !== undefined ? parseInt(body.hotelDaysBefore) : (existingEvent.hotelDaysBefore ?? 0);
-                const finalDaysAfter = body.hotelDaysAfter !== undefined ? parseInt(body.hotelDaysAfter) : (existingEvent.hotelDaysAfter ?? 0);
                 hotelDates = generateHotelDates(finalStartDate, finalEndDate, finalDaysBefore, finalDaysAfter);
                 hotelDefaultNights = generateDefaultHotelNights(hotelDates, finalStartDate, finalEndDate);
             }
 
+            const finalStatus = fields.status || existingEvent.status;
+            if (isActiveStatus(finalStatus) && (finalStatus !== existingEvent.status || !isActiveStatus(existingEvent.status))) {
+                await completeOtherActiveEvents(existingEvent.id);
+            }
+
             const updatedEvent = {
                 ...existingEvent,
-                ...body,
+                ...fields,
                 id: existingEvent.id,
                 createdAt: existingEvent.createdAt,
-                sequenceId: body.sequenceId !== undefined ? body.sequenceId : existingEvent.sequenceId,
-                sequenceEnabled: body.sequenceEnabled !== undefined ? body.sequenceEnabled : existingEvent.sequenceEnabled,
-                teamWelcomeEmailId: body.teamWelcomeEmailId !== undefined ? body.teamWelcomeEmailId : existingEvent.teamWelcomeEmailId,
-                sendTeamRegistrationEmail: body.sendTeamRegistrationEmail !== undefined ? body.sendTeamRegistrationEmail : existingEvent.sendTeamRegistrationEmail,
-                sendWelcomeEmail: body.sendWelcomeEmail !== undefined ? body.sendWelcomeEmail : existingEvent.sendWelcomeEmail,
-                sendInterestAcknowledgment: body.sendInterestAcknowledgment !== undefined ? body.sendInterestAcknowledgment : existingEvent.sendInterestAcknowledgment,
-                sendJudgeInvitationEmail: body.sendJudgeInvitationEmail !== undefined ? body.sendJudgeInvitationEmail : existingEvent.sendJudgeInvitationEmail,
-                sendCommitteeInvitationEmail: body.sendCommitteeInvitationEmail !== undefined ? body.sendCommitteeInvitationEmail : existingEvent.sendCommitteeInvitationEmail,
-                hotelEnabled: body.hotelEnabled !== undefined ? body.hotelEnabled : existingEvent.hotelEnabled,
-                hotelMandatory: body.hotelMandatory !== undefined ? body.hotelMandatory : existingEvent.hotelMandatory,
-                hotelDaysBefore: body.hotelDaysBefore !== undefined ? parseInt(body.hotelDaysBefore) : (existingEvent.hotelDaysBefore ?? 0),
-                hotelDaysAfter: body.hotelDaysAfter !== undefined ? parseInt(body.hotelDaysAfter) : (existingEvent.hotelDaysAfter ?? 0),
+                hotelDaysBefore: finalDaysBefore,
+                hotelDaysAfter: finalDaysAfter,
                 hotelDates: hotelDates,
                 hotelDefaultNights: hotelDefaultNights,
                 updatedAt: new Date().toISOString()
@@ -336,17 +456,28 @@ app.http('events-delete', {
 
             const id = request.params.id;
 
-            const events = await eventsStorage.getAll();
-            const index = events.findIndex(e => e.id === id);
+            const deletedEvent = isGuid(id) ? await StorageModule.events.getById(id) : null;
 
-            if (index < 0) {
+            if (!deletedEvent) {
                 return {
                     status: 404,
                     jsonBody: { error: 'Event not found' }
                 };
             }
 
-            const deletedEvent = events[index];
+            const dependants = await eventDependants(id);
+            if (dependants.length > 0) {
+                const summary = dependants.map(d => `${d.count} ${d.what}`).join(', ');
+                return {
+                    status: 409,
+                    jsonBody: {
+                        error: `Cannot delete this event while it still has ${summary}. Remove them first.`,
+                        dependants
+                    }
+                };
+            }
+
+            await deleteEventLooseRows(id);
             await eventsStorage.delete(id);
 
             context.log(`Event deleted: ${id}`);
@@ -365,5 +496,3 @@ app.http('events-delete', {
         }
     }
 });
-
-

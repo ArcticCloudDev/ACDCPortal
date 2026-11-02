@@ -2,13 +2,33 @@ const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { requireAuth, hasEventRole } = require('../shared/auth');
 const { Storage: GenericStorage } = require('../shared/storage');
-const { generateId } = require('../shared/id');
+const { generateId, isGuid, sameId } = require('../shared/id');
+const { upperId } = require('../shared/validate');
+const q = require('../shared/admin-queries');
 
-const badgesStorage = new GenericStorage('badges');
 const eventBadgesStorage = new GenericStorage('event-badges');
-const badgeClaimsStorage = new GenericStorage('badge-claims');
-const eventsStorage = new GenericStorage('events');
-const participationsStorage = new GenericStorage('participations');
+
+const CATEGORY_ORDER = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3 };
+
+function sortByBadge(enriched) {
+    enriched.sort((a, b) => {
+        if (!a.badge || !b.badge) return 0;
+        const catDiff = (CATEGORY_ORDER[a.badge.category] ?? 99) - (CATEGORY_ORDER[b.badge.category] ?? 99);
+        if (catDiff !== 0) return catDiff;
+        return (a.badge.name || '').localeCompare(b.badge.name || '');
+    });
+    return enriched;
+}
+
+// Badge library IDs are free-form NVARCHAR(100), not GUIDs.
+function isValidBadgeId(id) {
+    return typeof id === 'string' && id.length > 0 && id.length <= 100;
+}
+
+function optionalGuid(value) {
+    if (value === undefined || value === null || value === '') return { value: null };
+    return isGuid(value) ? { value } : { error: 'judgeUserId must be a GUID' };
+}
 
 app.http('event-badges-list', {
     methods: ['GET'],
@@ -22,38 +42,28 @@ app.http('event-badges-list', {
             }
 
             const eventId = request.params.eventId;
-            const participations = await participationsStorage.getAll();
-            const canManageAssignments = auth.user.isPortalAdmin
-                || hasEventRole(auth.user, eventId, 'judge', participations)
-                || hasEventRole(auth.user, eventId, 'committee', participations);
-            const isEventParticipant = participations.some(p =>
-                p.userId === auth.user.userId && p.eventId === eventId
-            );
+            if (!isGuid(eventId)) {
+                return { status: 404, jsonBody: { error: 'Event not found' } };
+            }
+            const actor = q.asActor(auth.user);
+            const eventKey = upperId(eventId);
+            const participations = await q.participationsForUser(actor.userId);
+            const canManageAssignments = actor.isPortalAdmin
+                || hasEventRole(actor, eventKey, 'judge', participations)
+                || hasEventRole(actor, eventKey, 'committee', participations);
+            const isEventParticipant = participations.some(p => sameId(p.eventId, eventId));
 
             if (!canManageAssignments && !isEventParticipant) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to view badges for this event' } };
             }
 
-            const eventBadges = await eventBadgesStorage.getAll();
-            const badges = await badgesStorage.getAll();
+            const assignments = await q.eventBadgesForEvent(eventId);
+            const badges = await q.badgesByIds(assignments.map(eb => eb.badgeId));
 
-            const assignments = eventBadges.filter(eb => eb.eventId === eventId);
-
-            const enriched = assignments.map(eb => {
-                const badge = badges.find(b => b.id === eb.badgeId);
-                return {
-                    ...eb,
-                    badge: badge || null
-                };
-            });
-
-            const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3 };
-            enriched.sort((a, b) => {
-                if (!a.badge || !b.badge) return 0;
-                const catDiff = (categoryOrder[a.badge.category] || 99) - (categoryOrder[b.badge.category] || 99);
-                if (catDiff !== 0) return catDiff;
-                return a.badge.name.localeCompare(b.badge.name);
-            });
+            const enriched = sortByBadge(assignments.map(eb => ({
+                ...eb,
+                badge: badges.find(b => b.id === eb.badgeId) || null
+            })));
 
             if (canManageAssignments) {
                 return { status: 200, jsonBody: enriched };
@@ -93,19 +103,25 @@ app.http('event-badges-add', {
             const eventId = request.params.eventId;
             const body = await request.json();
 
-            const badgeIds = body.badgeIds || (body.badgeId ? [body.badgeId] : []);
+            const rawIds = Array.isArray(body?.badgeIds) ? body.badgeIds : (body?.badgeId ? [body.badgeId] : []);
+            const badgeIds = q.unique(rawIds);
             if (badgeIds.length === 0) {
                 return { status: 400, jsonBody: { error: 'badgeId or badgeIds is required' } };
             }
+            if (!badgeIds.every(isValidBadgeId)) {
+                return { status: 400, jsonBody: { error: 'badgeIds must be non-empty strings' } };
+            }
+            const judge = optionalGuid(body.judgeUserId);
+            if (judge.error) {
+                return { status: 400, jsonBody: { error: judge.error } };
+            }
 
-            const events = await eventsStorage.getAll();
-            const event = events.find(e => e.id === eventId);
-            if (!event) {
+            if (!isGuid(eventId) || !(await q.eventExists(eventId))) {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
 
-            const badges = await badgesStorage.getAll();
-            const eventBadges = await eventBadgesStorage.getAll();
+            const badges = await q.badgesByIds(badgeIds);
+            const eventBadges = await q.eventBadgesForEvent(eventId);
 
             const added = [];
             const skipped = [];
@@ -117,7 +133,7 @@ app.http('event-badges-add', {
                     continue;
                 }
 
-                const existing = eventBadges.find(eb => eb.eventId === eventId && eb.badgeId === badgeId);
+                const existing = eventBadges.find(eb => eb.badgeId === badgeId);
                 if (existing) {
                     skipped.push({ badgeId, reason: 'Already assigned' });
                     continue;
@@ -127,7 +143,7 @@ app.http('event-badges-add', {
                     id: generateId(),
                     eventId: eventId,
                     badgeId: badgeId,
-                    judgeUserId: body.judgeUserId || null,
+                    judgeUserId: judge.value,
                     isActive: true,
                     createdAt: new Date().toISOString()
                 };
@@ -163,15 +179,20 @@ app.http('event-badges-update', {
             const { eventId, id } = request.params;
             const body = await request.json();
 
-            const eventBadge = await eventBadgesStorage.getById(id);
+            const eventBadge = isGuid(id) && isGuid(eventId) ? await eventBadgesStorage.getById(id) : null;
 
-            if (!eventBadge || eventBadge.eventId !== eventId) {
+            if (!eventBadge || !sameId(eventBadge.eventId, eventId)) {
                 return { status: 404, jsonBody: { error: 'Event-badge assignment not found' } };
             }
 
+            const judge = body.judgeUserId !== undefined ? optionalGuid(body.judgeUserId) : { value: eventBadge.judgeUserId };
+            if (judge.error) {
+                return { status: 400, jsonBody: { error: judge.error } };
+            }
+
             const updated = await eventBadgesStorage.update(id, {
-                judgeUserId: body.judgeUserId !== undefined ? body.judgeUserId : eventBadge.judgeUserId,
-                isActive: body.isActive !== undefined ? body.isActive : eventBadge.isActive,
+                judgeUserId: judge.value,
+                isActive: body.isActive !== undefined ? !!body.isActive : eventBadge.isActive,
                 updatedAt: new Date().toISOString()
             });
 
@@ -198,20 +219,14 @@ app.http('event-badges-remove', {
 
             const { eventId, id } = request.params;
 
-            const eventBadge = await eventBadgesStorage.getById(id);
+            const eventBadge = isGuid(id) && isGuid(eventId) ? await eventBadgesStorage.getById(id) : null;
 
-            if (!eventBadge || eventBadge.eventId !== eventId) {
+            if (!eventBadge || !sameId(eventBadge.eventId, eventId)) {
                 return { status: 404, jsonBody: { error: 'Event-badge assignment not found' } };
             }
 
-            await eventBadgesStorage.delete(id);
-
-            const claims = await badgeClaimsStorage.getAll();
-            for (const c of claims) {
-                if (c.eventBadgeId === id) {
-                    await badgeClaimsStorage.delete(c.id);
-                }
-            }
+            // Claims first, then the assignment (FK_BadgeClaims_EventBadges), in one transaction.
+            await q.deleteEventBadgesCascade([id]);
 
             context.log(`Badge removed from event ${eventId}`);
             return { status: 200, jsonBody: { message: 'Badge removed from event' } };
@@ -236,54 +251,64 @@ app.http('event-badges-bulk', {
 
             const eventId = request.params.eventId;
             const body = await request.json();
-            const { selectedBadgeIds } = body;
+            const { selectedBadgeIds } = body || {};
 
             if (!Array.isArray(selectedBadgeIds)) {
                 return { status: 400, jsonBody: { error: 'selectedBadgeIds array is required' } };
             }
+            const wanted = q.unique(selectedBadgeIds);
+            if (!wanted.every(isValidBadgeId)) {
+                return { status: 400, jsonBody: { error: 'selectedBadgeIds must be non-empty strings' } };
+            }
 
-            const eventBadges = await eventBadgesStorage.getAll();
+            if (!isGuid(eventId) || !(await q.eventExists(eventId))) {
+                return { status: 404, jsonBody: { error: 'Event not found' } };
+            }
 
-            const currentAssignments = eventBadges.filter(eb => eb.eventId === eventId);
+            const knownBadges = await q.badgesByIds(wanted);
+            const unknown = wanted.filter(id => !knownBadges.some(b => b.id === id));
+            if (unknown.length > 0) {
+                return { status: 400, jsonBody: { error: 'Unknown badge ids', badgeIds: unknown } };
+            }
+
+            const currentAssignments = await q.eventBadgesForEvent(eventId);
             const currentBadgeIds = currentAssignments.map(eb => eb.badgeId);
 
-            const toAdd = selectedBadgeIds.filter(id => !currentBadgeIds.includes(id));
-            const toRemove = currentAssignments.filter(eb => !selectedBadgeIds.includes(eb.badgeId));
+            const toAdd = wanted.filter(id => !currentBadgeIds.includes(id));
+            const toRemove = currentAssignments.filter(eb => !wanted.includes(eb.badgeId));
 
-            for (const eb of toRemove) {
-                await eventBadgesStorage.delete(eb.id);
-            }
-
-            const added = [];
-            for (const badgeId of toAdd) {
-                const newEb = await eventBadgesStorage.create({
-                    id: generateId(),
-                    eventId: eventId,
-                    badgeId: badgeId,
-                    judgeUserId: null,
-                    isActive: true,
-                    createdAt: new Date().toISOString()
-                });
-                added.push(newEb);
-            }
-
-            if (toRemove.length > 0) {
-                const removeIds = new Set(toRemove.map(eb => eb.id));
-                const claims = await badgeClaimsStorage.getAll();
-                for (const c of claims) {
-                    if (removeIds.has(c.eventBadgeId)) {
-                        await badgeClaimsStorage.delete(c.id);
-                    }
+            const added = await q.withTransaction(async makeRequest => {
+                await q.deleteEventBadgesCascade(toRemove.map(eb => eb.id), makeRequest);
+                const created = [];
+                for (const badgeId of toAdd) {
+                    const newEb = {
+                        id: generateId(),
+                        eventId: eventId,
+                        badgeId: badgeId,
+                        judgeUserId: null,
+                        isActive: true,
+                        createdAt: new Date().toISOString()
+                    };
+                    await makeRequest()
+                        .input('id', newEb.id)
+                        .input('eventId', newEb.eventId)
+                        .input('badgeId', newEb.badgeId)
+                        .input('isActive', newEb.isActive)
+                        .input('createdAt', newEb.createdAt)
+                        .query(`INSERT INTO [EventBadges] (Id, EventId, BadgeId, JudgeUserId, IsActive, CreatedAt)
+                                VALUES (@id, @eventId, @badgeId, NULL, @isActive, @createdAt)`);
+                    created.push(newEb);
                 }
-            }
+                return created;
+            });
 
-            const totalForEvent = currentAssignments.length - toRemove.length + toAdd.length;
+            const totalForEvent = currentAssignments.length - toRemove.length + added.length;
 
-            context.log(`Bulk update for event ${eventId}: added ${toAdd.length}, removed ${toRemove.length}`);
+            context.log(`Bulk update for event ${eventId}: added ${added.length}, removed ${toRemove.length}`);
             return {
                 status: 200,
                 jsonBody: {
-                    added: toAdd.length,
+                    added: added.length,
                     removed: toRemove.length,
                     total: totalForEvent
                 }

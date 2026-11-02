@@ -1,8 +1,16 @@
 const { getPool, sql } = require('./sql');
+const { generateId } = require('./id');
 
 const VALID_TYPES = new Set(['income', 'expense']);
 const VALID_CATEGORIES = new Set(['hotel', 'food', 'venue', 'sponsorship', 'activity', 'registration', 'other']);
 const VALID_PAID_BY = new Set(['participant', 'event']);
+
+// Errors callers can map straight onto an HTTP status (400 validation, 404 missing row).
+function fail(status, message) {
+    const error = new Error(message);
+    error.status = status;
+    return error;
+}
 
 function mapRow(row) {
     return {
@@ -62,6 +70,25 @@ async function ensureTable(pool) {
     `);
 }
 
+function validateDescription(description) {
+    if (typeof description !== 'string' || !description.trim()) throw fail(400, 'description is required');
+    if (description.trim().length > 200) throw fail(400, 'description must be at most 200 characters');
+    return description.trim();
+}
+
+function validateOptionalNumber(value, name, { integer = false } = {}) {
+    if (value === undefined || value === null || value === '') return null;
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0 || (integer && !Number.isInteger(n))) throw fail(400, `${name} must be a non-negative ${integer ? 'integer' : 'number'}`);
+    return n;
+}
+
+function validateNotes(notes) {
+    if (notes === undefined || notes === null || notes === '') return null;
+    if (typeof notes !== 'string') throw fail(400, 'notes must be a string');
+    return notes;
+}
+
 async function listByEvent(eventId) {
     const pool = await getPool();
     await ensureTable(pool);
@@ -84,29 +111,33 @@ async function listByEvent(eventId) {
     }));
 }
 
-async function createManual(eventId, { type, category, description, amount, paidBy = 'event', unitCost = null, days = null, notes = null, sponsorId = null }) {
-    if (!VALID_TYPES.has(type)) throw new Error(`Invalid type: ${type}`);
-    if (!VALID_CATEGORIES.has(category)) throw new Error(`Invalid category: ${category}`);
-    if (!VALID_PAID_BY.has(paidBy)) throw new Error(`Invalid paidBy: ${paidBy}`);
-    if (amount == null || !Number.isFinite(Number(amount)) || Number(amount) < 0) throw new Error('amount must be a non-negative number');
+async function createManual(eventId, { type, category, description, amount, paidBy = 'event', unitCost = null, days = null, notes = null, sponsorId = null } = {}) {
+    if (!VALID_TYPES.has(type)) throw fail(400, `Invalid type: ${type}`);
+    if (!VALID_CATEGORIES.has(category)) throw fail(400, `Invalid category: ${category}`);
+    if (!VALID_PAID_BY.has(paidBy)) throw fail(400, `Invalid paidBy: ${paidBy}`);
+    if (amount == null || amount === '' || !Number.isFinite(Number(amount)) || Number(amount) < 0) throw fail(400, 'amount must be a non-negative number');
+    if (sponsorId !== null && sponsorId !== undefined && !/^[0-9a-f-]{36}$/i.test(String(sponsorId))) throw fail(400, 'sponsorId must be a GUID');
+    const cleanDescription = validateDescription(description);
+    const cleanUnitCost = validateOptionalNumber(unitCost, 'unitCost');
+    const cleanDays = validateOptionalNumber(days, 'days', { integer: true });
+    const cleanNotes = validateNotes(notes);
 
     const pool = await getPool();
     await ensureTable(pool);
-    const { generateId } = require('./id');
     const id = generateId();
 
     await pool.request()
         .input('id', sql.UniqueIdentifier, id)
         .input('eventId', sql.UniqueIdentifier, eventId)
-        .input('sponsorId', sql.UniqueIdentifier, sponsorId)
+        .input('sponsorId', sql.UniqueIdentifier, sponsorId || null)
         .input('type', sql.NVarChar(10), type)
         .input('category', sql.NVarChar(30), category)
-        .input('description', sql.NVarChar(200), description)
-        .input('unitCost', sql.Decimal(12, 2), unitCost)
-        .input('days', sql.Int, days)
+        .input('description', sql.NVarChar(200), cleanDescription)
+        .input('unitCost', sql.Decimal(12, 2), cleanUnitCost)
+        .input('days', sql.Int, cleanDays)
         .input('amount', sql.Decimal(12, 2), Number(amount))
         .input('paidBy', sql.NVarChar(20), paidBy)
-        .input('notes', sql.NVarChar(sql.MAX), notes)
+        .input('notes', sql.NVarChar(sql.MAX), cleanNotes)
         .query(`
             INSERT INTO EventFinancials
               (Id, EventId, SponsorId, Type, Category, Description, UnitCost, Days, Amount, PaidBy, Source, Notes)
@@ -144,7 +175,6 @@ async function upsertParticipationRow(eventId, participationId, { category, desc
                 WHERE Id = @id
             `);
     } else {
-        const { generateId } = require('./id');
         const id = generateId();
         await pool.request()
             .input('id', sql.UniqueIdentifier, id)
@@ -165,6 +195,15 @@ async function upsertParticipationRow(eventId, participationId, { category, desc
     }
 }
 
+// Removes the auto-generated row of one category for a participation (when its driver became zero).
+async function deleteParticipationCategoryRow(participationId, category) {
+    const pool = await getPool();
+    await pool.request()
+        .input('participationId', sql.UniqueIdentifier, participationId)
+        .input('category', sql.NVarChar(30), category)
+        .query(`DELETE FROM EventFinancials WHERE ParticipationId = @participationId AND Category = @category AND Source = 'auto'`);
+}
+
 async function syncParticipationToFinancials(event, participation) {
     const hotelRate = event.hotelRatePerNight != null ? Number(event.hotelRatePerNight) : null;
     const foodRate  = event.foodRatePerDay    != null ? Number(event.foodRatePerDay)    : null;
@@ -178,7 +217,8 @@ async function syncParticipationToFinancials(event, participation) {
     const nightCount = Object.values(nights).filter(Boolean).length;
     const effectiveNights = nightCount > 0 ? nightCount : (eventHotelNights ?? 0);
 
-    if (hotelRate != null && effectiveNights > 0) {
+    // Each auto row follows its driver: present while rate x quantity > 0, removed otherwise.
+    if (hotelRate != null && hotelRate > 0 && effectiveNights > 0) {
         const description = nightCount > 0
             ? `Hotel - ${Object.entries(nights).filter(([, v]) => v).map(([k]) => k).join(', ')}`
             : `Hotel - ${effectiveNights} night${effectiveNights !== 1 ? 's' : ''}`;
@@ -190,9 +230,11 @@ async function syncParticipationToFinancials(event, participation) {
             amount: hotelRate * effectiveNights,
             paidBy
         });
+    } else {
+        await deleteParticipationCategoryRow(participation.id, 'hotel');
     }
 
-    if (foodRate != null && foodDays != null) {
+    if (foodRate != null && foodRate > 0 && foodDays != null && foodDays > 0) {
         await upsertParticipationRow(participation.eventId, participation.id, {
             category: 'food',
             description: `Food - ${foodDays} day${foodDays !== 1 ? 's' : ''}`,
@@ -201,6 +243,8 @@ async function syncParticipationToFinancials(event, participation) {
             amount: foodRate * foodDays,
             paidBy
         });
+    } else {
+        await deleteParticipationCategoryRow(participation.id, 'food');
     }
 
     const regFee = event.costPerParticipant != null ? Number(event.costPerParticipant) : null;
@@ -216,7 +260,6 @@ async function syncParticipationToFinancials(event, participation) {
                 .input('amount', sql.Decimal(12, 2), regFee)
                 .query(`UPDATE EventFinancials SET Amount = @amount, UpdatedAt = SYSUTCDATETIME() WHERE Id = @id`);
         } else {
-            const { generateId } = require('./id');
             const id = generateId();
             await pool.request()
                 .input('id', sql.UniqueIdentifier, id)
@@ -226,11 +269,13 @@ async function syncParticipationToFinancials(event, participation) {
                 .query(`INSERT INTO EventFinancials (Id, EventId, ParticipationId, Type, Category, Description, Amount, PaidBy, Source)
                         VALUES (@id, @eventId, @participationId, 'income', 'registration', 'Registration fee', @amount, 'participant', 'auto')`);
         }
+    } else {
+        await deleteParticipationCategoryRow(participation.id, 'registration');
     }
 }
 
 async function updatePaidBy(id, eventId, paidBy) {
-    if (!VALID_PAID_BY.has(paidBy)) throw new Error(`Invalid paidBy: ${paidBy}`);
+    if (!VALID_PAID_BY.has(paidBy)) throw fail(400, `Invalid paidBy: ${paidBy}`);
     const pool = await getPool();
     const result = await pool.request()
         .input('id', sql.UniqueIdentifier, id)
@@ -238,7 +283,7 @@ async function updatePaidBy(id, eventId, paidBy) {
         .input('paidBy', sql.NVarChar(20), paidBy)
         .query(`UPDATE EventFinancials SET PaidBy = @paidBy, UpdatedAt = SYSUTCDATETIME()
                 WHERE Id = @id AND EventId = @eventId`);
-    if (!result.rowsAffected[0]) throw new Error('Financial row not found');
+    if (!result.rowsAffected[0]) throw fail(404, 'Financial row not found');
 }
 
 async function deleteParticipationRows(participationId) {
@@ -248,10 +293,15 @@ async function deleteParticipationRows(participationId) {
         .query(`DELETE FROM EventFinancials WHERE ParticipationId = @participationId AND Source = 'auto'`);
 }
 
-async function updateManual(id, eventId, { type, category, description, amount, paidBy, unitCost, days, notes }) {
-    if (type !== undefined && !VALID_TYPES.has(type)) throw new Error(`Invalid type: ${type}`);
-    if (category !== undefined && !VALID_CATEGORIES.has(category)) throw new Error(`Invalid category: ${category}`);
-    if (paidBy !== undefined && !VALID_PAID_BY.has(paidBy)) throw new Error(`Invalid paidBy: ${paidBy}`);
+async function updateManual(id, eventId, { type, category, description, amount, paidBy, unitCost, days, notes } = {}) {
+    if (type !== undefined && !VALID_TYPES.has(type)) throw fail(400, `Invalid type: ${type}`);
+    if (category !== undefined && !VALID_CATEGORIES.has(category)) throw fail(400, `Invalid category: ${category}`);
+    if (paidBy !== undefined && !VALID_PAID_BY.has(paidBy)) throw fail(400, `Invalid paidBy: ${paidBy}`);
+    if (amount !== undefined && amount !== null && (!Number.isFinite(Number(amount)) || Number(amount) < 0)) throw fail(400, 'amount must be a non-negative number');
+    const cleanDescription = description !== undefined ? validateDescription(description) : undefined;
+    const cleanUnitCost = unitCost !== undefined ? validateOptionalNumber(unitCost, 'unitCost') : undefined;
+    const cleanDays = days !== undefined ? validateOptionalNumber(days, 'days', { integer: true }) : undefined;
+    const cleanNotes = notes !== undefined ? validateNotes(notes) : undefined;
 
     const pool = await getPool();
     const existing = await pool.request()
@@ -259,18 +309,18 @@ async function updateManual(id, eventId, { type, category, description, amount, 
         .input('eventId', sql.UniqueIdentifier, eventId)
         .query(`SELECT * FROM EventFinancials WHERE Id = @id AND EventId = @eventId AND Source = 'manual'`);
 
-    if (!existing.recordset.length) throw new Error('Financial row not found or not editable');
+    if (!existing.recordset.length) throw fail(404, 'Financial row not found or not editable');
 
     const cur = mapRow(existing.recordset[0]);
     const merged = {
         type: type ?? cur.type,
         category: category ?? cur.category,
-        description: description ?? cur.description,
+        description: cleanDescription ?? cur.description,
         amount: amount != null ? Number(amount) : cur.amount,
         paidBy: paidBy ?? cur.paidBy,
-        unitCost: unitCost !== undefined ? unitCost : cur.unitCost,
-        days: days !== undefined ? days : cur.days,
-        notes: notes !== undefined ? notes : cur.notes
+        unitCost: cleanUnitCost !== undefined ? cleanUnitCost : cur.unitCost,
+        days: cleanDays !== undefined ? cleanDays : cur.days,
+        notes: cleanNotes !== undefined ? cleanNotes : cur.notes
     };
 
     await pool.request()
@@ -306,6 +356,8 @@ async function deleteManual(id, eventId) {
     return result.rowsAffected[0] > 0;
 }
 
+// Totals per type/category/paidBy. Sponsorship rows stay listed, but only confirmed
+// sponsors count as income; reached-out/negotiating/declined are pipeline, not money.
 async function getSummary(eventId) {
     const pool = await getPool();
     const result = await pool.request()
@@ -319,6 +371,7 @@ async function getSummary(eventId) {
                 COUNT(*) AS RowCnt
             FROM EventFinancials
             WHERE EventId = @eventId
+              AND NOT (Category = 'sponsorship' AND SponsorStatus IS NOT NULL AND SponsorStatus <> 'confirmed')
             GROUP BY Type, Category, PaidBy
         `);
 
@@ -356,6 +409,7 @@ module.exports = {
     deleteManual,
     upsertParticipationRow,
     deleteParticipationRows,
+    deleteParticipationCategoryRow,
     syncParticipationToFinancials,
     getSummary
 };

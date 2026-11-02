@@ -1,14 +1,57 @@
+const path = require('path');
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { requireAuth, isTeamMember } = require('../shared/auth');
 const SharePointStorage = require('../shared/sharepoint');
-const { Storage } = require('../shared/storage');
-const participationsStorage = new Storage('participations');
+const StorageModule = require('../shared/storage');
+const { isGuid, sameId } = require('../shared/id');
+const { upperId } = require('../shared/validate');
+const { asActor, participationsForUser } = require('../shared/admin-queries');
 const multipart = require('parse-multipart-data');
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const GUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+// Exactly Events/<eventId>/<teamId>/<fileName>: anchored, GUIDs only, single file segment.
+const TEAM_FILE_PATH = new RegExp(`^Events/(${GUID})/(${GUID})/([^/\\\\]+)$`);
+
 function parseTeamPathSegments(filePath) {
-    const match = /Events\/([^/]+)\/([^/]+)/i.exec(filePath || '');
-    return match ? { eventId: match[1], teamId: match[2] } : null;
+    if (typeof filePath !== 'string' || filePath.length > 1200) return null;
+    const match = TEAM_FILE_PATH.exec(filePath);
+    if (!match) return null;
+    const fileName = match[3];
+    if (fileName === '.' || fileName === '..' || /[\u0000-\u001f]/.test(fileName)) return null;
+    return { eventId: match[1], teamId: match[2], fileName };
+}
+
+// Strips any directory part and control characters from an uploaded file name.
+function safeFileName(name) {
+    const base = path.posix.basename(String(name || '').replace(/\\/g, '/')).replace(/[\u0000-\u001f]/g, '').trim();
+    if (!base || base === '.' || base === '..') return null;
+    return base.length > 200 ? base.slice(-200) : base;
+}
+
+// Caller must be on the team (or a portal admin) and the team must belong to the event.
+async function authorizeTeamPath(user, eventId, teamId, action) {
+    if (!isGuid(eventId) || !isGuid(teamId)) {
+        return { status: 400, jsonBody: { error: 'eventId and teamId must be GUIDs' } };
+    }
+    const actor = asActor(user);
+    const participations = await participationsForUser(actor.userId);
+    if (!isTeamMember(actor, upperId(teamId), participations)) {
+        return { status: 403, jsonBody: { error: `You do not have permission to ${action}` } };
+    }
+    const team = await StorageModule.teams.getById(teamId);
+    if (!team) {
+        return { status: 404, jsonBody: { error: 'Team not found' } };
+    }
+    if (!sameId(team.eventId, eventId)) {
+        return { status: 400, jsonBody: { error: 'Team does not belong to this event' } };
+    }
+    return null;
+}
+
+function isNotFound(error) {
+    return /\(404\)|404/.test(error?.message || '');
 }
 
 app.http('files-upload', {
@@ -31,7 +74,7 @@ app.http('files-upload', {
 
             const eventId = request.query.get('eventId');
             const teamId = request.query.get('teamId');
-            const category = request.query.get('category') || 'General';
+            const category = (request.query.get('category') || 'General').slice(0, 100);
 
             if (!eventId || !teamId) {
                 return {
@@ -40,10 +83,8 @@ app.http('files-upload', {
                 };
             }
 
-            const uploadParticipations = await participationsStorage.getAll();
-            if (!isTeamMember(auth.user, teamId, uploadParticipations)) {
-                return { status: 403, jsonBody: { error: 'You do not have permission to upload files for this team' } };
-            }
+            const denied = await authorizeTeamPath(auth.user, eventId, teamId, 'upload files for this team');
+            if (denied) return denied;
 
             const contentType = request.headers.get('content-type') || '';
             if (!contentType.includes('multipart/form-data')) {
@@ -62,27 +103,32 @@ app.http('files-upload', {
             }
 
             const bodyBuffer = Buffer.from(await request.arrayBuffer());
-            const parts = multipart.parse(bodyBuffer, boundary);
+            if (bodyBuffer.length > MAX_FILE_SIZE + 64 * 1024) {
+                return { status: 400, jsonBody: { error: 'File too large. Maximum size is 10MB.' } };
+            }
+            const parts = multipart.parse(bodyBuffer, boundary.replace(/^"|"$/g, ''));
 
-            if (!parts || parts.length === 0) {
+            const file = (parts || []).find(p => p.name === 'file' && p.filename) || null;
+            if (!file) {
                 return {
                     status: 400,
-                    jsonBody: { error: 'No file found in request' }
+                    jsonBody: { error: 'No file found in request (expected a multipart part named "file")' }
                 };
             }
 
-            const file = parts[0];
-            const fileName = file.filename || 'unnamed-file';
+            const fileName = safeFileName(file.filename);
+            if (!fileName) {
+                return { status: 400, jsonBody: { error: 'Invalid file name' } };
+            }
 
-            const maxSize = 10 * 1024 * 1024;
-            if (file.data.length > maxSize) {
+            if (file.data.length > MAX_FILE_SIZE) {
                 return {
                     status: 400,
                     jsonBody: { error: 'File too large. Maximum size is 10MB.' }
                 };
             }
 
-            const folderPath = `Events/${eventId}/${teamId}`;
+            const folderPath = `Events/${upperId(eventId)}/${upperId(teamId)}`;
 
             const result = await SharePointStorage.uploadFile(file.data, fileName, folderPath);
 
@@ -106,6 +152,9 @@ app.http('files-upload', {
             };
 
         } catch (error) {
+            if (/too large/i.test(error.message || '')) {
+                return { status: 400, jsonBody: { error: 'File too large. Maximum size is 10MB.' } };
+            }
             await logError(context, error);
             context.error('File upload error:', error);
             return {
@@ -136,7 +185,6 @@ app.http('files-list', {
 
             const eventId = request.query.get('eventId');
             const teamId = request.query.get('teamId');
-            const category = request.query.get('category');
 
             if (!eventId || !teamId) {
                 return {
@@ -145,23 +193,23 @@ app.http('files-list', {
                 };
             }
 
-            const listParticipations = await participationsStorage.getAll();
-            if (!isTeamMember(auth.user, teamId, listParticipations)) {
-                return { status: 403, jsonBody: { error: 'You do not have permission to view files for this team' } };
+            const denied = await authorizeTeamPath(auth.user, eventId, teamId, 'view files for this team');
+            if (denied) return denied;
+
+            const folderPath = `Events/${upperId(eventId)}/${upperId(teamId)}`;
+
+            let files;
+            try {
+                files = await SharePointStorage.listFiles(folderPath);
+            } catch (error) {
+                if (isNotFound(error)) return { status: 200, jsonBody: [] };
+                throw error;
             }
 
-            const folderPath = `Events/${eventId}/${teamId}`;
-
-            const files = await SharePointStorage.listFiles(folderPath);
-
-            return { status: 200, jsonBody: files };
+            return { status: 200, jsonBody: files.filter(f => !f.isFolder) };
 
         } catch (error) {
             await logError(context, error);
-            if (error.message.includes('404')) {
-                return { status: 200, jsonBody: [] };
-            }
-
             context.error('File list error:', error);
             return {
                 status: 500,
@@ -198,16 +246,20 @@ app.http('files-download', {
                 };
             }
 
-            const downloadSegments = parseTeamPathSegments(filePath);
-            if (!downloadSegments) {
+            const segments = parseTeamPathSegments(filePath);
+            if (!segments) {
                 return { status: 400, jsonBody: { error: 'Invalid file path' } };
             }
-            const downloadParticipations = await participationsStorage.getAll();
-            if (!isTeamMember(auth.user, downloadSegments.teamId, downloadParticipations)) {
-                return { status: 403, jsonBody: { error: 'You do not have permission to access this file' } };
-            }
+            const denied = await authorizeTeamPath(auth.user, segments.eventId, segments.teamId, 'access this file');
+            if (denied) return denied;
 
-            const file = await SharePointStorage.getFile(filePath);
+            let file;
+            try {
+                file = await SharePointStorage.getFile(filePath);
+            } catch (error) {
+                if (isNotFound(error)) return { status: 404, jsonBody: { error: 'File not found' } };
+                throw error;
+            }
 
             return {
                 status: 200,
@@ -256,16 +308,19 @@ app.http('files-delete', {
                 };
             }
 
-            const deleteSegments = parseTeamPathSegments(filePath);
-            if (!deleteSegments) {
+            const segments = parseTeamPathSegments(filePath);
+            if (!segments) {
                 return { status: 400, jsonBody: { error: 'Invalid file path' } };
             }
-            const deleteParticipations = await participationsStorage.getAll();
-            if (!isTeamMember(auth.user, deleteSegments.teamId, deleteParticipations)) {
-                return { status: 403, jsonBody: { error: 'You do not have permission to delete this file' } };
-            }
+            const denied = await authorizeTeamPath(auth.user, segments.eventId, segments.teamId, 'delete this file');
+            if (denied) return denied;
 
-            await SharePointStorage.deleteFile(filePath);
+            try {
+                await SharePointStorage.deleteFile(filePath);
+            } catch (error) {
+                if (isNotFound(error)) return { status: 404, jsonBody: { error: 'File not found' } };
+                throw error;
+            }
 
             context.log(`File deleted: ${filePath}`);
 
@@ -304,9 +359,9 @@ app.http('files-setup-columns', {
             }
 
             const body = await request.json();
-            const categories = body.categories;
+            const categories = body?.categories;
 
-            if (!Array.isArray(categories) || categories.length === 0) {
+            if (!Array.isArray(categories) || categories.length === 0 || !categories.every(c => typeof c === 'string' && c.trim() && c.length <= 100)) {
                 return {
                     status: 400,
                     jsonBody: { error: 'categories array is required' }
@@ -334,4 +389,3 @@ app.http('files-setup-columns', {
         }
     }
 });
-

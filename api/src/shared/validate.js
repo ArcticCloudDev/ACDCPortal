@@ -1,8 +1,7 @@
-// Small request-body validator. Collects human-readable problems; handlers return
-// `v.failure()` (a 400 response) when `v.failed` is set. Never echoes the offending value.
 const { isGuid } = require('./id');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function isEmail(value) {
     return typeof value === 'string' && value.trim().length <= 320 && EMAIL_PATTERN.test(value.trim());
@@ -12,15 +11,36 @@ function normalizeEmail(value) {
     return String(value).trim().toLowerCase();
 }
 
-// http(s) only: anything else (javascript:, data:, file:...) is rejected.
-function isHttpUrl(value) {
+function isHttpUrl(value, { httpsOnly = false } = {}) {
     if (typeof value !== 'string' || value.length > 2000) return false;
     try {
         const url = new URL(value.trim());
-        return url.protocol === 'http:' || url.protocol === 'https:';
+        return url.protocol === 'https:' || (!httpsOnly && url.protocol === 'http:');
     } catch {
         return false;
     }
+}
+
+function isIsoDate(value) {
+    if (typeof value !== 'string' || !ISO_DATE_PATTERN.test(value)) return false;
+    const date = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function toInt(value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER } = {}) {
+    if (value === '' || value === null || value === undefined || typeof value === 'boolean') return null;
+    const n = typeof value === 'string' ? Number(value.trim()) : value;
+    return Number.isInteger(n) && n >= min && n <= max ? n : null;
+}
+
+function toNumber(value, { min = -Infinity, max = Infinity } = {}) {
+    if (value === '' || value === null || value === undefined || typeof value === 'boolean') return null;
+    const n = typeof value === 'string' ? Number(value.trim()) : value;
+    return typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max ? n : null;
+}
+
+function upperId(value) {
+    return typeof value === 'string' ? value.toUpperCase() : value;
 }
 
 class Validator {
@@ -36,8 +56,6 @@ class Validator {
         return { status: 400, jsonBody: { error: this.errors[0], message: this.errors[0], errors: this.errors } };
     }
 
-    // Trimmed string, or undefined when absent (null/'' count as "clear" and return null
-    // unless required). `min` applies only when a value is present.
     string(value, name, { max = 200, min = 0, required = false } = {}) {
         if (value === undefined || value === null || value === '') {
             if (required) this.errors.push(`${name} is required`);
@@ -134,7 +152,6 @@ class Validator {
     }
 }
 
-// Parses the JSON body; resolves to null when the body is missing or not JSON.
 async function readJson(request) {
     try {
         const body = await request.json();
@@ -146,4 +163,7 @@ async function readJson(request) {
 
 const INVALID_JSON = { status: 400, jsonBody: { error: 'A JSON object body is required', message: 'A JSON object body is required' } };
 
-module.exports = { Validator, isEmail, normalizeEmail, isHttpUrl, readJson, INVALID_JSON };
+module.exports = {
+    Validator, isEmail, normalizeEmail, isHttpUrl, isIsoDate, toInt, toNumber, upperId,
+    readJson, INVALID_JSON
+};
