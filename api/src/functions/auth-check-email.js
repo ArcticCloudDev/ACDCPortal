@@ -2,6 +2,8 @@ const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const Storage = require('../shared/storage');
 const { checkRateLimit } = require('./auth-send-otp');
+const { getClientIp } = require('../shared/auth');
+const { isEmail, normalizeEmail } = require('../shared/validate');
 
 const checkRateLimits = {
     byEmail: new Map(),
@@ -16,19 +18,24 @@ app.http('auth-check-email', {
         context.log('Auth check email called');
 
         try {
-            const body = await request.json();
-            const { email } = body;
+            let body;
+            try {
+                body = await request.json();
+            } catch {
+                body = {};
+            }
+            const { email } = body || {};
 
-            if (!email) {
+            if (!email || !isEmail(email)) {
                 return {
                     status: 400,
-                    jsonBody: { message: 'Email is required' }
+                    jsonBody: { message: 'A valid email is required' }
                 };
             }
 
-            const normalizedEmail = email.toLowerCase().trim();
-            const clientIp = request.headers.get('x-forwarded-for') ||
-                request.headers.get('x-client-ip') || 'unknown';
+            const normalizedEmail = normalizeEmail(email);
+            // Right-most X-Forwarded-For hop (appended by the SWA edge), never a client-chosen value.
+            const clientIp = getClientIp(request);
 
             const ipCheck = checkRateLimit(checkRateLimits.byIp, clientIp, 20);
             if (!ipCheck.allowed) {
@@ -51,7 +58,7 @@ app.http('auth-check-email', {
             const isAllowed = await Storage.allowedEmails.isAllowed(normalizedEmail);
 
             if (existingUser) {
-                context.log(`Existing user found: ${email}`);
+                context.log('Existing user found');
                 return {
                     status: 200,
                     jsonBody: {
@@ -63,7 +70,7 @@ app.http('auth-check-email', {
             }
 
             if (isAllowed) {
-                context.log(`Allowed email, new user: ${email}`);
+                context.log('Allowed email, new user');
                 return {
                     status: 200,
                     jsonBody: {
@@ -74,7 +81,7 @@ app.http('auth-check-email', {
                 };
             }
 
-            context.log(`Unknown email: ${email}`);
+            context.log('Unknown email');
             return {
                 status: 200,
                 jsonBody: {

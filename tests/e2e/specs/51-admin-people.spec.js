@@ -114,10 +114,11 @@ test('event participants page lists, filters and exports the roster', async ({ p
     expect(csv).toContain('Mats');
 });
 
-test('interest list shows leads recorded from the public form', async ({ page, harness, loginAs, apiAs }) => {
+test('interest list shows leads recorded from the interest form', async ({ page, harness, loginAs, apiAs }) => {
     const w = buildWorld({ event: { status: 'pre-registration' } });
     await harness.seed(w.seed());
-    const rec = await (await apiAs(null)).post('/api/interest/record', {
+    // interest/record requires the lead's own OTP session (contract 4).
+    const rec = await (await apiAs({ email: 'keen.kari@e2e.test', id: null })).post('/api/interest/record', {
         data: { eventId: w.event.id, email: 'keen.kari@e2e.test', firstName: 'Kari', lastName: 'Keen' }
     });
     expect(rec.status()).toBe(200);
@@ -134,7 +135,7 @@ test.describe('interest removal', () => {
         test.fail(true, 'participations.js:465 references an undeclared `teamId`, so PUT /participations/{id}/roles always 500s');
         const w = buildWorld({ event: { status: 'pre-registration' } });
         await harness.seed(w.seed());
-        await (await apiAs(null)).post('/api/interest/record', {
+        await (await apiAs({ email: 'keen.kari@e2e.test', id: null })).post('/api/interest/record', {
             data: { eventId: w.event.id, email: 'keen.kari@e2e.test', firstName: 'Kari', lastName: 'Keen' }
         });
         await loginAs(w.admin);

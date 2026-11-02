@@ -42,17 +42,13 @@ async function buildInvitationEmail(invitation, context) {
 
         const themeImageSrc = extractImageSrc(eventTheme.themeImage || '');
 
-        const portalUrl = process.env.PORTAL_URL || 'https://mango-ocean-075da8303.2.azurestaticapps.net';
-        const acceptUrl = `${portalUrl}?invite=${invitation.id}`;
-        context.log(`[DEBUG ${role}-invite] acceptUrl: '${acceptUrl}', invitation.id: '${invitation.id}'`);
+        // Every invitation link (team, judge, committee) lands on accept-invitation.html.
+        const portalUrl = process.env.PORTAL_URL || 'https://your-portal.com';
+        const acceptUrl = `${portalUrl}/accept-invitation.html?invite=${invitation.id}`;
 
         const rawBody = eventTheme.body || globalDefaults.body || '';
         const rawClosing = eventTheme.closing || globalDefaults.closing || '';
-        const fieldData = { firstName, fullName, eventName: event.name, inviterName: invitation.inviterName || 'Event Organizer' };
-        const bodyText = processTemplate(rawBody, fieldData);
-        const closingText = processTemplate(rawClosing, fieldData);
-
-        const mergeData = {
+        const fieldData = {
             firstName,
             fullName,
             eventName: event.name,
@@ -60,14 +56,18 @@ async function buildInvitationEmail(invitation, context) {
             inviteId: invitation.id,
             acceptUrl,
             themeImage: themeImageSrc,
-            noThemeImage: !themeImageSrc,
-            bodyText,
-            closingText
+            noThemeImage: !themeImageSrc
         };
 
-        const htmlContent = buildEmailHtml(template, mergeData);
+        const mergeData = {
+            ...fieldData,
+            bodyText: processTemplate(rawBody, fieldData),
+            closingText: processTemplate(rawClosing, fieldData)
+        };
 
-        const subject = processTemplate(template.subject, mergeData);
+        const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
+
+        const subject = processTemplate(eventTheme.subject || template.subject, mergeData, { html: false });
 
         return {
             success: true,

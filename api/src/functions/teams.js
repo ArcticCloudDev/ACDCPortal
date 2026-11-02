@@ -1,25 +1,67 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { requireAuth, isTeamAuthorized, isTeamMember } = require('../shared/auth');
-const { generateId } = require('../shared/id');
+const { generateId, isGuid, sameId } = require('../shared/id');
 const Storage = require('../shared/storage');
-const { Storage: GenericStorage } = require('../shared/storage');
-const { sendWelcomeEmail } = require('../shared/welcome-email');
+const { Storage: GenericStorage, withTransaction } = require('../shared/storage');
 const SharePointStorage = require('../shared/sharepoint');
+const { Validator, readJson, INVALID_JSON } = require('../shared/validate');
 
 const eventsStorage = new GenericStorage('events');
 const soloQueueStorage = new GenericStorage('solo-queue');
 const participationsStorage = new GenericStorage('participations');
 const usersStorage = new GenericStorage('users');
+const badgeClaimsStorage = new GenericStorage('badge-claims');
+const invitationsStorage = new GenericStorage('invitations');
+const deliveriesStorage = new GenericStorage('email-deliveries');
 
 function isActiveStatus(status) {
     return status === 'pre-registration' || status === 'registration' || status === 'live';
 }
 
-async function getActiveEventId() {
-    const events = await eventsStorage.getAll();
-    const activeEvent = events.find(e => isActiveStatus(e.status));
-    return activeEvent ? activeEvent.id : null;
+// Deterministic default: the active event that starts first (ties broken by id).
+async function getDefaultEventId() {
+    const events = (await eventsStorage.getAll()).filter(e => isActiveStatus(e.status));
+    events.sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || String(a.id).localeCompare(String(b.id)));
+    return events.length > 0 ? events[0].id : null;
+}
+
+function teamSizeBounds(event) {
+    const min = Number.isInteger(event?.minTeamSize) && event.minTeamSize > 0 ? event.minTeamSize : 1;
+    const max = Number.isInteger(event?.maxTeamSize) && event.maxTeamSize >= min ? event.maxTeamSize : Math.max(min, 5);
+    return { min, max };
+}
+
+async function participantCount(teamId) {
+    const members = await participationsStorage.findBy({ teamId });
+    return members.filter(p => (p.roles || []).includes('participant')).length;
+}
+
+// Trimmed 2-100 character name, unique (case-insensitively) within the event.
+async function validateTeamName(v, rawName, eventId, excludeTeamId = null) {
+    const name = v.string(rawName, 'teamName', { min: 2, max: 100, required: true });
+    if (name === undefined || name === null) return { name: undefined };
+    const clash = await Storage.teams.getByNameInEvent(name, eventId);
+    if (clash && !sameId(clash.id, excludeTeamId)) {
+        return { name, conflict: { status: 409, jsonBody: { message: 'A team with that name already exists for this event' } } };
+    }
+    return { name };
+}
+
+function memberProjection(user, participation, full) {
+    const base = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        gamertag: user.gamertag ?? null,
+        profileComplete: !!user.profileComplete,
+        participationId: participation?.id ?? null,
+        isTeamAdmin: !!participation?.isTeamAdmin,
+        roles: participation?.roles || [],
+        profileVerification: !!participation?.profileVerification
+    };
+    return full ? { ...base, phone: user.phone ?? null, allergies: user.allergies ?? null } : base;
 }
 
 app.http('teams-list', {
@@ -37,15 +79,14 @@ app.http('teams-list', {
             }
 
             const eventId = request.query.get('eventId');
-
-            let teams = await Storage.teams.getAll();
-
-            if (eventId) {
-                teams = teams.filter(t => t.eventId === eventId);
+            if (eventId && !isGuid(eventId)) {
+                return { status: 400, jsonBody: { message: 'Invalid event ID' } };
             }
 
+            let teams = eventId ? await Storage.teams.findByEvent(eventId) : await Storage.teams.getAll();
+
             if (!auth.user.isPortalAdmin) {
-                const participations = await new GenericStorage('participations').getAll();
+                const participations = await participationsStorage.findBy({ userId: auth.user.userId });
                 teams = teams.filter(t => isTeamMember(auth.user, t.id, participations));
             }
 
@@ -97,7 +138,7 @@ app.http('teams-get', {
                 };
             }
 
-            const participations = await new GenericStorage('participations').getAll();
+            const participations = await participationsStorage.findBy({ userId: auth.user.userId });
             if (!isTeamMember(auth.user, teamId, participations)) {
                 return {
                     status: 403,
@@ -135,7 +176,8 @@ app.http('teams-create', {
                 };
             }
 
-            const teamData = await request.json();
+            const teamData = await readJson(request);
+            if (!teamData) return INVALID_JSON;
 
             if (!teamData.teamName) {
                 return {
@@ -144,39 +186,65 @@ app.http('teams-create', {
                 };
             }
 
-            if (!teamData.committedParticipants) {
+            const sizeRaw = teamData.committedParticipants ?? teamData.numberOfParticipants;
+            if (sizeRaw === undefined || sizeRaw === null || sizeRaw === '') {
                 return {
                     status: 400,
                     jsonBody: { message: 'Committed participants is required' }
                 };
             }
 
-            const teamId = generateId();
+            if (!auth.user.userId) {
+                return { status: 400, jsonBody: { message: 'Complete your registration before creating a team' } };
+            }
 
-            const eventId = teamData.eventId || await getActiveEventId();
+            const v = new Validator();
+            const eventId = teamData.eventId ? v.guid(teamData.eventId, 'eventId') : await getDefaultEventId();
+            if (v.failed) return v.failure();
+            if (!eventId) {
+                return { status: 400, jsonBody: { message: 'No event is open for team registration' } };
+            }
 
-            const adminEmail = teamData.adminEmail;
+            const event = await Storage.events.getById(eventId);
+            if (!event) {
+                return { status: 404, jsonBody: { message: 'Event not found' } };
+            }
+            if (!isActiveStatus(event.status)) {
+                return { status: 400, jsonBody: { message: 'This event is not open for team registration' } };
+            }
 
-            const newTeam = {
-                id: teamId,
-                eventId: eventId,
-                teamName: teamData.teamName,
-                numberOfParticipants: teamData.committedParticipants,
-                adminUserId: auth.user.userId,
-                createdAt: new Date().toISOString()
-            };
+            const { min, max } = teamSizeBounds(event);
+            const numberOfParticipants = v.integer(sizeRaw, 'numberOfParticipants', { min, max, required: true });
+            const { name: teamName, conflict } = await validateTeamName(v, teamData.teamName, eventId);
+            if (v.failed) return v.failure();
+            if (conflict) return conflict;
 
-            const savedTeam = await Storage.teams.create(newTeam);
-            try {
-                const creatorParticipates = teamData.creatorParticipates !== false;
-                const participations = await participationsStorage.getAll();
-                const participation = participations.find(item =>
-                    item.userId === auth.user.userId && item.eventId === eventId
-                );
+            const creatorParticipates = teamData.creatorParticipates !== false;
 
+            const result = await withTransaction(async () => {
+                const participation = await participationsStorage.findOneBy({ userId: auth.user.userId, eventId });
                 if (!participation) {
-                    throw new Error('Participation not found for team creator');
+                    return { error: { status: 400, jsonBody: { message: 'Participation not found for team creator' } } };
                 }
+                if (participation.teamId) {
+                    return { error: { status: 400, jsonBody: { message: 'You are already on a team for this event' } } };
+                }
+                if (await Storage.teams.getByNameInEvent(teamName, eventId)) {
+                    return { error: { status: 409, jsonBody: { message: 'A team with that name already exists for this event' } } };
+                }
+
+                const now = new Date().toISOString();
+                const teamId = generateId();
+                const newTeam = {
+                    id: teamId,
+                    eventId: eventId,
+                    teamName,
+                    numberOfParticipants,
+                    adminUserId: auth.user.userId,
+                    createdAt: now,
+                    updatedAt: now
+                };
+                await Storage.teams.create(newTeam);
 
                 const roles = (participation.roles || []).filter(role => role !== 'participant');
                 if (creatorParticipates) roles.push('participant');
@@ -186,30 +254,22 @@ app.http('teams-create', {
                     isTeamAdmin: true,
                     roles,
                     profileVerification: true,
-                    updatedAt: new Date().toISOString()
+                    updatedAt: now
                 });
-            } catch (assignmentError) {
-                await Storage.teams.delete(teamId);
-                throw assignmentError;
-            }
 
-            if (auth.user.userId && newTeam.eventId) {
-                try {
-                    const queue = await soloQueueStorage.getAll();
-                    const entry = queue.find(q => q.userId === auth.user.userId && q.eventId === newTeam.eventId);
-                    if (entry) {
-                        await soloQueueStorage.delete(entry.id);
-                        context.log(`Removed ${auth.user.userId} from solo queue after team creation`);
-                    }
-                } catch (e) {
-                    context.log(`Warning: could not remove user from solo queue: ${e.message}`);
+                for (const entry of await soloQueueStorage.findBy({ userId: auth.user.userId, eventId })) {
+                    await soloQueueStorage.delete(entry.id);
                 }
-            }
 
-            context.log(`Team created and assigned to creator: ${newTeam.teamName}`);
+                return { team: newTeam };
+            });
+
+            if (result.error) return result.error;
+
+            context.log(`Team created and assigned to creator: ${result.team.id}`);
             return {
                 status: 201,
-                jsonBody: savedTeam
+                jsonBody: result.team
             };
 
         } catch (error) {
@@ -238,7 +298,6 @@ app.http('teams-update', {
             }
 
             const teamId = request.params.id;
-            const updateData = await request.json();
 
             if (!teamId) {
                 return {
@@ -256,7 +315,10 @@ app.http('teams-update', {
                 };
             }
 
-            const participations = await new GenericStorage('participations').getAll();
+            const updateData = await readJson(request);
+            if (!updateData) return INVALID_JSON;
+
+            const participations = await participationsStorage.findBy({ userId: auth.user.userId });
             if (!isTeamAuthorized(auth.user, team, participations)) {
                 return {
                     status: 403,
@@ -264,17 +326,40 @@ app.http('teams-update', {
                 };
             }
 
-            const allowedFields = ['teamName', 'numberOfParticipants', 'committedParticipants', 'presentationFile', 'deliveryVideo'];
-            for (const field of allowedFields) {
-                if (updateData[field] !== undefined) {
-                    team[field] = updateData[field];
+            const v = new Validator();
+            const updates = {};
+
+            if (updateData.teamName !== undefined) {
+                const { name, conflict } = await validateTeamName(v, updateData.teamName, team.eventId, teamId);
+                if (conflict) return conflict;
+                if (name) updates.teamName = name;
+            }
+
+            // Team size lives in NumberOfParticipants; committedParticipants is the UI's alias for it.
+            const sizeRaw = updateData.numberOfParticipants ?? updateData.committedParticipants;
+            if (sizeRaw !== undefined) {
+                const event = await Storage.events.getById(team.eventId);
+                const { min, max } = teamSizeBounds(event);
+                const size = v.integer(sizeRaw, 'numberOfParticipants', { min, max });
+                if (size !== undefined) {
+                    const current = await participantCount(teamId);
+                    if (size < current) {
+                        return { status: 400, jsonBody: { message: `Team size cannot be lower than the current ${current} participants` } };
+                    }
+                    updates.numberOfParticipants = size;
                 }
             }
-            team.updatedAt = new Date().toISOString();
 
-            const updatedTeam = await Storage.teams.update(teamId, team);
+            if (v.failed) return v.failure();
 
-            context.log(`Team updated: ${team.teamName}`);
+            if (Object.keys(updates).length === 0) {
+                return { status: 200, jsonBody: team };
+            }
+
+            updates.updatedAt = new Date().toISOString();
+            const updatedTeam = await Storage.teams.update(teamId, updates);
+
+            context.log(`Team updated: ${teamId}`);
             return {
                 status: 200,
                 jsonBody: updatedTeam
@@ -323,9 +408,6 @@ app.http('teams-delete', {
                 };
             }
 
-            const participationsStorage = new GenericStorage('participations');
-            const allParticipations = await participationsStorage.getAll();
-
             if (!auth.user.isPortalAdmin) {
                 return {
                     status: 403,
@@ -345,121 +427,78 @@ app.http('teams-delete', {
                 await SharePointStorage.deleteFolder(eventFolder);
             }
 
-            let participationsChanged = 0;
-            const noRemainingTeamEmails = [];
+            const result = await withTransaction(async () => {
+                const now = new Date().toISOString();
+                let participationsChanged = 0;
+                const noRemainingTeamEmails = [];
 
-            for (const p of allParticipations) {
-                const memberships = p.teamMemberships || [];
-                const hadMembership = memberships.some(m => m.teamId === teamId) || p.teamId === teamId;
-
-                if (hadMembership) {
-                    p.teamMemberships = memberships.filter(m => m.teamId !== teamId);
-
-                    if (p.teamId === teamId) {
-                        p.teamId = null;
-                        p.isTeamAdmin = false;
-                    }
-
-                    const hasOtherTeams = p.teamMemberships.some(m => m.isParticipant);
+                for (const p of await participationsStorage.findBy({ teamId })) {
                     const roles = p.roles || [];
                     const hasNonParticipantRole = roles.some(r => r !== 'participant');
+                    const changes = { teamId: null, isTeamAdmin: false, updatedAt: now };
 
-                    if (!hasOtherTeams) {
-                        if (hasNonParticipantRole) {
-                            p.hotelPaidBy = 'committee';
-                            context.log(`Hotel payer reverted to committee for ${p.email}`);
-                        } else {
-                            p.hotelPaidBy = null;
-                            p.hotelNights = {};
-                            context.log(`Cleared hotel for ${p.email} (no remaining teams)`);
-                            if (p.email) noRemainingTeamEmails.push(p.email.toLowerCase());
-                        }
+                    if (hasNonParticipantRole) {
+                        changes.hotelPaidBy = 'committee';
+                        context.log(`Hotel payer reverted to committee for participation ${p.id}`);
+                    } else {
+                        changes.hotelPaidBy = null;
+                        changes.hotelNights = {};
+                        if (p.email) noRemainingTeamEmails.push(p.email.toLowerCase());
                     }
 
-                    p.updatedAt = new Date().toISOString();
-                    await participationsStorage.update(p.id, {
-                        teamId: p.teamId,
-                        isTeamAdmin: p.isTeamAdmin,
-                        hotelPaidBy: p.hotelPaidBy,
-                        hotelNights: p.hotelNights,
-                        updatedAt: p.updatedAt
-                    });
+                    await participationsStorage.update(p.id, changes);
                     participationsChanged++;
                 }
-            }
 
-            if (participationsChanged > 0) {
-                context.log(`Cleaned ${participationsChanged} participation(s) for team ${teamId}`);
-            }
-
-            let usersUpdated = 0;
-            const teamUsers = await usersStorage.getAll();
-            for (const user of teamUsers.filter(candidate => candidate.teamId === teamId)) {
-                await usersStorage.update(user.id, { teamId: null, updatedAt: new Date().toISOString() });
-                usersUpdated++;
-            }
-
-            let deliveriesRemoved = 0;
-            if (noRemainingTeamEmails.length > 0) {
-                const deliveriesStorage = new GenericStorage('email-deliveries');
-                const allDeliveries = await deliveriesStorage.getAll();
-                const removedDeliveries = allDeliveries.filter(d =>
-                    d.email && noRemainingTeamEmails.includes(d.email.toLowerCase())
-                );
-                deliveriesRemoved = removedDeliveries.length;
-                for (const d of removedDeliveries) {
-                    await deliveriesStorage.delete(d.id);
+                let usersUpdated = 0;
+                for (const user of await usersStorage.findBy({ teamId })) {
+                    await usersStorage.update(user.id, { teamId: null, updatedAt: now });
+                    usersUpdated++;
                 }
-                if (deliveriesRemoved > 0) {
-                    context.log(`Removed ${deliveriesRemoved} orphaned delivery record(s) for team ${teamId}`);
+
+                let deliveriesRemoved = 0;
+                if (noRemainingTeamEmails.length > 0) {
+                    for (const d of await deliveriesStorage.findBy({ email: noRemainingTeamEmails })) {
+                        await deliveriesStorage.delete(d.id);
+                        deliveriesRemoved++;
+                    }
                 }
-            }
 
-            const badgeClaimsStorage = new GenericStorage('badge-claims');
-            const allClaims = await badgeClaimsStorage.getAll();
-            const removedClaims = allClaims.filter(c => c.teamId === teamId);
-            const claimsRemoved = removedClaims.length;
+                let claimsRemoved = 0;
+                for (const c of await badgeClaimsStorage.findBy({ teamId })) {
+                    await badgeClaimsStorage.delete(c.id);
+                    claimsRemoved++;
+                }
 
-            for (const c of removedClaims) {
-                await badgeClaimsStorage.delete(c.id);
-            }
-            if (claimsRemoved > 0) {
-                context.log(`Removed ${claimsRemoved} badge claim(s) for team ${teamId}`);
-            }
+                let invitationsRemoved = 0;
+                for (const inv of await invitationsStorage.findBy({ teamId })) {
+                    await invitationsStorage.delete(inv.id);
+                    invitationsRemoved++;
+                }
 
-            const invitationsStorage = new GenericStorage('invitations');
-            const allInvitations = await invitationsStorage.getAll();
-            const removedInvitations = allInvitations.filter(i => i.teamId === teamId);
-            const invitationsRemoved = removedInvitations.length;
+                const deleted = await Storage.teams.delete(teamId);
+                return { deleted, participationsChanged, usersUpdated, deliveriesRemoved, claimsRemoved, invitationsRemoved };
+            });
 
-            for (const inv of removedInvitations) {
-                await invitationsStorage.delete(inv.id);
-            }
-            if (invitationsRemoved > 0) {
-                context.log(`Removed ${invitationsRemoved} invitation(s) for team ${teamId}`);
-            }
-
-            const deleted = await Storage.teams.delete(teamId);
-
-            if (!deleted) {
+            if (!result.deleted) {
                 return {
                     status: 500,
                     jsonBody: { message: 'Failed to delete team' }
                 };
             }
 
-            context.log(`Team deleted: ${team.teamName} (${teamId})`);
+            context.log(`Team deleted: ${teamId}`);
             return {
                 status: 200,
                 jsonBody: {
                     success: true,
                     message: `Team "${team.teamName}" deleted`,
                     cleanup: {
-                        participationsUpdated: participationsChanged,
-                        usersUpdated,
-                        badgeClaimsRemoved: claimsRemoved,
-                        invitationsRemoved: invitationsRemoved,
-                        deliveriesRemoved: deliveriesRemoved
+                        participationsUpdated: result.participationsChanged,
+                        usersUpdated: result.usersUpdated,
+                        badgeClaimsRemoved: result.claimsRemoved,
+                        invitationsRemoved: result.invitationsRemoved,
+                        deliveriesRemoved: result.deliveriesRemoved
                     }
                 }
             };
@@ -504,7 +543,7 @@ app.http('teams-members', {
                 };
             }
 
-            const participations = await new GenericStorage('participations').getAll();
+            const participations = await participationsStorage.findBy({ userId: auth.user.userId });
             if (!isTeamMember(auth.user, teamId, participations)) {
                 return {
                     status: 403,
@@ -512,7 +551,12 @@ app.http('teams-members', {
                 };
             }
 
-            const members = await Storage.users.getByTeamId(teamId);
+            // Membership lives in Participations; the legacy Users.TeamId column is never set.
+            const memberParticipations = await participationsStorage.findBy({ teamId });
+            const userIds = [...new Set(memberParticipations.map(p => p.userId).filter(Boolean))];
+            const users = userIds.length > 0 ? await Storage.users.getByIds(userIds) : [];
+            const full = isTeamAuthorized(auth.user, team, participations);
+            const members = users.map(user => memberProjection(user, memberParticipations.find(p => sameId(p.userId, user.id)), full));
 
             return {
                 status: 200,

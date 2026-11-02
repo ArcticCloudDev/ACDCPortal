@@ -96,7 +96,10 @@ test('team admin invites a member, who accepts with a code and joins the team', 
 
 test('team admin resends and then cancels a pending invitation', async ({ page, harness, loginAs, dialogs }) => {
     const w = buildWorld();
-    const inv = f.invitation(w.event, w.leader, { teamId: w.team.id, teamName: w.team.teamName, email: 'pending.pia@e2e.test', inviteeFirstName: 'Pia', inviteeLastName: 'Pending' });
+    // Sent two minutes ago: a reminder is refused for 60 s after the last send.
+    const sentAt = Date.now() - 2 * 60_000;
+    const inv = f.invitation(w.event, w.leader, { teamId: w.team.id, teamName: w.team.teamName, email: 'pending.pia@e2e.test', inviteeFirstName: 'Pia', inviteeLastName: 'Pending',
+        createdAt: new Date(sentAt).toISOString(), expiresAt: new Date(sentAt + 7 * 24 * 3600e3).toISOString() });
     await harness.seed({ ...w.seed(), invitations: [inv] });
     await loginAs(w.leader);
     await page.goto(`/event.html?id=${w.event.id}`);

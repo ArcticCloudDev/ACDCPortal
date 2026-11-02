@@ -17,7 +17,6 @@ const PUBLIC_ENDPOINTS = new Set([
     'register-complete',
     'invitations-get',
     'invitations-accept',
-    'interest-record',
     'events-list',
     'events-active',
     'events-get',

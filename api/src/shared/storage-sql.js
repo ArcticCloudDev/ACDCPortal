@@ -1,8 +1,89 @@
+const { AsyncLocalStorage } = require('async_hooks');
 const { getPool, sql } = require('./sql');
+const { isGuid } = require('./id');
 
 const DATE_ONLY_COLUMNS = new Set([
     'StartDate', 'EndDate', 'HotelDate'
 ]);
+
+// ---------------------------------------------------------------------------
+// Transaction scope. withTransaction(work) opens a SQL transaction and runs `work`
+// inside an AsyncLocalStorage scope; every storage call made (directly or indirectly)
+// while that scope is active issues its requests through the transaction, so the
+// handlers below need no plumbing. Nested calls join the outer transaction.
+// Requests inside one transaction must run serially (mssql allows one at a time),
+// so never Promise.all storage calls inside withTransaction.
+// ---------------------------------------------------------------------------
+const transactionScope = new AsyncLocalStorage();
+
+async function getDb() {
+    return transactionScope.getStore() || getPool();
+}
+
+function inTransaction() {
+    return !!transactionScope.getStore();
+}
+
+async function withTransaction(work) {
+    if (transactionScope.getStore()) return work();
+    const pool = await getPool();
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    let result;
+    try {
+        result = await transactionScope.run(transaction, work);
+    } catch (error) {
+        try { await transaction.rollback(); } catch (e) { /* already rolled back by the server */ }
+        throw error;
+    }
+    await transaction.commit();
+    return result;
+}
+
+// Columns compared as GUIDs: a non-GUID filter value can never match, and would make
+// SQL Server raise a conversion error, so findBy() short-circuits to "no rows".
+const GUID_FILTER_KEYS = new Set([
+    'id', 'eventId', 'teamId', 'userId', 'inviterId', 'acceptedBy', 'leadId', 'judgeUserId',
+    'eventBadgeId', 'sequenceId', 'adminUserId', 'participationId', 'sponsorId', 'digestId'
+]);
+const CASE_INSENSITIVE_KEYS = new Set(['email', 'inviterEmail', 'contactEmail']);
+
+// Builds a parameterised WHERE clause from { camelKey: value | value[] | null }.
+// Returns null when the filter can match nothing (e.g. an empty IN list).
+function buildWhere(request, where) {
+    const clauses = [];
+    let i = 0;
+    for (const [key, raw] of Object.entries(where || {})) {
+        if (raw === undefined) continue;
+        const col = camelToSql(key);
+        if (raw === null) {
+            clauses.push(`[${col}] IS NULL`);
+            continue;
+        }
+        const values = (Array.isArray(raw) ? raw : [raw]).filter(v => v !== undefined && v !== null);
+        const usable = GUID_FILTER_KEYS.has(key) ? values.filter(isGuid) : values;
+        if (usable.length === 0) return null;
+        const ci = CASE_INSENSITIVE_KEYS.has(key);
+        const params = usable.map(v => {
+            const p = `w${i++}`;
+            request.input(p, ci ? String(v).toLowerCase() : v);
+            return `@${p}`;
+        });
+        const lhs = ci ? `LOWER([${col}])` : `[${col}]`;
+        clauses.push(params.length === 1 ? `${lhs} = ${params[0]}` : `${lhs} IN (${params.join(', ')})`);
+    }
+    return clauses.length ? clauses.join(' AND ') : '1 = 1';
+}
+
+function orderByClause(orderBy) {
+    if (!orderBy) return '';
+    const parts = (Array.isArray(orderBy) ? orderBy : [orderBy]).map(spec => {
+        const m = /^(-?)([A-Za-z_][A-Za-z0-9_]*)$/.exec(String(spec));
+        if (!m) throw new Error(`Invalid orderBy: ${spec}`);
+        return `[${camelToSql(m[2])}]${m[1] ? ' DESC' : ''}`;
+    });
+    return ` ORDER BY ${parts.join(', ')}`;
+}
 
 function rowToJs(row) {
     const obj = {};
@@ -95,7 +176,7 @@ const TABLE_MAP = {
     'events':           { table: 'Events',           wrapperKey: null,             idCol: 'Id' },
     'users':            { table: 'Users',            wrapperKey: null,             idCol: 'Id' },
     'teams':            { table: 'Teams',            wrapperKey: null,             idCol: 'Id' },
-    'badges':           { table: 'Badges',           wrapperKey: null,             idCol: 'Id' },
+    'badges':           { table: 'Badges',           wrapperKey: null,             idCol: 'Id', guidId: false },
     'event-badges':     { table: 'EventBadges',      wrapperKey: null,             idCol: 'Id' },
     'badge-claims':     { table: 'BadgeClaims',      wrapperKey: null,             idCol: 'Id' },
     'participations':   { table: 'Participations',   wrapperKey: 'participations', idCol: 'Id' },
@@ -109,7 +190,7 @@ const TABLE_MAP = {
     'interest-queue':   { table: 'InterestQueue',    wrapperKey: 'entries',        idCol: 'Id' },
     'solo-queue':       { table: 'SoloQueue',        wrapperKey: null,             idCol: 'Id' },
     'sequence-progress':{ table: null },
-    'system-email-config': { table: 'SystemEmailConfig', wrapperKey: 'templates',  idCol: 'TemplateKey' },
+    'system-email-config': { table: 'SystemEmailConfig', wrapperKey: 'templates',  idCol: 'TemplateKey', guidId: false },
     'errors':           { table: 'Errors',           wrapperKey: 'errors',         idCol: 'Id' },
 };
 
@@ -222,6 +303,24 @@ async function readAllEvents(pool) {
     for (const event of events) {
         event.hotelDates = hotelDatesByEvent[event.id] || [];
         event.hotelDefaultNights = defaultNightsByEvent[event.id] || [];
+    }
+    return events;
+}
+
+async function hydrateEvents(pool, events) {
+    for (const event of events) {
+        const hd = await pool.request()
+            .input('eventId', event.id)
+            .query('SELECT * FROM [EventHotelDates] WHERE EventId = @eventId ORDER BY HotelDate');
+        event.hotelDates = hd.recordset.map(r => ({
+            date: r.HotelDate instanceof Date ? r.HotelDate.toISOString().split('T')[0] : r.HotelDate,
+            dayLabel: r.DayLabel,
+            dayLabelFull: r.DayLabelFull
+        }));
+        const dn = await pool.request()
+            .input('eventId', event.id)
+            .query('SELECT * FROM [EventDefaultNights] WHERE EventId = @eventId');
+        event.hotelDefaultNights = dn.recordset.map(r => r.NightLabel);
     }
     return events;
 }
@@ -491,6 +590,42 @@ class GenericStorage {
         this.wrapperKey = this.config?.wrapperKey || key;
     }
 
+    // Tables keyed by UNIQUEIDENTIFIER: a malformed id can never match, and sending it
+    // to SQL Server would raise a conversion error (500) instead of a clean "not found".
+    _validId(id) {
+        if (!this.config || this.config.guidId === false) return id !== undefined && id !== null;
+        return isGuid(id);
+    }
+
+    // Targeted, parameterised lookup: findBy({ eventId }), findBy({ userId: [a, b] }),
+    // findBy({ teamId: null }), findBy({ email }) (case-insensitive) ...
+    async findBy(where, options = {}) {
+        if (!this.config || !this.config.table) return [];
+        const pool = await getDb();
+        const request = pool.request();
+        const whereSql = buildWhere(request, where);
+        if (whereSql === null) return [];
+        const result = await request.query(`SELECT * FROM [${this.config.table}] WHERE ${whereSql}${orderByClause(options.orderBy)}`);
+        const items = result.recordset.map(row => this._convertRow(row));
+        if (this.config.table === 'Events') await hydrateEvents(pool, items);
+        return items;
+    }
+
+    async findOneBy(where) {
+        const items = await this.findBy(where);
+        return items.length > 0 ? items[0] : undefined;
+    }
+
+    async countBy(where) {
+        if (!this.config || !this.config.table) return 0;
+        const pool = await getDb();
+        const request = pool.request();
+        const whereSql = buildWhere(request, where);
+        if (whereSql === null) return 0;
+        const result = await request.query(`SELECT COUNT(*) AS n FROM [${this.config.table}] WHERE ${whereSql}`);
+        return result.recordset[0].n;
+    }
+
     _convertRow(row) {
         if (!this.config) return rowToJs(row);
         switch (this.config.table) {
@@ -503,7 +638,7 @@ class GenericStorage {
 
     async getRaw() {
         if (!this.config || !this.config.table) return {};
-        const pool = await getPool();
+        const pool = await getDb();
 
         if (this.config.table === 'Events') {
             const events = await readAllEvents(pool);
@@ -528,7 +663,7 @@ class GenericStorage {
 
     async saveRaw(data) {
         if (!this.config || !this.config.table) return false;
-        const pool = await getPool();
+        const pool = await getDb();
 
         if (this.config.table === 'SystemEmailConfig') {
             await writeSystemEmailConfig(pool, data);
@@ -549,7 +684,7 @@ class GenericStorage {
 
     async getAll() {
         if (!this.config || !this.config.table) return [];
-        const pool = await getPool();
+        const pool = await getDb();
 
         if (this.config.table === 'Events') {
             return readAllEvents(pool);
@@ -564,7 +699,7 @@ class GenericStorage {
 
     async saveAll(items) {
         if (!this.config || !this.config.table) return false;
-        const pool = await getPool();
+        const pool = await getDb();
         return this._saveItems(pool, items);
     }
 
@@ -609,24 +744,27 @@ class GenericStorage {
 
     async getById(id) {
         if (!this.config || !this.config.table) return undefined;
-        const pool = await getPool();
+        if (!this._validId(id)) return undefined;
+        const pool = await getDb();
         const result = await pool.request()
             .input('id', id)
             .query(`SELECT * FROM [${this.config.table}] WHERE [${this.config.idCol}] = @id`);
         if (result.recordset.length === 0) return undefined;
-        return this._convertRow(result.recordset[0]);
+        const item = this._convertRow(result.recordset[0]);
+        if (this.config.table === 'Events') await hydrateEvents(pool, [item]);
+        return item;
     }
 
     async create(item) {
         if (!this.config || !this.config.table) return item;
-        const pool = await getPool();
+        const pool = await getDb();
         await this._insertItem(pool, item);
         return item;
     }
 
     async update(id, updates) {
         if (!this.config || !this.config.table) return null;
-        const pool = await getPool();
+        const pool = await getDb();
 
         const current = await this.getById(id);
         if (!current) return null;
@@ -642,7 +780,7 @@ class GenericStorage {
 
     async updateFull(item) {
         if (!this.config || !this.config.table) return item;
-        const pool = await getPool();
+        const pool = await getDb();
         if (this.config.table === 'Events') {
             await updateEventFull(pool, item);
             return item;
@@ -652,7 +790,8 @@ class GenericStorage {
 
     async delete(id) {
         if (!this.config || !this.config.table) return false;
-        const pool = await getPool();
+        if (!this._validId(id)) return false;
+        const pool = await getDb();
         if (this.config.table === 'Events') {
             await pool.request().input('eid', id).query('DELETE FROM [EventHotelDates] WHERE EventId = @eid');
             await pool.request().input('eid', id).query('DELETE FROM [EventDefaultNights] WHERE EventId = @eid');
@@ -667,21 +806,41 @@ class GenericStorage {
 const Storage = {
     teams: {
         async getAll() {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request().query('SELECT * FROM [Teams]');
             return result.recordset.map(rowToJs);
         },
 
         async getById(id) {
-            const pool = await getPool();
+            if (!isGuid(id)) return null;
+            const pool = await getDb();
             const result = await pool.request()
                 .input('id', id)
                 .query('SELECT * FROM [Teams] WHERE Id = @id');
             return result.recordset.length > 0 ? rowToJs(result.recordset[0]) : null;
         },
 
+        async getByIds(ids) {
+            return new GenericStorage('teams').findBy({ id: ids });
+        },
+
+        async findByEvent(eventId) {
+            return new GenericStorage('teams').findBy({ eventId });
+        },
+
+        // Case-insensitive team-name lookup inside one event (names are unique per event).
+        async getByNameInEvent(name, eventId) {
+            if (!isGuid(eventId)) return null;
+            const pool = await getDb();
+            const result = await pool.request()
+                .input('name', String(name).trim().toLowerCase())
+                .input('eventId', eventId)
+                .query('SELECT * FROM [Teams] WHERE LOWER(LTRIM(RTRIM(TeamName))) = @name AND EventId = @eventId');
+            return result.recordset.length > 0 ? rowToJs(result.recordset[0]) : null;
+        },
+
         async getByName(name) {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request()
                 .input('name', name)
                 .query('SELECT * FROM [Teams] WHERE LOWER(TeamName) = LOWER(@name)');
@@ -689,13 +848,14 @@ const Storage = {
         },
 
         async create(team) {
-            const pool = await getPool();
+            const pool = await getDb();
             await insertGeneric(pool, 'Teams', team);
             return team;
         },
 
         async update(id, updates) {
-            const pool = await getPool();
+            if (!isGuid(id)) return null;
+            const pool = await getDb();
             await updateGeneric(pool, 'Teams', 'Id', id, updates);
             const result = await pool.request()
                 .input('id', id)
@@ -704,7 +864,8 @@ const Storage = {
         },
 
         async delete(id) {
-            const pool = await getPool();
+            if (!isGuid(id)) return false;
+            const pool = await getDb();
             const result = await pool.request()
                 .input('id', id)
                 .query('DELETE FROM [Teams] WHERE Id = @id');
@@ -714,12 +875,13 @@ const Storage = {
 
     events: {
         async getAll() {
-            const pool = await getPool();
+            const pool = await getDb();
             return readAllEvents(pool);
         },
 
         async getById(id) {
-            const pool = await getPool();
+            if (!isGuid(id)) return null;
+            const pool = await getDb();
             const result = await pool.request()
                 .input('id', id)
                 .query('SELECT * FROM [Events] WHERE Id = @id');
@@ -747,21 +909,27 @@ const Storage = {
 
     users: {
         async getAll() {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request().query('SELECT * FROM [Users]');
             return result.recordset.map(rowToJs);
         },
 
         async getById(id) {
-            const pool = await getPool();
+            if (!isGuid(id)) return null;
+            const pool = await getDb();
             const result = await pool.request()
                 .input('id', id)
                 .query('SELECT * FROM [Users] WHERE Id = @id');
             return result.recordset.length > 0 ? rowToJs(result.recordset[0]) : null;
         },
 
+        async getByIds(ids) {
+            return new GenericStorage('users').findBy({ id: ids });
+        },
+
         async getByEmail(email) {
-            const pool = await getPool();
+            if (typeof email !== 'string' || !email) return null;
+            const pool = await getDb();
             const result = await pool.request()
                 .input('email', email)
                 .query('SELECT * FROM [Users] WHERE LOWER(Email) = LOWER(@email)');
@@ -769,7 +937,7 @@ const Storage = {
         },
 
         async getByTeamId(teamId) {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request()
                 .input('teamId', teamId)
                 .query('SELECT * FROM [Users] WHERE TeamId = @teamId');
@@ -777,13 +945,14 @@ const Storage = {
         },
 
         async create(user) {
-            const pool = await getPool();
+            const pool = await getDb();
             await insertGeneric(pool, 'Users', user);
             return user;
         },
 
         async update(id, updates) {
-            const pool = await getPool();
+            if (!isGuid(id)) return null;
+            const pool = await getDb();
             await updateGeneric(pool, 'Users', 'Id', id, {
                 ...updates,
                 updatedAt: updates.updatedAt || new Date().toISOString()
@@ -795,7 +964,8 @@ const Storage = {
         },
 
         async delete(id) {
-            const pool = await getPool();
+            if (!isGuid(id)) return false;
+            const pool = await getDb();
             const result = await pool.request()
                 .input('id', id)
                 .query('DELETE FROM [Users] WHERE Id = @id');
@@ -805,13 +975,13 @@ const Storage = {
 
     allowedEmails: {
         async getAll() {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request().query('SELECT * FROM [AllowedEmails]');
             return result.recordset.map(rowToJs);
         },
 
         async getByEmail(email) {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request()
                 .input('email', email)
                 .query('SELECT * FROM [AllowedEmails] WHERE LOWER(Email) = LOWER(@email)');
@@ -824,7 +994,7 @@ const Storage = {
         },
 
         async add(email, addedByUserId = null) {
-            const pool = await getPool();
+            const pool = await getDb();
             const existing = await this.getByEmail(email);
             if (existing) return existing;
 
@@ -839,7 +1009,7 @@ const Storage = {
         },
 
         async remove(email) {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request()
                 .input('email', email)
                 .query('DELETE FROM [AllowedEmails] WHERE LOWER(Email) = LOWER(@email)');
@@ -847,7 +1017,7 @@ const Storage = {
         },
 
         async deactivate(email) {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request()
                 .input('email', email)
                 .query('UPDATE [AllowedEmails] SET IsActive = 0 WHERE LOWER(Email) = LOWER(@email)');
@@ -857,13 +1027,13 @@ const Storage = {
 
     pendingRegistrations: {
         async getAll() {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request().query('SELECT * FROM [PendingRegistrations]');
             return result.recordset.map(rowToJs);
         },
 
         async getById(id) {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request()
                 .input('id', id)
                 .query('SELECT * FROM [PendingRegistrations] WHERE Id = @id');
@@ -871,15 +1041,26 @@ const Storage = {
         },
 
         async getByEmail(email) {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request()
                 .input('email', email)
                 .query('SELECT * FROM [PendingRegistrations] WHERE LOWER(Email) = LOWER(@email)');
             return result.recordset.length > 0 ? rowToJs(result.recordset[0]) : null;
         },
 
+        // The registration draft only (OTP rows share the Email column under Id 'otp_<email>').
+        async getRegistrationByEmail(email) {
+            const pool = await getDb();
+            const result = await pool.request()
+                .input('email', email)
+                .query(`SELECT * FROM [PendingRegistrations]
+                        WHERE LOWER(Email) = LOWER(@email) AND Id NOT LIKE 'otp_%'
+                        ORDER BY CreatedAt DESC`);
+            return result.recordset.length > 0 ? rowToJs(result.recordset[0]) : null;
+        },
+
         async create(registration) {
-            const pool = await getPool();
+            const pool = await getDb();
             const isOtpRecord = registration.id && registration.id.startsWith('otp_');
             if (isOtpRecord) {
                 await pool.request()
@@ -903,7 +1084,7 @@ const Storage = {
         },
 
         async delete(id) {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request()
                 .input('id', id)
                 .query('DELETE FROM [PendingRegistrations] WHERE Id = @id');
@@ -911,7 +1092,7 @@ const Storage = {
         },
 
         async cleanupExpired() {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request()
                 .query('DELETE FROM [PendingRegistrations] WHERE ExpiresAt < SYSUTCDATETIME()');
             return result.rowsAffected[0];
@@ -920,7 +1101,7 @@ const Storage = {
 
     interestLeads: {
         async getAll() {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request().query('SELECT * FROM [InterestLeads]');
             return result.recordset.map(rowToJs);
         }
@@ -928,7 +1109,7 @@ const Storage = {
 
     emailCampaigns: {
         async getAll() {
-            const pool = await getPool();
+            const pool = await getDb();
             const result = await pool.request().query('SELECT * FROM [EmailCampaigns]');
             return result.recordset.map(rowToJs);
         }
@@ -943,7 +1124,7 @@ async function readData(filename) {
         return {};
     }
 
-    const pool = await getPool();
+    const pool = await getDb();
 
     if (config.table === 'SystemEmailConfig') {
         return readSystemEmailConfig(pool);
@@ -981,7 +1162,7 @@ async function writeData(filename, data) {
         return true;
     }
 
-    const pool = await getPool();
+    const pool = await getDb();
 
     if (config.table === 'SystemEmailConfig') {
         await writeSystemEmailConfig(pool, data);
@@ -1043,3 +1224,5 @@ module.exports = Storage;
 module.exports.Storage = GenericStorage;
 module.exports.readData = readData;
 module.exports.writeData = writeData;
+module.exports.withTransaction = withTransaction;
+module.exports.inTransaction = inTransaction;

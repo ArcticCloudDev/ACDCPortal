@@ -161,8 +161,8 @@ test.describe('confirmed security defects', () => {
         expect(await page.evaluate(() => window.__xss)).toBeUndefined();  // <- bug
     });
 
-    test('BUG (high): an anonymous interest sign-up cannot inject script into admin pages', async ({ page, harness, loginAs, apiAs }) => {
-        test.fail(true, 'admin-events.js recipient overview renders lead names unescaped; names come from the public interest/record endpoint');
+    test('BUG (high): an interest sign-up cannot inject script into admin pages', async ({ page, harness, loginAs, apiAs }) => {
+        test.fail(true, 'admin-events.js recipient overview renders lead names unescaped; names come from the interest/record endpoint');
         const w = buildWorld();
         const seq = { id: f.id(), name: 'Pre-reg drip', description: null, createdAt: new Date().toISOString() };
         w.event.sequenceId = seq.id;
@@ -170,8 +170,9 @@ test.describe('confirmed security defects', () => {
         const campaign = { id: f.id(), sequenceId: seq.id, subject: 'Hello', content: '<p>x</p>', type: 'sequence', sequenceOrder: 1,
             status: 'draft', createdAt: new Date().toISOString() };
         await harness.seed({ ...w.seed(), sequences: [seq], 'email-campaigns': [campaign] });
-        const anon = await apiAs(null);
-        const rec = await anon.post('/api/interest/record', {
+        // interest/record requires the signed-in session of the lead (contract 4); any OTP login gets one.
+        const mallory = await apiAs({ email: 'mallory@e2e.test', id: null });
+        const rec = await mallory.post('/api/interest/record', {
             data: { eventId: w.event.id, email: 'mallory@e2e.test', firstName: '<img src=x onerror="window.__xss=1">', lastName: 'M' }
         });
         expect(rec.status()).toBe(200);

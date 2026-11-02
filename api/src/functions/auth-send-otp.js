@@ -4,6 +4,8 @@ const Storage = require('../shared/storage');
 const { getPool } = require('../shared/sql');
 const Email = require('../shared/email');
 const { verifyCaptcha } = require('../shared/captcha');
+const { getClientIp } = require('../shared/auth');
+const { isEmail, normalizeEmail } = require('../shared/validate');
 
 const rateLimits = {
     byEmail: new Map(),
@@ -63,19 +65,24 @@ app.http('auth-send-otp', {
         context.log('Auth send OTP called');
 
         try {
-            const body = await request.json();
-            const { email, captchaToken } = body;
+            let body;
+            try {
+                body = await request.json();
+            } catch {
+                body = {};
+            }
+            const { email, captchaToken } = body || {};
 
-            if (!email) {
+            if (!email || !isEmail(email)) {
                 return {
                     status: 400,
-                    jsonBody: { message: 'Email is required' }
+                    jsonBody: { message: 'A valid email is required' }
                 };
             }
 
-            const normalizedEmail = email.toLowerCase().trim();
-            const clientIp = request.headers.get('x-forwarded-for') ||
-                             request.headers.get('x-client-ip') || 'unknown';
+            const normalizedEmail = normalizeEmail(email);
+            // Right-most X-Forwarded-For hop (appended by the SWA edge), never a client-chosen value.
+            const clientIp = getClientIp(request);
 
             if (!checkCooldown(normalizedEmail)) {
                 return {
@@ -95,10 +102,20 @@ app.http('auth-send-otp', {
 
             const emailCheck = checkRateLimit(rateLimits.byEmail, normalizedEmail, RATE_LIMITS.EMAIL_MAX);
             if (!emailCheck.allowed) {
-                context.warn(`Rate limit exceeded for email: ${normalizedEmail}`);
+                context.warn('Rate limit exceeded for an email address');
                 return {
                     status: 429,
                     jsonBody: { message: 'Too many codes requested. Please wait before trying again.' }
+                };
+            }
+
+            // The in-memory maps above are per Function instance; the OTP row itself gives a
+            // cooldown that holds across instances (its CreatedAt is the last send time).
+            const previousOtp = await Storage.pendingRegistrations.getById(`otp_${normalizedEmail}`);
+            if (previousOtp?.createdAt && Date.now() - new Date(previousOtp.createdAt).getTime() < RATE_LIMITS.COOLDOWN_MS) {
+                return {
+                    status: 429,
+                    jsonBody: { message: 'Please wait 60 seconds before requesting another code.' }
                 };
             }
 
@@ -152,11 +169,21 @@ app.http('auth-send-otp', {
 
             await Storage.pendingRegistrations.create(otpRecord);
 
-            await Email.sendVerificationCode(normalizedEmail, otpCode);
+            try {
+                await Email.sendVerificationCode(normalizedEmail, otpCode);
+            } catch (mailError) {
+                // Nothing reached the inbox: take the unusable code back and say so.
+                await Storage.pendingRegistrations.delete(otpRecord.id).catch(() => {});
+                await logError(context, mailError);
+                return {
+                    status: 502,
+                    jsonBody: { message: 'Could not send the verification email. Please try again.' }
+                };
+            }
 
             markSent(normalizedEmail);
 
-            context.log(`OTP sent to ${normalizedEmail}`);
+            context.log('OTP sent');
             return {
                 status: 200,
                 jsonBody: {

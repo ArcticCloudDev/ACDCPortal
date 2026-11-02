@@ -1,20 +1,19 @@
 const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
-const { Storage } = require('../shared/storage');
-const { generateId } = require('../shared/id');
-const fs = require('fs').promises;
-const path = require('path');
+const Storage = require('../shared/storage');
+const { Storage: GenericStorage } = require('../shared/storage');
+const { generateId, isGuid } = require('../shared/id');
+const { Validator, readJson, INVALID_JSON } = require('../shared/validate');
 
 const { sendInterestAcknowledgmentEmail } = require('../shared/interest-acknowledgment');
 const { sendSequenceDigest } = require('../shared/sequence-digest');
 
-const leadsStorage = new Storage('interest-leads');
-const eventsStorage = new Storage('events');
+const leadsStorage = new GenericStorage('interest-leads');
+const deliveriesStorage = new GenericStorage('email-deliveries');
+const participationsStorage = new GenericStorage('participations');
 
-const deliveriesStorage = new Storage('email-deliveries');
-const participationsStorage = new Storage('participations');
-const usersStorage = new Storage('users');
+const INTEREST_STATUSES = ['pre-registration', 'registration'];
 
 async function triggerSequenceEmailsForLead(lead, event, context) {
     return sendSequenceDigest({ event, email: lead.email, firstName: lead.firstName }, context);
@@ -22,32 +21,44 @@ async function triggerSequenceEmailsForLead(lead, event, context) {
 
 app.http('interest-record', {
     methods: ['POST'],
-    authLevel: 'anonymous',
+    authLevel: 'function',
     route: 'interest/record',
     handler: async (request, context) => {
         try {
-            const body = await request.json();
+            // Interest is recorded for the signed-in person only: the OTP session proves the email.
+            const auth = requireAuth(request, context);
+            if (!auth.authorized) {
+                return { status: auth.status, jsonBody: auth.jsonBody };
+            }
+
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
             const { eventId, email, firstName, lastName } = body;
 
             if (!eventId || !email) {
                 return { status: 400, jsonBody: { error: 'eventId and email are required' } };
             }
 
-            const events = await eventsStorage.getAll();
-            const event = events.find(e => e.id === eventId);
+            const v = new Validator();
+            const cleanEventId = v.guid(eventId, 'eventId', { required: true });
+            const normalizedEmail = v.email(email, 'email');
+            const leadFirstName = v.string(firstName, 'firstName', { max: 100 }) || '';
+            const leadLastName = v.string(lastName, 'lastName', { max: 100 }) || '';
+            if (v.failed) return v.failure();
+
+            if (!auth.user.email || auth.user.email.toLowerCase() !== normalizedEmail) {
+                return { status: 403, jsonBody: { error: 'You can only register interest for your own email address' } };
+            }
+
+            const event = await Storage.events.getById(cleanEventId);
             if (!event) {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
+            if (!INTEREST_STATUSES.includes(event.status)) {
+                return { status: 400, jsonBody: { error: 'Interest registration is not open for this event' } };
+            }
 
-            const normalizedEmail = email.toLowerCase().trim();
-            const leadFirstName = (firstName || '').trim();
-            const leadLastName = (lastName || '').trim();
-
-            const allLeadsForRecord = await leadsStorage.getAll();
-            const existingLead = allLeadsForRecord.find(l =>
-                l.eventId === eventId &&
-                l.email.toLowerCase() === normalizedEmail
-            );
+            const existingLead = await leadsStorage.findOneBy({ eventId: cleanEventId, email: normalizedEmail });
 
             if (existingLead && existingLead.verified) {
                 return {
@@ -62,7 +73,7 @@ app.http('interest-record', {
 
             const lead = {
                 id: existingLead ? existingLead.id : generateId(),
-                eventId,
+                eventId: cleanEventId,
                 email: normalizedEmail,
                 firstName: leadFirstName,
                 lastName: leadLastName,
@@ -80,29 +91,19 @@ app.http('interest-record', {
                 await leadsStorage.create(lead);
             }
 
-            context.log(`Interest recorded (authenticated) for ${normalizedEmail} on event ${event.name}`);
+            context.log(`Interest recorded for event ${event.id}`);
 
             try {
-                const allUsers = await usersStorage.getAll();
-                const user = allUsers.find(u => u.email?.toLowerCase() === normalizedEmail);
+                const user = await Storage.users.getByEmail(normalizedEmail);
                 const userId = user ? user.id : null;
 
-                const allPartsForRecord = await participationsStorage.getAll();
-                const existingPart = allPartsForRecord.find(p =>
-                    p.email?.toLowerCase() === normalizedEmail &&
-                    p.eventId === eventId
-                );
+                const existingPart = await participationsStorage.findOneBy({ email: normalizedEmail, eventId: cleanEventId })
+                    || (userId ? await participationsStorage.findOneBy({ userId, eventId: cleanEventId }) : undefined);
 
                 if (existingPart) {
                     const roles = existingPart.roles || [];
                     if (!roles.includes('interest')) roles.push('interest');
-                    const updates = {
-                        roles,
-                        interestVerified: true,
-                        interestDate: lead.verifiedAt,
-                        interestSource: 'unified-register',
-                        updatedAt: new Date().toISOString()
-                    };
+                    const updates = { roles, updatedAt: new Date().toISOString() };
                     if (userId && !existingPart.userId) updates.userId = userId;
                     await participationsStorage.update(existingPart.id, updates);
                 } else {
@@ -110,33 +111,27 @@ app.http('interest-record', {
                         id: generateId(),
                         email: normalizedEmail,
                         userId: userId,
-                        eventId: eventId,
+                        eventId: cleanEventId,
                         roles: ['interest'],
                         teamId: null,
                         isTeamAdmin: false,
                         hotelNights: {},
-                        interestVerified: true,
-                        interestDate: lead.verifiedAt,
-                        interestSource: 'unified-register',
-                        interestFirstName: leadFirstName,
-                        interestLastName: leadLastName,
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
                     });
                 }
-                context.log(`Participation with interest role created/updated for ${normalizedEmail}`);
             } catch (partError) {
+                await logError(context, partError);
                 context.error('Warning: Failed to create interest participation:', partError);
             }
 
-            sendInterestAcknowledgmentEmail(normalizedEmail, eventId, context)
-                .then(r => context.log(`[INTEREST-RECORD] Interest ack sent: ${r?.reason || 'ok'}`))
+            sendInterestAcknowledgmentEmail(normalizedEmail, cleanEventId, context)
+                .then(r => context.log(`[INTEREST-RECORD] Interest ack: ${r?.reason || 'ok'}`))
                 .catch(err => context.error('[INTEREST-RECORD] Interest ack error:', err));
 
-            let seqResult = { sent: 0, reason: null };
             try {
-                seqResult = await triggerSequenceEmailsForLead(lead, event, context);
-                context.log(`[INTEREST-RECORD] Sequence result: sent=${seqResult.sent}, reason=${seqResult.reason}, campaigns=${seqResult.totalCampaigns}`);
+                const seqResult = await triggerSequenceEmailsForLead(lead, event, context);
+                context.log(`[INTEREST-RECORD] Sequence result: sent=${seqResult?.sent}, reason=${seqResult?.reason}`);
             } catch (seqError) {
                 context.error('[INTEREST-RECORD] Sequence email error:', seqError);
             }
@@ -173,12 +168,11 @@ app.http('interest-list', {
             }
 
             const eventId = request.query.get('eventId');
-
-            let leads = await leadsStorage.getAll();
-
-            if (eventId) {
-                leads = leads.filter(l => l.eventId === eventId);
+            if (eventId && !isGuid(eventId)) {
+                return { status: 400, jsonBody: { error: 'Invalid event ID' } };
             }
+
+            let leads = eventId ? await leadsStorage.findBy({ eventId }) : await leadsStorage.getAll();
 
             const verifiedOnly = request.query.get('verified') !== 'false';
             if (verifiedOnly) {
@@ -230,21 +224,21 @@ app.http('interest-delete', {
 
             let cleaned = { deliveries: 0, participations: 0 };
             try {
-                const allDeliveries = await deliveriesStorage.getAll();
-                const toDeleteDeliveries = allDeliveries.filter(d => {
-                    if (d.leadId === id) return true;
-                    if (email && d.email?.toLowerCase() === email.toLowerCase() && !d.userId) return true;
-                    return false;
-                });
-                for (const d of toDeleteDeliveries) await deliveriesStorage.delete(d.id);
-                cleaned.deliveries = toDeleteDeliveries.length;
+                const byLead = await deliveriesStorage.findBy({ leadId: id });
+                const byEmail = email ? (await deliveriesStorage.findBy({ email })).filter(d => !d.userId) : [];
+                const seen = new Set();
+                for (const d of [...byLead, ...byEmail]) {
+                    const key = String(d.id).toLowerCase();
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    await deliveriesStorage.delete(d.id);
+                    cleaned.deliveries++;
+                }
             } catch (e) { context.log(`Warning: delivery cleanup failed: ${e.message}`); }
 
             try {
-                const allParts = await participationsStorage.getAll();
-                for (const p of allParts) {
-                    if (!email || p.email?.toLowerCase() !== email.toLowerCase()) continue;
-                    if (lead.eventId && p.eventId !== lead.eventId) continue;
+                const parts = email ? await participationsStorage.findBy({ email, eventId: lead.eventId || undefined }) : [];
+                for (const p of parts) {
                     const roles = p.roles || [];
                     if (!roles.includes('interest')) continue;
                     if (roles.length === 1) {
@@ -256,7 +250,7 @@ app.http('interest-delete', {
                 }
             } catch (e) { context.log(`Warning: participation cleanup failed: ${e.message}`); }
 
-            context.log(`Deleted lead ${id} (${email}). Cleaned: ${cleaned.deliveries} deliveries`);
+            context.log(`Deleted lead ${id}. Cleaned: ${cleaned.deliveries} deliveries, ${cleaned.participations} participations`);
 
             return { status: 200, jsonBody: { message: 'Lead deleted', cleaned } };
         } catch (error) {
@@ -278,7 +272,8 @@ app.http('interest-restart-sequence', {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
 
-            const body = await request.json();
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
             const { leadId, userId, eventId } = body;
 
             if (!leadId && !userId) {
@@ -299,50 +294,46 @@ app.http('interest-restart-sequence', {
                 recipient = lead;
                 recipientEventId = lead.eventId;
             } else {
-                const users = await usersStorage.getAll();
-                const user = users.find(u => u.id === userId);
+                const user = await Storage.users.getById(userId);
                 if (!user) {
                     return { status: 404, jsonBody: { error: 'User not found' } };
                 }
-                if (!eventId) {
+                if (!eventId || !isGuid(eventId)) {
                     return { status: 400, jsonBody: { error: 'eventId is required for user-based restart' } };
                 }
                 recipient = { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, userId: user.id };
                 recipientEventId = eventId;
             }
 
-            context.log(`[RESTART] Manually restarting sequence for ${recipient.email}`);
-
             const normalizedEmail = (recipient.email || '').toLowerCase();
-            const allDeliveriesForRestart = await deliveriesStorage.getAll();
-            const deliveriesToDelete = allDeliveriesForRestart.filter(d => {
-                if (leadId) {
-                    return d.leadId === leadId || (normalizedEmail && (d.email || '').toLowerCase() === normalizedEmail);
-                } else {
-                    return d.userId === userId || (normalizedEmail && (d.email || '').toLowerCase() === normalizedEmail);
-                }
-            });
-            for (const d of deliveriesToDelete) await deliveriesStorage.delete(d.id);
-            if (deliveriesToDelete.length > 0) {
-                context.log(`[RESTART] Deleted ${deliveriesToDelete.length} existing delivery records for ${leadId || userId}`);
+            const deliveriesToDelete = [
+                ...(leadId ? await deliveriesStorage.findBy({ leadId }) : await deliveriesStorage.findBy({ userId })),
+                ...(normalizedEmail ? await deliveriesStorage.findBy({ email: normalizedEmail }) : [])
+            ];
+            const seen = new Set();
+            let deletedCount = 0;
+            for (const d of deliveriesToDelete) {
+                const key = String(d.id).toLowerCase();
+                if (seen.has(key)) continue;
+                seen.add(key);
+                await deliveriesStorage.delete(d.id);
+                deletedCount++;
+            }
+            if (deletedCount > 0) {
+                context.log(`[RESTART] Deleted ${deletedCount} existing delivery records`);
             }
 
-            const events = await eventsStorage.getAll();
-            const event = events.find(e => e.id === recipientEventId);
-            context.log(`[RESTART] Event found:`, event ? { id: event.id, name: event.name, sequenceId: event.sequenceId } : 'NOT FOUND');
-
+            const event = await Storage.events.getById(recipientEventId);
             if (!event) {
                 return { status: 404, jsonBody: { error: 'Event not found' } };
             }
 
             const triggerResult = await triggerSequenceEmailsForLead(recipient, event, context);
 
-            const updatedDeliveries = await deliveriesStorage.getAll();
-            const sentDeliveries = updatedDeliveries
-                .filter(d => {
-                    if (leadId) return d.leadId === leadId && d.status === 'sent';
-                    return d.userId === userId && d.status === 'sent';
-                });
+            const updatedDeliveries = leadId
+                ? await deliveriesStorage.findBy({ leadId })
+                : await deliveriesStorage.findBy({ userId });
+            const sentDeliveries = updatedDeliveries.filter(d => d.status === 'sent');
 
             return {
                 status: 200,
@@ -364,4 +355,3 @@ app.http('interest-restart-sequence', {
         }
     }
 });
-

@@ -1,36 +1,38 @@
 const { app } = require('@azure/functions');
 const { requireAuth } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
-const { generateId } = require('../shared/id');
+const { generateId, isGuid, sameId } = require('../shared/id');
+const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
+const { Validator, readJson, INVALID_JSON } = require('../shared/validate');
 
 const soloQueueStorage = new GenericStorage('solo-queue.json');
-const usersStorage = new GenericStorage('users');
-const interestQueueStorage = new GenericStorage('interest-queue');
+const participationsStorage = new GenericStorage('participations');
 
-async function markRegisteredInInterestQueue(userId, eventId, context) {
-    try {
-        const users = await usersStorage.getAll();
-        const user = users.find(u => u.id === userId);
-        if (!user || !user.email) return;
+function byJoinedAt(a, b) {
+    const diff = new Date(a.joinedAt) - new Date(b.joinedAt);
+    return diff !== 0 ? diff : String(a.id).localeCompare(String(b.id));
+}
 
-        const entries = await interestQueueStorage.getAll();
+// Waiting entries for an event, oldest first - the queue order everyone sees.
+async function waitingQueue(eventId) {
+    const entries = await soloQueueStorage.findBy({ eventId, status: 'waiting' });
+    return entries.sort(byJoinedAt);
+}
 
-        const entry = entries.find(e =>
-            e.email.toLowerCase() === user.email.toLowerCase() && !e.registeredEventId
-        );
+function publicEntry(entry) {
+    return {
+        id: entry.id,
+        eventId: entry.eventId,
+        userId: entry.userId,
+        note: entry.note ?? null,
+        status: entry.status,
+        joinedAt: entry.joinedAt
+    };
+}
 
-        if (entry) {
-            await interestQueueStorage.update(entry.id, {
-                registeredEventId: eventId,
-                registeredAt: new Date().toISOString()
-            });
-            context.log(`Marked interest queue entry for ${user.email} as registered (solo queue)`);
-        }
-    } catch (error) {
-        await logError(context, error);
-        context.log(`Warning: Failed to update interest queue: ${error.message}`);
-    }
+function isOpenForRegistration(event) {
+    return event.status === 'registration' || event.registrationOpen === true;
 }
 
 app.http('solo-queue-get', {
@@ -46,20 +48,17 @@ app.http('solo-queue-get', {
 
             const eventId = request.query.get('eventId');
             const userId = request.query.get('userId');
-
-            let queue = await soloQueueStorage.getAll();
-
-            if (eventId) {
-                queue = queue.filter(q => q.eventId === eventId);
-            }
-            if (userId) {
-                queue = queue.filter(q => q.userId === userId);
+            if ((eventId && !isGuid(eventId)) || (userId && !isGuid(userId))) {
+                return { status: 400, jsonBody: { error: 'Invalid id' } };
             }
 
-            queue.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
+            const where = {};
+            if (eventId) where.eventId = eventId;
+            if (userId) where.userId = userId;
+            const queue = (await soloQueueStorage.findBy(where)).sort(byJoinedAt);
 
             if (!auth.user.isPortalAdmin) {
-                const own = queue.filter(e => e.userId === auth.user.userId);
+                const own = queue.filter(e => sameId(e.userId, auth.user.userId));
                 return {
                     status: 200,
                     jsonBody: { entries: own, totalCount: queue.length }
@@ -92,23 +91,45 @@ app.http('solo-queue-join', {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
 
-            const body = await request.json();
-            const { userId, eventId, note } = body;
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
 
-            if (!userId || !eventId) {
+            if (!body.userId || !body.eventId) {
                 return {
                     status: 400,
                     jsonBody: { error: 'userId and eventId are required' }
                 };
             }
 
-            if (userId !== auth.user.userId && !auth.user.isPortalAdmin) {
+            if (!sameId(body.userId, auth.user.userId) && !auth.user.isPortalAdmin) {
                 return { status: 403, jsonBody: { error: 'You can only join the solo queue for yourself' } };
             }
 
-            const queue = await soloQueueStorage.getAll();
+            const v = new Validator();
+            const userId = v.guid(body.userId, 'userId', { required: true });
+            const eventId = v.guid(body.eventId, 'eventId', { required: true });
+            const note = v.string(body.note, 'note', { max: 500 });
+            if (v.failed) return v.failure();
 
-            const existing = queue.find(q => q.userId === userId && q.eventId === eventId);
+            const event = await Storage.events.getById(eventId);
+            if (!event) {
+                return { status: 404, jsonBody: { error: 'Event not found' } };
+            }
+            if (!isOpenForRegistration(event)) {
+                return { status: 400, jsonBody: { error: 'This event is not open for registration' } };
+            }
+
+            const user = await Storage.users.getById(userId);
+            if (!user) {
+                return { status: 404, jsonBody: { error: 'User not found' } };
+            }
+
+            const participation = await participationsStorage.findOneBy({ userId, eventId });
+            if (participation && (participation.teamId || (participation.teamMemberships || []).length > 0)) {
+                return { status: 400, jsonBody: { error: 'You are already on a team for this event' } };
+            }
+
+            const existing = await soloQueueStorage.findOneBy({ userId, eventId });
             if (existing) {
                 return {
                     status: 400,
@@ -127,16 +148,14 @@ app.http('solo-queue-join', {
 
             await soloQueueStorage.create(entry);
 
-            await markRegisteredInInterestQueue(userId, eventId, context);
-
-            const eventQueue = queue.filter(q => q.eventId === eventId && q.status === 'waiting');
-            eventQueue.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
-            const position = eventQueue.findIndex(q => q.id === entry.id) + 1;
+            // Position is read back after the insert, so it is the real 1-based position.
+            const queue = await waitingQueue(eventId);
+            const position = queue.findIndex(q => sameId(q.id, entry.id)) + 1;
 
             context.log(`User ${userId} joined solo queue for event ${eventId}, position ${position}`);
             return {
                 status: 201,
-                jsonBody: { ...entry, position }
+                jsonBody: { ...entry, position, totalCount: queue.length }
             };
         } catch (error) {
             await logError(context, error);
@@ -161,23 +180,20 @@ app.http('solo-queue-leave', {
             }
 
             const id = request.params.id;
+            const entryToRemove = await soloQueueStorage.getById(id);
 
-            const queue = await soloQueueStorage.getAll();
-            const index = queue.findIndex(q => q.id === id);
-
-            if (index < 0) {
+            if (!entryToRemove) {
                 return {
                     status: 404,
                     jsonBody: { error: 'Queue entry not found' }
                 };
             }
 
-            const entryToRemove = queue[index];
-            if (entryToRemove.userId !== auth.user.userId && !auth.user.isPortalAdmin) {
+            if (!sameId(entryToRemove.userId, auth.user.userId) && !auth.user.isPortalAdmin) {
                 return { status: 403, jsonBody: { error: 'You can only remove your own solo queue entry' } };
             }
 
-            await soloQueueStorage.delete(id);
+            await soloQueueStorage.delete(entryToRemove.id);
 
             context.log(`Solo queue entry ${id} removed`);
             return {
@@ -208,46 +224,29 @@ app.http('solo-queue-position', {
 
             const { eventId, userId } = request.params;
 
-            if (userId !== auth.user.userId && !auth.user.isPortalAdmin) {
+            if (!sameId(userId, auth.user.userId) && !auth.user.isPortalAdmin) {
                 return { status: 403, jsonBody: { error: 'You can only check your own queue position' } };
             }
 
-            const queue = await soloQueueStorage.getAll();
-            const eventQueue = queue.filter(q => q.eventId === eventId && q.status === 'waiting');
-            eventQueue.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
+            const eventQueue = await waitingQueue(eventId);
+            const index = eventQueue.findIndex(q => sameId(q.userId, userId));
 
-            const userEntry = eventQueue.find(q => q.userId === userId);
-
-            if (!userEntry) {
+            if (index < 0) {
                 return {
                     status: 200,
                     jsonBody: { inQueue: false }
                 };
             }
 
-            if (!auth.user.isPortalAdmin && userId !== auth.user.userId) {
-                return {
-                    status: 403,
-                    jsonBody: { error: 'You do not have permission to view this queue position' }
-                };
-            }
-
-            const position = eventQueue.findIndex(q => q.id === userEntry.id) + 1;
-
-            if (!auth.user.isPortalAdmin) {
-                return {
-                    status: 200,
-                    jsonBody: { position, totalCount: eventQueue.length }
-                };
-            }
-
+            const totalCount = eventQueue.length;
             return {
                 status: 200,
                 jsonBody: {
                     inQueue: true,
-                    position,
-                    totalInQueue: eventQueue.length,
-                    entry: userEntry
+                    position: index + 1,
+                    totalCount,
+                    totalInQueue: totalCount,
+                    entry: publicEntry(eventQueue[index])
                 }
             };
         } catch (error) {

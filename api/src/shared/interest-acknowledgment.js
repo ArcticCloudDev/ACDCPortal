@@ -15,20 +15,15 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
             return { success: false, reason: 'Interest acknowledgment not enabled for event' };
         }
 
-        const interestLeads = await Storage.interestLeads.getAll();
-        const wasInterestLead = interestLeads.some(lead =>
-            lead.email.toLowerCase() === memberEmail.toLowerCase() &&
-            lead.eventId === eventId &&
-            lead.verified === true
-        );
+        const leads = await new Storage.Storage('interest-leads').findBy({ email: memberEmail, eventId });
+        const wasInterestLead = leads.some(lead => lead.verified === true);
 
         if (!wasInterestLead) {
             context.log(`Member ${memberEmail} was not a verified interest lead for event ${eventId}, skipping acknowledgment`);
             return { success: false, reason: 'Not a verified interest lead' };
         }
 
-        const users = await Storage.users.getAll();
-        const memberUser = users.find(u => u.email?.toLowerCase() === memberEmail.toLowerCase());
+        const memberUser = await Storage.users.getByEmail(memberEmail);
         const fullName = memberUser ? `${memberUser.firstName} ${memberUser.lastName}` : memberEmail;
 
         const { processTemplate } = require('./mail');
@@ -60,7 +55,7 @@ async function sendInterestAcknowledgmentEmail(memberEmail, eventId, context) {
 
         const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
 
-        const subject = processTemplate(eventTheme.subject || template.subject, mergeData);
+        const subject = processTemplate(eventTheme.subject || template.subject, mergeData, { html: false });
 
         const { sendEmail } = require('./mail');
         await sendEmail({

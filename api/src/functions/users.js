@@ -1,9 +1,33 @@
 const { app } = require('@azure/functions');
 const { logError } = require('../shared/error-log');
 const { requireAuth, canManageUser } = require('../shared/auth');
+const { generateId, isGuid } = require('../shared/id');
 const Storage = require('../shared/storage');
 const { Storage: GenericStorage } = require('../shared/storage');
+const { Validator, readJson, INVALID_JSON } = require('../shared/validate');
 const participationsStorage = new GenericStorage('participations');
+
+// The only columns a profile edit may touch. Everything else in the body (isPortalAdmin,
+// teamId, invitationPending, arbitrary keys that would become SQL columns) is dropped.
+const PROFILE_LIMITS = { firstName: 100, lastName: 100, phone: 50, gamertag: 100, allergies: 2000 };
+
+function profileUpdates(body, v) {
+    const updates = {};
+    for (const [field, max] of Object.entries(PROFILE_LIMITS)) {
+        if (body[field] === undefined) continue;
+        const value = v.string(body[field], field, { max });
+        if (value !== undefined) updates[field] = value === null ? (field === 'phone' ? null : '') : value;
+    }
+    if (body.profileComplete !== undefined) {
+        const flag = v.boolean(body.profileComplete, 'profileComplete');
+        if (flag !== undefined) updates.profileComplete = flag;
+    }
+    return updates;
+}
+
+async function participationsFor(...userIds) {
+    return participationsStorage.findBy({ userId: userIds.filter(Boolean) });
+}
 
 app.http('users-get-all', {
     methods: ['GET'],
@@ -52,7 +76,10 @@ app.http('users-get', {
             const email = request.query.get('email');
 
             if (email) {
-                const isSelf = auth.user.email && auth.user.email.toLowerCase() === email.toLowerCase();
+                if (typeof email !== 'string' || email.length > 320) {
+                    return { status: 400, jsonBody: { message: 'Invalid email' } };
+                }
+                const isSelf = auth.user.email && auth.user.email.toLowerCase() === email.trim().toLowerCase();
                 if (!isSelf && !auth.user.isPortalAdmin) {
                     return {
                         status: 403,
@@ -60,7 +87,7 @@ app.http('users-get', {
                     };
                 }
 
-                const user = await Storage.users.getByEmail(email);
+                const user = await Storage.users.getByEmail(email.trim());
                 if (!user) {
                     return {
                         status: 404,
@@ -104,8 +131,11 @@ app.http('users-get-by-id', {
             }
 
             const userId = request.params.id;
+            if (!isGuid(userId)) {
+                return { status: 404, jsonBody: { message: 'User not found' } };
+            }
 
-            const participations = await participationsStorage.getAll();
+            const participations = await participationsFor(auth.user.userId, userId);
             if (!canManageUser(auth.user, userId, participations)) {
                 return {
                     status: 403,
@@ -152,19 +182,12 @@ app.http('users-update', {
             }
 
             const userId = request.params.id;
-
-            if (!userId) {
-                return {
-                    status: 400,
-                    jsonBody: { message: 'User ID required' }
-                };
+            if (!isGuid(userId)) {
+                return { status: 404, jsonBody: { message: 'User not found' } };
             }
 
-            const updates = await request.json();
-
-            delete updates.id;
-            delete updates.createdAt;
-            delete updates.isPortalAdmin;
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
 
             const existingUser = await Storage.users.getById(userId);
             if (!existingUser) {
@@ -174,7 +197,7 @@ app.http('users-update', {
                 };
             }
 
-            const participations = await participationsStorage.getAll();
+            const participations = await participationsFor(auth.user.userId, userId);
             if (!canManageUser(auth.user, userId, participations)) {
                 return {
                     status: 403,
@@ -182,8 +205,22 @@ app.http('users-update', {
                 };
             }
 
-            if (updates.email && !existingUser.isTBD) {
-                delete updates.email;
+            const v = new Validator();
+            const updates = profileUpdates(body, v);
+
+            // Email is identity (it is what the OTP login proves); only a portal admin may change it.
+            if (auth.user.isPortalAdmin && body.email !== undefined) {
+                const email = v.email(body.email, 'email');
+                if (email && email !== existingUser.email?.toLowerCase()) {
+                    const taken = await Storage.users.getByEmail(email);
+                    if (taken) return { status: 409, jsonBody: { message: 'Another user already has that email' } };
+                    updates.email = email;
+                }
+            }
+            if (v.failed) return v.failure();
+
+            if (Object.keys(updates).length === 0) {
+                return { status: 200, jsonBody: existingUser };
             }
 
             const updatedUser = await Storage.users.update(userId, updates);
@@ -216,18 +253,14 @@ app.http('users-create', {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
 
-            const userData = await request.json();
+            const body = await readJson(request);
+            if (!body) return INVALID_JSON;
 
-            if (!userData.email) {
-                return {
-                    status: 400,
-                    jsonBody: { message: 'Email is required' }
-                };
-            }
+            const v = new Validator();
+            const email = v.email(body.email, 'email');
+            if (v.failed) return v.failure();
 
-            delete userData.isPortalAdmin;
-
-            const isSelf = auth.user.email && auth.user.email.toLowerCase() === userData.email.toLowerCase();
+            const isSelf = auth.user.email && auth.user.email.toLowerCase() === email;
             if (!isSelf && !auth.user.isPortalAdmin) {
                 return {
                     status: 403,
@@ -235,7 +268,10 @@ app.http('users-create', {
                 };
             }
 
-            const existingUser = await Storage.users.getByEmail(userData.email);
+            const profile = profileUpdates(body, v);
+            if (v.failed) return v.failure();
+
+            const existingUser = await Storage.users.getByEmail(email);
             if (existingUser) {
                 return {
                     status: 409,
@@ -243,9 +279,27 @@ app.http('users-create', {
                 };
             }
 
-            const newUser = await Storage.users.create(userData);
+            const now = new Date().toISOString();
+            const newUser = {
+                id: isGuid(body.id) ? body.id : generateId(),
+                email,
+                firstName: profile.firstName || '',
+                lastName: profile.lastName || '',
+                phone: profile.phone ?? null,
+                gamertag: profile.gamertag || '',
+                allergies: profile.allergies || '',
+                profileComplete: profile.profileComplete === true,
+                createdAt: now,
+                updatedAt: now
+            };
 
-            context.log(`User created: ${userData.email}`);
+            if (await Storage.users.getById(newUser.id)) {
+                return { status: 409, jsonBody: { message: 'User already exists' } };
+            }
+
+            await Storage.users.create(newUser);
+
+            context.log(`User created: ${newUser.id}`);
             return {
                 status: 201,
                 jsonBody: newUser
@@ -261,4 +315,3 @@ app.http('users-create', {
         }
     }
 });
-

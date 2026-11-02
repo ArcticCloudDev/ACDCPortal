@@ -1,5 +1,11 @@
 const crypto = require('crypto');
 
+// Verification codes only ever appear in logs on a developer machine. In Azure the
+// Functions host sets AZURE_FUNCTIONS_ENVIRONMENT to 'Production' (or leaves it unset).
+function isDevelopment() {
+    return process.env.AZURE_FUNCTIONS_ENVIRONMENT === 'Development';
+}
+
 const Email = {
     generateCode() {
         return crypto.randomInt(100000, 999999).toString();
@@ -10,7 +16,7 @@ const Email = {
     },
 
     verifyCode(inputCode, storedHash) {
-        const inputHash = this.hashCode(inputCode);
+        const inputHash = this.hashCode(String(inputCode));
         try {
             return crypto.timingSafeEqual(
                 Buffer.from(inputHash, 'hex'),
@@ -21,11 +27,12 @@ const Email = {
         }
     },
 
+    // Resolves true when the code was handed to the mail system; throws otherwise. A failed
+    // send is never reported as success - the caller must not tell the user a code is on its way.
     async sendVerificationCode(email, code) {
-        console.log('========================================');
-        console.log(`📧 VERIFICATION EMAIL TO: ${email}`);
-        console.log(`🔐 CODE: ${code}`);
-        console.log('========================================');
+        if (isDevelopment()) {
+            console.log(`[otp] development only - code for ${email}: ${code}`);
+        }
 
         try {
             const { sendEmail } = require('./mail');
@@ -59,16 +66,12 @@ const Email = {
                 htmlContent: htmlContent
             });
 
-            console.log(`✅ Verification email sent to ${email}`);
             return true;
         } catch (mailError) {
-            console.error('❌ Failed to send verification email via mail system:', mailError.message);
-            const isLocal = !process.env.WEBSITE_HOSTNAME;
-            if (isLocal) {
-                console.log('⚠️  Code was logged above for development use');
-                return true;
-            }
-            throw new Error('Failed to send verification email. Please try again.');
+            console.error('Failed to send verification email:', mailError.message);
+            const error = new Error('Failed to send verification email. Please try again.');
+            error.code = 'MAIL_SEND_FAILED';
+            throw error;
         }
     }
 };
