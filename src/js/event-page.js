@@ -20,6 +20,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let eventBadges = [];
     let badgeClaims = [];
     let profileConfirmationRequired = false;
+    // Users fetched for the team cards, reused by the badge section (same /users/{id} data).
+    const usersById = new Map();
 
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('id');
@@ -38,7 +40,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         await Auth.handleRedirect();
 
         if (!Auth.isLoggedIn()) {
-            window.location.href = '/events.html';
+            // Sign in and come straight back to this event (register.js validates the redirect).
+            Auth.login();
             return;
         }
 
@@ -51,47 +54,40 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.location.href = completeProfileUrl;
                 return;
             }
-
-            if (!currentUser.profileComplete) {
-                let hasExistingRelationship = false;
-                try {
-                    const participation = await API.participations.getOrNull(currentUser.id, eventId);
-                    if (participation) {
-                        hasExistingRelationship = true;
-                    }
-                } catch (e) { }
-                if (!hasExistingRelationship) {
-                    window.location.href = completeProfileUrl;
-                    return;
-                }
-            }
         } catch (error) {
             console.error('Error loading user:', error);
             window.location.href = completeProfileUrl;
             return;
         }
 
-        try {
-            currentEvent = await API.events.get(eventId);
-        } catch (error) {
-            console.error('Error loading event:', error);
+        // The event and this user's participation do not depend on each other.
+        const [eventResult, participationResult] = await Promise.allSettled([
+            API.events.get(eventId),
+            API.participations.getOrNull(currentUser.id, eventId)
+        ]);
+
+        currentParticipation = participationResult.status === 'fulfilled' ? (participationResult.value || null) : null;
+
+        if (!currentUser.profileComplete && !currentParticipation) {
+            window.location.href = completeProfileUrl;
+            return;
+        }
+
+        if (eventResult.status === 'rejected') {
+            console.error('Error loading event:', eventResult.reason);
             loadingDiv.innerHTML = `<p class="error-message">Event not found</p>
                                    <a href="events.html" class="btn btn-primary">Back to Events</a>`;
             return;
         }
-
-        if (urlParams.get('action') === 'create-team') {
-            document.getElementById('create-team-btn').click();
-            window.history.replaceState({}, '', `event.html?id=${encodeURIComponent(eventId)}`);
-        }
-
-        currentParticipation = await API.participations.getOrNull(currentUser.id, eventId);
+        currentEvent = eventResult.value;
 
         if (!currentParticipation) {
+            // A first visit only records that the user looked at the event; hotel nights are
+            // chosen later, never invented here.
             currentParticipation = await API.participations.upsert({
                 userId: currentUser.id,
                 eventId: eventId,
-                hotelNights: { 'thu-sun': true }
+                hotelNights: {}
             });
         }
 
@@ -100,6 +96,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         populateEventBanner();
         setupCostHint();
         await renderTeams();
+
+        if (urlParams.get('action') === 'create-team') {
+            window.history.replaceState({}, '', `event.html?id=${encodeURIComponent(eventId)}`);
+            // Only open the dialog once we know the user is not already on a team here.
+            if (!userHasTeam() && isRegistrationOpen()) {
+                document.getElementById('create-team-btn').click();
+            }
+        }
 
         const isTeamLeader = currentParticipation.isTeamAdmin
             || (currentParticipation.teamMemberships || []).some(membership => membership.isAdmin);
@@ -136,25 +140,52 @@ document.addEventListener('DOMContentLoaded', async () => {
                                <a href="events.html" class="btn btn-primary">Back to Events</a>`;
     }
 
+    // Teams, roster, badges and claims are independent: load them together.
     async function loadEventTeams() {
-        try {
-            const allTeams = await API.request('/teams');
-            eventTeams = allTeams.filter(t => t.eventId === eventId);
+        const [teamsResult, rosterResult, badgesResult, claimsResult] = await Promise.allSettled([
+            API.request('/teams'),
+            API.participations.getByEvent(eventId),
+            API.badges.getEventBadges(eventId),
+            API.badgeClaims.list({ eventId: eventId })
+        ]);
 
-            allParticipations = await API.participations.getByEvent(eventId);
-
-            try {
-                eventBadges = await API.badges.getEventBadges(eventId);
-                badgeClaims = await API.badgeClaims.list({ eventId: eventId });
-            } catch (err) {
-                console.error('Error loading badges:', err);
-                eventBadges = [];
-                badgeClaims = [];
-            }
-        } catch (error) {
-            console.error('Error loading teams:', error);
+        if (teamsResult.status === 'fulfilled') {
+            eventTeams = teamsResult.value.filter(t => sameId(t.eventId, eventId));
+        } else {
+            console.error('Error loading teams:', teamsResult.reason);
             eventTeams = [];
         }
+
+        if (rosterResult.status === 'fulfilled') {
+            allParticipations = rosterResult.value || [];
+        } else {
+            console.error('Error loading participations:', rosterResult.reason);
+            allParticipations = [];
+        }
+
+        if (badgesResult.status === 'fulfilled' && claimsResult.status === 'fulfilled') {
+            eventBadges = badgesResult.value || [];
+            badgeClaims = claimsResult.value || [];
+        } else {
+            console.error('Error loading badges:', badgesResult.reason || claimsResult.reason);
+            eventBadges = [];
+            badgeClaims = [];
+        }
+    }
+
+    // IDs come back upper-case from SQL and lower-case from some API echoes.
+    function sameId(a, b) {
+        return a != null && b != null && String(a).toUpperCase() === String(b).toUpperCase();
+    }
+
+    function userHasTeam() {
+        return !!currentParticipation?.teamId
+            || (Array.isArray(currentParticipation?.teamMemberships) && currentParticipation.teamMemberships.length > 0);
+    }
+
+    function isRegistrationOpen() {
+        if (!currentEvent) return false;
+        return currentEvent.status === 'registration' || !!currentEvent.registrationOpen;
     }
 
     function setupCostHint() {
@@ -162,16 +193,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const participantSelect = document.getElementById('expectedParticipants');
         const costHint = document.getElementById('cost-hint');
         if (!participantSelect || !costHint) return;
-        const currency = currentEvent.currency;
-        const locale = currencyLocale(currency);
-        const costPer = currentEvent.costPerParticipant;
+        const currency = escapeHtml(currentEvent.currency || '');
+        const locale = currencyLocale(currentEvent.currency);
+        const costPer = Number(currentEvent.costPerParticipant) || 0;
         function updateCostHint() {
             const count = parseInt(participantSelect.value) || 0;
             if (count > 0) {
                 const total = (count * costPer).toLocaleString(locale);
                 costHint.innerHTML = `Total commitment: <strong>${total}\u00a0${currency}</strong> (${count}\u00a0\u00d7\u00a0${costPer.toLocaleString(locale)}\u00a0${currency})`;
             } else {
-                costHint.textContent = `${costPer.toLocaleString(locale)}\u00a0${currency} per participant \u2014 select a count to see total.`;
+                costHint.textContent = `${costPer.toLocaleString(locale)}\u00a0${currentEvent.currency || ''} per participant \u2014 select a count to see total.`;
             }
         }
         participantSelect.addEventListener('change', updateCostHint);
@@ -179,7 +210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function populateEventBanner() {
-        const currentTeam = eventTeams.find(team => team.id === currentParticipation?.teamId);
+        const currentTeam = eventTeams.find(team => sameId(team.id, currentParticipation?.teamId));
         const headerTitle = currentTeam
             ? `${currentEvent.name} - ${currentTeam.teamName}`
             : currentEvent.name;
@@ -220,23 +251,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const isJudge = userRoles.includes('judge');
         const isCommittee = userRoles.includes('committee');
-        const hasTeam = currentParticipation?.teamId || (currentParticipation?.teamMemberships?.length > 0);
+        const hasTeam = userHasTeam();
         const isInterest = userRoles.includes('interest') && !hasTeam;
         const hasSpecialRole = isJudge || isCommittee || isInterest;
+        const eventMeta = `📅 ${escapeHtml(formatDateRange(currentEvent.startDate, currentEvent.endDate))}`
+            + (currentEvent.location ? ` &nbsp;•&nbsp; 📍 ${escapeHtml(currentEvent.location)}` : '');
 
         if (hasSpecialRole) {
             banner.classList.remove('inactive');
 
-            document.getElementById('event-nav')?.classList.add('hidden');
-
             const preRegSection = document.getElementById('pre-reg-section');
             if (preRegSection) preRegSection.classList.add('hidden');
-            const teamsSection = document.querySelector('.teams-section');
-            if (teamsSection) teamsSection.classList.add('hidden');
-            const noTeams = document.getElementById('no-teams');
-            if (noTeams) noTeams.classList.add('hidden');
-            const createSection = document.getElementById('create-team-section');
-            if (createSection) createSection.classList.add('hidden');
+            if (!hasTeam) {
+                // A judge or committee member who is also on a team keeps their team section.
+                document.getElementById('event-nav')?.classList.add('hidden');
+                const teamsSection = document.querySelector('.teams-section');
+                if (teamsSection) teamsSection.classList.add('hidden');
+                const noTeams = document.getElementById('no-teams');
+                if (noTeams) noTeams.classList.add('hidden');
+                const createSection = document.getElementById('create-team-section');
+                if (createSection) createSection.classList.add('hidden');
+            }
 
             const roleSection = document.getElementById('role-confirmed-section');
             if (roleSection) {
@@ -249,9 +284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     document.getElementById('role-confirmed-message').textContent =
                         `You've been registered as a judge for this event. We'll notify you when judging details are available.`;
                     document.getElementById('role-confirmed-badge').textContent = '✓ Judge — Confirmed';
-                    document.getElementById('role-confirmed-details').innerHTML =
-                        `📅 ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}` +
-                        (currentEvent.location ? ` &nbsp;•&nbsp; 📍 ${currentEvent.location}` : '') +
+                    document.getElementById('role-confirmed-details').innerHTML = eventMeta +
                         `<br><span style="margin-top: 8px; display: inline-block;">We'll be in touch with judging criteria, schedules, and logistics closer to the event.</span>`;
                     const adminLink = document.getElementById('role-admin-link');
                     if (adminLink) {
@@ -265,9 +298,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     document.getElementById('role-confirmed-message').textContent =
                         `You've been registered as a committee member for this event. We'll notify you as things progress.`;
                     document.getElementById('role-confirmed-badge').textContent = '✓ Committee Member — Confirmed';
-                    document.getElementById('role-confirmed-details').innerHTML =
-                        `📅 ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}` +
-                        (currentEvent.location ? ` &nbsp;•&nbsp; 📍 ${currentEvent.location}` : '') +
+                    document.getElementById('role-confirmed-details').innerHTML = eventMeta +
                         `<br><span style="margin-top: 8px; display: inline-block;">You'll receive updates as the event planning progresses.</span>`;
                     const adminLink = document.getElementById('role-admin-link');
                     if (adminLink) {
@@ -281,13 +312,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     document.getElementById('role-confirmed-message').textContent =
                         `We'll notify you when registration opens. You'll be among the first to know!`;
                     document.getElementById('role-confirmed-badge').textContent = '✓ Interest Registered';
-                    document.getElementById('role-confirmed-details').innerHTML =
-                        `📅 ${formatDateRange(currentEvent.startDate, currentEvent.endDate)}` +
-                        (currentEvent.location ? ` &nbsp;•&nbsp; 📍 ${currentEvent.location}` : '') +
+                    document.getElementById('role-confirmed-details').innerHTML = eventMeta +
                         `<br><span style="margin-top: 8px; display: inline-block;">Keep an eye on your inbox — we'll send updates as the event takes shape.</span>`;
 
                     const eventStatus = currentEvent.status || 'draft';
-                    if (eventStatus === 'registration-open' || eventStatus === 'pre-registration' || currentEvent.registrationOpen) {
+                    if (eventStatus === 'registration' || eventStatus === 'pre-registration' || currentEvent.registrationOpen) {
                         const upgradeDiv = document.getElementById('interest-upgrade-actions');
                         if (upgradeDiv) upgradeDiv.classList.remove('hidden');
                     }
@@ -314,7 +343,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 preRegSection.classList.remove('hidden');
                 const interestLink = document.getElementById('interest-link');
                 if (interestLink) {
-                    interestLink.href = `register.html?intent=interest&eventId=${currentEvent.id}`;
+                    interestLink.href = `register.html?intent=interest&eventId=${encodeURIComponent(currentEvent.id)}`;
                 }
             }
             const teamsSection = document.querySelector('.teams-section');
@@ -332,12 +361,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isPrivileged = currentUser.isPortalAdmin ||
             (currentParticipation?.roles || []).includes('committee');
         const userTeamIds = new Set(
-            (currentParticipation?.teamMemberships || []).map(m => m.teamId)
+            (currentParticipation?.teamMemberships || []).map(m => String(m.teamId).toUpperCase())
         );
         if (currentParticipation?.teamId) {
-            userTeamIds.add(currentParticipation.teamId);
+            userTeamIds.add(String(currentParticipation.teamId).toUpperCase());
         }
-        const myTeams = isPrivileged ? eventTeams : eventTeams.filter(t => userTeamIds.has(t.id));
+        const myTeams = isPrivileged ? eventTeams : eventTeams.filter(t => userTeamIds.has(String(t.id).toUpperCase()));
 
         if (myTeams.length === 0) {
             teamsContainer.classList.add('hidden');
@@ -384,15 +413,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
 
-            document.querySelectorAll('.btn-delete-team').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const teamId = btn.dataset.teamId;
-                    const teamName = btn.dataset.teamName;
-                    await deleteTeam(teamId, teamName);
-                });
-            });
-
             document.querySelectorAll('.resend-invite-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -433,6 +453,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function setupFileUploadHandlers() {
+        document.querySelectorAll('.btn-upload[data-team-id]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.getElementById(`file-${btn.dataset.teamId}`)?.click();
+            });
+        });
+
         document.querySelectorAll('input[id^="file-"]').forEach(input => {
             input.addEventListener('change', async (e) => {
                 const teamId = input.id.replace('file-', '');
@@ -535,79 +561,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    async function deleteTeam(teamId, teamName) {
-        if (!confirm(`Are you sure you want to delete team "${teamName}"?\n\nThis will also remove:\n• Team memberships from all participants\n• Hotel bookings (for participants with no other role)\n• Badge claims for this team\n• Pending invitations\n\nThis action cannot be undone.`)) {
-            return;
-        }
-        try {
-            await API.teams.delete(teamId);
-            eventTeams = eventTeams.filter(t => t.id !== teamId);
-            await renderTeams();
-        } catch (error) {
-            console.error('Error deleting team:', error);
-            alert('Failed to delete team: ' + error.message);
-        }
-    }
-
     async function buildTeamCard(team) {
         const teamParticipations = allParticipations.filter(p => {
             const memberships = p.teamMemberships || [];
-            return memberships.some(m => m.teamId === team.id);
+            return memberships.some(m => sameId(m.teamId, team.id));
         });
 
-        let participantCount = 0;
-        let adminParticipation = null;
-        let adminUser = null;
-
-        for (const p of teamParticipations) {
-            const membership = (p.teamMemberships || []).find(m => m.teamId === team.id);
-            if (membership && membership.isParticipant) participantCount++;
-            if (membership && membership.isAdmin && !adminParticipation) {
-                adminParticipation = p;
-            }
-        }
-
-        if (adminParticipation) {
-            try {
-                adminUser = await API.request(`/users/${adminParticipation.userId}`);
-            } catch (err) {
-                console.error('Could not load admin user:', err);
-            }
-        }
-
-        const userMembership = currentParticipation?.teamMemberships?.find(m => m.teamId === team.id);
+        const userMembership = currentParticipation?.teamMemberships?.find(m => sameId(m.teamId, team.id));
         const isAdmin = userMembership?.isAdmin || false;
-        const isParticipant = userMembership?.isParticipant || false;
 
-        const allParticipantCards = await Promise.all(
-            teamParticipations.map(async (p) => {
+        // Member profiles, pending invitations and uploaded files are independent requests.
+        // The roster only carries membership data for ordinary participants, so each member's
+        // profile still has to be fetched (one request per member, all in parallel).
+        const [allParticipantCards, teamInvitations, uploadsHtml] = await Promise.all([
+            Promise.all(teamParticipations.map(async (p) => {
                 try {
-                    const user = await API.request(`/users/${p.userId}`);
-                    const membership = (p.teamMemberships || []).find(m => m.teamId === team.id);
-                    const canEdit = isAdmin || (p.userId === currentUser.id);
+                    const user = await API.request(`/users/${encodeURIComponent(p.userId)}`);
+                    usersById.set(String(user.id).toUpperCase(), user);
+                    const membership = (p.teamMemberships || []).find(m => sameId(m.teamId, team.id));
+                    const canEdit = isAdmin || sameId(p.userId, currentUser.id);
                     return { user, membership, participation: p, canEdit, isTBD: user.isTBD || false };
                 } catch (err) {
                     return null;
                 }
-            })
-        );
+            })),
+            API.invitations.list(team.id).catch(err => {
+                console.error('Error loading invitations for team:', err);
+                return [];
+            }),
+            currentEvent.sharepointUrl ? buildUploadsSection(team) : Promise.resolve('')
+        ]);
 
         const participantCards = allParticipantCards
             .filter(p => p !== null && !p.isTBD)
             .map(p => buildParticipantCard(p.user, p.membership, p.participation, p.canEdit, team.id));
 
         const maxParticipants = currentEvent.maxTeamSize || 5;
-        const committedParticipants = team.committedParticipants || team.numberOfParticipants || maxParticipants;
+        // The team size lives in numberOfParticipants; committedParticipants is a legacy alias.
+        const committedParticipants = team.numberOfParticipants || team.committedParticipants || maxParticipants;
 
         const realParticipantCount = allParticipantCards.filter(p => p !== null && !p.isTBD && p.membership?.isParticipant).length;
 
-        let pendingInvitations = [];
-        try {
-            const teamInvitations = await API.invitations.list(team.id);
-            pendingInvitations = (teamInvitations || []).filter(i => i.status === 'pending');
-        } catch (err) {
-            console.error('Error loading invitations for team:', err);
-        }
+        const pendingInvitations = (teamInvitations || []).filter(i => i.status === 'pending');
 
         const contactEmails = new Set(
             allParticipantCards
@@ -627,7 +622,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let pendingCardsHtml = '';
         if (legacyPendingInvitations.length > 0) {
             pendingCardsHtml = legacyPendingInvitations.map(inv => `
-                <div class="participant-card pending-card" data-invite-id="${inv.id}">
+                <div class="participant-card pending-card" data-invite-id="${escapeHtml(inv.id)}">
                     <div class="pending-icon">✉️</div>
                     <div class="name">Invitation Sent</div>
                     <div class="detail-row email">${escapeHtml(inv.email)}</div>
@@ -637,8 +632,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="pending-date">Sent ${new Date(inv.createdAt).toLocaleDateString()}</div>
                     ${isAdmin ? `
                     <div class="pending-actions" style="display:flex;gap:6px;margin-top:10px;justify-content:center;">
-                        <button class="btn btn-small btn-secondary resend-invite-btn" data-invite-id="${inv.id}" style="padding:4px 10px;font-size:0.75rem;">🔄 Resend</button>
-                        <button class="btn btn-small btn-danger cancel-invite-btn" data-invite-id="${inv.id}" data-invite-email="${escapeHtml(inv.email)}" style="padding:4px 10px;font-size:0.75rem;">✕ Cancel</button>
+                        <button type="button" class="btn btn-small btn-secondary resend-invite-btn" data-invite-id="${escapeHtml(inv.id)}" style="padding:4px 10px;font-size:0.75rem;">🔄 Resend</button>
+                        <button type="button" class="btn btn-small btn-danger cancel-invite-btn" data-invite-id="${escapeHtml(inv.id)}" data-invite-email="${escapeHtml(inv.email)}" style="padding:4px 10px;font-size:0.75rem;">✕ Cancel</button>
                     </div>` : ''}
                 </div>
             `).join('');
@@ -647,7 +642,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let emptySlotsHtml = '';
         if (isAdmin && emptyCommittedSlots > 0) {
             emptySlotsHtml = Array(emptyCommittedSlots).fill(`
-                <div class="empty-slot add-member-slot" data-team-id="${team.id}">
+                <div class="empty-slot add-member-slot" data-team-id="${escapeHtml(team.id)}" role="button" tabindex="0">
                     <span class="add-icon">+</span>
                     <span class="add-text">Add Member</span>
                 </div>
@@ -657,28 +652,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         let unlockSlotsHtml = '';
         if (isAdmin && unlockSlots > 0) {
             unlockSlotsHtml = `
-                <div class="unlock-slot" data-team-id="${team.id}">
+                <div class="unlock-slot" data-team-id="${escapeHtml(team.id)}" role="button" tabindex="0">
                     <span class="unlock-icon">🔓</span>
                     <span class="unlock-text">Unlock 1 more</span>
                 </div>
             `;
         }
 
-        const uploadsHtml = currentEvent.sharepointUrl ? await buildUploadsSection(team) : '';
-
-        const adminDisplay = adminUser
-            ? `<span class="team-admin-info">Admin: ${escapeHtml(adminUser.firstName)} ${escapeHtml(adminUser.lastName)}</span>`
-            : '';
-
-        const canDeleteTeam = currentUser.isPortalAdmin ||
-            (currentParticipation?.roles || []).includes('committee');
-
-        const deleteButtonHtml = canDeleteTeam ? `
-            <button class="btn-delete-team" data-team-id="${team.id}" data-team-name="${escapeHtml(team.teamName)}" title="Delete team" style="background: none; border: 1px solid #fca5a5; color: #dc2626; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.85rem;">🗑️</button>
-        ` : '';
-
         return `
-            <div class="team-card" data-team-id="${team.id}">
+            <div class="team-card" data-team-id="${escapeHtml(team.id)}">
                 <div class="team-card-body">
                     <div class="team-stats">
                         <span>👥 ${realParticipantCount}/${committedParticipants} committed</span>
@@ -712,16 +694,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.warn('Could not load SharePoint files:', err);
         }
 
+        const teamIdAttr = escapeHtml(team.id);
         const filesHtml = spFiles.length > 0
             ? `<div class="uploaded-files-list">
-                ${spFiles.map(f => `
+                ${spFiles.map(f => {
+                    const link = safeHttpUrl(f.webUrl);
+                    const nameHtml = link
+                        ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" class="file-name file-link">${escapeHtml(f.name)}</a>`
+                        : `<span class="file-name">${escapeHtml(f.name)}</span>`;
+                    return `
                     <div class="uploaded-file-row">
                         <span class="file-category-badge">${escapeHtml(f.category || 'General')}</span>
-                        <a href="${escapeHtml(f.webUrl)}" target="_blank" rel="noopener" class="file-name file-link">${escapeHtml(f.name)}</a>
+                        ${nameHtml}
                         <span class="file-size">${formatFileSize(f.size)}</span>
-                        <button class="btn-remove" data-team-id="${team.id}" data-file-path="Events/${currentEvent.id}/${team.id}/${f.name}" title="Remove">✕</button>
+                        <button type="button" class="btn-remove" data-team-id="${teamIdAttr}" data-file-path="${escapeHtml(`Events/${currentEvent.id}/${team.id}/${f.name}`)}" title="Remove" aria-label="Remove file">✕</button>
                     </div>
-                `).join('')}
+                `; }).join('')}
               </div>`
             : '<p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">No files uploaded yet.</p>';
 
@@ -731,13 +719,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ${filesHtml}
                 <div class="upload-box">
                     <div class="upload-row">
-                        <select id="file-cat-${team.id}" class="upload-category-select">
+                        <label for="file-cat-${teamIdAttr}" class="hidden">File category</label>
+                        <select id="file-cat-${teamIdAttr}" class="upload-category-select">
                             ${categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
                         </select>
-                        <input type="file" id="file-${team.id}" style="display:none;" accept="*/*">
-                        <button class="btn btn-secondary btn-upload" id="upload-btn-${team.id}" onclick="document.getElementById('file-${team.id}').click()">📎 Upload File</button>
+                        <input type="file" id="file-${teamIdAttr}" style="display:none;" accept="*/*" aria-label="Choose a file to upload">
+                        <button type="button" class="btn btn-secondary btn-upload" id="upload-btn-${teamIdAttr}" data-team-id="${teamIdAttr}">📎 Upload File</button>
                     </div>
-                    <div id="upload-progress-${team.id}" class="upload-progress hidden"></div>
+                    <div id="upload-progress-${teamIdAttr}" class="upload-progress hidden"></div>
                 </div>
                 <small style="color: var(--text-muted); display: block; margin-top: 6px;">Max 10 MB per file.</small>
             </div>
@@ -760,33 +749,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const badgeTeamIds = new Set(
-            (currentParticipation?.teamMemberships || []).map(m => m.teamId)
+            (currentParticipation?.teamMemberships || []).map(m => String(m.teamId).toUpperCase())
         );
-        if (currentParticipation?.teamId) badgeTeamIds.add(currentParticipation.teamId);
-        const myTeam = eventTeams.find(t => badgeTeamIds.has(t.id));
+        if (currentParticipation?.teamId) badgeTeamIds.add(String(currentParticipation.teamId).toUpperCase());
+        const myTeam = eventTeams.find(t => badgeTeamIds.has(String(t.id).toUpperCase()));
         const teamId = myTeam?.id || '';
-
-        const myMembership = (currentParticipation?.teamMemberships || []).find(m => m.teamId === teamId);
-        const isAdmin = myMembership?.isAdmin || currentParticipation?.isTeamAdmin || false;
 
         const teamParticipations = allParticipations.filter(p => {
             const memberships = p.teamMemberships || [];
-            return memberships.some(m => m.teamId === teamId);
+            return memberships.some(m => sameId(m.teamId, teamId));
         });
         const memberOptions = teamParticipations
             .filter(p => {
-                const m = (p.teamMemberships || []).find(m => m.teamId === teamId);
+                const m = (p.teamMemberships || []).find(m => sameId(m.teamId, teamId));
                 return m?.isParticipant;
             })
-            .map(p => ({
-                userId: p.userId,
-                name: `${p.firstName || ''} ${p.lastName || ''}`.trim() || p.email
-            }));
+            .map(p => {
+                const user = usersById.get(String(p.userId).toUpperCase());
+                const first = user?.firstName ?? p.firstName ?? '';
+                const last = user?.lastName ?? p.lastName ?? '';
+                return {
+                    userId: p.userId,
+                    name: `${first} ${last}`.trim() || user?.email || p.email || 'Team member'
+                };
+            });
 
         const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3, 'exclusive': 4 };
         const categoryLabels = { 'soft': '🤝 Soft Skills', 'low-code': '⚡ Low-Code', 'pro-code': '💻 Pro-Code', 'sponsor': '🏢 Sponsor', 'exclusive': '🏆 Exclusive' };
 
-        const teamClaims = teamId ? badgeClaims.filter(c => c.teamId === teamId) : [];
+        const teamClaims = teamId ? badgeClaims.filter(c => sameId(c.teamId, teamId)) : [];
 
         const userRoles = currentParticipation?.roles || [];
         const isJudge = userRoles.includes('judge');
@@ -839,15 +830,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const awardedCount = catBadges.filter(({ eventBadge }) => {
                     return badgeClaims.some(c => c.eventBadgeId === eventBadge.id && c.status === 'approved');
                 }).length;
-                return `<button class="badge-tab ${i === 0 ? 'active' : ''}" data-cat="${cat}" onclick="switchBadgeTab(this)">
-                    ${label} <span class="badge-tab-count">${awardedCount}/${catBadges.length}</span>
+                return `<button type="button" class="badge-tab ${i === 0 ? 'active' : ''}" data-cat="${escapeHtml(cat)}">
+                    ${escapeHtml(label)} <span class="badge-tab-count">${awardedCount}/${catBadges.length}</span>
                 </button>`;
             }
             const catClaimed = catBadges.filter(({ eventBadge }) => {
                 return teamClaims.some(c => c.eventBadgeId === eventBadge.id && (c.status === 'pending' || c.status === 'approved'));
             }).length;
-            return `<button class="badge-tab ${i === 0 ? 'active' : ''}" data-cat="${cat}" onclick="switchBadgeTab(this)">
-                ${label} <span class="badge-tab-count">${catClaimed}/${catBadges.length}</span>
+            return `<button type="button" class="badge-tab ${i === 0 ? 'active' : ''}" data-cat="${escapeHtml(cat)}">
+                ${escapeHtml(label)} <span class="badge-tab-count">${catClaimed}/${catBadges.length}</span>
             </button>`;
         }).join('');
 
@@ -856,7 +847,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const cat = sortedCategories[ci];
             const badges = grouped[cat];
 
-            panelsHtml += `<div class="badge-panel ${ci === 0 ? 'active' : ''}" data-cat="${cat}">`;
+            panelsHtml += `<div class="badge-panel ${ci === 0 ? 'active' : ''}" data-cat="${escapeHtml(cat)}">`;
 
             const statusOrder = { 'declined': 0, undefined: 1, 'draft': 2, 'pending': 3, 'approved': 4 };
             const sortedBadges = [...badges].sort((a, b) => {
@@ -886,59 +877,61 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let statusHtml = '';
                 let actionHtml = '';
 
+                // Badge names, URLs and ids are rendered as text / data attributes; the click
+                // handler is delegated from the section (no inline handlers under the CSP).
+                const claimAttrs = `data-eb-id="${escapeHtml(eventBadge.id)}" data-team-id="${escapeHtml(teamId)}" data-badge-name="${escapeHtml(badge.name)}"`;
+                const blogLink = claim ? safeHttpUrl(claim.blogUrl) : '';
+                const blogHtml = blogLink
+                    ? `<a href="${escapeHtml(blogLink)}" target="_blank" rel="noopener noreferrer" class="btn-badge-blog" title="View blog post">📝 Blog</a>`
+                    : '';
+
                 if (claim && claim.status === 'approved') {
                     statusHtml = `<span class="badge-claim-status approved" title="Approved">Approved</span>`;
-                    if (claim.blogUrl) {
-                        actionHtml = `<a href="${escapeHtml(claim.blogUrl)}" target="_blank" class="btn-badge-blog" title="View blog post">📝 Blog</a>`;
-                    }
+                    actionHtml = blogHtml;
                 } else if (claim && claim.status === 'pending') {
                     statusHtml = `<span class="badge-claim-status submitted" title="Submitted — awaiting review">Submitted</span>`;
-                    if (claim.blogUrl) {
-                        actionHtml = `<a href="${escapeHtml(claim.blogUrl)}" target="_blank" class="btn-badge-blog" title="View blog post">📝 Blog</a>`;
-                    }
+                    actionHtml = blogHtml;
                 } else if (claim && claim.status === 'declined') {
                     statusHtml = `<span class="badge-claim-status rejected" title="Rejected">Rejected</span>`;
                     if (teamId && isEventLive) {
-                        const safeName = badge.name.replace(/'/g, "\\'");
-                        actionHtml = `<button class="btn-badge-claim" onclick="openClaimBadge('${eventBadge.id}', '${teamId}', '${safeName}')">Re-claim</button>`;
+                        actionHtml = `<button type="button" class="btn-badge-claim" ${claimAttrs}>Re-claim</button>`;
                     }
                 } else if (isExclusive) {
                     statusHtml = `<span class="badge-claim-status exclusive" title="Exclusive — awarded by judges">🏆</span>`;
                     if (canAward) {
-                        const safeName = badge.name.replace(/'/g, "\\'");
-                        actionHtml = `<button class="btn-badge-award" onclick="openAwardBadge('${eventBadge.id}', '${safeName}')">Award</button>`;
+                        actionHtml = `<button type="button" class="btn-badge-award" ${claimAttrs}>Award</button>`;
                     }
                 } else {
                     if (teamId && isEventLive) {
-                        const safeName = badge.name.replace(/'/g, "\\'");
-                        actionHtml = `<button class="btn-badge-claim" onclick="openClaimBadge('${eventBadge.id}', '${teamId}', '${safeName}')">Claim</button>`;
+                        actionHtml = `<button type="button" class="btn-badge-claim" ${claimAttrs}>Claim</button>`;
                     }
                 }
 
                 let assignedHtml = '';
                 if (isExclusive && claim && claim.status === 'approved') {
-                    const awardedTeam = eventTeams.find(t => t.id === claim.teamId);
+                    const awardedTeam = eventTeams.find(t => sameId(t.id, claim.teamId));
                     assignedHtml = `<span class="badge-assigned-name" style="color: #d97706; font-weight: 600;">🏆 ${awardedTeam ? escapeHtml(awardedTeam.teamName) : 'Unknown team'}</span>`;
                 } else if (isExclusive) {
                     assignedHtml = `<span class="badge-assigned-name" style="color: #94a3b8; font-style: italic;">Awaiting award...</span>`;
                 } else if (!isExclusive && teamId) {
                     const isApproved = claim && claim.status === 'approved';
                     assignedHtml = `
-                        <select class="badge-assign-select" data-eb-id="${eventBadge.id}" data-team-id="${teamId}"
-                                onchange="assignBadgeMember(this)" title="Assign team member"${isApproved ? ' disabled' : ''}>
+                        <select class="badge-assign-select" data-eb-id="${escapeHtml(eventBadge.id)}" data-team-id="${escapeHtml(teamId)}"
+                                title="Assign team member" aria-label="Assign team member"${isApproved ? ' disabled' : ''}>
                             <option value="">— assign —</option>
                             ${memberOptions.map(m =>
-                                `<option value="${m.userId}" ${m.userId === assignedUserId ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
+                                `<option value="${escapeHtml(m.userId)}" ${sameId(m.userId, assignedUserId) ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
                             ).join('')}
                         </select>
                     `;
                 } else if (assignedUserId) {
-                    const assigned = memberOptions.find(m => m.userId === assignedUserId);
+                    const assigned = memberOptions.find(m => sameId(m.userId, assignedUserId));
                     assignedHtml = `<span class="badge-assigned-name">${assigned ? escapeHtml(assigned.name) : ''}</span>`;
                 }
 
-                const examplesLink = badge.imageUrl
-                    ? `<a href="${escapeHtml(badge.imageUrl)}" target="_blank" class="btn-badge-examples" title="${escapeHtml(badge.description)}">Examples</a>`
+                const examplesUrl = safeHttpUrl(badge.imageUrl);
+                const examplesLink = examplesUrl
+                    ? `<a href="${escapeHtml(examplesUrl)}" target="_blank" rel="noopener noreferrer" class="btn-badge-examples" title="${escapeHtml(badge.description)}">Examples</a>`
                     : '';
 
                 const rejectionHtml = (claim && claim.status === 'declined' && claim.declineReason)
@@ -985,9 +978,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     function buildParticipantCard(user, membership, participation, canEdit, teamId) {
         return `
             <div class="participant-card ${canEdit ? 'editable' : ''}"
-                 data-user-id="${user.id}"
-                 data-participation-id="${participation.id}"
-                 data-team-id="${teamId}"
+                 data-user-id="${escapeHtml(user.id)}"
+                 data-participation-id="${escapeHtml(participation.id)}"
+                 data-team-id="${escapeHtml(teamId)}"
                  data-can-edit="${canEdit}">
                 <div class="name">${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</div>
                 <div class="detail-row email">${escapeHtml(user.email)}</div>
@@ -998,7 +991,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ${membership.isParticipant ? '<span class="role-tag participant">Participant</span>' : ''}
                     ${!participation.profileVerification ? '<span class="role-tag verify-needed" title="Confirm your information to continue">Confirm information</span>' : ''}
                 </div>
-                ${canEdit ? '<button class="btn btn-small btn-secondary edit-participant-btn">✏️ Edit</button>' : ''}
+                ${canEdit ? '<button type="button" class="btn btn-small btn-secondary edit-participant-btn">✏️ Edit</button>' : ''}
             </div>
         `;
     }
@@ -1009,17 +1002,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         const rolesTab = document.getElementById('tab-roles-btn');
         profileConfirmationRequired = requireConfirmation;
 
+        // Never show the previous session's error or "Saved!" message.
+        document.getElementById('edit-participant-error').classList.add('hidden');
+        document.getElementById('edit-participant-success').classList.add('hidden');
+
         document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         document.querySelector('.modal-tab[data-tab="tab-personal"]').classList.add('active');
         document.getElementById('tab-personal').classList.add('active');
 
         try {
-            const user = await API.request(`/users/${userId}`);
-            const participation = allParticipations.find(p => p.id === participationId);
-            const membership = (participation?.teamMemberships || []).find(m => m.teamId === teamId);
+            const user = await API.request(`/users/${encodeURIComponent(userId)}`);
+            const participation = allParticipations.find(p => sameId(p.id, participationId));
+            const membership = (participation?.teamMemberships || []).find(m => sameId(m.teamId, teamId));
 
-            const currentMembership = currentParticipation?.teamMemberships?.find(m => m.teamId === teamId);
+            const currentMembership = currentParticipation?.teamMemberships?.find(m => sameId(m.teamId, teamId));
             const isCurrentUserAdmin = currentMembership?.isAdmin || false;
 
             document.getElementById('edit-userId').value = userId;
@@ -1081,9 +1078,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             Please select your hotel nights as soon as possible so we can finalize room reservations.
                             <br>Rooms fill up quickly — don't miss out!
                         </div>
-                        <button onclick="openSelfEditHotel()">🛏️ Select Hotel Nights Now</button>
+                        <button type="button" id="role-hotel-select-btn">🛏️ Select Hotel Nights Now</button>
                     </div>
                 `;
+                hotelAlert.querySelector('#role-hotel-select-btn').addEventListener('click', openSelfEditHotel);
             } else {
                 hotelAlert.innerHTML = `
                     <div class="hotel-urgency-alert">
@@ -1103,7 +1101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    window.openSelfEdit = async function() {
+    async function openSelfEdit() {
         const modal = document.getElementById('edit-participant-modal');
 
         document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
@@ -1140,26 +1138,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('edit-participant-success').classList.add('hidden');
 
         modal.classList.add('active');
-    };
+    }
 
-    window.openSelfEditHotel = async function() {
+    async function openSelfEditHotel() {
         await openSelfEdit();
         document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         document.querySelector('.modal-tab[data-tab="tab-hotel"]').classList.add('active');
         document.getElementById('tab-hotel').classList.add('active');
-    };
+    }
 
-    window.openEditOnHotel = function(userId, participationId, teamId) {
-        openParticipantEdit(userId, participationId, teamId).then(() => {
-            document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.querySelector('.modal-tab[data-tab="tab-hotel"]').classList.add('active');
-            document.getElementById('tab-hotel').classList.add('active');
-        });
-    };
-
-    window.switchEventTab = function(tabName, updateHash = true) {
+    function switchEventTab(tabName, updateHash = true) {
         document.querySelectorAll('.event-nav-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.tab === tabName);
         });
@@ -1169,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (updateHash) {
             history.replaceState(null, '', `#${tabName}`);
         }
-    };
+    }
 
     const initHash = location.hash.replace('#', '');
     if (initHash === 'badges' || initHash === 'team') {
@@ -1183,7 +1172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    window.switchBadgeTab = function(tabBtn) {
+    function switchBadgeTab(tabBtn) {
         const cat = tabBtn.dataset.cat;
         const section = document.getElementById('badges-section');
         if (!section) return;
@@ -1192,9 +1181,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         section.querySelectorAll('.badge-panel').forEach(p => {
             p.classList.toggle('active', p.dataset.cat === cat);
         });
-    };
+    }
 
-    window.openClaimBadge = function(eventBadgeId, teamId, badgeName) {
+    // One listener on the badge section serves every tab, claim/award button and assignment select.
+    function setupBadgeSection() {
+        const section = document.getElementById('badges-section');
+        if (!section) return;
+        section.addEventListener('click', (e) => {
+            const tab = e.target.closest('.badge-tab');
+            if (tab) { switchBadgeTab(tab); return; }
+            const claimBtn = e.target.closest('.btn-badge-claim');
+            if (claimBtn) { openClaimBadge(claimBtn.dataset.ebId, claimBtn.dataset.teamId, claimBtn.dataset.badgeName); return; }
+            const awardBtn = e.target.closest('.btn-badge-award');
+            if (awardBtn) { openAwardBadge(awardBtn.dataset.ebId, awardBtn.dataset.badgeName); }
+        });
+        section.addEventListener('change', (e) => {
+            const select = e.target.closest('.badge-assign-select');
+            if (select) assignBadgeMember(select);
+        });
+    }
+
+    function openClaimBadge(eventBadgeId, teamId, badgeName) {
         const modal = document.getElementById('badge-claim-modal');
         if (!modal) return;
 
@@ -1205,9 +1212,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('badge-claim-error').classList.add('hidden');
 
         modal.classList.remove('hidden');
-    };
+    }
 
-    window.openAwardBadge = function(eventBadgeId, badgeName) {
+    function openAwardBadge(eventBadgeId, badgeName) {
         const modal = document.getElementById('badge-award-modal');
         if (!modal) return;
 
@@ -1216,25 +1223,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('badge-award-error').classList.add('hidden');
 
         const teamSelect = document.getElementById('badge-award-team');
-        teamSelect.innerHTML = '<option value="">Select a team...</option>';
+        teamSelect.replaceChildren();
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select a team...';
+        teamSelect.appendChild(placeholder);
         for (const team of eventTeams) {
-            teamSelect.innerHTML += `<option value="${team.id}">${escapeHtml(team.teamName)}</option>`;
+            const option = document.createElement('option');
+            option.value = team.id;
+            option.textContent = team.teamName;
+            teamSelect.appendChild(option);
         }
 
         modal.classList.remove('hidden');
-    };
+    }
 
-    window.closeBadgeClaimModal = function() {
+    function closeBadgeClaimModal() {
         const modal = document.getElementById('badge-claim-modal');
         if (modal) modal.classList.add('hidden');
-    };
+    }
 
-    window.closeAwardModal = function() {
+    function closeAwardModal() {
         const modal = document.getElementById('badge-award-modal');
         if (modal) modal.classList.add('hidden');
-    };
+    }
 
-    window.submitBadgeAward = async function() {
+    async function submitBadgeAward() {
         const eventBadgeId = document.getElementById('badge-award-eb-id').value;
         const teamId = document.getElementById('badge-award-team').value;
         const errorDiv = document.getElementById('badge-award-error');
@@ -1269,11 +1283,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             errorDiv.classList.remove('hidden');
         } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Award Badge';
+            submitBtn.textContent = '🏆 Award Badge';
         }
-    };
+    }
 
-    window.submitBadgeClaim = async function() {
+    async function submitBadgeClaim() {
         const eventBadgeId = document.getElementById('badge-claim-eb-id').value;
         const teamId = document.getElementById('badge-claim-team-id').value;
         const blogUrl = document.getElementById('badge-claim-url').value.trim();
@@ -1286,9 +1300,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        try {
-            new URL(blogUrl);
-        } catch {
+        if (!safeHttpUrl(blogUrl)) {
             errorDiv.textContent = 'Please enter a valid URL (e.g. https://acdc.blog/...).';
             errorDiv.classList.remove('hidden');
             return;
@@ -1320,9 +1332,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Save Claim';
         }
-    };
+    }
 
-    window.assignBadgeMember = async function(selectEl) {
+    async function assignBadgeMember(selectEl) {
         const eventBadgeId = selectEl.dataset.ebId;
         const teamId = selectEl.dataset.teamId;
         const assignedToUserId = selectEl.value || null;
@@ -1340,7 +1352,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await renderTeams();
             renderBadgesSection();
         }
-    };
+    }
 
     function computeHotelDates(startDate, endDate) {
         const daysBefore = currentEvent.hotelDaysBefore ?? 0;
@@ -1544,7 +1556,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             successDiv.classList.remove('hidden');
             profileConfirmationRequired = false;
 
-            if (userId === currentUser.id) {
+            if (sameId(userId, currentUser.id)) {
                 Object.assign(currentUser, userData);
                 if (currentParticipation) {
                     currentParticipation.hotelNights = hotelNights;
@@ -1571,10 +1583,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function openInviteMember(teamId) {
-        const team = eventTeams.find(t => t.id === teamId);
+        const team = eventTeams.find(t => sameId(t.id, teamId));
         if (!team) return;
 
-        const userMembership = currentParticipation?.teamMemberships?.find(m => m.teamId === teamId);
+        const userMembership = currentParticipation?.teamMemberships?.find(m => sameId(m.teamId, teamId));
         if (!userMembership?.isAdmin) {
             alert('Only team admins can invite members.');
             return;
@@ -1666,26 +1678,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function showResendOption(email, invitationId, errorDiv, successDiv) {
-        errorDiv.innerHTML = `
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                <div>📧 An invitation is already pending for <strong>${escapeHtml(email)}</strong></div>
-                <div style="display: flex; gap: 8px;">
-                    <button type="button" class="btn btn-small btn-secondary" onclick="resendExistingInvitation('${invitationId}')">
-                        🔄 Resend Invitation
-                    </button>
-                    <button type="button" class="btn btn-small btn-ghost" onclick="document.getElementById('invite-error').classList.add('hidden')">
-                        Dismiss
-                    </button>
-                </div>
-            </div>
-        `;
+        errorDiv.replaceChildren();
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+        const message = document.createElement('div');
+        message.append('📧 An invitation is already pending for ');
+        const strong = document.createElement('strong');
+        strong.textContent = email;
+        message.appendChild(strong);
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display: flex; gap: 8px;';
+        const resendBtn = document.createElement('button');
+        resendBtn.type = 'button';
+        resendBtn.className = 'btn btn-small btn-secondary';
+        resendBtn.textContent = '🔄 Resend Invitation';
+        resendBtn.addEventListener('click', () => resendExistingInvitation(invitationId));
+        const dismissBtn = document.createElement('button');
+        dismissBtn.type = 'button';
+        dismissBtn.className = 'btn btn-small btn-ghost';
+        dismissBtn.textContent = 'Dismiss';
+        dismissBtn.addEventListener('click', () => errorDiv.classList.add('hidden'));
+        actions.append(resendBtn, dismissBtn);
+        wrap.append(message, actions);
+        errorDiv.appendChild(wrap);
         errorDiv.classList.remove('hidden');
         errorDiv.style.background = '#fef3c7';
         errorDiv.style.color = '#92400e';
         errorDiv.style.borderColor = '#f59e0b';
     }
 
-    window.resendExistingInvitation = async function(invitationId) {
+    async function resendExistingInvitation(invitationId) {
         const errorDiv = document.getElementById('invite-error');
         const successDiv = document.getElementById('invite-success');
 
@@ -1712,10 +1734,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             errorDiv.style.color = '';
             errorDiv.style.borderColor = '';
         }
-    };
+    }
 
     async function openTeamDetails(teamId) {
-        const team = eventTeams.find(t => t.id === teamId);
+        const team = eventTeams.find(t => sameId(t.id, teamId));
         if (!team) return;
 
         const modal = document.getElementById('team-details-modal');
@@ -1728,12 +1750,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         modal.classList.add('active');
 
-        const userMembership = currentParticipation?.teamMemberships?.find(m => m.teamId === teamId);
+        const userMembership = currentParticipation?.teamMemberships?.find(m => sameId(m.teamId, teamId));
         const isTeamAdmin = userMembership?.isAdmin;
 
         try {
             const teamParticipations = allParticipations.filter(p => {
-                const membership = (p.teamMemberships || []).find(m => m.teamId === teamId);
+                const membership = (p.teamMemberships || []).find(m => sameId(m.teamId, teamId));
                 return membership;
             });
 
@@ -1741,7 +1763,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 teamParticipations.map(async (p) => {
                     try {
                         const user = await API.request(`/users/${p.userId}`);
-                        const membership = (p.teamMemberships || []).find(m => m.teamId === teamId);
+                        const membership = (p.teamMemberships || []).find(m => sameId(m.teamId, teamId));
                         return {
                             participation: p,
                             user,
@@ -1805,7 +1827,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                             <div class="member-roles">
                                 <span class="role-badge" style="background: #fef3c7; color: #92400e; border: 1px solid #f59e0b;">⏳ Pending</span>
-                                <button class="btn btn-small btn-ghost" onclick="cancelInvitation('${inv.id}')" title="Cancel invitation" style="padding: 4px 8px; margin-left: 8px;">✕</button>
+                                <button type="button" class="btn btn-small btn-ghost cancel-pending-invite-btn" data-invite-id="${escapeHtml(inv.id)}" title="Cancel invitation" aria-label="Cancel invitation" style="padding: 4px 8px; margin-left: 8px;">✕</button>
                             </div>
                         </div>
                     `;
@@ -1813,7 +1835,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 html += '</div>';
             }
 
-            const committedSpots = team.committedParticipants || 3;
+            const committedSpots = team.numberOfParticipants || team.committedParticipants || 3;
             const filledSpots = validMembers.length;
             const pendingSpots = pendingInvitations.length;
             const remainingSpots = Math.max(0, committedSpots - filledSpots - pendingSpots);
@@ -1856,7 +1878,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    window.cancelInvitation = async function(invitationId) {
+    async function cancelInvitation(invitationId) {
         if (!confirm('Are you sure you want to cancel this invitation?')) return;
 
         try {
@@ -1868,7 +1890,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             alert('Error cancelling invitation: ' + error.message);
         }
-    };
+    }
 
     function getInitials(firstName, lastName) {
         return ((firstName?.[0] || '') + (lastName?.[0] || '')).toUpperCase() || '?';
@@ -1887,18 +1909,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         return `${months[startDate.getMonth()]} ${startDate.getDate()}, ${startDate.getFullYear()}`;
     }
 
+    // Safe for text nodes and quoted attribute values.
     function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        if (text == null) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // Admin-written terms are shown as text; line breaks survive through `white-space: pre-line`.
+    function renderTerms(el, terms) {
+        el.textContent = terms || '';
+        el.style.whiteSpace = 'pre-line';
     }
 
     function setupModals() {
-        const isRegistrationOpen = () => {
-            const s = currentEvent.status;
-            return s === 'registration' || s === 'registration-open' || !!currentEvent.registrationOpen;
-        };
+        document.getElementById('edit-details-btn')?.addEventListener('click', openSelfEdit);
+
+        document.querySelectorAll('.event-nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchEventTab(tab.dataset.tab));
+        });
+
+        setupBadgeSection();
+
+        ['badge-claim-backdrop', 'badge-claim-close', 'badge-claim-cancel'].forEach(id => {
+            document.getElementById(id)?.addEventListener('click', closeBadgeClaimModal);
+        });
+        document.getElementById('badge-claim-submit-btn')?.addEventListener('click', submitBadgeClaim);
+
+        ['badge-award-backdrop', 'badge-award-close', 'badge-award-cancel'].forEach(id => {
+            document.getElementById(id)?.addEventListener('click', closeAwardModal);
+        });
+        document.getElementById('badge-award-submit-btn')?.addEventListener('click', submitBadgeAward);
+
+        ['registration-terms-close', 'registration-terms-cancel'].forEach(id => {
+            document.getElementById(id)?.addEventListener('click', closeRegistrationTermsModal);
+        });
+        document.getElementById('registration-terms-confirm')?.addEventListener('click', confirmRegistrationTerms);
+
+        document.getElementById('team-members-list')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.cancel-pending-invite-btn');
+            if (btn) cancelInvitation(btn.dataset.inviteId);
+        });
 
         const createTeamModal = document.getElementById('create-team-modal');
         document.getElementById('create-team-btn').addEventListener('click', () => {
@@ -1945,8 +2000,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const ackLabel = document.getElementById('create-team-ack-label');
             const terms = currentEvent.teamRegistrationTerms;
             if (terms) {
-                const rendered = terms.includes('<') ? terms : terms.replace(/\n/g, '<br>');
-                termsDisplay.innerHTML = rendered;
+                renderTerms(termsDisplay, terms);
                 termsDisplay.style.display = '';
                 ackLabel.textContent = 'I have read and agree to the terms above';
             } else {
@@ -1978,11 +2032,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const termsDisplay = document.getElementById('solo-terms-display');
             const terms = currentEvent.soloQueueTerms;
             if (terms) {
-                const rendered = terms.includes('<') ? terms : terms.replace(/\n/g, '<br>');
-                termsDisplay.innerHTML = rendered;
+                renderTerms(termsDisplay, terms);
                 termsDisplay.classList.remove('hidden');
             } else {
-                termsDisplay.innerHTML = '';
+                termsDisplay.textContent = '';
                 termsDisplay.classList.add('hidden');
             }
             soloQueueModal.classList.add('active');
@@ -2070,27 +2123,38 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // GET /solo-queue/position/{eventId}/{userId} answers {inQueue:false} or
+    // {inQueue:true, position, totalCount, entry}. Older responses omit inQueue/entry and only
+    // carry {position, totalCount}; both shapes are handled.
     async function checkSoloQueueStatus() {
         try {
             const result = await API.soloQueue.getPosition(eventId, currentUser.id);
+            const inQueue = !!result && (result.inQueue === true
+                || (result.inQueue === undefined && result.position != null));
 
-            if (result && result.inQueue) {
-                currentSoloQueueEntry = result.entry || null;
-                showSoloQueueStatus(result.position, result.totalInQueue ?? result.totalCount);
-                return;
-            }
-
-            if (result && typeof result.position !== 'undefined' && result.position !== null) {
+            if (!inQueue) {
                 currentSoloQueueEntry = null;
-                showSoloQueueStatus(result.position, result.totalInQueue ?? result.totalCount);
+                hideSoloQueueStatus();
                 return;
             }
 
-            currentSoloQueueEntry = null;
-            hideSoloQueueStatus();
+            currentSoloQueueEntry = result.entry || await findOwnQueueEntry();
+            showSoloQueueStatus(result.position, result.totalCount ?? result.totalInQueue);
         } catch (error) {
             currentSoloQueueEntry = null;
             hideSoloQueueStatus();
+        }
+    }
+
+    // The queue list endpoint returns the caller's own entries; used when the position
+    // response does not include the entry itself.
+    async function findOwnQueueEntry() {
+        try {
+            const result = await API.soloQueue.get(eventId, currentUser.id);
+            const entries = Array.isArray(result) ? result : (result?.entries || []);
+            return entries.find(e => sameId(e.userId, currentUser.id) && sameId(e.eventId, eventId)) || null;
+        } catch (error) {
+            return null;
         }
     }
 
@@ -2144,7 +2208,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             const result = await API.soloQueue.join(eventId, currentUser.id, note);
             currentSoloQueueEntry = result;
 
-            successDiv.textContent = `You're in the queue! Position: ${result.position}`;
+            let position = result.position;
+            if (!(position > 0)) {
+                // Fall back to the authoritative position when the join response has none.
+                try {
+                    const status = await API.soloQueue.getPosition(eventId, currentUser.id);
+                    if (status?.position > 0) position = status.position;
+                } catch (e) { }
+            }
+
+            successDiv.textContent = `You're in the queue! Position: ${position}`;
             successDiv.classList.remove('hidden');
 
             setTimeout(async () => {
@@ -2163,7 +2236,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function leaveSoloQueue() {
-        if (!currentSoloQueueEntry) return;
+        if (!currentSoloQueueEntry) {
+            currentSoloQueueEntry = await findOwnQueueEntry();
+        }
+        if (!currentSoloQueueEntry) {
+            alert('Could not find your queue entry. Please reload the page and try again.');
+            return;
+        }
 
         if (!confirm('Are you sure you want to leave the solo queue?')) return;
 
@@ -2242,10 +2321,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function unlockTeamSlot(teamId) {
-        const team = eventTeams.find(t => t.id === teamId);
+        const team = eventTeams.find(t => sameId(t.id, teamId));
         if (!team) return;
 
-        const currentCommitted = team.committedParticipants || team.numberOfParticipants || 3;
+        const currentCommitted = team.numberOfParticipants || team.committedParticipants || 3;
         const newCommitted = currentCommitted + 1;
 
         if (!confirm(`Unlock 1 more slot? This will expand your team commitment to ${newCommitted} participants.`)) {
@@ -2253,7 +2332,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         try {
-            await API.teams.update(teamId, { committedParticipants: newCommitted });
+            // The team size is stored in numberOfParticipants.
+            await API.teams.update(teamId, { numberOfParticipants: newCommitted });
 
             await loadEventTeams();
             await renderTeams();
@@ -2267,23 +2347,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let _termsOnConfirm = null;
 
-    function showRegistrationTermsModal(actionTitle, termsHtml, onConfirm) {
+    function showRegistrationTermsModal(actionTitle, terms, onConfirm) {
         _termsOnConfirm = onConfirm;
         document.getElementById('registration-terms-title').textContent = `Before you continue: ${actionTitle}`;
-        const rendered = termsHtml.includes('<') ? termsHtml : termsHtml.replace(/\n/g, '<br>');
-        document.getElementById('registration-terms-body').innerHTML = rendered;
+        renderTerms(document.getElementById('registration-terms-body'), terms);
         document.getElementById('registration-terms-modal').classList.add('active');
     }
 
-    window.closeRegistrationTermsModal = function() {
+    function closeRegistrationTermsModal() {
         document.getElementById('registration-terms-modal').classList.remove('active');
         _termsOnConfirm = null;
-    };
+    }
 
-    window.confirmRegistrationTerms = function() {
+    function confirmRegistrationTerms() {
         const cb = _termsOnConfirm;
         closeRegistrationTermsModal();
         if (cb) cb();
-    };
+    }
 });
 

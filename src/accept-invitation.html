@@ -124,7 +124,7 @@
     <div class="container">
         <header>
             <h1>🏔️ ACDC Portal</h1>
-            <p class="subtitle">Team Invitation</p>
+            <p class="subtitle" id="page-subtitle">Invitation</p>
         </header>
 
         <main>
@@ -144,14 +144,13 @@
 
             <div id="step-invite" class="hidden">
                 <div class="invite-card">
-                    <div class="invite-icon">🎉</div>
-                    <h2>You've Been Invited!</h2>
-                    <p class="invite-detail">
-                        <strong id="invite-inviter-name"></strong> has invited you to join team
-                    </p>
+                    <div class="invite-icon" id="invite-icon">🎉</div>
+                    <h2 id="invite-heading">You've Been Invited!</h2>
+                    <p class="invite-detail" id="invite-detail-line">You have been invited to join team</p>
                     <p class="invite-event" id="invite-team-name"></p>
                     <p class="invite-detail" id="invite-event-line"></p>
                     <p class="invite-meta" id="invite-meta-line"></p>
+                    <p class="invite-meta" id="invite-email-hint"></p>
                     <p class="invite-expires" id="invite-expires-line"></p>
                 </div>
 
@@ -196,8 +195,8 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="profile-email">Email</label>
-                            <input type="email" id="profile-email" readonly class="readonly">
+                            <label for="profile-email">Email *</label>
+                            <input type="email" id="profile-email" name="email" required class="readonly">
                         </div>
 
                         <div id="profile-error" class="error-message hidden"></div>
@@ -241,8 +240,8 @@
                         <div id="otp-error" class="error-message hidden"></div>
 
                         <button type="submit" class="btn btn-primary btn-full" id="verify-otp-btn">
-                            <span class="btn-text">Verify & Join Team 🎉</span>
-                            <span class="btn-loading hidden">Verifying & joining...</span>
+                            <span class="btn-text">Verify &amp; Join Team 🎉</span>
+                            <span class="btn-loading hidden">Verifying &amp; joining...</span>
                         </button>
                     </form>
 
@@ -258,8 +257,8 @@
             <div id="step-success" class="card hidden">
                 <div class="success-card">
                     <div class="success-icon">🎉</div>
-                    <h2>You're In!</h2>
-                    <p>You've successfully joined team <strong id="success-team-name"></strong>.</p>
+                    <h2 id="success-title">You're In!</h2>
+                    <p><span id="success-prefix">You've successfully joined team </span><strong id="success-team-name"></strong>.</p>
                     <p style="font-size: 0.9rem; color: #64748b; margin-top: 8px;">Redirecting to your event page...</p>
                 </div>
             </div>
@@ -273,365 +272,6 @@
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
-    <script>        document.addEventListener('DOMContentLoaded', async () => {
-            Auth.init();
-
-            const stepLoading = document.getElementById('step-loading');
-            const wakeTimer = setTimeout(() => {
-                if (stepLoading.classList.contains('hidden')) return;
-                if (!stepLoading.querySelector('.loader-wake')) {
-                    stepLoading.insertAdjacentHTML('beforeend', '<div class=\"loader-wake\"><span class=\"wake-scene\"><span class=\"wake-bear\">🐻‍❄️</span> <span class=\"wake-zzz\">💤</span></span><div class=\"wake-title\">Waking up the Arctic Database<span class=\"wake-dots\"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class=\"wake-subtitle\">☕ Brewing some Arctic coffee to speed things up...</div></div>');
-                }
-            }, 1200);
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const inviteId = urlParams.get('invite');
-
-            if (!inviteId) {
-                showError('No Invitation Found', 'This link is missing an invitation ID. Please use the link from your invitation email.');
-                return;
-            }
-
-            let invitation = null;
-            let currentUser = null;
-            let alreadyLoggedIn = false;
-            let pendingProfile = {};
-
-            try {
-                invitation = await API.invitations.get(inviteId);
-
-                if (!invitation) {
-                    showError('Invitation Not Found', 'This invitation could not be found. It may have been deleted.');
-                    return;
-                }
-
-                if (invitation.isExpired) {
-                    showError('Invitation Expired', 'This invitation has expired. Please ask the event organizer to send a new one.');
-                    return;
-                }
-
-                if (invitation.status !== 'pending') {
-                    showError('Already Processed', `This invitation has already been ${invitation.status}.`);
-                    return;
-                }
-
-                displayInvitation(invitation);
-
-            } catch (err) {
-                console.error('Failed to load invitation:', err);
-                showError('Error Loading Invitation', 'Could not load the invitation. Please try again later.');
-                return;
-            }
-
-            if (Auth.isLoggedIn()) {
-                const authUser = Auth.getUser();
-                if (authUser?.email) {
-                    alreadyLoggedIn = true;
-                    try {
-                        currentUser = await API.users.getOrNull(authUser.email);
-                    } catch (e) {
-                        console.warn('Could not load user:', e);
-                    }
-                }
-            }
-
-            initProfileForm();
-
-            function initProfileForm() {
-                const firstNameField = document.getElementById('profile-firstName');
-                const lastNameField = document.getElementById('profile-lastName');
-                const phoneField = document.getElementById('profile-phone');
-                const gamertagField = document.getElementById('profile-gamertag');
-                const allergiesField = document.getElementById('profile-allergies');
-                const emailField = document.getElementById('profile-email');
-
-                const sessionEmail = Auth.getUser()?.email || '';
-                emailField.value = sessionEmail;
-                emailField.readOnly = false;
-                emailField.required = true;
-
-                if (currentUser) {
-                    firstNameField.value = currentUser.firstName || invitation.inviteeFirstName || '';
-                    lastNameField.value = currentUser.lastName || invitation.inviteeLastName || '';
-                    phoneField.value = currentUser.phone || invitation.inviteePhone || '';
-                    gamertagField.value = currentUser.gamertag || invitation.inviteeGamertag || '';
-                    allergiesField.value = currentUser.allergies || invitation.inviteeAllergies || '';
-                } else {
-                    firstNameField.value = invitation.inviteeFirstName || '';
-                    lastNameField.value = invitation.inviteeLastName || '';
-                    phoneField.value = invitation.inviteePhone || '';
-                    gamertagField.value = invitation.inviteeGamertag || '';
-                    allergiesField.value = invitation.inviteeAllergies || '';
-                }
-
-                firstNameField.focus();
-            }
-
-            document.getElementById('next-to-profile-btn').addEventListener('click', () => {
-                document.getElementById('step-invite').classList.add('hidden');
-                document.getElementById('step-profile').classList.remove('hidden');
-                initProfileForm();
-            });
-
-            document.getElementById('profile-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const errorDiv = document.getElementById('profile-error');
-
-                const firstName = document.getElementById('profile-firstName').value.trim();
-                const lastName = document.getElementById('profile-lastName').value.trim();
-                const phone = document.getElementById('profile-phone').value.trim();
-                const gamertag = document.getElementById('profile-gamertag').value.trim();
-                const allergies = document.getElementById('profile-allergies').value.trim();
-
-                if (!firstName || !lastName || !phone) {
-                    errorDiv.textContent = 'Please fill in all required fields.';
-                    errorDiv.classList.remove('hidden');
-                    return;
-                }
-
-                errorDiv.classList.add('hidden');
-
-                const email = document.getElementById('profile-email').value.trim();
-                if (!email) {
-                    errorDiv.textContent = 'Please enter your email address.';
-                    errorDiv.classList.remove('hidden');
-                    return;
-                }
-
-                pendingProfile = { firstName, lastName, phone, gamertag, allergies };
-                pendingProfile.email = email;
-
-                if (alreadyLoggedIn && Auth.getUser()?.email?.toLowerCase() === email.toLowerCase()) {
-                    await submitAcceptance();
-                    return;
-                }
-
-                document.getElementById('step-profile').classList.add('hidden');
-                document.getElementById('step-verify').classList.remove('hidden');
-                document.getElementById('email-display').textContent = email;
-            });
-
-            document.getElementById('send-otp-btn').addEventListener('click', async () => {
-                const btn = document.getElementById('send-otp-btn');
-                const errorDiv = document.getElementById('email-error');
-
-                btn.disabled = true;
-                btn.querySelector('.btn-text').classList.add('hidden');
-                btn.querySelector('.btn-loading').classList.remove('hidden');
-                errorDiv.classList.add('hidden');
-
-                const email = document.getElementById('profile-email').value.trim();
-
-                try {
-                    await API.auth.sendOtp(email);
-
-                    document.getElementById('substep-email').classList.add('hidden');
-                    document.getElementById('substep-otp').classList.remove('hidden');
-                    document.getElementById('otp-email-display').textContent = email;
-                    document.getElementById('otp-code').value = '';
-                    document.getElementById('otp-code').focus();
-
-                } catch (err) {
-                    document.getElementById('substep-email').classList.add('hidden');
-                    document.getElementById('substep-otp').classList.remove('hidden');
-                    document.getElementById('otp-email-display').textContent = email;
-                    const otpError = document.getElementById('otp-error');
-                    otpError.textContent = (err.message || 'Failed to send code.') + ' You may already have a pending code.';
-                    otpError.classList.remove('hidden');
-                } finally {
-                    btn.disabled = false;
-                    btn.querySelector('.btn-text').classList.remove('hidden');
-                    btn.querySelector('.btn-loading').classList.add('hidden');
-                }
-            });
-
-            document.getElementById('otp-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const btn = document.getElementById('verify-otp-btn');
-                const errorDiv = document.getElementById('otp-error');
-                const code = document.getElementById('otp-code').value.trim();
-
-                if (code.length !== 6) {
-                    errorDiv.textContent = 'Please enter the 6-digit code.';
-                    errorDiv.classList.remove('hidden');
-                    return;
-                }
-
-                btn.disabled = true;
-                btn.querySelector('.btn-text').classList.add('hidden');
-                btn.querySelector('.btn-loading').classList.remove('hidden');
-                errorDiv.classList.add('hidden');
-
-                const email = document.getElementById('profile-email').value.trim();
-
-                try {
-                    const result = await API.auth.verifyOtp(email, code);
-
-                    if (!result.success) {
-                        throw new Error(result.message || 'Invalid code.');
-                    }
-
-                    Auth.setSession(result.token, result.user);
-
-                    try {
-                        currentUser = await API.users.getOrNull(email);
-                    } catch (e) {
-                        console.warn('Could not load user:', e);
-                    }
-
-                    alreadyLoggedIn = true;
-                    initProfileForm();
-                    document.getElementById('step-verify').classList.add('hidden');
-                    document.getElementById('step-profile').classList.remove('hidden');
-
-                } catch (err) {
-                    errorDiv.textContent = err.message || 'Verification failed. Please try again.';
-                    errorDiv.classList.remove('hidden');
-                    btn.disabled = false;
-                    btn.querySelector('.btn-text').classList.remove('hidden');
-                    btn.querySelector('.btn-loading').classList.add('hidden');
-                }
-            });
-
-            document.getElementById('resend-otp-link').addEventListener('click', async (e) => {
-                e.preventDefault();
-                const link = e.target;
-                link.textContent = 'Sending...';
-                link.style.pointerEvents = 'none';
-                try {
-                    await API.auth.sendOtp(document.getElementById('profile-email').value.trim());
-                    link.textContent = '✓ Code sent!';
-                    setTimeout(() => {
-                        link.textContent = 'Resend code';
-                        link.style.pointerEvents = '';
-                    }, 30000);
-                } catch (err) {
-                    link.textContent = 'Resend code';
-                    link.style.pointerEvents = '';
-                    const otpError = document.getElementById('otp-error');
-                    otpError.textContent = err.message || 'Failed to resend.';
-                    otpError.classList.remove('hidden');
-                }
-            });
-
-            document.getElementById('otp-code').addEventListener('input', (e) => {
-                e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
-            });
-
-            async function submitAcceptance(authToken) {
-                try {
-                    const userId = currentUser ? currentUser.id : null;
-
-                    const result = await API.invitations.accept(inviteId, userId, pendingProfile.email, {
-                        firstName: pendingProfile.firstName,
-                        lastName: pendingProfile.lastName,
-                        phone: pendingProfile.phone,
-                        gamertag: pendingProfile.gamertag,
-                        allergies: pendingProfile.allergies
-                    });
-
-                    if (!result.success) {
-                        throw new Error('Failed to accept invitation.');
-                    }
-
-                    document.getElementById('step-invite').classList.add('hidden');
-                    document.getElementById('step-profile').classList.add('hidden');
-                    document.getElementById('step-verify').classList.add('hidden');
-                    document.getElementById('step-success').classList.remove('hidden');
-                    document.getElementById('success-team-name').textContent = invitation.teamName || 'the team';
-
-                    const eventId = result.eventId || invitation.eventId;
-                    setTimeout(() => {
-                        if (eventId) {
-                            window.location.href = `event.html?id=${eventId}`;
-                        } else {
-                            window.location.href = 'events.html';
-                        }
-                    }, 2000);
-
-                } catch (err) {
-                    const visibleError = document.querySelector('#substep-otp:not(.hidden) #otp-error') ||
-                                         document.getElementById('profile-error');
-                    if (visibleError) {
-                        visibleError.textContent = err.message || 'Something went wrong. Please try again.';
-                        visibleError.classList.remove('hidden');
-                    } else {
-                        alert(err.message || 'Something went wrong. Please try again.');
-                    }
-
-                    document.querySelectorAll('.btn').forEach(b => {
-                        b.disabled = false;
-                        const txt = b.querySelector('.btn-text');
-                        const load = b.querySelector('.btn-loading');
-                        if (txt) txt.classList.remove('hidden');
-                        if (load) load.classList.add('hidden');
-                    });
-                }
-            }
-
-            function displayInvitation(inv) {
-                document.getElementById('step-loading').classList.add('hidden');
-                clearTimeout(wakeTimer);
-                document.getElementById('step-invite').classList.remove('hidden');
-
-                document.getElementById('invite-inviter-name').textContent = inv.inviterName || 'An event organizer';
-                document.getElementById('invite-team-name').textContent = inv.teamName || 'the team';
-
-                const eventLine = document.getElementById('invite-event-line');
-                if (inv.eventName) {
-                    eventLine.innerHTML = `for <strong>${escapeHtml(inv.eventName)}</strong>`;
-                } else {
-                    eventLine.classList.add('hidden');
-                }
-
-                const metaParts = [];
-                if (inv.eventStartDate) {
-                    metaParts.push(`📅 ${formatDate(inv.eventStartDate)}${inv.eventEndDate ? ' – ' + formatDate(inv.eventEndDate) : ''}`);
-                }
-                if (inv.eventLocation) {
-                    metaParts.push(`📍 ${inv.eventLocation}`);
-                }
-                const metaLine = document.getElementById('invite-meta-line');
-                if (metaParts.length > 0) {
-                    metaLine.textContent = metaParts.join(' · ');
-                } else {
-                    metaLine.classList.add('hidden');
-                }
-
-                const expiresLine = document.getElementById('invite-expires-line');
-                if (inv.expiresAt) {
-                    const days = Math.ceil((new Date(inv.expiresAt) - new Date()) / (1000 * 60 * 60 * 24));
-                    if (days <= 1) {
-                        expiresLine.textContent = 'This invitation expires soon';
-                    } else {
-                        expiresLine.textContent = `This invitation expires in ${days} days`;
-                    }
-                } else {
-                    expiresLine.classList.add('hidden');
-                }
-            }
-
-            function showError(title, message) {
-                document.getElementById('step-loading').classList.add('hidden');
-                document.getElementById('step-invite').classList.add('hidden');
-                document.getElementById('step-profile').classList.add('hidden');
-                document.getElementById('step-verify').classList.add('hidden');
-                document.getElementById('step-error').classList.remove('hidden');
-                document.getElementById('error-title').textContent = title;
-                document.getElementById('error-message').textContent = message;
-            }
-
-            function formatDate(dateStr) {
-                if (!dateStr) return '';
-                return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-            }
-
-            function escapeHtml(str) {
-                const div = document.createElement('div');
-                div.textContent = str;
-                return div.innerHTML;
-            }
-        });
-    </script>
+    <script src="js/accept-invitation.js"></script>
 </body>
 </html>

@@ -5,13 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register Interest - ACDC Portal</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
-    <script>        const params = new URLSearchParams(window.location.search);
-        const eventId = params.get('eventId') || params.get('event');
-        const target = eventId
-            ? `register.html?intent=interest&eventId=${encodeURIComponent(eventId)}`
-            : 'register.html?intent=interest';
-        window.location.replace(target);
-    </script>
+    <script src="js/legacy-redirect.js"></script>
 </head>
 <body>
     <p>Redirecting to registration...</p>

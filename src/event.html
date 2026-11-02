@@ -1922,14 +1922,14 @@
                             <p class="ich-message">You've registered your interest. Take the next step by creating a team or joining the solo queue so we can match you with other participants.</p>
 
                             <div id="upgrade-not-queued" class="interest-cta-row">
-                                <button id="upgrade-register-team-btn-a" class="interest-cta-btn">
+                                <button type="button" id="upgrade-register-team-btn-a" class="interest-cta-btn">
                                     <span class="icb-icon">👥</span>
                                     <span class="icb-text">
                                         <span class="icb-label">Register a Team</span>
                                         <span class="icb-hint">Create and manage your team</span>
                                     </span>
                                 </button>
-                                <button id="interest-solo-btn" class="interest-cta-btn icb-green">
+                                <button type="button" id="interest-solo-btn" class="interest-cta-btn icb-green">
                                     <span class="icb-icon">🎲</span>
                                     <span class="icb-text">
                                         <span class="icb-label">Join Solo Queue</span>
@@ -1939,7 +1939,7 @@
                             </div>
 
                             <div id="upgrade-in-queue" class="interest-cta-row hidden">
-                                <button id="upgrade-register-team-btn-b" class="interest-cta-btn">
+                                <button type="button" id="upgrade-register-team-btn-b" class="interest-cta-btn">
                                     <span class="icb-icon">👥</span>
                                     <span class="icb-text">
                                         <span class="icb-label">Register a Team</span>
@@ -1953,7 +1953,7 @@
                                             <span class="icb-label">In Solo Queue</span>
                                             <span class="icb-hint">Position <strong id="interest-queue-position">—</strong></span>
                                         </span>
-                                        <button id="leave-queue-interest-btn" class="iat-leave">✕ Leave</button>
+                                        <button type="button" id="leave-queue-interest-btn" class="iat-leave">✕ Leave</button>
                                     </div>
                                 </div>
                             </div>
@@ -1963,7 +1963,7 @@
                 </div>
 
                 <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-                    <button id="edit-details-btn" onclick="openSelfEdit()" class="btn btn-secondary" style="border-radius: 10px; padding: 12px 28px; font-weight: 600; font-size: 0.95rem;">
+                    <button type="button" id="edit-details-btn" class="btn btn-secondary" style="border-radius: 10px; padding: 12px 28px; font-weight: 600; font-size: 0.95rem;">
                         ✏️ Update My Details &amp; Hotel
                     </button>
                     <a id="role-admin-link" href="admin-dashboard.html" class="admin-portal-link hidden"></a>
@@ -1971,10 +1971,10 @@
             </div>
 
             <div id="event-nav" class="event-nav hidden">
-                <button class="event-nav-tab active" data-tab="team" onclick="switchEventTab('team')">
+                <button type="button" class="event-nav-tab active" data-tab="team">
                     👥 My Team
                 </button>
-                <button class="event-nav-tab" data-tab="badges" onclick="switchEventTab('badges')">
+                <button type="button" class="event-nav-tab" data-tab="badges">
                     🏅 Badges <span class="nav-count" id="badges-nav-count">0</span>
                 </button>
             </div>
@@ -1992,8 +1992,8 @@
 
                 <div id="create-team-section" class="create-team-section">
                     <div class="action-buttons">
-                        <button id="create-team-btn" class="btn btn-primary btn-lg">+ Create New Team</button>
-                        <button id="join-solo-btn" class="btn btn-secondary btn-lg">🎲 Join Solo Queue</button>
+                        <button type="button" id="create-team-btn" class="btn btn-primary btn-lg">+ Create New Team</button>
+                        <button type="button" id="join-solo-btn" class="btn btn-secondary btn-lg">🎲 Join Solo Queue</button>
                     </div>
                     <p class="solo-hint">No team? Join solo and we'll match you with others!</p>
                 </div>
@@ -2004,7 +2004,7 @@
                         <h3>You're in the Solo Queue!</h3>
                         <p>We'll match you with other solo players or teams looking for members.</p>
                         <p class="queue-position">Position: <span id="queue-position">-</span></p>
-                        <button id="leave-queue-btn" class="btn btn-outline">Leave Queue</button>
+                        <button type="button" id="leave-queue-btn" class="btn btn-outline">Leave Queue</button>
                     </div>
                 </div>
             </div>
@@ -2024,7 +2024,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h2>🏔️ Create New Team</h2>
-                <button class="modal-close" id="close-create-team">&times;</button>
+                <button type="button" class="modal-close" id="close-create-team" aria-label="Close">&times;</button>
             </div>
 
             <div class="modal-step-indicators">
@@ -2073,7 +2073,7 @@
                 </div>
 
                 <div id="create-team-step-2" class="hidden">
-                    <div id="create-team-terms-display" style="margin-bottom: 16px; line-height: 1.6; padding: 14px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--border-radius);"></div>
+                    <div id="create-team-terms-display" style="margin-bottom: 16px; line-height: 1.6; padding: 14px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--border-radius); white-space: pre-line;"></div>
 
                     <div class="form-group">
                         <label class="radio-label" style="border-color: var(--primary-color); background: rgba(0, 120, 212, 0.04);">
@@ -2101,7 +2101,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h2>➕ Register Team Member</h2>
-                <button class="modal-close" id="close-invite-member">&times;</button>
+                <button type="button" class="modal-close" id="close-invite-member" aria-label="Close">&times;</button>
             </div>
 
             <form id="invite-member-form">
@@ -2161,7 +2161,7 @@
         <div class="modal" style="max-width: 600px;">
             <div class="modal-header">
                 <h2 id="team-modal-title">👥 Team Name</h2>
-                <button class="modal-close" id="close-team-details">&times;</button>
+                <button type="button" class="modal-close" id="close-team-details" aria-label="Close">&times;</button>
             </div>
 
             <div id="team-modal-content">
@@ -2170,7 +2170,7 @@
 
                 <div id="team-admin-actions" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
                     <h4>Admin Actions</h4>
-                    <button id="invite-member-btn" class="btn btn-secondary btn-small">+ Register Team Member</button>
+                    <button type="button" id="invite-member-btn" class="btn btn-secondary btn-small">+ Register Team Member</button>
                 </div>
             </div>
         </div>
@@ -2180,10 +2180,10 @@
         <div class="modal">
             <div class="modal-header">
                 <h2>🎲 Join Solo Queue</h2>
-                <button class="modal-close" id="close-solo-queue">&times;</button>
+                <button type="button" class="modal-close" id="close-solo-queue" aria-label="Close">&times;</button>
             </div>
 
-            <div id="solo-terms-display" class="hidden" style="margin-bottom: 16px; line-height: 1.6;"></div>
+            <div id="solo-terms-display" class="hidden" style="margin-bottom: 16px; line-height: 1.6; white-space: pre-line;"></div>
 
             <form id="solo-queue-form">
                 <div class="form-group">
@@ -2207,13 +2207,13 @@
         <div class="modal modal-tabbed">
             <div class="modal-header">
                 <h2>✏️ Edit Participant</h2>
-                <button class="modal-close" id="close-edit-participant">&times;</button>
+                <button type="button" class="modal-close" id="close-edit-participant" aria-label="Close">&times;</button>
             </div>
 
             <div class="modal-tabs">
-                <button class="modal-tab active" data-tab="tab-personal">👤 Personal</button>
-                <button class="modal-tab" data-tab="tab-hotel" id="tab-hotel-btn">🏨 Hotel</button>
-                <button class="modal-tab" data-tab="tab-roles" id="tab-roles-btn">🔑 Roles</button>
+                <button type="button" class="modal-tab active" data-tab="tab-personal">👤 Personal</button>
+                <button type="button" class="modal-tab" data-tab="tab-hotel" id="tab-hotel-btn">🏨 Hotel</button>
+                <button type="button" class="modal-tab" data-tab="tab-roles" id="tab-roles-btn">🔑 Roles</button>
             </div>
 
             <form id="edit-participant-form">
@@ -2311,11 +2311,11 @@
     </div>
 
     <div id="badge-claim-modal" class="hidden">
-        <div class="badge-modal-backdrop" onclick="closeBadgeClaimModal()"></div>
+        <div class="badge-modal-backdrop" id="badge-claim-backdrop"></div>
         <div class="badge-modal-dialog">
             <div class="badge-modal-header">
                 <h3 id="badge-claim-title">Claim Badge</h3>
-                <button class="modal-close" onclick="closeBadgeClaimModal()">&times;</button>
+                <button type="button" class="modal-close" id="badge-claim-close" aria-label="Close">&times;</button>
             </div>
             <div class="badge-modal-body">
                 <input type="hidden" id="badge-claim-eb-id">
@@ -2328,8 +2328,8 @@
                 <div id="badge-claim-error" class="error-message hidden"></div>
             </div>
             <div class="badge-modal-footer">
-                <button class="btn btn-secondary" onclick="closeBadgeClaimModal()">Cancel</button>
-                <button class="btn btn-primary" id="badge-claim-submit-btn" onclick="submitBadgeClaim()">Save Claim</button>
+                <button type="button" class="btn btn-secondary" id="badge-claim-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="badge-claim-submit-btn">Save Claim</button>
             </div>
         </div>
     </div>
@@ -2338,22 +2338,22 @@
         <div class="modal">
             <div class="modal-header">
                 <h2 id="registration-terms-title">Before you continue</h2>
-                <button class="modal-close" onclick="closeRegistrationTermsModal()">&times;</button>
+                <button type="button" class="modal-close" id="registration-terms-close" aria-label="Close">&times;</button>
             </div>
-            <div id="registration-terms-body" style="line-height: 1.6; margin-bottom: 24px;"></div>
+            <div id="registration-terms-body" style="line-height: 1.6; margin-bottom: 24px; white-space: pre-line;"></div>
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button class="btn btn-secondary" onclick="closeRegistrationTermsModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="confirmRegistrationTerms()">I Understand — Continue</button>
+                <button type="button" class="btn btn-secondary" id="registration-terms-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="registration-terms-confirm">I Understand — Continue</button>
             </div>
         </div>
     </div>
 
     <div id="badge-award-modal" class="hidden">
-        <div class="badge-modal-backdrop" onclick="closeAwardModal()"></div>
+        <div class="badge-modal-backdrop" id="badge-award-backdrop"></div>
         <div class="badge-modal-dialog">
             <div class="badge-modal-header">
                 <h3 id="badge-award-title">Award Badge</h3>
-                <button class="modal-close" onclick="closeAwardModal()">&times;</button>
+                <button type="button" class="modal-close" id="badge-award-close" aria-label="Close">&times;</button>
             </div>
             <div class="badge-modal-body">
                 <input type="hidden" id="badge-award-eb-id">
@@ -2367,8 +2367,8 @@
                 <div id="badge-award-error" class="error-message hidden"></div>
             </div>
             <div class="badge-modal-footer">
-                <button class="btn btn-secondary" onclick="closeAwardModal()">Cancel</button>
-                <button class="btn btn-primary" id="badge-award-submit-btn" onclick="submitBadgeAward()" style="background: #f59e0b; border-color: #f59e0b;">🏆 Award Badge</button>
+                <button type="button" class="btn btn-secondary" id="badge-award-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="badge-award-submit-btn" style="background: #f59e0b; border-color: #f59e0b;">🏆 Award Badge</button>
             </div>
         </div>
     </div>

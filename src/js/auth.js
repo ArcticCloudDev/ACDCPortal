@@ -117,3 +117,23 @@ const Auth = {
     }
 };
 
+// Only ever navigate to a same-origin absolute path when the target comes from the URL
+// (?redirect=...). Anything else (other origins, protocol-relative, javascript:, control
+// characters) falls back.
+function safeRedirectPath(value, fallback = '/events.html') {
+    if (typeof value !== 'string') return fallback;
+    const candidate = value.trim();
+    if (!candidate.startsWith('/') || candidate.startsWith('//') || candidate.startsWith('/\\')) return fallback;
+    if (/[\u0000-\u001f\u007f]/.test(candidate) || candidate.includes('\\')) return fallback;
+    if (typeof URL === 'function') {
+        try {
+            const probe = new URL(candidate, 'https://acdc.invalid');
+            if (probe.origin !== 'https://acdc.invalid') return fallback;
+            return probe.pathname + probe.search + probe.hash;
+        } catch {
+            return fallback;
+        }
+    }
+    return candidate;
+}
+

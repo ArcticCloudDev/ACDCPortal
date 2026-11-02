@@ -21,8 +21,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const intent = urlParams.get('intent');
     const eventId = urlParams.get('eventId');
-    const isTeamIntent = intent === 'team';
-    const isInterestIntent = intent === 'interest' && eventId;
+    // Both intents need an event; without one they are plain sign-in / account creation.
+    const isTeamIntent = intent === 'team' && !!eventId;
+    const isInterestIntent = intent === 'interest' && !!eventId;
+    const redirectTarget = safeRedirectPath(urlParams.get('redirect'), '/events.html');
 
     const subtitle = document.getElementById('page-subtitle');
     const emailHeading = document.getElementById('email-heading');
@@ -50,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (Auth.isLoggedIn()) {
-        window.location.href = '/events.html';
+        window.location.href = redirectTarget;
         return;
     }
 
@@ -116,6 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('back-to-email').addEventListener('click', (e) => {
         e.preventDefault();
         flowMode = null;
+        resetButton(document.getElementById('submit-btn'));
         showStep('email');
     });
 
@@ -188,10 +191,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             console.error('Registration error:', error);
             showError('form-error', error.message || 'Registration failed. Please try again.');
-
-            submitBtn.disabled = false;
-            submitBtn.querySelector('.btn-text').classList.remove('hidden');
-            submitBtn.querySelector('.btn-loading').classList.add('hidden');
+        } finally {
+            // The button must work again if the user comes back to this step.
+            resetButton(submitBtn);
         }
     });
 
@@ -235,8 +237,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else if (flowMode === 'team-login') {
                 window.location.href = `/event.html?id=${encodeURIComponent(eventId)}&action=create-team`;
             } else if (flowMode === 'login') {
-                const redirect = urlParams.get('redirect') || '/events.html';
-                window.location.href = redirect;
+                window.location.href = redirectTarget;
             } else {
                 showStep('completing');
 
@@ -246,10 +247,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     throw new Error(completeResult.message || 'Failed to complete registration');
                 }
 
+                // The OTP session was issued before the account existed (userId: null); the
+                // completion response carries a session for the newly created user.
+                if (completeResult.token && completeResult.user) {
+                    Auth.setSession(completeResult.token, completeResult.user);
+                }
+
                 if (flowMode === 'interest-register') {
                     await recordInterestAndShow();
                 } else if (flowMode === 'register-team') {
                     const targetEventId = completeResult.eventId || eventId;
+                    const eventUrl = `/event.html?id=${encodeURIComponent(targetEventId)}`;
                     if (targetEventId && completeResult.isParticipant) {
                         let eventData = null;
                         try { eventData = await API.events.get(targetEventId); } catch (e) { }
@@ -259,13 +267,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                             if (participation && participation.id) {
                                 showHotelStep(eventData, participation.id, targetEventId);
                             } else {
-                                window.location.href = `/event.html?id=${targetEventId}`;
+                                window.location.href = eventUrl;
                             }
                         } else {
-                            window.location.href = `/event.html?id=${targetEventId}`;
+                            window.location.href = eventUrl;
                         }
                     } else if (targetEventId) {
-                        window.location.href = `/event.html?id=${targetEventId}`;
+                        window.location.href = eventUrl;
                     } else {
                         document.getElementById('success-heading-text').textContent = 'Registration Complete!';
                         document.getElementById('success-team-line').classList.remove('hidden');
@@ -273,25 +281,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                         showStep('success');
                     }
                 } else {
-                    const redirect = urlParams.get('redirect') || '/events.html';
-                    window.location.href = redirect;
+                    window.location.href = redirectTarget;
                 }
             }
 
         } catch (error) {
             console.error('OTP verification error:', error);
-            showError('otp-error', error.message || 'Verification failed. Please try again.');
-
-            verifyBtn.disabled = false;
-            verifyBtn.querySelector('.btn-text').classList.remove('hidden');
-            verifyBtn.querySelector('.btn-loading').classList.add('hidden');
+            showVisibleError(error.message || 'Verification failed. Please try again.');
+            resetButton(verifyBtn);
         }
     });
 
     document.getElementById('resend-otp-btn').addEventListener('click', async (e) => {
         e.preventDefault();
         const resendBtn = e.target;
-        const isLoginFlow = flowMode === 'login' || flowMode === 'interest-login';
+        const isLoginFlow = flowMode === 'login' || flowMode === 'team-login' || flowMode === 'interest-login';
         const email = isLoginFlow ? currentEmail : (pendingFormData ? pendingFormData.email : null);
 
         if (!email) return;
@@ -337,6 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'form':
                 updateProgress(2);
                 document.getElementById('regEmail').value = email;
+                resetButton(document.getElementById('submit-btn'));
 
                 const teamFieldset = document.getElementById('team-fieldset');
                 const roleFieldset = document.getElementById('role-fieldset');
@@ -512,7 +517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             try {
                 await API.participations.updateHotel(participationId, hotelNights, true);
-                window.location.href = `/event.html?id=${targetEventId}`;
+                window.location.href = `/event.html?id=${encodeURIComponent(targetEventId)}`;
             } catch (err) {
                 console.error('Hotel save error:', err);
                 const errorDiv = document.getElementById('hotel-step-error');
@@ -537,12 +542,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                 lastName: user.lastName || (pendingFormData ? pendingFormData.lastName : '')
             });
 
-            window.location.href = `event.html?id=${eventId}`;
+            window.location.href = `/event.html?id=${encodeURIComponent(eventId)}`;
 
         } catch (error) {
             console.error('Interest recording error:', error);
             showError('completing-error', error.message || 'Failed to record interest. Please try again.');
         }
+    }
+
+    // After the code is verified the OTP step is hidden; an error must land in the step the
+    // user can actually see.
+    function showVisibleError(message) {
+        const steps = [
+            ['step-completing', 'completing-error'],
+            ['step-hotel', 'hotel-step-error'],
+            ['step-otp', 'otp-error'],
+            ['step-form', 'form-error'],
+            ['step-email', 'email-check-error']
+        ];
+        const visible = steps.find(([stepId]) => !document.getElementById(stepId).classList.contains('hidden'));
+        showError(visible ? visible[1] : 'otp-error', message);
+    }
+
+    function resetButton(btn) {
+        if (!btn) return;
+        btn.disabled = false;
+        btn.querySelector('.btn-text')?.classList.remove('hidden');
+        btn.querySelector('.btn-loading')?.classList.add('hidden');
     }
 });
 
