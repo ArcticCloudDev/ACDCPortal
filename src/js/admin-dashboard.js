@@ -36,8 +36,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.error('Dashboard error:', error);
         loadingDiv.innerHTML = `
-            <p style="color: #ef4444;">Error: ${escapeHtml(error.message)}</p>
-            <a href="events.html" class="btn-sm primary" style="margin-top: 16px;">Go to Events</a>
+            <div class="notice notice-danger">${icon('triangle-alert')}<div><div class="notice-title">Could not load the dashboard</div><div class="notice-body">${escapeHtml(error.message)}</div></div></div>
+            <a href="events.html" class="btn-sm">Go to events</a>
         `;
     }
 });
@@ -139,7 +139,7 @@ function renderEventsList() {
         return `
             <div class="event-row">
                 <div class="event-info">
-                    <div class="event-name">${escapeHtml(event.name)}</div>
+                    <a class="event-name" href="admin-events.html?event=${encodeURIComponent(event.id)}">${escapeHtml(event.name)}</a>
                     <div class="event-meta">
                         <span>${icon('map-pin')}${escapeHtml(event.location || 'TBD')}</span>
                         <span>${icon('calendar')}${startDate}</span>
@@ -148,8 +148,8 @@ function renderEventsList() {
                 </div>
                 <span class="badge ${escapeHtml(status)}">${escapeHtml(statusLabels[status] || status)}</span>
                 <div class="row-actions">
-                    <a href="event.html?id=${encodeURIComponent(event.id)}" class="btn-sm">View</a>
-                    <a href="admin-events.html?event=${encodeURIComponent(event.id)}" class="btn-sm">Edit</a>
+                    <a href="admin-event-participants.html?id=${encodeURIComponent(event.id)}" class="btn-sm ghost">${icon('users')}Participants</a>
+                    <a href="admin-events.html?event=${encodeURIComponent(event.id)}" class="btn-sm">${icon('pencil')}Edit</a>
                 </div>
             </div>
         `;
@@ -189,7 +189,7 @@ function renderTeamsTable(userMap = {}, memberCounts = {}) {
                 <td><span class="badge count" title="Committed team size: ${Number(team.numberOfParticipants) || 0}">${memberCounts[team.id] ?? 0} / ${Number(team.numberOfParticipants) || 0}</span></td>
                 <td>${event ? escapeHtml(event.name) : '—'}</td>
                 <td class="text-muted">${createdDate}</td>
-                <td><a href="event.html?id=${encodeURIComponent(team.eventId)}" class="btn-sm">View</a></td>
+                <td><a href="admin-teams.html?team=${encodeURIComponent(team.id)}" class="btn-sm">View team</a></td>
             </tr>
         `;
     }).join('');

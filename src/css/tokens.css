@@ -116,6 +116,24 @@
     --text-muted: var(--color-text-muted);
     --border-color: var(--color-border);
     --border-radius: var(--radius-md);
+
+    /* Legacy admin names. Admin pages not yet migrated still read these; without them their
+       borders and muted text disappear. Do not use in new code. */
+    --admin-bg: var(--color-bg);
+    --admin-bg-secondary: var(--color-surface-muted);
+    --admin-sidebar: var(--color-navy);
+    --admin-primary: var(--color-accent);
+    --admin-accent: var(--color-accent);
+    --admin-info: var(--color-info);
+    --admin-success: var(--color-success);
+    --admin-success-color: var(--color-success);
+    --admin-warning: var(--color-warning);
+    --admin-warning-color: var(--color-warning);
+    --admin-danger: var(--color-danger);
+    --admin-danger-color: var(--color-danger);
+    --admin-text: var(--color-text);
+    --admin-text-muted: var(--color-text-muted);
+    --admin-border: var(--color-border);
 }
 
 /* Dark mode follows the device setting on pages that opt in with <html data-theme="auto">.
