@@ -63,8 +63,6 @@ test('"Register Team" while signed in goes straight to team creation', async ({ 
 });
 
 test('BUG: a live event stays reachable for its teams', async ({ page, harness, loginAs }) => {
-    test.fail(true, 'events.html filters to pre-registration/registration only, so during the live event (when badges can be claimed) '
-        + 'teams have no link to their event page');
     const w = buildWorld({ event: { status: 'live' } });
     await harness.seed(w.seed());
     await loginAs(w.member);
@@ -72,24 +70,36 @@ test('BUG: a live event stays reachable for its teams', async ({ page, harness, 
     await expect(card(page, 'ACDC 2027')).toBeVisible({ timeout: 4000 });  // <- bug
 });
 
+// Every invitation link (participant, judge, committee) lands on accept-invitation.html, which
+// handles profile -> OTP -> accept for all roles. The old role page on events.html looped forever.
 test('BUG: an invited judge can accept the invitation', async ({ page, harness }) => {
-    test.fail(true, 'events.html ?invite= shows the role page, Accept -> login -> back to the same page in a loop; the only client '
-        + 'code that calls invitations.accept for roles is js/events.js, which no page loads');
     const w = buildWorld();
     const inv = f.invitation(w.event, w.admin, { role: 'judge', email: 'jo.judge@e2e.test' });
     await harness.seed(mergeSeeds(w.seed(), { invitations: [inv], allowedEmails: ['jo.judge@e2e.test'] }));
 
     await page.goto(`/?invite=${inv.id}`);
-    await page.locator('#accept-role-btn').click();
-    await page.locator('#checkEmail').fill('jo.judge@e2e.test');
-    await page.locator('#email-check-btn').click();
-    await expect(page.locator('#step-form')).toBeVisible();
-    await page.locator('#firstName').fill('Jo');
-    await page.locator('#lastName').fill('Judge');
-    await page.locator('#phone').fill('+47 955 55 555');
-    await page.locator('#submit-btn').click();
-    await page.locator('#otpCode').fill(await harness.otpFor('jo.judge@e2e.test'));
+    await expect(page).toHaveURL(new RegExp(`/accept-invitation\\.html\\?invite=${inv.id}`));
+    await expect(page.locator('#invite-heading')).toHaveText('Judge Invitation');
+    await expect(page.locator('#invite-team-name')).toHaveText('ACDC 2027');
+    await page.locator('#next-to-profile-btn').click();
+    await page.locator('#profile-firstName').fill('Jo');
+    await page.locator('#profile-lastName').fill('Judge');
+    await page.locator('#profile-phone').fill('+47 955 55 555');
+    await page.locator('#profile-email').fill('jo.judge@e2e.test');
+    await page.locator('#continue-to-verify-btn').click();
+    await page.locator('#send-otp-btn').click();
+    await page.locator('#otp-code').fill(await harness.otpFor('jo.judge@e2e.test'));
     await page.locator('#verify-otp-btn').click();
+    await expect(page.locator('#step-profile')).toBeVisible();
+    await page.locator('#continue-to-verify-btn').click();
+
+    await expect(page.locator('#success-title')).toHaveText('Welcome to the Jury!');
     await expect.poll(async () => (await rows("SELECT Status FROM Invitations WHERE Email = 'jo.judge@e2e.test'"))[0].Status,  // <- bug
         { timeout: 6000 }).toBe('accepted');
+    const [user] = await rows("SELECT * FROM Users WHERE Email = 'jo.judge@e2e.test'");
+    expect(user).toMatchObject({ FirstName: 'Jo', ProfileComplete: true });
+    const [p] = await rows('SELECT Roles FROM Participations WHERE UserId = @u AND EventId = @e', { u: user.Id, e: w.event.id });
+    expect(p.Roles).toContain('judge');
+    await expect(page).toHaveURL(new RegExp(`/event\\.html\\?id=${w.event.id}`), { timeout: 10000 });
+    await expect(page.locator('#role-confirmed-badge')).toHaveText('✓ Judge — Confirmed');
 });

@@ -28,3 +28,14 @@ function currencyLocale(currency) {
     return map[(currency || '').toUpperCase()] || 'en-US';
 }
 
+// A user-supplied URL may only be rendered into href/src when its scheme is http(s).
+function safeHttpUrl(value) {
+    if (typeof value !== 'string') return '';
+    try {
+        const url = new URL(value.trim());
+        return (url.protocol === 'http:' || url.protocol === 'https:') ? url.href : '';
+    } catch {
+        return '';
+    }
+}
+

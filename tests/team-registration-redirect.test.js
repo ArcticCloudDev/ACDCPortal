@@ -50,11 +50,19 @@ const eventMarkup = fs.readFileSync(
 );
 assert.match(eventMarkup, /creatorParticipates" value="no" checked/);
 
-const completeRegistration = fs.readFileSync(
+// The page script moved to js/complete-registration.js (strict CSP: no inline scripts) and the
+// redirect target is validated as a same-origin path before it is followed.
+const completeRegistrationMarkup = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'complete-registration.html'),
     'utf8'
 );
-assert.match(completeRegistration, /get\('redirect'\) \|\| 'events\.html'/);
+assert.match(completeRegistrationMarkup, /<script src="js\/complete-registration\.js"><\/script>/);
+assert.doesNotMatch(completeRegistrationMarkup, /<script>/);
+const completeRegistration = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'js', 'complete-registration.js'),
+    'utf8'
+);
+assert.match(completeRegistration, /safeRedirectPath\([\s\S]*?get\('redirect'\), '\/events\.html'\)/);
 assert.match(completeRegistration, /window\.location\.href = redirect/);
 
 console.log('PASS: Signed-in Register Team requests open the event team-creation flow');

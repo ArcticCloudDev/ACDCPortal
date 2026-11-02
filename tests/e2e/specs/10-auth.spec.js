@@ -88,7 +88,6 @@ test.describe('sign in through the UI', () => {
     });
 
     test('BUG: the user menu should start closed', async ({ page, harness, loginAs }) => {
-        test.fail(true, 'site-header.js renders #header-user-dropdown without .hidden, so it is open on load');
         const w = buildWorld();
         await harness.seed(w.seed());
         await loginAs(w.leader);

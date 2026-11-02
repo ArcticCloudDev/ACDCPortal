@@ -4,6 +4,15 @@ const SiteHeader = (() => {
     let _user = null;
     let _modalInjected = false;
 
+    function _esc(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     function render(config = {}) {
         _config = Object.assign({
             title: '🏔️ ACDC Portal',
@@ -24,13 +33,13 @@ const SiteHeader = (() => {
         let infoHTML = '';
         if (_config.infoBadges && _config.infoBadges.length) {
             const spans = _config.infoBadges.map(b => {
-                const cls = b.className ? ` class="${b.className}"` : '';
-                const idAttr = b.id ? ` id="${b.id}"` : '';
-                const icon = b.icon ? b.icon + ' ' : '';
+                const cls = b.className ? ` class="${_esc(b.className)}"` : '';
+                const idAttr = b.id ? ` id="${_esc(b.id)}"` : '';
+                const icon = b.icon ? _esc(b.icon) + ' ' : '';
                 if (b.icon && b.id) {
-                    return `<span${cls}>${icon}<span id="${b.id}">${b.text || ''}</span></span>`;
+                    return `<span${cls}>${icon}<span id="${_esc(b.id)}">${_esc(b.text || '')}</span></span>`;
                 }
-                return `<span${idAttr}${cls}>${icon}${b.text || ''}</span>`;
+                return `<span${idAttr}${cls}>${icon}${_esc(b.text || '')}</span>`;
             }).join('\n                        ');
             infoHTML = `
                     <div class="event-info">
@@ -39,7 +48,7 @@ const SiteHeader = (() => {
         } else if (_config.subtitle) {
             infoHTML = `
                     <div class="event-info">
-                        <span>${_config.subtitle}</span>
+                        <span>${_esc(_config.subtitle)}</span>
                     </div>`;
         }
 
@@ -50,8 +59,8 @@ const SiteHeader = (() => {
 
         _containerEl.className = 'event-banner' + inactiveClass;
         const titleHTML = _config.logoUrl
-            ? `<img src="${_config.logoUrl}" alt="ACDC Logo" style="height: 48px; display: block;">`
-            : `<h1>${_config.title}</h1>${infoHTML}`;
+            ? `<img src="${_esc(_config.logoUrl)}" alt="ACDC Logo" style="height: 48px; display: block;">`
+            : `<h1>${_esc(_config.title)}</h1>${infoHTML}`;
         _containerEl.innerHTML = `
             <div class="event-banner-left">
                 ${titleHTML}
@@ -59,11 +68,11 @@ const SiteHeader = (() => {
             <div class="banner-controls">
                 ${signInHTML}
                 <div id="header-user-menu" class="user-menu hidden">
-                    <button id="header-user-btn" class="banner-btn user-menu-toggle">👤 Profile</button>
-                    <div id="header-user-dropdown" class="user-menu-dropdown">
-                        <button id="header-profile-link" class="user-menu-item">📝 Update Profile</button>
+                    <button type="button" id="header-user-btn" class="banner-btn user-menu-toggle" aria-haspopup="true" aria-expanded="false">👤 Profile</button>
+                    <div id="header-user-dropdown" class="user-menu-dropdown hidden">
+                        <button type="button" id="header-profile-link" class="user-menu-item">📝 Update Profile</button>
                         <a id="header-dashboard-link" href="admin-dashboard.html" class="user-menu-item hidden">📊 Admin Portal</a>
-                        <button id="header-logout-menuitem" class="user-menu-item logout">↩ Log Out</button>
+                        <button type="button" id="header-logout-menuitem" class="user-menu-item logout">↩ Log Out</button>
                     </div>
                 </div>
             </div>
@@ -78,7 +87,8 @@ const SiteHeader = (() => {
         if (userBtn) {
             userBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                userDropdown.classList.toggle('hidden');
+                const open = userDropdown.classList.toggle('hidden') === false;
+                userBtn.setAttribute('aria-expanded', String(open));
             });
         }
 
@@ -101,6 +111,7 @@ const SiteHeader = (() => {
         document.addEventListener('click', (e) => {
             if (userMenu && !userMenu.contains(e.target)) {
                 userDropdown.classList.add('hidden');
+                if (userBtn) userBtn.setAttribute('aria-expanded', 'false');
             }
         });
     }
@@ -114,7 +125,7 @@ const SiteHeader = (() => {
             <div class="modal">
                 <div class="modal-header">
                     <h2>👤 Your Profile</h2>
-                    <button class="modal-close" id="sh-close-profile">&times;</button>
+                    <button type="button" class="modal-close" id="sh-close-profile" aria-label="Close">&times;</button>
                 </div>
                 <form id="sh-profile-form">
                     <div class="form-group">

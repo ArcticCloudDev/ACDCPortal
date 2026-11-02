@@ -3,88 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Team Admin - ACDC Portal</title>
+    <title>Redirecting - ACDC Portal</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
-    <link rel="stylesheet" href="css/styles.css">
+    <script src="/js/legacy-redirect.js"></script>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🏔️ ACDC Portal</h1>
-            <p class="subtitle">Team Administration</p>
-            <div class="header-buttons">
-                <a href="events.html" class="btn btn-small btn-secondary">← Events</a>
-                <button id="logout-btn" class="btn btn-small btn-secondary">Logout</button>
-            </div>
-        </header>
-
-        <main>
-            <div id="loading" class="card acdc-loader">
-                <div class="loader-spinner"></div>
-                <div class="loader-text">Loading team data...</div>
-            </div>
-
-            <div id="not-admin" class="card hidden">
-                <h2>Access Denied</h2>
-                <p>You are not a team admin.</p>
-                <a href="events.html" class="btn btn-primary">Back to Events</a>
-            </div>
-
-            <div id="admin-content" class="hidden">
-                <div class="card">
-                    <h2>Team: <span id="team-name"></span></h2>
-                    <p>Max Participants: <span id="max-participants"></span></p>
-                    <p>Current Members: <span id="current-members"></span></p>
-                </div>
-
-                <div class="card">
-                    <h3>✉️ Register Team Member</h3>
-                    <p class="form-hint">Send an email invitation to join your team. They'll receive a link to sign up and join automatically.</p>
-                    <form id="invite-member-form">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="inviteEmail">Email *</label>
-                                <input type="email" id="inviteEmail" name="inviteEmail" placeholder="teammate@example.com" required>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="inviteMessage">Personal Message (optional)</label>
-                                <textarea id="inviteMessage" name="inviteMessage" rows="2" placeholder="Hey! Join our team for the Arctic Cloud Developer Challenge..."></textarea>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-primary" id="invite-member-btn">
-                            <span class="btn-text">Register Team Member</span>
-                            <span class="btn-loading hidden">Sending...</span>
-                        </button>
-                        <div id="invite-member-error" class="error-message hidden"></div>
-                        <div id="invite-member-success" class="success-message hidden"></div>
-                    </form>
-                </div>
-
-                <div class="card">
-                    <h3>📬 Pending Invitations</h3>
-                    <div id="invitation-list">
-                        <p class="text-muted">Loading invitations...</p>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h3>👥 Team Members</h3>
-                    <div id="member-list">
-                    </div>
-                </div>
-            </div>
-        </main>
-
-        <footer>
-            <p>&copy; 2026 ACDC Portal</p>
-        </footer>
-    </div>
-
-    <script src="js/config.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/team-admin.js"></script>
+    <p>Redirecting to events...</p>
 </body>
 </html>
