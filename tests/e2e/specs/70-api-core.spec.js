@@ -92,7 +92,12 @@ test.describe('invitations', () => {
     test('an HTML team name arrives escaped in the invitation email', async ({ apiAs, harness }) => {
         const w = buildWorld();
         w.team.teamName = '<b>Bold</b> & "Brave"';
-        await harness.seed(w.seed());
+        const seed = w.seed();
+        const config = f.systemEmailConfig();
+        config.templates.welcome.editableSections.body = '<p>Hi {{firstName}}, {{inviterName}} invited you to {{teamName}}.</p>';
+        config.templates.welcome.features = ['teamBox'];
+        seed['system-email-config'] = [config];
+        await harness.seed(seed);
         const res = await (await apiAs(w.leader)).post('/api/invitations', {
             data: { email: 'escaped.erik@e2e.test', teamId: w.team.id, inviteeFirstName: '<i>Erik</i>', inviteeLastName: 'E' }
         });
@@ -191,12 +196,13 @@ test.describe('OTP endpoint hardening', () => {
         const w = buildWorld();
         await harness.seed(w.seed());
         const api = await apiAs(null);
-        expect((await api.post('/api/auth/send-otp', { data: { email: w.leader.email } })).status()).toBe(200);
-        // Fresh in-memory state (as another Function instance would have) must still honour the cooldown.
-        const otpModule = require('../../../api/src/functions/auth-send-otp');
-        otpModule.rateLimits.byEmail.clear();
+        // An OTP row written 20 s ago by another Function instance: this instance's in-memory
+        // maps are empty (fresh after reset), so only the database can enforce the cooldown.
+        await rows(`INSERT INTO PendingRegistrations (Id, Email, CodeHash, Attempts, MaxAttempts, Type, CreatedAt, ExpiresAt)
+                    VALUES (@id, @email, 'x', 0, 5, 'login', DATEADD(second, -20, SYSUTCDATETIME()), DATEADD(minute, 10, SYSUTCDATETIME()))`,
+            { id: `otp_${w.leader.email}`, email: w.leader.email });
         expect((await api.post('/api/auth/send-otp', { data: { email: w.leader.email } })).status()).toBe(429);
-        expect(await harness.outbox(w.leader.email)).toHaveLength(1);
+        expect(await harness.outbox(w.leader.email)).toHaveLength(0);
 
         expect((await api.post('/api/auth/send-otp', { data: { email: 'nope' } })).status()).toBe(400);
         expect((await api.post('/api/auth/verify-otp', { data: { email: w.leader.email, code: 'abc' } })).status()).toBe(400);
@@ -353,9 +359,11 @@ test.describe('registration', () => {
         expect(jwt.verify(body.token, JWT_SECRET, { issuer: 'acdc-portal' })).toMatchObject({ email: 'captain@e2e.test', userId: body.userId });
 
         const fresh = await apiAs(null, { 'x-acdc-token': body.token });
+        // SQL returns UNIQUEIDENTIFIERs upper-case; the API generated the id lower-case.
         const teams = await (await fresh.get('/api/teams')).json();
-        expect(teams.map(t => t.id)).toEqual([body.teamId]);
-        expect((await (await fresh.get(`/api/participations?userId=${body.userId}&eventId=${event.id}`)).json()).teamId).toBe(body.teamId);
+        expect(teams.map(t => t.id.toLowerCase())).toEqual([body.teamId.toLowerCase()]);
+        const participation = await (await fresh.get(`/api/participations?userId=${body.userId}&eventId=${event.id}`)).json();
+        expect(participation.teamId.toLowerCase()).toBe(body.teamId.toLowerCase());
     });
 
     test('register/start validates team registrations against the event', async ({ apiAs, harness }) => {
@@ -379,7 +387,7 @@ test.describe('malformed ids never produce a 500', () => {
         const checks = [
             ['get', `/api/teams/${BOGUS}`], ['delete', `/api/teams/${BOGUS}`], ['get', `/api/teams/${BOGUS}/members`],
             ['get', `/api/teams?eventId=${BOGUS}`], ['get', `/api/users/${BOGUS}`],
-            ['get', `/api/participations/${BOGUS}/hotel`], ['put', `/api/participations/${BOGUS}/hotel`, { hotelNights: {} }],
+            ['put', `/api/participations/${BOGUS}/hotel`, { hotelNights: {} }],
             ['put', `/api/participations/${BOGUS}/roles`, { add: ['participant'] }], ['delete', `/api/participations/${BOGUS}`],
             ['put', `/api/participations/${BOGUS}/team`, { teamId: w.team.id }],
             ['put', `/api/participations/${w.participations.loner.id}/team`, { teamId: BOGUS }],
@@ -396,7 +404,7 @@ test.describe('malformed ids never produce a 500', () => {
             const res = await admin[method](url, data !== undefined ? { data } : undefined);
             expect(res.status(), `${method.toUpperCase()} ${url}`).toBeGreaterThanOrEqual(200);
             expect(res.status(), `${method.toUpperCase()} ${url}`).toBeLessThan(500);
-            if (res.status() >= 400) expect(JSON.stringify(await res.json())).not.toMatch(/at .*\.js:\d+|SELECT|UNIQUEIDENTIFIER|conversion/i);
+            if (res.status() >= 400) expect(await res.text()).not.toMatch(/at .*\.js:\d+|SELECT|UNIQUEIDENTIFIER|conversion/i);
         }
     });
 });

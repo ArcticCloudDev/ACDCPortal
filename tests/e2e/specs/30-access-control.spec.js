@@ -140,13 +140,11 @@ test.describe('object-level authorization in the API', () => {
 });
 
 test.describe('confirmed security defects', () => {
-    test('BUG (critical): an ordinary user cannot delete another account', async ({ apiAs, harness }) => {
-        test.fail(true, 'members.js skips the authorization check when no team resolves (body has no teamId and the '
-            + 'legacy Users.TeamId is null, which registration never sets), so any signed-in user can delete any user');
+    test('an ordinary user cannot delete another account', async ({ apiAs, harness }) => {
         const w = buildWorld();
         await harness.seed(w.seed());
         const res = await (await apiAs(w.loner)).delete(`/api/members/${w.admin.id}`, { data: {} });
-        expect(res.status()).toBe(403);  // <- bug
+        expect(res.status()).toBe(403);
         expect(await rows('SELECT Id FROM Users WHERE Id = @id', { id: w.admin.id })).toHaveLength(1);
     });
 
