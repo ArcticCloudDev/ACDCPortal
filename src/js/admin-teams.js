@@ -7,6 +7,7 @@ let allUsers = [];
 let allInvitations = [];
 const expandedTeams = new Set();
 let currentPermissions = null;
+let highlightedTeamId = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const loadingDiv = document.getElementById('loading');
@@ -33,16 +34,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadData();
 
         setupFilters();
+        setupTableActions();
 
         loadingDiv.classList.add('hidden');
         clearTimeout(wakeTimer);
         adminContent.classList.remove('hidden');
 
+        focusTeamFromUrl();
+
     } catch (error) {
         console.error('Error:', error);
-        loadingDiv.innerHTML = `<p class="error-message">Error: ${error.message}</p>`;
+        loadingDiv.innerHTML = `<p class="error-message">Error: ${escapeHtml(error.message)}</p>`;
     }
 });
+
+// admin-events.html links here with ?team=<id>: show that team's event, expand it and scroll to it.
+function focusTeamFromUrl() {
+    const requested = new URLSearchParams(window.location.search).get('team');
+    if (!requested) return;
+    const team = allTeams.find(t => sameId(t.id, requested));
+    if (!team) return;
+
+    highlightedTeamId = team.id;
+    expandedTeams.add(team.id);
+    const eventFilter = document.getElementById('event-filter');
+    const option = Array.from(eventFilter.options).find(o => sameId(o.value, team.eventId));
+    if (option) eventFilter.value = option.value;
+    renderTeamsTable();
+
+    const row = document.querySelector('tr.team-main-row.highlighted');
+    if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center' });
+}
 
 async function loadData() {
     try {
@@ -104,6 +126,35 @@ function setupFilters() {
     searchInput.addEventListener('input', debounce(renderTeamsTable, 300));
 }
 
+// All row buttons carry data-action/data-* attributes; one listener on the table handles them.
+function setupTableActions() {
+    document.getElementById('teams-table-body').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const { action, teamId, participationId, inviteId } = btn.dataset;
+        switch (action) {
+            case 'toggle-members':
+                toggleTeamMembers(teamId);
+                break;
+            case 'remove-member':
+                removeTeamMember(participationId, teamId, btn);
+                break;
+            case 'cancel-invite':
+                cancelInvitation(inviteId, teamId, btn);
+                break;
+            case 'delete-team':
+                deleteTeam(teamId, btn);
+                break;
+        }
+    });
+}
+
+function committedSize(team) {
+    // Team size lives in numberOfParticipants (there is no committedParticipants column).
+    const n = Number(team.numberOfParticipants);
+    return Number.isFinite(n) && n > 0 ? n : 3;
+}
+
 function renderTeamsTable() {
     const tbody = document.getElementById('teams-table-body');
     const eventFilter = document.getElementById('event-filter').value;
@@ -112,13 +163,13 @@ function renderTeamsTable() {
     let filteredTeams = [...allTeams];
 
     if (eventFilter) {
-        filteredTeams = filteredTeams.filter(t => t.eventId === eventFilter);
+        filteredTeams = filteredTeams.filter(t => sameId(t.eventId, eventFilter));
     }
 
     if (searchQuery) {
         filteredTeams = filteredTeams.filter(t => {
             const adminInfo = getTeamAdminInfo(t.id);
-            return t.teamName.toLowerCase().includes(searchQuery) ||
+            return (t.teamName || '').toLowerCase().includes(searchQuery) ||
                 adminInfo.name.toLowerCase().includes(searchQuery) ||
                 adminInfo.email.toLowerCase().includes(searchQuery);
         });
@@ -133,15 +184,18 @@ function renderTeamsTable() {
         return;
     }
 
+    const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
+
     tbody.innerHTML = filteredTeams.map(team => {
-        const event = allEvents.find(e => e.id === team.eventId);
+        const event = allEvents.find(e => sameId(e.id, team.eventId));
         const createdDate = new Date(team.createdAt).toLocaleDateString('en-US', {
             month: 'short', day: 'numeric', year: 'numeric'
         });
 
         const memberCount = teamCounts[team.id] || 0;
-        const pendingCount = allInvitations.filter(i => i.teamId === team.id).length;
-        const committed = team.committedParticipants || 3;
+        const pendingInvites = allInvitations.filter(i => sameId(i.teamId, team.id));
+        const pendingCount = pendingInvites.length;
+        const committed = committedSize(team);
 
         let countClass = 'partial';
         if (memberCount >= committed) {
@@ -150,15 +204,15 @@ function renderTeamsTable() {
             countClass = 'empty';
         }
 
-        const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
         const members = getTeamMembers(team.id);
         const teamAdmin = getTeamAdminMember(team);
-        const displayedMembers = teamAdmin && !members.some(member => member.participation.userId === teamAdmin.participation.userId)
+        const displayedMembers = teamAdmin && !members.some(member => sameId(member.participation.userId, teamAdmin.participation.userId))
             ? [teamAdmin, ...members]
             : members;
         const isExpanded = expandedTeams.has(team.id);
-        const eventUrl = `admin-events.html?event=${team.eventId}&tab=teams`;
+        const eventUrl = `admin-events.html?event=${encodeURIComponent(team.eventId)}&tab=teams`;
         const adminInfo = getTeamAdminInfo(team.id);
+        const teamIdAttr = escapeHtml(team.id);
 
         const memberRows = displayedMembers.map(member => {
             const displayName = (member.user?.firstName || member.user?.lastName)
@@ -170,7 +224,7 @@ function renderTeamsTable() {
                 : '';
 
             const removeBtn = canDelete && !member.isRegisteredAdmin
-                ? `<button class="btn-sm" style="color:#dc2626;border-color:#fca5a5;" onclick="removeTeamMember('${member.participation.id}', '${escapeHtml(displayName).replace(/'/g, "\\'")}', '${team.id}')">Remove</button>`
+                ? `<button type="button" class="btn-sm" style="color:#dc2626;border-color:#fca5a5;" data-action="remove-member" data-participation-id="${escapeHtml(member.participation.id)}" data-team-id="${teamIdAttr}">Remove</button>`
                 : '';
 
             return `
@@ -182,11 +236,10 @@ function renderTeamsTable() {
             `;
         }).join('');
 
-        const pendingInvites = allInvitations.filter(i => i.teamId === team.id);
         const inviteRows = pendingInvites.map(invite => {
             const isExpiredInvite = invite.isExpired;
             const cancelBtn = canDelete
-                ? `<button class="btn-sm" style="color:#dc2626;border-color:#fca5a5;" onclick="cancelInvitation('${invite.id}', '${escapeHtml(invite.email).replace(/'/g, "\\'")}', '${team.id}')">Cancel</button>`
+                ? `<button type="button" class="btn-sm" style="color:#dc2626;border-color:#fca5a5;" data-action="cancel-invite" data-invite-id="${escapeHtml(invite.id)}" data-team-id="${teamIdAttr}">Cancel</button>`
                 : '';
             return `
                 <tr style="opacity:${isExpiredInvite ? '0.6' : '1'}">
@@ -211,17 +264,19 @@ function renderTeamsTable() {
             </tr>
         ` : '';
 
+        const highlighted = highlightedTeamId && sameId(highlightedTeamId, team.id) ? ' highlighted' : '';
+
         return `
-            <tr class="team-main-row ${isExpanded ? 'expanded' : ''}">
+            <tr class="team-main-row ${isExpanded ? 'expanded' : ''}${highlighted}" data-team-id="${teamIdAttr}">
                 <td><strong>${escapeHtml(team.teamName)}</strong></td>
                 <td>${event ? escapeHtml(event.name) : '<em style="color:#94a3b8">Unknown</em>'}</td>
                 <td style="color: #64748b;">${escapeHtml(adminInfo.name || adminInfo.email || 'Unknown')}</td>
                 <td><span class="badge ${countClass}" title="${memberCount} members${pendingCount > 0 ? ', ' + pendingCount + ' invited' : ''}">${memberCount}${pendingCount > 0 ? '+' + pendingCount : ''}/${committed}</span></td>
                 <td style="color: #64748b;">${createdDate}</td>
                 <td style="display: flex; gap: 6px; align-items: center;">
-                    <button class="btn-sm expand-btn" onclick="toggleTeamMembers('${team.id}')">${isExpanded ? 'Hide' : 'Members'}</button>
+                    <button type="button" class="btn-sm expand-btn" data-action="toggle-members" data-team-id="${teamIdAttr}">${isExpanded ? 'Hide' : 'Members'}</button>
                     <a href="${eventUrl}" class="btn-sm">View Event</a>
-                    ${canDelete ? `<button class="btn-sm" style="color: #dc2626; border-color: #fca5a5;" onclick="deleteTeam('${team.id}', '${escapeHtml(team.teamName).replace(/'/g, "\\'")}')">🗑️</button>` : ''}
+                    ${canDelete ? `<button type="button" class="btn-sm" style="color: #dc2626; border-color: #fca5a5;" data-action="delete-team" data-team-id="${teamIdAttr}">🗑️</button>` : ''}
                 </td>
             </tr>
             ${detailsHtml}
@@ -230,8 +285,8 @@ function renderTeamsTable() {
 }
 
 function getTeamAdminInfo(teamId) {
-    const team = allTeams.find(t => t.id === teamId);
-    const adminUser = team?.adminUserId ? allUsers.find(u => u.id === team.adminUserId) : null;
+    const team = allTeams.find(t => sameId(t.id, teamId));
+    const adminUser = team?.adminUserId ? allUsers.find(u => sameId(u.id, team.adminUserId)) : null;
     if (adminUser) {
         return {
             name: `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim(),
@@ -240,16 +295,16 @@ function getTeamAdminInfo(teamId) {
     }
 
     const adminParticipation = allParticipations.find(p =>
-        p.userId && p.userId === team?.adminUserId
+        p.userId && sameId(p.userId, team?.adminUserId)
     ) || allParticipations.find(p =>
-        (p.teamMemberships || []).some(m => m.teamId === teamId && m.isAdmin)
-    ) || allParticipations.find(p => p.teamId === teamId && p.isTeamAdmin);
+        (p.teamMemberships || []).some(m => sameId(m.teamId, teamId) && m.isAdmin)
+    ) || allParticipations.find(p => sameId(p.teamId, teamId) && p.isTeamAdmin);
 
     if (!adminParticipation) {
         return { name: '', email: '' };
     }
 
-    const user = allUsers.find(u => u.id === adminParticipation.userId);
+    const user = allUsers.find(u => sameId(u.id, adminParticipation.userId));
     if (user) {
         const name = `${user.firstName || ''} ${user.lastName || ''}`.trim();
         return { name, email: user.email || adminParticipation.email || '' };
@@ -264,9 +319,9 @@ function getTeamAdminInfo(teamId) {
 function getTeamAdminMember(team) {
     if (!team?.adminUserId) return null;
 
-    const user = allUsers.find(u => u.id === team.adminUserId);
+    const user = allUsers.find(u => sameId(u.id, team.adminUserId));
     const participation = allParticipations.find(p =>
-        p.userId === team.adminUserId && p.eventId === team.eventId
+        sameId(p.userId, team.adminUserId) && sameId(p.eventId, team.eventId)
     );
 
     if (!user && !participation) return null;
@@ -285,62 +340,77 @@ function getTeamAdminMember(team) {
 function getTeamMembers(teamId) {
     return allParticipations
         .filter(p => {
-            if ((p.teamMemberships || []).some(m => m.teamId === teamId && m.isParticipant)) return true;
-            return p.teamId === teamId && (p.roles || []).includes('participant');
+            if ((p.teamMemberships || []).some(m => sameId(m.teamId, teamId) && m.isParticipant)) return true;
+            return sameId(p.teamId, teamId) && (p.roles || []).includes('participant');
         })
         .map(participation => {
-            const user = allUsers.find(u => u.id === participation.userId) || null;
+            const user = allUsers.find(u => sameId(u.id, participation.userId)) || null;
             return { participation, user };
         });
 }
 
 function toggleTeamMembers(teamId) {
-    if (expandedTeams.has(teamId)) {
-        expandedTeams.delete(teamId);
+    const team = allTeams.find(t => sameId(t.id, teamId));
+    const key = team ? team.id : teamId;
+    if (expandedTeams.has(key)) {
+        expandedTeams.delete(key);
     } else {
-        expandedTeams.add(teamId);
+        expandedTeams.add(key);
     }
     renderTeamsTable();
 }
 
-async function cancelInvitation(inviteId, email, teamId) {
+async function cancelInvitation(inviteId, teamId, button) {
+    const invite = allInvitations.find(i => sameId(i.id, inviteId));
+    const email = invite?.email || 'this address';
     if (!confirm(`Cancel invitation for "${email}"?`)) return;
-    try {
-        await API.invitations.cancel(inviteId);
-        allInvitations = allInvitations.filter(i => i.id !== inviteId);
-        renderTeamsTable();
-        updateStats();
-    } catch (error) {
-        console.error('Error cancelling invitation:', error);
-        alert('Failed to cancel invitation: ' + error.message);
-    }
+    await withBusy(button, 'Cancelling...', async () => {
+        try {
+            await API.invitations.cancel(inviteId);
+            allInvitations = allInvitations.filter(i => !sameId(i.id, inviteId));
+            renderTeamsTable();
+            updateStats();
+        } catch (error) {
+            console.error('Error cancelling invitation:', error);
+            alert('Failed to cancel invitation: ' + error.message);
+        }
+    });
 }
 
-async function removeTeamMember(participationId, memberName, teamId) {
+async function removeTeamMember(participationId, teamId, button) {
+    const member = allParticipations.find(p => sameId(p.id, participationId));
+    const user = member ? allUsers.find(u => sameId(u.id, member.userId)) : null;
+    const memberName = (user?.firstName || user?.lastName)
+        ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+        : (user?.email || member?.email || 'this member');
+
     if (!confirm(`Remove "${memberName}" from this team?\n\nThis only removes their team assignment.`)) {
         return;
     }
 
-    try {
-        await API.participations.assignTeam(participationId, null, false);
+    await withBusy(button, 'Removing...', async () => {
+        try {
+            await API.participations.assignTeam(participationId, null, false);
 
-        const idx = allParticipations.findIndex(p => p.id === participationId);
-        if (idx >= 0) {
-            allParticipations[idx] = {
-                ...allParticipations[idx],
-                teamId: null,
-                isTeamAdmin: false,
-                teamMemberships: []
-            };
+            const idx = allParticipations.findIndex(p => sameId(p.id, participationId));
+            if (idx >= 0) {
+                allParticipations[idx] = {
+                    ...allParticipations[idx],
+                    teamId: null,
+                    isTeamAdmin: false,
+                    teamMemberships: []
+                };
+            }
+
+            const team = allTeams.find(t => sameId(t.id, teamId));
+            if (team) teamCounts[team.id] = getTeamMembers(team.id).length;
+            renderTeamsTable();
+            updateStats();
+        } catch (error) {
+            console.error('Error removing team member:', error);
+            alert('Failed to remove team member: ' + error.message);
         }
-
-        teamCounts[teamId] = getTeamMembers(teamId).length;
-        renderTeamsTable();
-        updateStats();
-    } catch (error) {
-        console.error('Error removing team member:', error);
-        alert('Failed to remove team member: ' + error.message);
-    }
+    });
 }
 
 function updateStats() {
@@ -350,7 +420,7 @@ function updateStats() {
 
     allTeams.forEach(team => {
         totalParticipants += teamCounts[team.id] || 0;
-        totalCommitted += team.committedParticipants || 3;
+        totalCommitted += committedSize(team);
     });
 
     const fillRate = totalCommitted > 0
@@ -363,39 +433,23 @@ function updateStats() {
     document.getElementById('fill-rate').textContent = fillRate + '%';
 }
 
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-async function deleteTeam(teamId, teamName) {
-    if (!confirm(`Are you sure you want to delete team "${teamName}"?\n\nThis will also remove:\n� Team memberships from all participants\n� Hotel bookings (for participants with no other role)\n� Badge claims for this team\n� Pending invitations\n\nThis action cannot be undone.`)) {
+async function deleteTeam(teamId, button) {
+    const team = allTeams.find(t => sameId(t.id, teamId));
+    const teamName = team?.teamName || 'this team';
+    if (!confirm(`Are you sure you want to delete team "${teamName}"?\n\nThis will also remove:\n• Team memberships from all participants\n• Hotel bookings (for participants with no other role)\n• Badge claims for this team\n• Pending invitations\n\nThis action cannot be undone.`)) {
         return;
     }
 
-    try {
-        await API.teams.delete(teamId);
-        allTeams = allTeams.filter(t => t.id !== teamId);
-        delete teamCounts[teamId];
-        renderTeamsTable();
-        updateStats();
-    } catch (error) {
-        console.error('Error deleting team:', error);
-        alert('Failed to delete team: ' + error.message);
-    }
+    await withBusy(button, '⏳', async () => {
+        try {
+            await API.teams.delete(teamId);
+            allTeams = allTeams.filter(t => !sameId(t.id, teamId));
+            if (team) delete teamCounts[team.id];
+            renderTeamsTable();
+            updateStats();
+        } catch (error) {
+            console.error('Error deleting team:', error);
+            alert('Failed to delete team: ' + error.message);
+        }
+    });
 }
-

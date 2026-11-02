@@ -39,7 +39,6 @@ test('dashboard summarises the portal and exports JSON', async ({ page, harness,
 });
 
 test('BUG: the dashboard "Edit" link opens the event editor', async ({ page, harness, loginAs }) => {
-    test.fail(true, 'admin-dashboard.js:136 links to admin-events.html?edit=<id>; admin-events reads ?event=');
     const w = await asAdmin(page, harness, loginAs, '/admin-dashboard.html');
     await page.locator('#events-list .event-row').getByText('Edit').click();
     await expect(page.locator('#event-name')).toHaveValue(w.event.name, { timeout: 4000 });  // <- bug
@@ -66,7 +65,6 @@ test('admin teams lists members, removes one, then deletes the team', async ({ p
 });
 
 test('BUG: admin teams shows the committed team size', async ({ page, harness, loginAs }) => {
-    test.fail(true, 'admin-teams.js reads team.committedParticipants; teams store the size in numberOfParticipants, so every team counts as 3');
     await asAdmin(page, harness, loginAs, '/admin-teams.html');
     await expect(page.locator('#total-committed')).toHaveText('4', { timeout: 4000 });  // <- bug
 });

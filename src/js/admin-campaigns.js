@@ -1,18 +1,11 @@
-let quill;
+// Read-only view of email sequences. Sequences and their emails are managed from the
+// Sequence tab of an event in admin-events.html.
 let allSequences = [];
 let allEvents = [];
 let currentSequence = null;
 let currentSequenceId = null;
 let currentEmails = [];
-let copyingSequenceId = null;
 let currentPermissions = null;
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
 
 async function init() {
     currentPermissions = await Permissions.initAdminPage('campaigns', {
@@ -21,19 +14,14 @@ async function init() {
 
     if (!currentPermissions) return;
 
-    quill = new Quill('#editor', {
-        theme: 'snow',
-        modules: {
-            toolbar: [
-                [{ 'header': [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline'],
-                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                ['link', 'image'],
-                ['clean']
-            ],
-            imageResize: {},
-            imageDrop: true
-        }
+    document.getElementById('back-to-sequences').addEventListener('click', (e) => {
+        e.preventDefault();
+        showSequencesList();
+    });
+
+    document.getElementById('sequences-list').addEventListener('click', (e) => {
+        const header = e.target.closest('.sequence-header[data-sequence-id]');
+        if (header) showSequenceDetail(header.dataset.sequenceId);
     });
 
     await loadEvents();
@@ -56,6 +44,8 @@ async function loadEvents() {
     }
 }
 
+// One request for the campaigns and one per event that uses a sequence, instead of
+// re-fetching the campaign list and every event's deliveries once per sequence.
 async function loadSequences() {
     try {
         const response = await API.sequences.list();
@@ -64,9 +54,30 @@ async function loadSequences() {
         const campaignsResponse = await API.campaigns.list();
         const allCampaigns = campaignsResponse.campaigns || [];
 
+        const eventsWithSequence = allEvents.filter(e => e.sequenceId);
+        const deliveriesByEvent = await Promise.all(eventsWithSequence.map(async event => {
+            try {
+                const res = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${encodeURIComponent(event.id)}`);
+                if (!res.ok) return { event, deliveries: [] };
+                const data = await res.json();
+                return { event, deliveries: data.deliveries || [] };
+            } catch (err) {
+                console.error(`Failed to load deliveries for event ${event.id}:`, err);
+                return { event, deliveries: [] };
+            }
+        }));
+
         for (const seq of allSequences) {
-            seq.emailCount = allCampaigns.filter(c => c.sequenceId === seq.id).length;
-            seq.stats = await getSequenceStats(seq.id);
+            seq.emailCount = allCampaigns.filter(c => sameId(c.sequenceId, seq.id)).length;
+            const stats = { sent: 0, failed: 0 };
+            if (seq.emailCount > 0) {
+                for (const { event, deliveries } of deliveriesByEvent) {
+                    if (!sameId(event.sequenceId, seq.id)) continue;
+                    stats.sent += deliveries.filter(d => d.status === 'sent').length;
+                    stats.failed += deliveries.filter(d => d.status === 'failed').length;
+                }
+            }
+            seq.stats = stats;
         }
 
         renderSequences();
@@ -75,52 +86,11 @@ async function loadSequences() {
     }
 }
 
-async function getSequenceStats(sequenceId) {
-    try {
-        const campaignsResponse = await API.campaigns.list();
-        const campaigns = campaignsResponse.campaigns || [];
-        const sequenceCampaigns = campaigns.filter(c => c.sequenceId === sequenceId);
-
-        if (sequenceCampaigns.length === 0) {
-            return { sent: 0, failed: 0 };
-        }
-
-        const eventsUsingSequence = allEvents.filter(e => e.sequenceId === sequenceId);
-
-        if (eventsUsingSequence.length === 0) {
-            return { sent: 0, failed: 0 };
-        }
-
-        let totalSent = 0;
-        let totalFailed = 0;
-
-        for (const event of eventsUsingSequence) {
-            try {
-                const deliveriesResponse = await fetch(`${CONFIG.api.baseUrl}/deliveries/event/${event.id}`);
-                if (deliveriesResponse.ok) {
-                    const data = await deliveriesResponse.json();
-                    const deliveries = data.deliveries || [];
-
-                    totalSent += deliveries.filter(d => d.status === 'sent').length;
-                    totalFailed += deliveries.filter(d => d.status === 'failed').length;
-                }
-            } catch (err) {
-                console.error(`Failed to load deliveries for event ${event.id}:`, err);
-            }
-        }
-
-        return { sent: totalSent, failed: totalFailed };
-    } catch (err) {
-        console.error('Failed to get sequence stats:', err);
-        return { sent: 0, failed: 0 };
-    }
-}
-
 function renderSequences() {
     const container = document.getElementById('sequences-list');
 
     if (allSequences.length === 0) {
-        container.innerHTML = '<div class="empty-state">No sequences yet. Click "New Sequence" to create one!</div>';
+        container.innerHTML = '<div class="empty-state">No sequences yet. Open an event in Events and use its Sequence tab to create one.</div>';
         return;
     }
 
@@ -129,13 +99,13 @@ function renderSequences() {
 
         return `
             <div class="sequence-card">
-                <div class="sequence-header" onclick="showSequenceDetail('${seq.id}')">
+                <div class="sequence-header" data-sequence-id="${escapeHtml(seq.id)}">
                     <div class="sequence-info">
                         <h3>${escapeHtml(seq.name)}</h3>
                         <div class="sequence-meta">
-                            ${seq.emailCount || 0} email${(seq.emailCount || 0) !== 1 ? 's' : ''} �
-                            ${seq.stats?.sent || 0} sent �
-                            ${seq.stats?.failed || 0} failed �
+                            ${seq.emailCount || 0} email${(seq.emailCount || 0) !== 1 ? 's' : ''} ·
+                            ${seq.stats?.sent || 0} sent ·
+                            ${seq.stats?.failed || 0} failed ·
                             Created ${createdDate}
                         </div>
                     </div>
@@ -171,23 +141,41 @@ async function showSequenceDetail(sequenceId) {
 
         renderEmails();
         showView('sequence-detail');
-        window.history.replaceState({}, '', `admin-campaigns.html?sequence=${sequenceId}`);
+        window.history.replaceState({}, '', `admin-campaigns.html?sequence=${encodeURIComponent(sequenceId)}`);
     } catch (err) {
         console.error('Failed to load sequence:', err);
         alert('Failed to load sequence details');
     }
 }
 
+// Team members per event, derived from participations (GET /teams returns no members).
+function countTeamMembersByEvent(participations, teams) {
+    const eventByTeam = {};
+    for (const t of teams) eventByTeam[String(t.id).toLowerCase()] = String(t.eventId || '').toLowerCase();
+    const counts = {};
+    for (const p of participations) {
+        let teamKey = null;
+        if (p.teamId && (p.roles || []).includes('participant')) {
+            teamKey = String(p.teamId).toLowerCase();
+        } else {
+            const m = (p.teamMemberships || []).find(x => x.isParticipant && x.teamId);
+            if (m) teamKey = String(m.teamId).toLowerCase();
+        }
+        if (!teamKey) continue;
+        const eventKey = eventByTeam[teamKey];
+        if (!eventKey) continue;
+        counts[eventKey] = (counts[eventKey] || 0) + 1;
+    }
+    return counts;
+}
+
 async function loadSequenceStats(sequenceId) {
+    const statsEl = document.getElementById('sequence-stats');
     try {
-
-        const events = await API.events.list();
-        const eventsList = Array.isArray(events) ? events : (events.events || []);
-
-        const eventsUsingSequence = eventsList.filter(e => e.sequenceId === sequenceId);
+        const eventsUsingSequence = allEvents.filter(e => sameId(e.sequenceId, sequenceId));
 
         if (eventsUsingSequence.length === 0) {
-            document.getElementById('sequence-stats').innerHTML =
+            statsEl.innerHTML =
                 `<p style="color: var(--admin-text-muted); font-size: 0.9rem;">
                     This sequence is not assigned to any events yet.
                     <strong>Assign it to exactly one event</strong> to start sending emails to interest leads.
@@ -195,22 +183,24 @@ async function loadSequenceStats(sequenceId) {
             return;
         }
 
-        const leadsResponse = await fetch(`${CONFIG.api.baseUrl}/interest/leads?verified=false`);
-        const leadsData = await leadsResponse.json();
+        const [leadsData, teamsResponse, participationsResponse] = await Promise.all([
+            fetch(`${CONFIG.api.baseUrl}/interest/leads?verified=false`).then(r => r.ok ? r.json() : { leads: [] }),
+            API.teams.list(),
+            API.participations.list().catch(() => [])
+        ]);
         const allLeads = leadsData.leads || [];
-
-        const teamsResponse = await API.teams.list();
-        const teams = teamsResponse.teams || [];
+        const teams = Array.isArray(teamsResponse) ? teamsResponse : (teamsResponse.teams || []);
+        const participations = Array.isArray(participationsResponse) ? participationsResponse : (participationsResponse.participations || []);
+        const membersByEvent = countTeamMembersByEvent(participations, teams);
 
         let totalInterestLeads = 0;
         let verifiedInterestLeads = 0;
         let totalTeamMembers = 0;
 
         const eventStats = eventsUsingSequence.map(event => {
-            const eventLeads = allLeads.filter(l => l.eventId === event.id);
+            const eventLeads = allLeads.filter(l => sameId(l.eventId, event.id));
             const verifiedLeads = eventLeads.filter(l => l.verified);
-            const eventTeams = teams.filter(t => t.eventId === event.id);
-            const teamMemberCount = eventTeams.reduce((sum, t) => sum + (t.members?.length || 0), 0);
+            const teamMemberCount = membersByEvent[String(event.id).toLowerCase()] || 0;
 
             totalInterestLeads += eventLeads.length;
             verifiedInterestLeads += verifiedLeads.length;
@@ -224,8 +214,7 @@ async function loadSequenceStats(sequenceId) {
             };
         });
 
-
-        let statsHtml = `
+        statsEl.innerHTML = `
             <div style="background: var(--admin-bg-secondary); padding: 12px; border-radius: 4px; margin-bottom: 16px;">
                 <strong style="color: var(--admin-accent);">📊 Sequence Recipients</strong>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 8px;">
@@ -246,19 +235,17 @@ async function loadSequenceStats(sequenceId) {
                     <strong style="font-size: 0.9rem;">Events using this sequence:</strong>
                     ${eventStats.map(e => `
                         <div style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;">
-                            � ${escapeHtml(e.name)}: ${e.verified} verified leads, ${e.teams} team members
+                            • ${escapeHtml(e.name)}: ${e.verified} verified leads, ${e.teams} team members
                         </div>
                     `).join('')}
                 </div>
             </div>
         `;
 
-        document.getElementById('sequence-stats').innerHTML = statsHtml;
-
     } catch (err) {
         console.error('[STATS] Failed to load sequence stats:', err);
-        document.getElementById('sequence-stats').innerHTML =
-            `<p style="color: var(--admin-danger); font-size: 0.9rem;">Failed to load recipient statistics: ${err.message}</p>`;
+        statsEl.innerHTML =
+            `<p style="color: var(--admin-danger); font-size: 0.9rem;">Failed to load recipient statistics: ${escapeHtml(err.message)}</p>`;
     }
 }
 
@@ -266,7 +253,7 @@ function renderEmails() {
     const tbody = document.getElementById('emails-body');
 
     if (currentEmails.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-state-small">No emails yet. Click "Add Email" to create the first email in this sequence.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state-small">No emails yet. Add emails from the event\'s Sequence tab.</td></tr>';
         return;
     }
 
@@ -304,14 +291,14 @@ function renderEmails() {
 
         return `
             <tr>
-                <td><span class="badge sequence">#${email.sequenceOrder ?? (index + 1)}</span></td>
+                <td><span class="badge sequence">#${Number(email.sequenceOrder ?? (index + 1))}</span></td>
                 <td>
                     <strong>${escapeHtml(email.subject)}</strong>
                     ${scheduleBadge}
                 </td>
                 <td>${statusBadge}</td>
-                <td><span style="color: var(--admin-success);">${email.stats?.sent || 0}</span></td>
-                <td><span style="color: var(--admin-danger);">${email.stats?.failed || 0}</span></td>
+                <td><span style="color: var(--admin-success);">${Number(email.stats?.sent) || 0}</span></td>
+                <td><span style="color: var(--admin-danger);">${Number(email.stats?.failed) || 0}</span></td>
                 <td>${createdDate}</td>
                 <td>
                     <span style="color: var(--admin-text-muted); font-size: 0.85rem;">View only</span>
@@ -319,373 +306,6 @@ function renderEmails() {
             </tr>
         `;
     }).join('');
-}
-
-function showCreateSequenceModal() {
-    document.getElementById('sequence-id').value = '';
-    document.getElementById('sequence-modal-title').textContent = '📧 Create New Sequence';
-    document.getElementById('sequence-name').value = '';
-    document.getElementById('sequence-event').value = '';
-    document.getElementById('sequence-description').value = '';
-    document.getElementById('sequence-warning').style.display = 'none';
-    document.getElementById('delete-sequence-btn').classList.add('hidden');
-    document.getElementById('create-sequence-modal').classList.add('active');
-}
-
-function editSequence(sequenceId) {
-    const seq = allSequences.find(s => s.id === sequenceId);
-    if (!seq) return;
-
-    document.getElementById('sequence-id').value = seq.id;
-    document.getElementById('sequence-modal-title').textContent = '✏️ Edit Sequence';
-    document.getElementById('sequence-name').value = seq.name;
-    document.getElementById('sequence-event').value = seq.eventId;
-    document.getElementById('sequence-description').value = seq.description || '';
-    document.getElementById('sequence-warning').style.display = 'none';
-    document.getElementById('delete-sequence-btn').classList.remove('hidden');
-    document.getElementById('create-sequence-modal').classList.add('active');
-}
-
-function editCurrentSequence() {
-    editSequence(currentSequenceId);
-}
-
-function closeSequenceModal() {
-    document.getElementById('create-sequence-modal').classList.remove('active');
-}
-
-async function saveSequence() {
-    const sequenceId = document.getElementById('sequence-id').value;
-    const name = document.getElementById('sequence-name').value.trim();
-    const description = document.getElementById('sequence-description').value.trim();
-
-    if (!name) {
-        alert('Please enter a sequence name');
-        return;
-    }
-
-    try {
-        if (sequenceId) {
-            await API.sequences.update(sequenceId, { name, description });
-        } else {
-            await API.sequences.create({ name, description });
-        }
-
-        closeSequenceModal();
-        await loadSequences();
-
-        if (sequenceId && currentSequenceId === sequenceId) {
-            showSequenceDetail(sequenceId);
-        }
-    } catch (err) {
-        console.error('Failed to save sequence:', err);
-        alert('Failed to save sequence: ' + (err.message || 'Unknown error'));
-    }
-}
-
-async function deleteSequence() {
-    const sequenceId = document.getElementById('sequence-id').value;
-    if (!sequenceId) return;
-
-    const seq = allSequences.find(s => s.id === sequenceId);
-    if (!confirm(`Are you sure you want to delete "${seq.name}"?\n\nThis will delete the sequence and all ${seq.emailCount || 0} email(s) in it. This cannot be undone.`)) {
-        return;
-    }
-
-    try {
-        await API.sequences.delete(sequenceId);
-        closeSequenceModal();
-        await loadSequences();
-
-        if (currentSequenceId === sequenceId) {
-            showSequencesList();
-        }
-    } catch (err) {
-        console.error('Failed to delete sequence:', err);
-        alert('Failed to delete sequence');
-    }
-}
-
-function showCreateEmailForm() {
-    if (!currentSequenceId) return;
-
-    document.getElementById('email-id').value = '';
-    document.getElementById('email-sequence-id').value = currentSequenceId;
-    document.getElementById('email-sequence-order').value = '';
-    document.getElementById('email-form-title').textContent = 'Create Email';
-    document.getElementById('email-subject').value = '';
-    quill.setContents([]);
-    document.getElementById('email-cta-url').value = '';
-    document.getElementById('email-cta-text').value = '';
-    document.getElementById('status-draft').checked = true;
-    document.getElementById('email-schedule').value = '';
-    document.getElementById('schedule-group').style.display = 'none';
-    document.getElementById('delete-email-btn').classList.add('hidden');
-
-    const nextOrder = currentEmails.length + 1;
-    document.getElementById('email-order-info').innerHTML = `This will be email #<span id="email-number">${nextOrder}</span> in the sequence.`;
-
-    setupStatusHandlers();
-    showView('email-form');
-}
-
-async function editEmail(emailId) {
-    try {
-        const response = await API.campaigns.get(emailId);
-        const email = response.campaign;
-
-        document.getElementById('email-id').value = email.id;
-        document.getElementById('email-sequence-id').value = email.sequenceId;
-        document.getElementById('email-sequence-order').value = email.sequenceOrder ?? '';
-        document.getElementById('email-form-title').textContent = 'Edit Email';
-        document.getElementById('email-subject').value = email.subject;
-        quill.root.innerHTML = email.content;
-        document.getElementById('email-cta-url').value = email.ctaUrl || '';
-        document.getElementById('email-cta-text').value = email.ctaText || '';
-
-        const status = email.status || 'draft';
-        if (status === 'live') {
-            document.getElementById('status-live').checked = true;
-            document.getElementById('schedule-group').style.display = 'block';
-        } else {
-            document.getElementById('status-draft').checked = true;
-            document.getElementById('schedule-group').style.display = 'none';
-        }
-
-        if (email.scheduledSendTime) {
-            const date = new Date(email.scheduledSendTime);
-            const formatted = date.getFullYear() + '-' +
-                String(date.getMonth() + 1).padStart(2, '0') + '-' +
-                String(date.getDate()).padStart(2, '0') + 'T' +
-                String(date.getHours()).padStart(2, '0') + ':' +
-                String(date.getMinutes()).padStart(2, '0');
-            document.getElementById('email-schedule').value = formatted;
-            updateSchedulePreview();
-        } else {
-            document.getElementById('email-schedule').value = '';
-        }
-
-        document.getElementById('delete-email-btn').classList.remove('hidden');
-
-        document.getElementById('email-order-info').innerHTML = `This is email #<span id="email-number">${email.sequenceOrder ?? currentEmails.length}</span> of ${currentEmails.length} in the sequence.`;
-
-        setupStatusHandlers();
-        showView('email-form');
-    } catch (err) {
-        console.error('Failed to load email:', err);
-        alert('Failed to load email');
-    }
-}
-
-async function saveEmail() {
-    const emailId = document.getElementById('email-id').value;
-    const sequenceId = document.getElementById('email-sequence-id').value;
-    const sequenceOrderRaw = document.getElementById('email-sequence-order').value;
-    const subject = document.getElementById('email-subject').value.trim();
-    const content = quill.root.innerHTML;
-    const ctaUrl = document.getElementById('email-cta-url').value.trim();
-    const ctaText = document.getElementById('email-cta-text').value.trim();
-    const status = document.querySelector('input[name="email-status"]:checked').value;
-    const scheduleValue = document.getElementById('email-schedule').value;
-
-    if (!subject || !content) {
-        alert('Please fill in all required fields');
-        return;
-    }
-
-    const data = {
-        sequenceId,
-        subject,
-        content,
-        ctaUrl,
-        ctaText,
-        status
-    };
-
-    if (emailId && sequenceOrderRaw !== '') {
-        data.sequenceOrder = parseInt(sequenceOrderRaw, 10);
-    }
-
-    if (scheduleValue) {
-        data.scheduledSendTime = new Date(scheduleValue).toISOString();
-    } else {
-        data.scheduledSendTime = null;
-    }
-
-    try {
-        if (emailId) {
-            await API.campaigns.update(emailId, data);
-        } else {
-            await API.campaigns.create(data);
-        }
-
-        showSequenceDetail(sequenceId);
-    } catch (err) {
-        console.error('Failed to save email:', err);
-        alert('Failed to save email: ' + (err.message || 'Unknown error'));
-    }
-}
-
-async function deleteEmail() {
-    const emailId = document.getElementById('email-id').value;
-    if (!emailId) return;
-
-    const email = currentEmails.find(e => e.id === emailId);
-    if (!confirm(`Are you sure you want to delete this email?\n\n"${email?.subject}"\n\nThis cannot be undone.`)) {
-        return;
-    }
-
-    try {
-        await API.campaigns.delete(emailId);
-        showSequenceDetail(currentSequenceId);
-    } catch (err) {
-        console.error('Failed to delete email:', err);
-        alert('Failed to delete email');
-    }
-}
-
-function cancelEmailEdit() {
-    showSequenceDetail(currentSequenceId);
-}
-
-function setupStatusHandlers() {
-    const statusRadios = document.querySelectorAll('input[name="email-status"]');
-    const scheduleGroup = document.getElementById('schedule-group');
-    const scheduleInput = document.getElementById('email-schedule');
-
-    displayUserTimezone();
-
-    const checkedRadio = document.querySelector('input[name="email-status"]:checked');
-    if (checkedRadio && checkedRadio.value === 'live') {
-        scheduleGroup.style.display = 'block';
-        updateSchedulePreview();
-    }
-
-    statusRadios.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            if (e.target.value === 'live') {
-                scheduleGroup.style.display = 'block';
-            } else {
-                scheduleGroup.style.display = 'none';
-            }
-        });
-    });
-
-    scheduleInput.addEventListener('change', updateSchedulePreview);
-}
-
-function displayUserTimezone() {
-    const now = new Date();
-    const offsetMinutes = now.getTimezoneOffset();
-    const offsetHours = Math.abs(offsetMinutes / 60);
-    const offsetSign = offsetMinutes <= 0 ? '+' : '-';
-    const timezoneStr = `GMT${offsetSign}${Math.floor(offsetHours)}${offsetMinutes % 60 !== 0 ? ':' + Math.abs(offsetMinutes % 60) : ''}`;
-
-    let timezoneName = '';
-    try {
-        timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch (e) {
-    }
-
-    const display = document.getElementById('user-timezone-display');
-    if (display) {
-        display.textContent = `(${timezoneStr}${timezoneName ? ' - ' + timezoneName : ''})`;
-    }
-}
-
-function updateSchedulePreview() {
-    const scheduleValue = document.getElementById('email-schedule').value;
-    const preview = document.getElementById('schedule-preview');
-
-    if (scheduleValue) {
-        const date = new Date(scheduleValue);
-        const now = new Date();
-
-        const offsetMinutes = date.getTimezoneOffset();
-        const offsetHours = Math.abs(offsetMinutes / 60);
-        const offsetSign = offsetMinutes <= 0 ? '+' : '-';
-        const timezoneStr = `GMT${offsetSign}${Math.floor(offsetHours)}${offsetMinutes % 60 !== 0 ? ':' + Math.abs(offsetMinutes % 60) : ''}`;
-
-        if (date <= now) {
-            preview.innerHTML = `⚠️ This date is in the past. Email will send immediately when saved as Live.<br>
-                <small style="color: var(--admin-text-muted);">Your timezone: ${timezoneStr}</small>`;
-            preview.style.color = 'var(--danger)';
-        } else {
-            const options = {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            };
-            const localTime = date.toLocaleDateString('en-US', options);
-            const utcTime = date.toUTCString();
-
-            preview.innerHTML = `📅 Will send on ${localTime}<br>
-                <small style="color: var(--admin-text-muted);">
-                    Your timezone: <strong>${timezoneStr}</strong> |
-                    UTC time: ${new Date(date).toISOString().replace('T', ' ').substring(0, 16)}
-                </small>`;
-            preview.style.color = 'var(--admin-accent)';
-        }
-        preview.style.display = 'block';
-    } else {
-        preview.style.display = 'none';
-    }
-}
-
-async function previewEmail() {
-    const subject = document.getElementById('email-subject').value.trim();
-    const content = quill.root.innerHTML;
-    const ctaUrl = document.getElementById('email-cta-url').value.trim();
-    const ctaText = document.getElementById('email-cta-text').value.trim();
-
-    try {
-        const response = await fetch(`${CONFIG.api.baseUrl}/email/preview`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                templateId: 'announcement',
-                data: {
-                    subject,
-                    firstName: 'Preview User',
-                    content,
-                    ctaUrl,
-                    ctaText
-                }
-            })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            const frame = document.getElementById('preview-frame');
-            frame.srcdoc = data.html;
-        }
-    } catch (err) {
-        console.error('Preview error:', err);
-    }
-}
-
-async function duplicateSequence(sequenceId) {
-    const sequence = allSequences.find(s => s.id === sequenceId);
-
-    if (!sequence) return;
-
-    if (!confirm(`Duplicate sequence "${sequence.name}"?\n\nThis will create a copy of the sequence with all its emails.`)) {
-        return;
-    }
-
-    try {
-        await API.sequences.copy(sequenceId);
-
-        await loadSequences();
-
-        alert(`Sequence duplicated successfully!`);
-    } catch (err) {
-        console.error('Failed to duplicate sequence:', err);
-        alert('Failed to duplicate sequence: ' + (err.message || 'Unknown error'));
-    }
 }
 
 document.addEventListener('DOMContentLoaded', init);

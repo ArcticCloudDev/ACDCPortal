@@ -110,7 +110,7 @@ test('admin records, edits and deletes a sponsor', async ({ page, harness, login
 test('admin adds a manual budget row and the summary updates', async ({ page, harness, loginAs }) => {
     const w = await openAdminEvents(page, harness, loginAs);
     await page.goto(`/admin-events.html?event=${w.event.id}&tab=budget`);
-    await page.locator('button[onclick="openFinancialModal()"]').click();
+    await page.locator('#open-financial-modal-btn').click();
     await page.locator('#financial-type').selectOption('expense');
     await page.locator('#financial-category').selectOption('venue');
     await page.locator('#financial-description').fill('Venue rental');
@@ -152,41 +152,35 @@ test('admin starts an event sequence from scratch', async ({ page, harness, logi
     expect(await rows('SELECT * FROM Sequences WHERE Id = @id', { id: e.SequenceId })).toHaveLength(1);
 });
 
-test.describe('known broken admin event actions', () => {
-    test.use({ allowServerErrors: true });
+test('saving budget rates persists them', async ({ page, harness, loginAs, dialogs }) => {
+    const w = await openAdminEvents(page, harness, loginAs);
+    await page.goto(`/admin-events.html?event=${w.event.id}&tab=budget`);
+    await page.locator('#budget-hotel-rate').fill('1200');
+    await page.locator('#budget-hotel-nights').fill('2');
+    await page.locator('#save-rates-btn').click();
+    await expect.poll(() => dialogs.last()?.message).toContain('Rates saved');
+    await expect.poll(async () => Number((await rows('SELECT HotelRatePerNight r FROM Events WHERE Id = @id', { id: w.event.id }))[0].r)).toBe(1200);
+});
 
-    test('saving budget rates persists them', async ({ page, harness, loginAs, dialogs }) => {
-        const w = await openAdminEvents(page, harness, loginAs);
-        await page.goto(`/admin-events.html?event=${w.event.id}&tab=budget`);
-        await page.locator('#budget-hotel-rate').fill('1200');
-        await page.locator('#budget-hotel-nights').fill('2');
-        await page.locator('button[onclick="saveEventRates()"]').click();
-        await expect.poll(() => dialogs.last()?.message).toContain('Rates saved');
-        await expect.poll(async () => Number((await rows('SELECT HotelRatePerNight r FROM Events WHERE Id = @id', { id: w.event.id }))[0].r)).toBe(1200);
-    });
+test('copying a sequence from another event works', async ({ page, harness, loginAs, dialogs }) => {
+    const source = f.event({ name: 'ACDC 2026', status: 'completed' });
+    const seq = { id: f.id(), name: 'ACDC 2026 drip', description: null, createdAt: new Date().toISOString() };
+    source.sequenceId = seq.id;
+    const w = await openAdminEvents(page, harness, loginAs, { sequences: [seq], events: [source] });
+    await page.goto(`/admin-events.html?event=${w.event.id}&tab=sequence`);
+    await page.locator('#create-sequence-btn').click();
+    await page.getByText('📋 Copy from another event').click();
+    await page.locator('#copy-from-event-select').selectOption(source.id);
+    await page.locator('#create-sequence-modal').getByRole('button', { name: 'Create Sequence' }).click();
+    await expect(page.locator('#sequence-exists-state')).toBeVisible({ timeout: 4000 });
+});
 
-    test('BUG: copying a sequence from another event works', async ({ page, harness, loginAs, dialogs }) => {
-        test.fail(true, 'admin-events.js:1767 calls API.sequences.duplicate(), which does not exist (api.js has copy())');
-        const source = f.event({ name: 'ACDC 2026', status: 'completed' });
-        const seq = { id: f.id(), name: 'ACDC 2026 drip', description: null, createdAt: new Date().toISOString() };
-        source.sequenceId = seq.id;
-        const w = await openAdminEvents(page, harness, loginAs, { sequences: [seq], events: [source] });
-        await page.goto(`/admin-events.html?event=${w.event.id}&tab=sequence`);
-        await page.locator('#create-sequence-btn').click();
-        await page.getByText('📋 Copy from another event').click();
-        await page.locator('#copy-from-event-select').selectOption(source.id);
-        await page.locator('#create-sequence-modal').getByRole('button', { name: 'Create Sequence' }).click();
-        await expect(page.locator('#sequence-exists-state')).toBeVisible({ timeout: 4000 });  // <- bug
-    });
-
-    test('BUG: an admin can add an email to an event sequence', async ({ page, harness, loginAs }) => {
-        test.fail(true, 'admin-email.html sequence mode saves to POST /api/campaigns, but the route is /api/email/campaigns -> 404');
-        const seq = { id: f.id(), name: 'Drip', description: null, createdAt: new Date().toISOString() };
-        const w = await openAdminEvents(page, harness, loginAs, { sequences: [seq] });
-        await page.goto(`/admin-email.html?mode=sequence&sequenceId=${seq.id}&eventId=${w.event.id}&order=1`);
-        await page.locator('#subject').fill('Welcome aboard');
-        await page.locator('#editor-container .ql-editor').fill('Hello there');
-        await page.locator('#send-btn').click();
-        await expect(page.locator('#status-bar')).toContainText('saved successfully', { timeout: 4000 });  // <- bug
-    });
+test('an admin can add an email to an event sequence', async ({ page, harness, loginAs }) => {
+    const seq = { id: f.id(), name: 'Drip', description: null, createdAt: new Date().toISOString() };
+    const w = await openAdminEvents(page, harness, loginAs, { sequences: [seq] });
+    await page.goto(`/admin-email.html?mode=sequence&sequenceId=${seq.id}&eventId=${w.event.id}&order=1`);
+    await page.locator('#subject').fill('Welcome aboard');
+    await page.locator('#editor-container .ql-editor').fill('Hello there');
+    await page.locator('#send-btn').click();
+    await expect(page.locator('#status-bar')).toContainText('saved successfully', { timeout: 4000 });
 });

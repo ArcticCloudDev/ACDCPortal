@@ -126,103 +126,6 @@
 
         .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
 
-        .recipient-card {
-            background: white;
-            border: 1px solid var(--admin-border);
-            border-radius: 8px;
-            margin-bottom: 12px;
-            overflow: hidden;
-        }
-
-        .recipient-card.complete { border-left: 4px solid var(--admin-success); }
-        .recipient-card.partial { border-left: 4px solid #f59e0b; }
-        .recipient-card.none { border-left: 4px solid var(--admin-danger); }
-
-        .recipient-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .recipient-header:hover { background: var(--admin-bg); }
-
-        .recipient-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .status-icon { font-size: 1.5rem; }
-
-        .recipient-stats {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .email-count {
-            font-weight: 500;
-            color: var(--admin-text);
-        }
-
-        .expand-icon {
-            color: var(--admin-text-muted);
-            transition: transform 0.2s;
-        }
-
-        .recipient-details {
-            border-top: 1px solid var(--admin-border);
-            background: var(--admin-bg);
-            padding: 16px;
-        }
-
-        .deliveries-table {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .delivery-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            background: white;
-            border-radius: 6px;
-            border: 1px solid var(--admin-border);
-        }
-
-        .delivery-row.sent { background: #f0fdf4; }
-        .delivery-row.failed { background: #fef2f2; }
-        .delivery-row.pending { background: #fafafa; }
-
-        .delivery-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex: 1;
-        }
-
-        .sequence-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            background: var(--admin-primary);
-            color: white;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .delivery-status {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-align: right;
-        }
-
         .error-message {
             font-size: 0.75rem;
             color: var(--admin-danger);
@@ -886,7 +789,7 @@
                                             <label>📂 SharePoint Document Folder URL</label>
                                             <div style="display: flex; gap: 8px; align-items: flex-start;">
                                                 <input type="url" id="event-sharepoint-url" placeholder="https://yourtenant.sharepoint.com/:f:/s/site/..." style="flex: 1;">
-                                                <button type="button" class="btn-sm" id="verify-sharepoint-btn" onclick="verifySharePointUrl()" style="white-space: nowrap;">🔗 Verify</button>
+                                                <button type="button" class="btn-sm" id="verify-sharepoint-btn" style="white-space: nowrap;">🔗 Verify</button>
                                             </div>
                                             <div id="sharepoint-verify-result" style="margin-top: 6px;"></div>
                                             <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Paste the SharePoint folder URL where teams should upload documents. Use the Verify button to confirm the link works.</small>
@@ -1262,7 +1165,7 @@
                                 <div class="panel-body padded" style="padding: 16px 20px;">
                                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                                         <h4 style="margin:0; font-size:0.9rem; font-weight:600; color:var(--admin-text);">⚙️ Event Rates</h4>
-                                        <button type="button" class="btn-sm primary" onclick="saveEventRates()" style="white-space:nowrap;">💾 Save Rates</button>
+                                        <button type="button" class="btn-sm primary" id="save-rates-btn" style="white-space:nowrap;">💾 Save Rates</button>
                                     </div>
                                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                                         <div style="background:var(--admin-bg); border:1px solid var(--admin-border); border-left:3px solid #6c8ebf; border-radius:6px; padding:14px 16px;">
@@ -1270,12 +1173,12 @@
                                             <div style="display:grid; grid-template-columns:1fr auto 80px; gap:8px; align-items:end;">
                                                 <div class="form-group" style="margin:0;">
                                                     <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Rate per night</label>
-                                                    <input type="number" id="budget-hotel-rate" min="0" step="1" placeholder="e.g. 1500" oninput="updateRatePreview('hotel')">
+                                                    <input type="number" id="budget-hotel-rate" min="0" step="1" placeholder="e.g. 1500">
                                                 </div>
                                                 <span style="padding-bottom:9px; color:var(--admin-text-muted); font-weight:600; font-size:1rem;">×</span>
                                                 <div class="form-group" style="margin:0;">
                                                     <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Default nights</label>
-                                                    <input type="number" id="budget-hotel-nights" min="0" step="1" placeholder="e.g. 3" oninput="updateRatePreview('hotel')">
+                                                    <input type="number" id="budget-hotel-nights" min="0" step="1" placeholder="e.g. 3">
                                                 </div>
                                             </div>
                                             <div id="hotel-rate-preview" style="margin-top:8px; font-size:0.82rem; font-weight:600; color:#6c8ebf; min-height:18px;"></div>
@@ -1285,26 +1188,26 @@
                                             <div style="display:grid; grid-template-columns:1fr auto 80px; gap:8px; align-items:end;">
                                                 <div class="form-group" style="margin:0;">
                                                     <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Rate per day</label>
-                                                    <input type="number" id="budget-food-rate" min="0" step="1" placeholder="e.g. 800" oninput="updateRatePreview('food')">
+                                                    <input type="number" id="budget-food-rate" min="0" step="1" placeholder="e.g. 800">
                                                 </div>
                                                 <span style="padding-bottom:9px; color:var(--admin-text-muted); font-weight:600; font-size:1rem;">×</span>
                                                 <div class="form-group" style="margin:0;">
                                                     <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Days</label>
-                                                    <input type="number" id="budget-food-days" min="0" step="1" placeholder="e.g. 3" oninput="updateRatePreview('food')">
+                                                    <input type="number" id="budget-food-days" min="0" step="1" placeholder="e.g. 3">
                                                 </div>
                                             </div>
                                             <div id="food-rate-preview" style="margin-top:8px; font-size:0.82rem; font-weight:600; color:#82b97e; min-height:18px;"></div>
                                         </div>
                                     </div>
-                                    <p style="font-size:0.75rem; color:var(--admin-text-muted); margin:12px 0 0 0;">Rates auto-calculate per-person hotel and food rows when participants are assigned. Hotel nights default to this count when a participant has no individual night selections.</p>
+                                    <p style="font-size:0.75rem; color:var(--admin-text-muted); margin:12px 0 0 0;">Rates apply to the per-person hotel and food rows when you click Recalculate. Hotel rows use each participant's selected nights; the default-nights field only drives the preview above.</p>
                                 </div>
                             </div>
 
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                                 <h3 style="margin: 0;">📋 Financial Rows</h3>
                                 <div style="display: flex; gap: 8px;">
-                                    <button type="button" class="btn-sm" onclick="recalculateFinancials()" id="recalculate-btn" title="Re-generate hotel and food rows for all participants based on current rates">♻️ Recalculate</button>
-                                    <button type="button" class="btn-sm primary" onclick="openFinancialModal()">➕ Add Row</button>
+                                    <button type="button" class="btn-sm" id="recalculate-btn" title="Re-generate hotel and food rows for all participants based on current rates">♻️ Recalculate</button>
+                                    <button type="button" class="btn-sm primary" id="open-financial-modal-btn">➕ Add Row</button>
                                 </div>
                             </div>
 
@@ -1353,28 +1256,6 @@
                                             <tr><td colspan="5" class="empty-state">No teams registered yet</td></tr>
                                         </tbody>
                                     </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-panel" id="deliveries-panel">
-                    <div class="panel">
-                        <div class="panel-body padded">
-                            <div class="invite-section">
-                                <h3>📬 Email Deliveries</h3>
-                                <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 16px;">
-                                    Track sequence email deliveries to interest leads. Click a recipient to see individual email details.
-                                </p>
-
-                                <div class="members-list">
-                                    <div id="deliveries-loading" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">
-                                        Loading deliveries...
-                                    </div>
-                                    <div id="deliveries-content" style="display: none;">
-                                        <div id="deliveries-list"></div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1480,8 +1361,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-sm" onclick="closeCreateSequenceModal()">Cancel</button>
-                <button class="btn-sm primary" onclick="confirmCreateSequence()">Create Sequence</button>
+                <button type="button" class="btn-sm" id="close-create-sequence-btn">Cancel</button>
+                <button type="button" class="btn-sm primary" id="confirm-create-sequence-btn">Create Sequence</button>
             </div>
         </div>
     </div>
@@ -1549,7 +1430,7 @@
                     <div class="sponsor-grid">
                         <div class="form-group">
                             <label for="financial-type">Type *</label>
-                            <select id="financial-type" onchange="toggleFinancialPaidBy()">
+                            <select id="financial-type">
                                 <option value="expense">Expense</option>
                                 <option value="income">Income</option>
                             </select>
@@ -1588,7 +1469,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn-sm" onclick="closeFinancialModal()">Cancel</button>
+                    <button type="button" class="btn-sm" id="close-financial-modal-btn">Cancel</button>
                     <button type="submit" id="save-financial-btn" class="btn-sm primary">➕ Add Row</button>
                 </div>
             </form>
@@ -1598,10 +1479,10 @@
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/admin-utils.js"></script>
     <script src="js/admin-sidebar.js"></script>
     <script src="js/permissions.js"></script>
     <script src="js/admin-events.js"></script>
-    <script src="js/admin-deliveries.js"></script>
 </body>
 </html>
 

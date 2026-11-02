@@ -51,7 +51,7 @@ function renderAdminSidebar(activePage = '', permissions = null) {
         const roleLabel = typeof Permissions !== 'undefined'
             ? Permissions.getRoleLabel(permissions)
             : permissions.highestRole;
-        roleIndicator = `<div class="sidebar-role-label">${roleLabel}</div>`;
+        roleIndicator = `<div class="sidebar-role-label">${escapeHtml(roleLabel)}</div>`;
     }
 
     const sidebarHTML = `

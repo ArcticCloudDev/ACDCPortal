@@ -113,7 +113,6 @@ test('a judge awards an exclusive badge, which cannot be claimed', async ({ apiA
 });
 
 test('BUG: badge search survives a badge without a description', async ({ page, harness, loginAs }) => {
-    test.fail(true, 'admin-badges.js:200 calls b.description.toLowerCase() and description is nullable');
     const w = buildWorld();
     await harness.seed({ ...w.seed(), badges: [f.badge({ name: 'Plain', description: null }), f.badge({ name: 'Fancy' })] });
     await loginAs(w.admin);

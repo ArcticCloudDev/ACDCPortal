@@ -158,8 +158,7 @@ test.describe('confirmed security defects', () => {
         expect(await page.evaluate(() => window.__xss)).toBeUndefined();  // <- bug
     });
 
-    test('BUG (high): an interest sign-up cannot inject script into admin pages', async ({ page, harness, loginAs, apiAs }) => {
-        test.fail(true, 'admin-events.js recipient overview renders lead names unescaped; names come from the interest/record endpoint');
+    test('an interest sign-up cannot inject script into admin pages', async ({ page, harness, loginAs, apiAs }) => {
         const w = buildWorld();
         const seq = { id: f.id(), name: 'Pre-reg drip', description: null, createdAt: new Date().toISOString() };
         w.event.sequenceId = seq.id;
