@@ -435,7 +435,7 @@ test.describe('admin-side contract fixes', () => {
 
         await page.goto('/admin-teams.html');
         await expect(page.locator('#total-committed')).toHaveText('9');
-        await expect(page.locator('tr.team-main-row', { hasText: 'Power Rangers' }).locator('.badge')).toHaveText('2/4');
+        await expect(page.locator('tr.team-main-row', { hasText: 'Power Rangers' }).locator('.badge')).toHaveText('2 / 4');
 
         await page.goto(`/admin-teams.html?team=${w.team.id.toLowerCase()}`);
         await expect(page.locator('#event-filter')).toHaveValue(w.event.id);

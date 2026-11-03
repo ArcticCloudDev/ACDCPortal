@@ -139,3 +139,19 @@ Headings use `--weight-bold` and slight negative letter spacing.
   accent, Participant = neutral. Placeholders (add member, unlock slot) are dashed neutral tiles, not tinted.
 - 2026-11-02: `:has()` is allowed as a progressive enhancement (checked option rows, joining an empty state
   with its call to action). Without it the page must still work and read correctly.
+- 2026-11-03: Admin teams, event participants and interest list migrated (inline `<style>` removed, page
+  sections at the end of `admin-styles.css`, `data-theme="auto"`).
+- 2026-11-03: In admin tables an event name is a link (`.table-link`) to that event in the event editor;
+  no separate "View event" button. Team members expand inline under the row (`.expand-btn` with
+  `aria-expanded` and a rotating chevron). Under 640px the teams table becomes stacked cards.
+- 2026-11-03: Team fill badge reads "filled / committed" like the dashboard: full = success, no members yet =
+  warning, in between = neutral; pending invites sit next to it as muted "+N invited" text. A team opened with
+  `?team=<id>` gets `--color-accent-subtle` and a 3px accent bar (also along its member list).
+- 2026-11-03: Invitation pending = warning badge, expired = neutral. Interest leads: registered = success,
+  verified = info (waiting for registration), unverified = warning. Allergy tags = warning badges; hotel payer and
+  roles (judge, committee) = neutral badges; team admin = accent badge; booked hotel night = success check.
+- 2026-11-03: Roster group rows (team, committee, judges, no team) are one neutral band; an icon tells them apart,
+  not a tint. Stat icons use `tone-accent` or `tone-neutral` unless the number is itself a status (allergies =
+  warning, registered = success, verified = info); no decorative blue.
+- 2026-11-03: Icon-only buttons that run through `withBusy()` pass no busy label, because the label replaces the
+  button's content and would wipe the icon; the disabled state shows progress instead.

@@ -57,7 +57,7 @@ test('admin teams lists members, removes one, then deletes the team', async ({ p
     await expect.poll(() => dialogs.last()?.message).toContain('Remove "Mats Member" from this team?');
     await expect.poll(async () => (await rows('SELECT TeamId FROM Participations WHERE Id = @id', { id: w.participations.member.id }))[0].TeamId).toBeNull();
 
-    await page.locator('tr.team-main-row', { hasText: 'Power Rangers' }).getByRole('button', { name: '🗑️' }).click();
+    await page.locator('tr.team-main-row', { hasText: 'Power Rangers' }).getByRole('button', { name: 'Delete team Power Rangers' }).click();
     await expect(page.locator('tr.team-main-row', { hasText: 'Power Rangers' })).toHaveCount(0);
     expect(await rows('SELECT Id FROM Teams WHERE Id = @id', { id: w.team.id })).toHaveLength(0);
     const [leader] = await rows('SELECT TeamId, IsTeamAdmin FROM Participations WHERE Id = @id', { id: w.participations.leader.id });
