@@ -35,7 +35,6 @@ a {
 :focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
-    border-radius: var(--radius-sm);
 }
 
 .icon {
@@ -1250,6 +1249,97 @@ a {
     color: var(--color-text-subtle);
 }
 
+/* Icon sizes (styles.css has the same for the portal; admin pages do not load it) */
+.icon-sm { width: 1em; height: 1em; }
+.icon-lg { width: 1.5em; height: 1.5em; }
+
+/* Panel titles are often h2/h3: no browser margins */
+.panel-title {
+    margin: 0;
+}
+
+.panel-subtitle {
+    margin: var(--space-1) 0 0;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+}
+
+/* Empty state with an icon and a title */
+.empty-state-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: var(--space-3);
+    border-radius: var(--radius-full);
+    background: var(--color-surface-muted);
+    color: var(--color-text-subtle);
+}
+
+.empty-state-icon .icon {
+    width: 24px;
+    height: 24px;
+}
+
+.empty-state-title {
+    margin: 0 0 var(--space-1);
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+}
+
+/* Link inside a data table (event names etc.) */
+.table-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--color-accent-text);
+    font-weight: var(--weight-medium);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+    text-underline-offset: 3px;
+}
+
+.table-link:hover {
+    color: var(--color-accent-hover);
+    text-decoration-color: currentColor;
+}
+
+.data-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Muted "(optional)" or unit after a label */
+.label-optional {
+    font-weight: var(--weight-medium);
+    color: var(--color-text-muted);
+}
+
+/* Selects in a toolbar never push the page wider than the screen */
+.toolbar :where(select) {
+    max-width: 100%;
+}
+
+/* Buttons run through withBusy() */
+:is(.btn, .btn-sm)[aria-busy="true"] {
+    cursor: progress;
+}
+
+.tab-btn:disabled {
+    color: var(--color-text-subtle);
+    cursor: not-allowed;
+}
+
+/* A <form> wrapping a modal's body and footer keeps the modal's column layout */
+.modal > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
 /* Dashboard ---------------------------------------------------------------- */
 .stats-row {
     display: grid;
@@ -1284,7 +1374,10 @@ a {
     height: 22px;
 }
 
+.tone-neutral { background: var(--color-surface-muted); color: var(--color-text-muted); }
 .tone-accent { background: var(--color-accent-subtle); color: var(--color-accent-text); }
+.tone-success { background: var(--color-success-subtle); color: var(--color-success-text); }
+.tone-danger { background: var(--color-danger-subtle); color: var(--color-danger-text); }
 .tone-info { background: var(--color-info-subtle); color: var(--color-info-text); }
 .tone-violet { background: var(--color-violet-subtle); color: var(--color-violet-text); }
 .tone-warning { background: var(--color-warning-subtle); color: var(--color-warning-text); }
@@ -1440,14 +1533,6 @@ a.event-name:hover {
 
 /* Page: admin-teams ------------------------------------------------- */
 
-/* candidate shared: icon sizes (admin pages do not load styles.css, where these live for the portal) */
-.icon-sm { width: 1em; height: 1em; }
-.icon-lg { width: 1.5em; height: 1.5em; }
-
-/* candidate shared: neutral and success tones for .stat-icon (next to .tone-accent/-info/-violet/-warning) */
-.tone-neutral { background: var(--color-surface-muted); color: var(--color-text-muted); }
-.tone-success { background: var(--color-success-subtle); color: var(--color-success-text); }
-
 /* candidate shared: compact stat cards on phones (.stats-row.stats-compact). Two per row,
    three per row when there are exactly three, icon above the number. */
 @media (max-width: 640px) {
@@ -1491,33 +1576,6 @@ a.event-name:hover {
     .stats-compact .stat-label {
         font-size: var(--text-xs);
     }
-}
-
-/* candidate shared: link inside a data table (event names etc.) */
-.table-link {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    color: var(--color-accent-text);
-    font-weight: var(--weight-medium);
-    text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
-    text-underline-offset: 3px;
-}
-
-.table-link:hover {
-    color: var(--color-accent-hover);
-    text-decoration-color: currentColor;
-}
-
-/* candidate shared: selects in a toolbar never push the page wider than the screen */
-.toolbar :where(select) {
-    max-width: 100%;
-}
-
-/* candidate shared: busy state for buttons run through withBusy() */
-:is(.btn, .btn-sm)[aria-busy="true"] {
-    cursor: progress;
 }
 
 .teams-table .col-team strong {
@@ -2069,24 +2127,12 @@ a.event-name:hover {
     font-size: 0.9em;
 }
 
-/* candidate shared: panel-subtitle (one line of help under a .panel-title) */
-.page-events .panel-subtitle {
-    margin: var(--space-1) 0 0;
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-}
-
 /* A panel can stack a padded form area above a table */
 .page-events .panel-body + .panel-body {
     border-top: 1px solid var(--color-border);
 }
 
-/* candidate shared: tone-success (stat icon), stat-hint, stat-unit */
-.page-events .tone-success {
-    background: var(--color-success-subtle);
-    color: var(--color-success-text);
-}
-
+/* candidate shared: stat-hint, stat-unit */
 .page-events .stat-hint {
     margin-top: 2px;
     font-size: var(--text-xs);
@@ -2164,31 +2210,6 @@ a.event-name:hover {
 .page-events .inline-status.is-success { color: var(--color-success-text); }
 .page-events .inline-status.is-warning { color: var(--color-warning-text); }
 .page-events .inline-status.is-danger { color: var(--color-danger-text); }
-
-/* candidate shared: empty-state-icon, empty-state-title */
-.page-events .empty-state-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 48px;
-    height: 48px;
-    margin-bottom: var(--space-3);
-    border-radius: var(--radius-full);
-    background: var(--color-accent-subtle);
-    color: var(--color-accent-text);
-}
-
-.page-events .empty-state-icon .icon {
-    width: 24px;
-    height: 24px;
-}
-
-.page-events .empty-state-title {
-    margin: 0 0 var(--space-1);
-    font-size: var(--text-lg);
-    font-weight: var(--weight-semibold);
-    color: var(--color-text);
-}
 
 .page-events .empty-state p {
     max-width: 46ch;
@@ -2851,47 +2872,11 @@ a.event-name:hover {
 /* Page rules are scoped to body.page-people. The "candidate shared" blocks are new, unscoped
    classes that admin-person and admin-badges use too. */
 
-/* candidate shared: icon sizes (same values as styles.css, which admin pages do not load) */
-.icon-sm {
-    width: 1em;
-    height: 1em;
-}
-
-.icon-lg {
-    width: 1.5em;
-    height: 1.5em;
-}
-
 /* candidate shared: badge list (a wrapping row of .badge) */
 .badge-list {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-1);
-}
-
-/* candidate shared: empty state with an icon and a title */
-.empty-state-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 48px;
-    height: 48px;
-    margin-bottom: var(--space-3);
-    border-radius: var(--radius-full);
-    background: var(--color-surface-muted);
-    color: var(--color-text-subtle);
-}
-
-.empty-state-icon .icon {
-    width: 24px;
-    height: 24px;
-}
-
-.empty-state-title {
-    margin: 0 0 var(--space-1);
-    font-size: var(--text-base);
-    font-weight: var(--weight-semibold);
-    color: var(--color-text);
 }
 
 /* candidate shared: links inside .meta-list look like links */
@@ -3460,17 +3445,6 @@ a.timeline-title:hover {
     margin: 0;
 }
 
-/* candidate shared: stat icon tones for success and danger */
-.tone-success {
-    background: var(--color-success-subtle);
-    color: var(--color-success-text);
-}
-
-.tone-danger {
-    background: var(--color-danger-subtle);
-    color: var(--color-danger-text);
-}
-
 /* candidate shared: .stats-row.compact (smaller stat cards, two per row on phones) */
 .stats-row.compact {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
@@ -3950,12 +3924,6 @@ a.timeline-title:hover {
 }
 /* Page: admin-email ------------------------------------------------- */
 
-/* candidate shared: icon-sm (mirrors styles.css; admin pages do not load it) */
-.icon-sm {
-    width: 1em;
-    height: 1em;
-}
-
 /* candidate shared: status-bar (a .notice that a script fills in; hidden until it has a tone).
    Also used by admin-email-templates. */
 .status-bar {
@@ -3976,18 +3944,6 @@ button.option-card {
 button.option-card:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-}
-
-/* candidate shared: label-optional (muted "(optional)" or unit after a label) */
-.label-optional {
-    font-weight: var(--weight-medium);
-    color: var(--color-text-muted);
-}
-
-/* candidate shared: data-table numeric column */
-.data-table .num {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
 }
 
 /* candidate shared: rich-editor. The Quill "snow" editor themed with tokens (borders, focus, dark mode).
@@ -4287,12 +4243,6 @@ button.option-card:disabled {
 }
 
 /* Page: admin-campaigns ------------------------------------------------- */
-
-/* candidate shared: tone-neutral (stat icon without a status meaning) */
-.tone-neutral {
-    background: var(--color-surface-muted);
-    color: var(--color-text-muted);
-}
 
 .sequence-card {
     border-bottom: 1px solid var(--color-border);

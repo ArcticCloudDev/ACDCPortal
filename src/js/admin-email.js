@@ -56,6 +56,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.getElementById('custom-emails').addEventListener('input', parseCustomEmails);
+    // The form is usable while permissions load; if "custom" was picked before this handler
+    // existed, show the box now.
+    document.getElementById('custom-recipients').classList.toggle('visible',
+        document.getElementById('recipient-filter').value === 'custom');
 
     document.querySelectorAll('input[name="email-status"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
@@ -382,6 +386,11 @@ async function sendEmail() {
 
     if (isSequenceMode) {
         return withBusy(sendBtn, 'Saving...', saveSequenceEmail);
+    }
+
+    // Custom recipients are whatever is in the box right now, never a list from an earlier load.
+    if (document.getElementById('recipient-filter').value === 'custom') {
+        parseCustomEmails();
     }
 
     if (recipients.length === 0) {
