@@ -724,6 +724,8 @@ app.http('participations-by-event', {
                         .flatMap(p => (p.teamMemberships || []).map(m => String(m.teamId).toLowerCase()))
                 );
                 // Regular participants only get membership data, never other people's contact or hotel details.
+                // Teammates also see hotel nights and whether each member has confirmed their details
+                // (without that flag every teammate showed "Confirm information").
                 results = results.map(p => {
                     const sharesTeam = (p.teamMemberships || []).some(m => callerTeamIds.has(String(m.teamId).toLowerCase()));
                     return {
@@ -734,7 +736,7 @@ app.http('participations-by-event', {
                         isTeamAdmin: p.isTeamAdmin,
                         roles: p.roles,
                         teamMemberships: p.teamMemberships,
-                        ...(sharesTeam ? { hotelNights: p.hotelNights } : {})
+                        ...(sharesTeam ? { hotelNights: p.hotelNights, profileVerification: p.profileVerification } : {})
                     };
                 });
             }

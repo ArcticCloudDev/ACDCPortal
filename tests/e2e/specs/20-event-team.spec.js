@@ -60,6 +60,10 @@ test('team admin invites a member, who accepts with a code and joins the team', 
     // Invitees are provisional members: a participant card flagged "Confirm information".
     const invitee = teamCard(page, w.team).locator('.participant-card', { hasText: 'Ingrid Invitee' });
     await expect(invitee.locator('.role-tag.verify-needed')).toBeVisible();
+    // A teammate who already confirmed is not flagged (the participant roster used to drop the flag).
+    const confirmed = teamCard(page, w.team).locator('.participant-card', { hasText: 'Mats Member' });
+    await expect(confirmed).toBeVisible();
+    await expect(confirmed.locator('.role-tag.verify-needed')).toHaveCount(0);
 
     const mail = await harness.waitForMail('ingrid.invitee@e2e.test');
     const link = mail.html.match(/https?:\/\/[^"'\s]+\/accept-invitation\.html\?invite=[0-9a-fA-F-]{36}/);

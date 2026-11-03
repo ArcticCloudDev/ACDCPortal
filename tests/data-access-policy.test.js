@@ -21,13 +21,15 @@ const DATA = {
             id: 'p-teammate', userId: 'user-2', email: 'teammate@example.com', eventId: 'event-1',
             teamId: 'team-1', isTeamAdmin: false, roles: ['participant'],
             teamMemberships: [{ teamId: 'team-1', isAdmin: false, isParticipant: true }],
-            hotelNights: { 'thu-sun': true }
+            hotelNights: { 'thu-sun': true },
+            profileVerification: true
         },
         {
             id: 'p-stranger', userId: 'user-3', email: 'stranger@example.com', eventId: 'event-1',
             teamId: 'team-2', isTeamAdmin: false, roles: ['participant'],
             teamMemberships: [{ teamId: 'team-2', isAdmin: false, isParticipant: true }],
-            hotelNights: { 'sun-mon': true }
+            hotelNights: { 'sun-mon': true },
+            profileVerification: false
         }
     ],
     events: [{ id: 'event-1', name: 'Test Event', status: 'live' }],
@@ -144,6 +146,8 @@ function endpoint(name) {
     const stranger = rows.find(r => r.id === 'p-stranger');
     assert.ok(teammate.hotelNights, 'same-team hotel data stays available for team management');
     assert.equal(stranger.hotelNights, undefined, 'other teams\' hotel data must be hidden');
+    assert.equal(teammate.profileVerification, true, 'teammates see whether a member confirmed their details');
+    assert.equal(stranger.profileVerification, undefined, 'other teams\' confirmation state stays hidden');
     res = await byEvent(request(ADMIN, { params: { eventId: 'event-1' } }), ctx());
     assert.ok(res.jsonBody.every(r => r.email !== undefined), 'admin keeps full records');
 

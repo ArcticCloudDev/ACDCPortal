@@ -1023,7 +1023,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="roles">
                     ${membership.isAdmin ? '<span class="role-tag admin badge badge-accent">Admin</span>' : ''}
                     ${membership.isParticipant ? '<span class="role-tag participant badge">Participant</span>' : ''}
-                    ${!participation.profileVerification ? `<span class="role-tag verify-needed badge badge-warning" title="Confirm your information to continue">${icon('circle-alert', 'icon-sm')}Confirm information</span>` : ''}
+                    ${participation.profileVerification === false ? `<span class="role-tag verify-needed badge badge-warning" title="Confirm your information to continue">${icon('circle-alert', 'icon-sm')}Confirm information</span>` : ''}
                 </div>
                 <div class="participant-details">
                     <div class="detail-row email">${icon('mail')}<span>${escapeHtml(user.email)}</span></div>
