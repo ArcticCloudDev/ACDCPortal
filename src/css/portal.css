@@ -228,10 +228,11 @@
     margin-top: var(--space-6);
 }
 
-/* Interest leads see only the "ready to join?" card, not the confirmation panel */
-.role-confirmed-section.interest { max-width: 720px; padding: 0; text-align: left; background: none; border: 0; box-shadow: none; }
-.role-confirmed-section.interest > :is(.role-icon, h2, p, .role-badge, .role-details) { display: none; }
-.role-confirmed-section.interest .role-actions { margin-top: 0; }
+/* Interest leads: while registration is open (.can-join) they see only the "ready to join?" card;
+   before and after registration they see the confirmation panel. They never have role actions. */
+.role-confirmed-section.interest.can-join { max-width: 720px; padding: 0; text-align: left; background: none; border: 0; box-shadow: none; }
+.role-confirmed-section.interest.can-join > :is(.role-icon, h2, p, .role-badge, .role-details) { display: none; }
+.role-confirmed-section.interest .role-actions { display: none; }
 
 /* Icon circles: panel icons, call-to-action tiles, placeholder tiles */
 .event-panel-icon,
@@ -762,3 +763,355 @@ button.interest-cta-btn:hover { border-color: var(--color-accent); box-shadow: v
     .badge-modal { align-items: flex-end; padding: 0; }
     .badge-modal-dialog { max-height: 92vh; border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
 }
+
+/* Page: auth flows (register, accept-invitation, complete-registration) ---- */
+/* Top bar from site-header.js, then one narrow centred column: title, step bar, one card per
+   step with one primary action. Phone first: 48px inputs and buttons, nothing wider than 375px. */
+.page-auth {
+    background:
+        radial-gradient(60rem 22rem at 50% -6rem, color-mix(in srgb, var(--color-accent-bright) 16%, transparent), transparent 70%) no-repeat,
+        var(--color-bg);
+}
+
+.auth-main {
+    width: 100%;
+    max-width: calc(30rem + 2 * var(--space-5));
+    margin: 0 auto;
+    padding: var(--space-10) var(--space-5) var(--space-4);
+}
+
+.auth-intro {
+    margin-bottom: var(--space-6);
+    text-align: center;
+}
+
+.auth-intro h1 { font-size: var(--text-3xl); }
+.auth-intro .auth-lead { margin-top: var(--space-2); color: var(--color-text-muted); }
+
+/* Step bar: ol.progress-steps.auth-progress > li.progress-step (.active / .completed / .hidden).
+   Numbers come from a CSS counter, so a step hidden for this visitor is not counted. */
+.auth-progress {
+    --step-size: 2rem;
+    --step-gap: var(--space-2);
+    list-style: none;
+    align-items: flex-start;
+    max-width: 22rem;
+    margin: 0 auto var(--space-6);
+    padding: 0;
+    counter-reset: step;
+}
+
+.auth-progress .progress-step {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    counter-increment: step;
+    text-align: center;
+}
+
+.auth-progress .progress-step + .progress-step::before {
+    content: '';
+    position: absolute;
+    top: calc(var(--step-size) / 2 - 1px);
+    left: calc(-50% + var(--step-size) / 2 + var(--step-gap));
+    right: calc(50% + var(--step-size) / 2 + var(--step-gap));
+    height: 2px;
+    border-radius: var(--radius-full);
+    background: var(--color-border-strong);
+}
+
+.auth-progress .progress-step:is(.active, .completed)::before { background: var(--color-accent); }
+.auth-progress .step-circle { width: var(--step-size); height: var(--step-size); }
+.auth-progress .step-num::before { content: counter(step); }
+.auth-progress .step-check { display: none; width: 1rem; height: 1rem; stroke-width: 3; }
+.auth-progress .progress-step.completed .step-num { display: none; }
+.auth-progress .progress-step.completed .step-check { display: block; }
+.auth-progress .progress-step.active .step-label { color: var(--color-text); }
+
+/* Step cards */
+.auth-card {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+    box-shadow: var(--shadow-sm);
+}
+
+.auth-card.hidden { display: none; }
+.auth-card h2 { font-size: var(--text-xl); margin-bottom: var(--space-2); }
+
+.auth-card-lead {
+    margin-bottom: var(--space-6);
+    color: var(--color-text-muted);
+}
+
+.auth-email { color: var(--color-text); overflow-wrap: anywhere; }
+
+.auth-eyebrow {
+    margin-bottom: var(--space-1);
+    color: var(--color-accent-text);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+}
+
+.auth-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-start;
+    width: 48px;
+    height: 48px;
+    margin-bottom: var(--space-4);
+    border-radius: 50%;
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-text);
+}
+
+.auth-card-icon .icon { width: 1.5rem; height: 1.5rem; }
+
+/* Comfortable phone targets; 16px text keeps iOS from zooming into the field. */
+.page-auth .form-group :is(input:not([type="checkbox"]):not([type="radio"]), select) { min-height: 48px; }
+.page-auth .form-group .checkbox-label input[type="checkbox"] { min-height: 0; padding: 0; flex-shrink: 0; }
+.page-auth .code-input { text-indent: 0.5em; }
+
+/* Field groups: a quiet label instead of a second box inside the card */
+.auth-fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+    padding: 0;
+    border: 0;
+}
+
+.auth-fieldset legend {
+    margin-bottom: var(--space-3);
+    padding: 0;
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* Text-style actions that are real buttons (resend code, use a different email) */
+.link-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    align-self: flex-start;
+    min-height: 36px;
+    padding: var(--space-1) 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent-text);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+.link-button:hover { color: var(--color-accent-hover); }
+.link-button:disabled { color: var(--color-text-muted); text-decoration: none; cursor: default; }
+
+.auth-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin-top: var(--space-5);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+}
+
+.auth-hint .icon { margin-top: 0.15em; color: var(--color-accent-text); }
+
+.auth-card-footer {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+}
+
+.auth-links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); margin-top: var(--space-1); }
+.auth-card-after { margin-top: var(--space-4); }
+.page-auth .recaptcha-notice { margin-top: 0; }
+
+/* Neutral note inside a step (not a status) */
+.auth-note {
+    margin-top: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-muted);
+    font-size: var(--text-sm);
+}
+
+.auth-note p { margin-top: var(--space-1); color: var(--color-text-muted); }
+
+/* Waiting, done and failed states: centred, icon or spinner on top */
+.auth-status {
+    align-items: center;
+    gap: var(--space-3);
+    padding-block: var(--space-10);
+    text-align: center;
+}
+
+.auth-status h2 { margin: 0; }
+.auth-status p { max-width: 36ch; color: var(--color-text-muted); }
+.auth-status .btn { margin-top: var(--space-3); }
+.auth-status .error-message { text-align: left; }
+.auth-status:has(.error-message:not(.hidden)) .spinner { display: none; }
+
+.auth-status-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-text);
+}
+
+.auth-status-icon .icon { width: 1.75rem; height: 1.75rem; }
+.auth-status-icon.is-success { background: var(--color-success-subtle); color: var(--color-success-text); }
+.auth-status-icon.is-danger { background: var(--color-danger-subtle); color: var(--color-danger-text); }
+
+.spinner-sm { width: 16px; height: 16px; border-width: 2px; }
+
+/* Register: hotel nights as tappable rows (check-in day to check-out day) */
+.hotel-night-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.hotel-night-option { min-height: 48px; }
+.hotel-night-option:has(input:checked) { background: var(--color-accent-subtle); border-color: var(--color-accent); }
+.hotel-night-option.is-locked,
+.hotel-night-option.is-locked input { cursor: default; }
+.hotel-night-dates { flex: 1; min-width: 0; font-weight: var(--weight-medium); }
+
+.hotel-step-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+    color: var(--color-text);
+    font-weight: var(--weight-semibold);
+}
+
+.hotel-step-summary .icon { color: var(--color-accent-text); }
+#step-hotel .btn-full { margin-top: var(--space-5); }
+#step-hotel .error-message { margin-top: var(--space-4); }
+
+@media (max-width: 480px) {
+    .auth-main { padding: var(--space-6) var(--space-4) var(--space-2); }
+    .auth-intro { margin-bottom: var(--space-5); }
+    .auth-intro h1 { font-size: var(--text-2xl); }
+    .auth-progress { margin-bottom: var(--space-5); }
+}
+
+/* Page: accept-invitation ------------------------------------------------- */
+/* The invitation reads as one sentence: "You've been invited / to join the team / Power Rangers /
+   for ACDC 2027", with the role icon on top and the accept button inside the card. */
+.invite-card {
+    align-items: center;
+    padding-top: var(--space-8);
+    text-align: center;
+}
+
+.invite-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    margin-bottom: var(--space-4);
+    border-radius: 50%;
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-text);
+}
+
+.invite-icon .icon { width: 1.75rem; height: 1.75rem; }
+
+.invite-kicker {
+    margin-bottom: var(--space-1);
+    color: var(--color-accent-text);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+}
+
+.invite-card h1 { font-size: var(--text-2xl); }
+.invite-card .invite-detail { color: var(--color-text-muted); }
+.invite-card #invite-detail-line { margin-top: var(--space-2); }
+
+.invite-card .invite-event {
+    margin-top: var(--space-1);
+    color: var(--color-text);
+    font-size: var(--text-xl);
+    font-weight: var(--weight-bold);
+    overflow-wrap: anywhere;
+}
+
+.invite-card .invite-meta { justify-content: center; margin-top: var(--space-4); }
+.invite-card .invite-meta .meta-item { overflow-wrap: anywhere; }
+
+.invite-footnotes {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-1) var(--space-4);
+    margin-top: var(--space-4);
+    color: var(--color-text-subtle);
+    font-size: var(--text-sm);
+}
+
+.invite-footnotes:not(:has(p:not(.hidden))) { display: none; }
+.invite-card .btn-full { margin-top: var(--space-6); }
+
+.auth-status-note {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+}
+
+/* Page: complete-registration -------------------------------------------- */
+/* A pending invitation shows above the form; its link leads back to the invitation page,
+   where the invitation is actually accepted. */
+.invite-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+    padding: var(--space-4);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+    border-radius: var(--radius-md);
+    background: var(--color-accent-subtle);
+    font-size: var(--text-sm);
+}
+
+.invite-banner-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--color-accent-text);
+}
+
+.invite-banner-icon .icon { width: 1.25rem; height: 1.25rem; }
+.invite-banner-title { color: var(--color-text); font-weight: var(--weight-semibold); }
+.invite-banner #invitation-details { margin-top: var(--space-1); color: var(--color-text); }
+.invite-banner-helper { margin-top: var(--space-2); color: var(--color-text-muted); }
+.invite-banner-helper a { color: var(--color-accent-text); font-weight: var(--weight-semibold); }
+
+/* Page: event (leftovers) ------------------------------------------------- */
+/* event-page.js marks #site-header.inactive for draft, pre-registration and completed events
+   (registration not open). The title steps back; the status chip in the facts band says why. */
+#site-header.inactive .page-hero h1 { color: var(--color-text-muted); }
+
+/* "An invitation is already pending" in the add-member dialog: a choice, not an error */
+.error-message.is-warning {
+    background: var(--color-warning-subtle);
+    color: var(--color-warning-text);
+    border-color: color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+
+.resend-option { display: flex; flex-direction: column; gap: var(--space-3); }
+.resend-option-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }

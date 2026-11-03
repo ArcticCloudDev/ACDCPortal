@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const wakeTimer = setTimeout(() => {
         if (loadingDiv.classList.contains('hidden')) return;
         if (!loadingDiv.querySelector('.loader-wake')) {
-            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span><div class="wake-title">Waking up the Arctic Database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up...</div></div>');
+            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span><div class="wake-title">Waking up the Arctic database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up…</div></div>');
         }
     }, 1200);
     const registrationCard = document.getElementById('registration-card');
@@ -82,55 +82,52 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadingDiv.replaceChildren();
         const message = document.createElement('p');
         message.className = 'error-message';
-        message.textContent = `Error: ${error.message || 'Could not load your registration.'}`;
+        message.textContent = `Could not load your profile: ${error.message || 'unknown error'}. Reload the page to try again.`;
         const back = document.createElement('a');
         back.href = '/events.html';
         back.className = 'btn btn-primary';
-        back.textContent = 'Back to Events';
+        back.textContent = 'Back to events';
         loadingDiv.append(message, back);
     }
 
     // Everything in the banner is data from the API (inviter, team, event names), rendered as text.
+    // Saving this form does not accept the invitation, so the banner links back to it.
     function showInvitationBanner(invitation) {
         const banner = document.getElementById('invitation-banner');
+        const iconEl = document.getElementById('invitation-icon');
         const titleEl = document.getElementById('invitation-title');
         const detailsEl = document.getElementById('invitation-details');
         const helperEl = document.getElementById('invitation-helper');
 
         const eventName = invitation.eventName || 'the event';
-        const strong = (text, color) => {
+        const strong = (text) => {
             const el = document.createElement('strong');
             el.textContent = text;
-            if (color) el.style.color = color;
             return el;
         };
 
         detailsEl.replaceChildren();
         if (invitation.role === 'judge') {
-            banner.style.background = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
-            banner.style.borderLeft = '4px solid #d97706';
-            titleEl.style.color = '#92400e';
-            titleEl.textContent = '⚖️ Judge Invitation';
-            detailsEl.append(strong(invitation.inviterName || 'An event organizer'), ' invited you to serve as a ',
-                strong('Judge', '#92400e'), ' for ', strong(eventName, '#92400e'));
-            helperEl.textContent = 'Complete your profile below to accept the judge invitation.';
+            iconEl.innerHTML = icon('scale');
+            titleEl.textContent = 'Judge invitation';
+            detailsEl.append(strong(invitation.inviterName || 'An event organizer'), ' invited you to be a judge at ',
+                strong(eventName), '.');
         } else if (invitation.role === 'committee') {
-            banner.style.background = 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)';
-            banner.style.borderLeft = '4px solid #2563eb';
-            titleEl.style.color = '#1e40af';
-            titleEl.textContent = '🏛️ Committee Invitation';
-            detailsEl.append(strong(invitation.inviterName || 'An event organizer'), ' invited you to join the ',
-                strong('Committee', '#1e40af'), ' for ', strong(eventName, '#1e40af'));
-            helperEl.textContent = 'Complete your profile below to accept the committee invitation.';
+            iconEl.innerHTML = icon('landmark');
+            titleEl.textContent = 'Committee invitation';
+            detailsEl.append(strong(invitation.inviterName || 'An event organizer'), ' invited you to join the committee for ',
+                strong(eventName), '.');
         } else {
-            banner.style.background = 'linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%)';
-            banner.style.borderLeft = '4px solid #2563eb';
-            titleEl.style.color = '#1e40af';
-            titleEl.textContent = '🎉 You\'ve been invited to join a team!';
+            iconEl.innerHTML = icon('users');
+            titleEl.textContent = 'Team invitation';
             detailsEl.append(strong(invitation.inviterName || 'A team admin'), ' invited you to join team ',
-                strong(invitation.teamName || 'the team', '#1e40af'));
-            helperEl.textContent = 'Complete your profile below to accept the invitation.';
+                strong(invitation.teamName || 'the team'), '.');
         }
+
+        const inviteLink = document.createElement('a');
+        inviteLink.href = `/accept-invitation.html?invite=${encodeURIComponent(invitation.id || sessionStorage.getItem('pendingInvitation') || '')}`;
+        inviteLink.textContent = 'open the invitation';
+        helperEl.replaceChildren('Saving your profile doesn\'t accept the invitation. Afterwards, ', inviteLink, ' to accept it.');
 
         banner.classList.remove('hidden');
     }
@@ -148,7 +145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         if (!formData.firstName || !formData.lastName || !formData.phone) {
-            errorDiv.textContent = 'Please fill in all fields.';
+            errorDiv.textContent = 'Fill in your first name, last name and phone number.';
             errorDiv.classList.remove('hidden');
             return;
         }
@@ -169,7 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.href = redirect;
 
         } catch (error) {
-            errorDiv.textContent = error.message || 'Registration failed. Please try again.';
+            errorDiv.textContent = error.message || 'Could not save your profile. Try again in a moment.';
             errorDiv.classList.remove('hidden');
 
             completeBtn.disabled = false;

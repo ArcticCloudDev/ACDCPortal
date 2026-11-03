@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const wakeTimer = setTimeout(() => {
         if (loadingDiv.classList.contains('hidden')) return;
         if (!loadingDiv.querySelector('.loader-wake')) {
-            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span><div class="wake-title">Waking up the Arctic Database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up...</div></div>');
+            loadingDiv.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span><div class="wake-title">Waking up the Arctic database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up…</div></div>');
         }
     }, 1200);
     const content = document.getElementById('content');
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (eventResult.status === 'rejected') {
             console.error('Error loading event:', eventResult.reason);
             loadingDiv.innerHTML = `<p class="error-message">Event not found</p>
-                                   <a href="events.html" class="btn btn-primary">Back to Events</a>`;
+                                   <a href="events.html" class="btn btn-primary">Back to events</a>`;
             return;
         }
         currentEvent = eventResult.value;
@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.error('Error loading page:', error);
         loadingDiv.innerHTML = `<p class="error-message">Error loading: ${escapeHtml(error.message)}</p>
-                               <a href="events.html" class="btn btn-primary">Back to Events</a>`;
+                               <a href="events.html" class="btn btn-primary">Back to events</a>`;
     }
 
     // Teams, roster, badges and claims are independent: load them together.
@@ -216,10 +216,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             : currentEvent.name;
 
         const status = currentEvent.status || 'draft';
-        let statusText = 'Coming Soon';
+        let statusText = 'Coming soon';
         if (status === 'live') statusText = 'Live';
-        else if (status === 'registration') statusText = 'Registration Open';
-        else if (status === 'pre-registration') statusText = 'Pre-Registration';
+        else if (status === 'registration') statusText = 'Registration open';
+        else if (status === 'pre-registration') statusText = 'Pre-registration';
         else if (status === 'completed') statusText = 'Completed';
         // Status colours as on the events list: open = success, upcoming = info, live = violet.
         const statusTone = { 'registration': 'badge-success', 'pre-registration': 'badge-info', 'live': 'badge-violet' }[status] || '';
@@ -283,52 +283,63 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (isJudge) {
                     roleSection.classList.add('judge');
                     document.getElementById('role-confirmed-icon').innerHTML = icon('scale');
-                    document.getElementById('role-confirmed-title').textContent = `You're a Judge for ${currentEvent.name}`;
+                    document.getElementById('role-confirmed-title').textContent = `You're a judge for ${currentEvent.name}`;
                     document.getElementById('role-confirmed-message').textContent =
                         `You've been registered as a judge for this event. We'll notify you when judging details are available.`;
-                    document.getElementById('role-confirmed-badge').textContent = '✓ Judge — Confirmed';
+                    document.getElementById('role-confirmed-badge').innerHTML = `${icon('circle-check', 'icon-sm')}Confirmed as judge`;
                     document.getElementById('role-confirmed-details').innerHTML = eventMeta +
                         `<p class="role-note">We'll be in touch with judging criteria, schedules, and logistics closer to the event.</p>`;
                     const adminLink = document.getElementById('role-admin-link');
                     if (adminLink) {
-                        adminLink.innerHTML = `${icon('scale')}Open Judge Portal`;
+                        adminLink.innerHTML = `${icon('scale')}Open judge portal`;
                         adminLink.classList.remove('hidden');
                     }
                 } else if (isCommittee) {
                     roleSection.classList.add('committee');
                     document.getElementById('role-confirmed-icon').innerHTML = icon('landmark');
-                    document.getElementById('role-confirmed-title').textContent = `You're on the Committee for ${currentEvent.name}`;
+                    document.getElementById('role-confirmed-title').textContent = `You're on the committee for ${currentEvent.name}`;
                     document.getElementById('role-confirmed-message').textContent =
                         `You've been registered as a committee member for this event. We'll notify you as things progress.`;
-                    document.getElementById('role-confirmed-badge').textContent = '✓ Committee Member — Confirmed';
+                    document.getElementById('role-confirmed-badge').innerHTML = `${icon('circle-check', 'icon-sm')}Confirmed committee member`;
                     document.getElementById('role-confirmed-details').innerHTML = eventMeta +
                         `<p class="role-note">You'll receive updates as the event planning progresses.</p>`;
                     const adminLink = document.getElementById('role-admin-link');
                     if (adminLink) {
-                        adminLink.innerHTML = `${icon('landmark')}Open Committee Portal`;
+                        adminLink.innerHTML = `${icon('landmark')}Open committee portal`;
                         adminLink.classList.remove('hidden');
                     }
                 } else if (isInterest) {
                     roleSection.classList.add('interest');
+                    // While registration is open an interest lead sees only the "ready to join?" card
+                    // (.can-join). Otherwise the confirmation panel, worded for the event's status: the
+                    // join buttons would only answer "registration is not open".
+                    const canJoinNow = isRegistrationOpen();
+                    const isOver = status === 'live' || status === 'completed';
+                    roleSection.classList.toggle('can-join', canJoinNow);
                     document.getElementById('role-confirmed-icon').innerHTML = icon('bell');
-                    document.getElementById('role-confirmed-title').textContent = `You've registered interest for ${currentEvent.name}`;
-                    document.getElementById('role-confirmed-message').textContent =
-                        `We'll notify you when registration opens. You'll be among the first to know!`;
-                    document.getElementById('role-confirmed-badge').textContent = '✓ Interest Registered';
+                    document.getElementById('role-confirmed-title').textContent = `You've registered interest in ${currentEvent.name}`;
+                    document.getElementById('role-confirmed-message').textContent = isOver
+                        ? 'Registration for this event has closed.'
+                        : 'We\'ll email you as soon as registration opens.';
+                    document.getElementById('role-confirmed-badge').innerHTML = `${icon('circle-check', 'icon-sm')}Interest registered`;
                     document.getElementById('role-confirmed-details').innerHTML = eventMeta +
-                        `<p class="role-note">Keep an eye on your inbox — we'll send updates as the event takes shape.</p>`;
+                        `<p class="role-note">${isOver
+                            ? 'Thanks for your interest. Keep an eye on the events page for the next one.'
+                            : 'Keep an eye on your inbox: we\'ll send updates as the event takes shape.'}</p>`;
 
-                    const eventStatus = currentEvent.status || 'draft';
-                    if (eventStatus === 'registration' || eventStatus === 'pre-registration' || currentEvent.registrationOpen) {
+                    if (canJoinNow) {
                         const upgradeDiv = document.getElementById('interest-upgrade-actions');
                         if (upgradeDiv) upgradeDiv.classList.remove('hidden');
                     }
                 }
 
+                const editBtn = document.getElementById('edit-details-btn');
                 if (isInterest && !isJudge && !isCommittee) {
-                    const editBtn = document.getElementById('edit-details-btn');
                     if (editBtn) editBtn.classList.add('hidden');
                 } else {
+                    // Only organizers can change hotel nights; for judges the hotel tab is read-only.
+                    const canEditHotel = currentEvent.hotelEnabled && (isCommittee || !!currentUser?.isPortalAdmin);
+                    if (editBtn) editBtn.innerHTML = `${icon('pencil')}${canEditHotel ? 'Update my details and hotel' : 'Update my details'}`;
                     updateRoleHotelAlert();
                 }
             }
@@ -420,10 +431,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     btn.disabled = true;
-                    btn.textContent = 'Sending...';
+                    btn.textContent = 'Sending…';
                     try {
                         await API.invitations.resend(btn.dataset.inviteId);
-                        btn.textContent = '✓ Sent';
+                        btn.innerHTML = `${icon('check', 'icon-sm')}Sent`;
                         setTimeout(() => { btn.disabled = false; btn.textContent = 'Resend'; }, 2000);
                     } catch (err) {
                         alert('Failed to resend: ' + err.message);
@@ -634,7 +645,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="participant-head">
                         <span class="avatar avatar-muted pending-icon" aria-hidden="true">${icon('mail')}</span>
                         <div class="participant-ident">
-                            <div class="name">Invitation Sent</div>
+                            <div class="name">Invitation sent</div>
                         </div>
                     </div>
                     <div class="roles">
@@ -658,7 +669,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             emptySlotsHtml = Array(emptyCommittedSlots).fill(`
                 <button type="button" class="empty-slot add-member-slot" data-team-id="${escapeHtml(team.id)}">
                     <span class="add-icon">${icon('user-plus')}</span>
-                    <span class="add-text">Add Member</span>
+                    <span class="add-text">Add member</span>
                 </button>
             `).join('');
         }
@@ -668,7 +679,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             unlockSlotsHtml = `
                 <button type="button" class="unlock-slot" data-team-id="${escapeHtml(team.id)}">
                     <span class="unlock-icon">${icon('lock-open')}</span>
-                    <span class="unlock-text">Unlock 1 more</span>
+                    <span class="unlock-text">Unlock 1 more slot</span>
                 </button>
             `;
         }
@@ -732,7 +743,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         return `
             <div class="team-uploads card">
-                <h3>${icon('folder')}Team Deliverables</h3>
+                <h3>${icon('folder')}Team deliverables</h3>
                 ${filesHtml}
                 <div class="upload-box">
                     <div class="upload-row">
@@ -741,7 +752,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             ${categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
                         </select>
                         <input type="file" id="file-${teamIdAttr}" class="hidden" accept="*/*" aria-label="Choose a file to upload">
-                        <button type="button" class="btn btn-secondary btn-upload" id="upload-btn-${teamIdAttr}" data-team-id="${teamIdAttr}">${icon('upload')}Upload File</button>
+                        <button type="button" class="btn btn-secondary btn-upload" id="upload-btn-${teamIdAttr}" data-team-id="${teamIdAttr}">${icon('upload')}Upload file</button>
                     </div>
                     <div id="upload-progress-${teamIdAttr}" class="upload-progress hidden"></div>
                 </div>
@@ -792,7 +803,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
 
         const categoryOrder = { 'soft': 0, 'low-code': 1, 'pro-code': 2, 'sponsor': 3, 'exclusive': 4 };
-        const categoryLabels = { 'soft': 'Soft Skills', 'low-code': 'Low-Code', 'pro-code': 'Pro-Code', 'sponsor': 'Sponsor', 'exclusive': 'Exclusive' };
+        const categoryLabels = { 'soft': 'Soft skills', 'low-code': 'Low-code', 'pro-code': 'Pro-code', 'sponsor': 'Sponsor', 'exclusive': 'Exclusive' };
         const categoryIcons = { 'soft': 'handshake', 'low-code': 'zap', 'pro-code': 'laptop', 'sponsor': 'building-2', 'exclusive': 'trophy' };
         const categoryIcon = cat => categoryIcons[cat] ? icon(categoryIcons[cat], 'icon-sm') : '';
 
@@ -913,7 +924,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (claim && claim.status === 'declined') {
                     statusHtml = `<span class="badge-claim-status rejected badge badge-danger" title="Rejected">Rejected</span>`;
                     if (teamId && isEventLive) {
-                        actionHtml = `<button type="button" class="btn-badge-claim btn btn-small btn-secondary" ${claimAttrs}>Re-claim</button>`;
+                        actionHtml = `<button type="button" class="btn-badge-claim btn btn-small btn-secondary" ${claimAttrs}>Claim again</button>`;
                     }
                 } else if (isExclusive) {
                     statusHtml = `<span class="badge-claim-status exclusive badge badge-outline" title="Exclusive — awarded by judges">${icon('trophy', 'icon-sm')}Exclusive</span>`;
@@ -931,13 +942,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const awardedTeam = eventTeams.find(t => sameId(t.id, claim.teamId));
                     assignedHtml = `<span class="badge-assigned-name">${icon('trophy', 'icon-sm')}${awardedTeam ? escapeHtml(awardedTeam.teamName) : 'Unknown team'}</span>`;
                 } else if (isExclusive) {
-                    assignedHtml = `<span class="badge-assigned-name is-awaiting">Awaiting award...</span>`;
+                    assignedHtml = `<span class="badge-assigned-name is-awaiting">Awaiting award…</span>`;
                 } else if (!isExclusive && teamId) {
                     const isApproved = claim && claim.status === 'approved';
                     assignedHtml = `
                         <select class="badge-assign-select" data-eb-id="${escapeHtml(eventBadge.id)}" data-team-id="${escapeHtml(teamId)}"
                                 title="Assign team member" aria-label="Assign team member"${isApproved ? ' disabled' : ''}>
-                            <option value="">— assign —</option>
+                            <option value="">Assign to…</option>
                             ${memberOptions.map(m =>
                                 `<option value="${escapeHtml(m.userId)}" ${sameId(m.userId, assignedUserId) ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
                             ).join('')}
@@ -1028,6 +1039,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const form = document.getElementById('edit-participant-form');
         const rolesTab = document.getElementById('tab-roles-btn');
         profileConfirmationRequired = requireConfirmation;
+        document.getElementById('edit-participant-heading').textContent = requireConfirmation ? 'Confirm your details' : 'Edit details';
 
         // Never show the previous session's error or "Saved!" message.
         document.getElementById('edit-participant-error').classList.add('hidden');
@@ -1101,12 +1113,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="hotel-urgency-alert">
                         <div class="alert-icon">${icon('bed-double')}</div>
                         <div class="alert-body">
-                            <div class="alert-title">Hotel Booking Needed!</div>
+                            <div class="alert-title">Hotel booking needed</div>
                             <div class="alert-message">
-                                Please select your hotel nights as soon as possible so we can finalize room reservations.
-                                Rooms fill up quickly — don't miss out!
+                                Select your hotel nights soon so we can confirm the room reservations. Rooms fill up quickly.
                             </div>
-                            <button type="button" id="role-hotel-select-btn" class="btn btn-secondary btn-small">${icon('moon', 'icon-sm')}Select Hotel Nights Now</button>
+                            <button type="button" id="role-hotel-select-btn" class="btn btn-secondary btn-small">${icon('moon', 'icon-sm')}Select hotel nights</button>
                         </div>
                     </div>
                 `;
@@ -1116,8 +1127,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="hotel-urgency-alert is-info">
                         <div class="alert-icon">${icon('bed-double')}</div>
                         <div class="alert-body">
-                            <div class="alert-title">Hotel Not Yet Assigned</div>
-                            <div class="alert-message">Your hotel nights will be arranged by the event organizers. No action needed.</div>
+                            <div class="alert-title">Hotel not assigned yet</div>
+                            <div class="alert-message">The organizers arrange your hotel nights. No action needed.</div>
                         </div>
                     </div>
                 `;
@@ -1141,6 +1152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('tab-personal').classList.add('active');
 
         document.getElementById('tab-roles-btn').classList.add('hidden');
+        document.getElementById('edit-participant-heading').textContent = 'Update your details';
 
         const hotelTabBtn = document.getElementById('tab-hotel-btn');
         if (currentEvent.hotelEnabled) {
@@ -1292,7 +1304,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Awarding...';
+        submitBtn.textContent = 'Awarding…';
         errorDiv.classList.add('hidden');
 
         try {
@@ -1314,7 +1326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             errorDiv.classList.remove('hidden');
         } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Award Badge';
+            submitBtn.textContent = 'Award badge';
         }
     }
 
@@ -1326,19 +1338,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         const submitBtn = document.getElementById('badge-claim-submit-btn');
 
         if (!blogUrl) {
-            errorDiv.textContent = 'Please enter a blog post URL.';
+            errorDiv.textContent = 'Enter the link to your blog post.';
             errorDiv.classList.remove('hidden');
             return;
         }
 
         if (!safeHttpUrl(blogUrl)) {
-            errorDiv.textContent = 'Please enter a valid URL (e.g. https://acdc.blog/...).';
+            errorDiv.textContent = 'Enter a valid URL, for example https://acdc.blog/your-team/post.';
             errorDiv.classList.remove('hidden');
             return;
         }
 
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving...';
+        submitBtn.textContent = 'Submitting…';
         errorDiv.classList.add('hidden');
 
         try {
@@ -1361,7 +1373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             errorDiv.classList.remove('hidden');
         } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Save Claim';
+            submitBtn.textContent = 'Submit claim';
         }
     }
 
@@ -1514,8 +1526,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.querySelector('.modal-tab[data-tab="tab-personal"]').classList.add('active');
             document.getElementById('tab-personal').classList.add('active');
             const missing = [];
-            if (!userData.firstName) missing.push('First Name');
-            if (!userData.lastName)  missing.push('Last Name');
+            if (!userData.firstName) missing.push('First name');
+            if (!userData.lastName)  missing.push('Last name');
             if (!userData.phone)     missing.push('Phone');
             errorDiv.textContent = `${missing.join(', ')} ${missing.length > 1 ? 'are' : 'is'} required.`;
             errorDiv.classList.remove('hidden');
@@ -1698,7 +1710,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (error.existingInvitationId && error.canResend) {
                 showResendOption(email, error.existingInvitationId, errorDiv, successDiv);
             } else {
-                errorDiv.textContent = error.message || 'Could not send invitation.';
+                errorDiv.textContent = error.message || 'Could not add the team member.';
+                errorDiv.classList.remove('is-warning');
                 errorDiv.classList.remove('hidden');
             }
         } finally {
@@ -1711,18 +1724,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     function showResendOption(email, invitationId, errorDiv, successDiv) {
         errorDiv.replaceChildren();
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'display: flex; flex-direction: column; gap: var(--space-3);';
+        wrap.className = 'resend-option';
         const message = document.createElement('div');
         message.append('An invitation is already pending for ');
         const strong = document.createElement('strong');
         strong.textContent = email;
         message.appendChild(strong);
         const actions = document.createElement('div');
-        actions.style.cssText = 'display: flex; gap: var(--space-2);';
+        actions.className = 'resend-option-actions';
         const resendBtn = document.createElement('button');
         resendBtn.type = 'button';
         resendBtn.className = 'btn btn-small btn-secondary';
-        resendBtn.textContent = 'Resend Invitation';
+        resendBtn.textContent = 'Resend invitation';
         resendBtn.addEventListener('click', () => resendExistingInvitation(invitationId));
         const dismissBtn = document.createElement('button');
         dismissBtn.type = 'button';
@@ -1733,9 +1746,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         wrap.append(message, actions);
         errorDiv.appendChild(wrap);
         errorDiv.classList.remove('hidden');
-        errorDiv.style.background = 'var(--color-warning-subtle)';
-        errorDiv.style.color = 'var(--color-warning-text)';
-        errorDiv.style.borderColor = 'color-mix(in srgb, var(--color-warning) 30%, transparent)';
+        // Not an error: a choice. Shown in warning colours (needs attention).
+        errorDiv.classList.add('is-warning');
     }
 
     async function resendExistingInvitation(invitationId) {
@@ -1746,11 +1758,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             await API.invitations.resend(invitationId);
 
             errorDiv.classList.add('hidden');
-            errorDiv.style.background = '';
-            errorDiv.style.color = '';
-            errorDiv.style.borderColor = '';
+            errorDiv.classList.remove('is-warning');
 
-            successDiv.textContent = 'Invitation resent successfully!';
+            successDiv.textContent = 'Invitation sent again.';
             successDiv.classList.remove('hidden');
 
             document.getElementById('invite-email').value = '';
@@ -1760,10 +1770,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, 1500);
         } catch (error) {
             errorDiv.innerHTML = '';
-            errorDiv.textContent = 'Failed to resend: ' + (error.message || 'Unknown error');
-            errorDiv.style.background = '';
-            errorDiv.style.color = '';
-            errorDiv.style.borderColor = '';
+            errorDiv.textContent = 'Could not resend the invitation: ' + (error.message || 'unknown error');
+            errorDiv.classList.remove('is-warning');
         }
     }
 
@@ -1777,7 +1785,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const adminActions = document.getElementById('team-admin-actions');
 
         title.textContent = team.teamName;
-        membersList.innerHTML = '<p>Loading members...</p>';
+        membersList.innerHTML = '<p>Loading members…</p>';
 
         modal.classList.add('active');
 
@@ -1843,7 +1851,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (pendingInvitations.length > 0) {
                 html += `<div class="pending-invitations-section member-section">
-                    <p class="member-section-title">Pending Invitations</p>
+                    <p class="member-section-title">Pending invitations</p>
                 `;
                 html += pendingInvitations.map(inv => {
                     const sentDate = new Date(inv.createdAt).toLocaleDateString();
@@ -1873,7 +1881,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (isTeamAdmin && remainingSpots > 0) {
                 html += `<div class="empty-spots-section member-section">
-                    <p class="member-section-title">Available Spots (${remainingSpots})</p>
+                    <p class="member-section-title">Available spots (${remainingSpots})</p>
                 `;
                 for (let i = 0; i < remainingSpots; i++) {
                     html += `
@@ -1881,7 +1889,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <div class="member-info">
                                 <span class="avatar avatar-muted" aria-hidden="true">${icon('user')}</span>
                                 <div>
-                                    <div class="name member-name">Empty Spot</div>
+                                    <div class="name member-name">Empty spot</div>
                                     <div class="email member-email">Invite a team member</div>
                                 </div>
                             </div>
@@ -1954,7 +1962,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Admin-written terms are shown as text; line breaks survive through `white-space: pre-line`.
     function renderTerms(el, terms) {
         el.textContent = terms || '';
-        el.style.whiteSpace = 'pre-line';
     }
 
     function setupModals() {
@@ -1996,7 +2003,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const select = document.getElementById('expectedParticipants');
             const min = currentEvent.minTeamSize || 3;
             const max = currentEvent.maxTeamSize || 5;
-            select.innerHTML = '<option value="">Select...</option>';
+            select.innerHTML = '<option value="">Select…</option>';
             for (let i = min; i <= max; i++) {
                 const opt = document.createElement('option');
                 opt.value = i;
@@ -2032,10 +2039,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const terms = currentEvent.teamRegistrationTerms;
             if (terms) {
                 renderTerms(termsDisplay, terms);
-                termsDisplay.style.display = '';
+                termsDisplay.classList.remove('hidden');
                 ackLabel.textContent = 'I have read and agree to the terms above';
             } else {
-                termsDisplay.style.display = 'none';
+                termsDisplay.classList.add('hidden');
                 ackLabel.textContent = 'I confirm I want to create this team';
             }
 

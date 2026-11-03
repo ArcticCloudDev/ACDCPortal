@@ -27,13 +27,13 @@ test('each status gets the right card and calls to action', async ({ page, harne
     expect((await page.locator('.event-card h3').allInnerTexts()).sort()).toEqual(['Open Event', 'Soon Event']);
 
     const soon = card(page, 'Soon Event');
-    await expect(soon.locator('.status-badge')).toContainText('Coming Soon');
-    await expect(soon.locator('a.btn-event.interest-only')).toHaveText('Register Interest');
+    await expect(soon.locator('.status-badge')).toContainText('Coming soon');
+    await expect(soon.locator('a.btn-event.interest-only')).toHaveText('Register interest');
 
     const open = card(page, 'Open Event');
-    await expect(open.locator('.status-badge')).toContainText('Registration Open');
-    await expect(open.locator('a.btn-event.primary')).toHaveText('Register Team');
-    await expect(open.locator('a.btn-event.secondary')).toHaveText('Register Interest');
+    await expect(open.locator('.status-badge')).toContainText('Registration open');
+    await expect(open.locator('a.btn-event.primary')).toHaveText('Register a team');
+    await expect(open.locator('a.btn-event.secondary')).toHaveText('Register interest');
 });
 
 test('no open events shows the empty state', async ({ page, harness }) => {
@@ -48,7 +48,7 @@ test('a signed-in team member sees their status and can open the event', async (
     await loginAs(w.member);
     await page.goto('/events.html');
     const c = card(page, 'ACDC 2027');
-    await expect(c.locator('.my-status-pill.team')).toHaveText('Team Registered');
+    await expect(c.locator('.my-status-pill.team')).toHaveText('Team registered');
     await c.locator('a.btn-event.primary', { hasText: 'Open' }).click();
     await expect(page).toHaveURL(new RegExp(`/event\\.html\\?id=${w.event.id}`));
 });
@@ -58,7 +58,7 @@ test('"Register Team" while signed in goes straight to team creation', async ({ 
     await harness.seed(w.seed());
     await loginAs(w.loner);
     await page.goto('/events.html');
-    await card(page, 'ACDC 2027').locator('a.btn-event.primary', { hasText: 'Register Team' }).click();
+    await card(page, 'ACDC 2027').locator('a.btn-event.primary', { hasText: 'Register a team' }).click();
     await expect(page.locator('#create-team-modal')).toHaveClass(/active/);
 });
 
@@ -79,7 +79,7 @@ test('BUG: an invited judge can accept the invitation', async ({ page, harness }
 
     await page.goto(`/?invite=${inv.id}`);
     await expect(page).toHaveURL(new RegExp(`/accept-invitation\\.html\\?invite=${inv.id}`));
-    await expect(page.locator('#invite-heading')).toHaveText('Judge Invitation');
+    await expect(page.locator('#invite-heading')).toHaveText("You're invited to judge");
     await expect(page.locator('#invite-team-name')).toHaveText('ACDC 2027');
     await page.locator('#next-to-profile-btn').click();
     await page.locator('#profile-firstName').fill('Jo');
@@ -93,7 +93,7 @@ test('BUG: an invited judge can accept the invitation', async ({ page, harness }
     await expect(page.locator('#step-profile')).toBeVisible();
     await page.locator('#continue-to-verify-btn').click();
 
-    await expect(page.locator('#success-title')).toHaveText('Welcome to the Jury!');
+    await expect(page.locator('#success-title')).toHaveText('Welcome to the jury!');
     await expect.poll(async () => (await rows("SELECT Status FROM Invitations WHERE Email = 'jo.judge@e2e.test'"))[0].Status,  // <- bug
         { timeout: 6000 }).toBe('accepted');
     const [user] = await rows("SELECT * FROM Users WHERE Email = 'jo.judge@e2e.test'");
@@ -101,7 +101,7 @@ test('BUG: an invited judge can accept the invitation', async ({ page, harness }
     const [p] = await rows('SELECT Roles FROM Participations WHERE UserId = @u AND EventId = @e', { u: user.Id, e: w.event.id });
     expect(p.Roles).toContain('judge');
     await expect(page).toHaveURL(new RegExp(`/event\\.html\\?id=${w.event.id}`), { timeout: 10000 });
-    await expect(page.locator('#role-confirmed-badge')).toHaveText('✓ Judge — Confirmed');
+    await expect(page.locator('#role-confirmed-badge')).toHaveText('Confirmed as judge');
 });
 
 test('a visitor sees their status on every open event, not just one', async ({ page, harness, loginAs }) => {

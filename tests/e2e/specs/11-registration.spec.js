@@ -25,7 +25,7 @@ async function verifyOtp(page, harness, email) {
 
 async function registerTeamThroughUi(page, harness, event, email) {
     await page.goto(`/register.html?intent=team&eventId=${event.id}`);
-    await expect(page.locator('#page-subtitle')).toContainText('Register Team');
+    await expect(page.locator('#page-subtitle')).toContainText('Register a team');
     await fillEmail(page, email);
     await page.locator('#firstName').fill('Cora');
     await page.locator('#lastName').fill('Captain');
@@ -98,7 +98,7 @@ test('a newcomer registers interest in a pre-registration event', async ({ page,
     await verifyOtp(page, harness, email);
 
     await expect(page).toHaveURL(new RegExp(`/event\\.html\\?id=${event.id}`));
-    await expect(page.locator('#role-confirmed-badge')).toHaveText('✓ Interest Registered');
+    await expect(page.locator('#role-confirmed-badge')).toHaveText('Interest registered');
     const leads = await rows('SELECT * FROM InterestLeads WHERE Email = @e', { e: email });
     expect(leads).toHaveLength(1);
     expect(leads[0]).toMatchObject({ EventId: event.id, Verified: true });

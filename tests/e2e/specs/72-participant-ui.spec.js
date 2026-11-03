@@ -69,7 +69,7 @@ test.describe('strict CSP: participant pages load without violations', () => {
 
         await loginAs(judge);
         await page.goto(`/event.html?id=${w.event.id}`);
-        await expect(page.locator('#role-confirmed-badge')).toHaveText('✓ Judge — Confirmed');
+        await expect(page.locator('#role-confirmed-badge')).toHaveText('Confirmed as judge');
         await expect(page.locator('#role-confirmed-details')).toContainText('Oslo Spektrum');
         await page.locator('#edit-details-btn').click();
         await expect(page.locator('#edit-participant-modal')).toHaveClass(/active/);
@@ -77,11 +77,11 @@ test.describe('strict CSP: participant pages load without violations', () => {
 
         await loginAs(committee);
         await page.goto(`/event.html?id=${w.event.id}`);
-        await expect(page.locator('#role-confirmed-badge')).toHaveText('✓ Committee Member — Confirmed');
+        await expect(page.locator('#role-confirmed-badge')).toHaveText('Confirmed committee member');
 
         await loginAs(lead);
         await page.goto(`/event.html?id=${w.event.id}`);
-        await expect(page.locator('#role-confirmed-badge')).toHaveText('✓ Interest Registered');
+        await expect(page.locator('#role-confirmed-badge')).toHaveText('Interest registered');
         await expect(page.locator('#interest-upgrade-actions')).toBeVisible();
         expect(participantCsp(context)).toEqual([]);
     });
@@ -115,16 +115,16 @@ test.describe('strict CSP: participant pages load without violations', () => {
         await harness.seed(mergeSeeds(w.seed(), { invitations: [teamInv, judgeInv] }));
 
         await page.goto(`/accept-invitation.html?invite=${teamInv.id}`);
-        await expect(page.locator('#invite-heading')).toHaveText("You've Been Invited!");
+        await expect(page.locator('#invite-heading')).toHaveText("You've been invited");
         await expect(page.locator('#invite-team-name')).toHaveText('Power Rangers');
         await expect(page.locator('#invite-email-hint')).toHaveText('Sent to t***@e2e.test');
         await page.locator('#next-to-profile-btn').click();
         await expect(page.locator('#step-profile')).toBeVisible();
 
         await page.goto(`/accept-invitation.html?invite=${judgeInv.id}`);
-        await expect(page.locator('#invite-heading')).toHaveText('Judge Invitation');
+        await expect(page.locator('#invite-heading')).toHaveText("You're invited to judge");
         await expect(page.locator('#invite-team-name')).toHaveText('ACDC 2027');
-        await expect(page.locator('#next-to-profile-btn')).toContainText('Accept Judge Invitation');
+        await expect(page.locator('#next-to-profile-btn')).toContainText('Accept judge invitation');
         expect(participantCsp(context)).toEqual([]);
     });
 
@@ -306,7 +306,7 @@ test.describe('invitations', () => {
         await expect(page).toHaveURL(new RegExp(`/accept-invitation\\.html\\?invite=${participant.id}$`));
         await page.goto(`/index.html?invite=${committee.id}`);
         await expect(page).toHaveURL(new RegExp(`/accept-invitation\\.html\\?invite=${committee.id}$`));
-        await expect(page.locator('#invite-heading')).toHaveText('Committee Invitation');
+        await expect(page.locator('#invite-heading')).toHaveText("You're invited to the committee");
     });
 
     test('a signed-in user accepts a committee invitation without a second code', async ({ page, harness, loginAs }) => {
@@ -315,15 +315,15 @@ test.describe('invitations', () => {
         await harness.seed(mergeSeeds(w.seed(), { invitations: [inv] }));
         await loginAs(w.loner);
         await page.goto(`/?invite=${inv.id}`);
-        await expect(page.locator('#invite-heading')).toHaveText('Committee Invitation');
+        await expect(page.locator('#invite-heading')).toHaveText("You're invited to the committee");
         await page.locator('#next-to-profile-btn').click();
         await expect(page.locator('#profile-firstName')).toHaveValue('Solo');
         await expect(page.locator('#profile-email')).toHaveValue(w.loner.email);
         await page.locator('#continue-to-verify-btn').click();
-        await expect(page.locator('#success-title')).toHaveText('Welcome to the Committee!');
+        await expect(page.locator('#success-title')).toHaveText('Welcome to the committee!');
         await expect(page.locator('#success-team-name')).toHaveText('ACDC 2027');
         await expect(page).toHaveURL(new RegExp(`/event\\.html\\?id=${w.event.id}`), { timeout: 10000 });
-        await expect(page.locator('#role-confirmed-badge')).toHaveText('✓ Committee Member — Confirmed');
+        await expect(page.locator('#role-confirmed-badge')).toHaveText('Confirmed committee member');
         const [row] = await rows('SELECT Status FROM Invitations WHERE Id = @id', { id: inv.id });
         expect(row.Status).toBe('accepted');
         const [p] = await rows('SELECT Roles FROM Participations WHERE Id = @id', { id: w.participations.loner.id });
@@ -437,7 +437,7 @@ test.describe('register flow', () => {
         const w = buildWorld();
         await harness.seed(w.seed());
         await page.goto('/register.html?intent=team');
-        await expect(page.locator('#page-subtitle')).toHaveText('Sign In');
+        await expect(page.locator('#page-subtitle')).toHaveText('Sign in');
         await loginAs(w.loner);
         await page.goto('/register.html?intent=team');
         await expect(page).toHaveURL(/\/events\.html$/);
@@ -461,7 +461,7 @@ test.describe('event page', () => {
         await harness.seed(w.seed());
         await loginAs(w.member);
         await page.goto(`/event.html?id=${w.event.id}`);
-        await expect(page.locator('#role-confirmed-badge')).toHaveText('✓ Judge — Confirmed');
+        await expect(page.locator('#role-confirmed-badge')).toHaveText('Confirmed as judge');
         await expect(page.locator(`.team-card[data-team-id="${w.team.id}"]`)).toBeVisible();
     });
 
