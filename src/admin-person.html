@@ -1,252 +1,46 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Person Search - ACDC Committee</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <title>Person lookup - ACDC Admin</title>
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <style>        .search-container {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 24px;
-        }
-
-        .search-container input {
-            flex: 1;
-            padding: 10px 14px;
-            border: 1px solid var(--admin-border);
-            border-radius: 8px;
-            font-size: 0.95rem;
-            outline: none;
-            transition: border-color 0.15s;
-        }
-
-        .search-container input:focus {
-            border-color: var(--admin-primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .search-container button {
-            padding: 10px 20px;
-            background: var(--admin-primary);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-
-        .search-container button:hover { background: #2563eb; }
-
-        .person-card {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid var(--admin-border);
-            overflow: hidden;
-            margin-bottom: 24px;
-        }
-
-        .person-header {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 20px 24px;
-            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-            color: white;
-        }
-
-        .person-avatar {
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.15);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.4rem;
-            font-weight: 700;
-            flex-shrink: 0;
-        }
-
-        .person-info h2 {
-            margin: 0;
-            font-size: 1.15rem;
-            font-weight: 600;
-        }
-
-        .person-info .email {
-            color: #94a3b8;
-            font-size: 0.85rem;
-            margin-top: 2px;
-        }
-
-        .person-info .user-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            margin-top: 6px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .person-info .user-status.registered {
-            background: rgba(16, 185, 129, 0.2);
-            color: #6ee7b7;
-        }
-
-        .person-info .user-status.unregistered {
-            background: rgba(245, 158, 11, 0.2);
-            color: #fcd34d;
-        }
-
-        .person-stats {
-            display: flex;
-            gap: 0;
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .person-stat {
-            flex: 1;
-            padding: 14px 20px;
-            text-align: center;
-            border-right: 1px solid var(--admin-border);
-        }
-
-        .person-stat:last-child { border-right: none; }
-        .person-stat .value { font-size: 1.4rem; font-weight: 700; color: var(--admin-sidebar); }
-        .person-stat .label { font-size: 0.7rem; color: var(--admin-text-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
-
-        .timeline { padding: 24px; }
-        .timeline-title {
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--admin-text-muted);
-            margin-bottom: 16px;
-        }
-
-        .timeline-event {
-            display: flex;
-            gap: 16px;
-            padding: 16px 0;
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .timeline-event:last-child { border-bottom: none; }
-
-        .timeline-dot {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #dbeafe;
-            color: #2563eb;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            flex-shrink: 0;
-        }
-
-        .timeline-content { flex: 1; }
-
-        .timeline-content .event-name {
-            font-weight: 600;
-            font-size: 0.95rem;
-            color: var(--admin-sidebar);
-        }
-
-        .timeline-content .event-dates {
-            font-size: 0.8rem;
-            color: var(--admin-text-muted);
-            margin-top: 2px;
-        }
-
-        .timeline-roles {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-top: 8px;
-        }
-
-        .role-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 0.72rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-
-        .role-pill.interest { background: #fef3c7; color: #92400e; }
-        .role-pill.participant { background: #dbeafe; color: #1d4ed8; }
-        .role-pill.judge { background: #ede9fe; color: #6d28d9; }
-        .role-pill.committee { background: #d1fae5; color: #065f46; }
-        .role-pill.sponsor { background: #fce7f3; color: #9d174d; }
-
-        .timeline-meta {
-            display: flex;
-            gap: 16px;
-            margin-top: 8px;
-            font-size: 0.78rem;
-            color: var(--admin-text-muted);
-        }
-
-        .timeline-meta span {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--admin-text-muted);
-        }
-
-        .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
-        .empty-state h3 { color: var(--admin-sidebar); margin: 0 0 6px; font-size: 1rem; }
-        .empty-state p { margin: 0; font-size: 0.85rem; }
-
-        .no-results {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid var(--admin-border);
-            padding: 40px;
-            text-align: center;
-        }
-    </style>
 </head>
-<body>
+<body class="page-person">
     <div class="admin-layout">
         <div id="sidebar-container"></div>
 
         <main class="main-content">
+            <nav class="breadcrumb hidden" id="person-breadcrumb" aria-label="Breadcrumb">
+                <a href="admin-users.html"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#arrow-left"></use></svg>People</a>
+            </nav>
+
             <div class="page-header">
-                <h1 class="page-title">Person Search</h1>
+                <div>
+                    <h1 class="page-title">Person lookup</h1>
+                    <p class="page-subtitle">Look up anyone by email to see their events, roles and teams.</p>
+                </div>
             </div>
 
-            <div class="search-container">
-                <input type="email" id="search-email" placeholder="Enter email address..." 
-                       autocomplete="off" spellcheck="false">
-                <button type="button" id="search-btn">🔍 Search</button>
+            <div class="toolbar person-search" role="search">
+                <div class="search-field">
+                    <svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#search"></use></svg>
+                    <label for="search-email" class="visually-hidden">Email address</label>
+                    <input type="email" id="search-email" placeholder="name@example.com"
+                           autocomplete="off" spellcheck="false">
+                </div>
+                <button type="button" class="btn btn-primary" id="search-btn">Look up</button>
             </div>
 
             <div id="results-container">
-                <div class="empty-state">
-                    <div class="icon">🔍</div>
-                    <h3>Search for a person</h3>
-                    <p>Enter an email address to see their participation history across all events</p>
+                <div class="panel">
+                    <div class="empty-state">
+                        <span class="empty-state-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#user-round"></use></svg></span>
+                        <h2 class="empty-state-title">Look up a person</h2>
+                        <p>Enter an email address to see their history across all events.</p>
+                    </div>
                 </div>
             </div>
         </main>

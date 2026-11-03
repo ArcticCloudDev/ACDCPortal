@@ -171,3 +171,18 @@ Headings use `--weight-bold` and slight negative letter spacing.
   reached out = neutral, negotiating = warning, confirmed = success, declined = danger; interest lead joined = success,
   in solo queue = info, interest only = neutral. Budget: income amounts in success text, expenses stay neutral (an
   expense is not an error); only a negative net balance uses danger.
+- 2026-11-03: People (`admin-users`), person lookup (`admin-person`) and badges (`admin-badges`) migrated; they opt in
+  to dark mode. Their sections in `admin-styles.css` are scoped by a body class (`page-people`, `page-person`,
+  `page-badges`) so page sections written in parallel cannot collide; new reusable classes are marked "candidate shared".
+- 2026-11-03: Admin role badges: committee and judge = accent (staff), pending invitation = warning, participant /
+  interest / sponsor = neutral; a Lucide icon tells the roles apart. Badge categories are labels, not statuses: neutral
+  badge + icon (soft code `handshake`, low code `zap`, pro code `laptop`, sponsor `building-2`). Claim status: pending =
+  warning, approved / awarded = success, declined = danger. Account status: registered = success dot, none = neutral.
+- 2026-11-03: Filters that show counts are `.pill-group` pills (people roles, badge categories), not clickable stat
+  cards. Stat cards are for read-only numbers (`.stats-row.compact` puts them two per row on phones).
+- 2026-11-03: On phones, list tables do not scroll sideways where people act on them: the people list becomes two-line
+  items, badge claims and exclusive awards become labelled cards (`.data-table.stack-sm`, cells carry `data-label`) with
+  full-width actions, so judges can review and award at 375px. Detail panels are a right-hand `.drawer`, full width on phones.
+- 2026-11-03: Admin links stay in the admin area: event names go to `admin-events.html?event=`, teams to
+  `admin-teams.html?team=`, people to `admin-person.html?email=`. Claim evidence that is an http(s) URL is a link that
+  opens the team's post in a new tab (`safeHttpUrl`, `rel="noopener noreferrer"`).

@@ -9,11 +9,12 @@ let currentPermissions = null;
 let allClaimsEventBadges = [];
 let allJudgeUsers = [];
 
+// Categories are labels, not statuses: they get a Lucide icon and neutral styling.
 const CATEGORIES = {
-    'soft': { label: 'Soft Code', emoji: '🟦', icon: '🤝' },
-    'low-code': { label: 'Low Code', emoji: '🟩', icon: '⚡' },
-    'pro-code': { label: 'Pro Code', emoji: '🟪', icon: '💻' },
-    'sponsor': { label: 'Sponsor', emoji: '🟨', icon: '🏢' }
+    'soft': { label: 'Soft code', icon: 'handshake' },
+    'low-code': { label: 'Low code', icon: 'zap' },
+    'pro-code': { label: 'Pro code', icon: 'laptop' },
+    'sponsor': { label: 'Sponsor', icon: 'building-2' }
 };
 
 const CATEGORY_ORDER = ['soft', 'low-code', 'pro-code', 'sponsor'];
@@ -48,10 +49,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const isJudgeOnly = currentPermissions.highestRole === 'judge';
         if (isJudgeOnly) {
-            document.querySelectorAll('.tab-btn[data-tab="master"], .tab-btn[data-tab="event-badges"]').forEach(t => t.style.display = 'none');
+            document.querySelectorAll('.tab-btn[data-tab="master"], .tab-btn[data-tab="event-badges"]').forEach(t => t.classList.add('hidden'));
             document.getElementById('tab-master')?.classList.remove('active');
             document.querySelector('.tab-btn[data-tab="claims"]').classList.add('active');
             document.getElementById('tab-claims').classList.add('active');
+            document.getElementById('badges-subtitle').textContent = 'Review the badge claims assigned to you and award exclusive badges.';
             renderClaims();
         } else {
             renderBadgeLibrary();
@@ -59,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     } catch (error) {
         console.error('Init error:', error);
-        loadingDiv.textContent = 'Error loading page. Please refresh.';
+        loadingDiv.innerHTML = `<div class="notice notice-danger">${icon('triangle-alert')}<div><div class="notice-title">Could not load badges</div><div class="notice-body">Please refresh the page.</div></div></div>`;
     }
 });
 
@@ -140,7 +142,17 @@ function setupEventListeners() {
         });
     });
 
-    document.getElementById('filter-category').addEventListener('change', renderBadgeLibrary);
+    // Category filter pills: exactly one is active ("All" has an empty category).
+    document.getElementById('filter-category').addEventListener('click', (e) => {
+        const pill = e.target.closest('.pill[data-category]');
+        if (!pill) return;
+        document.querySelectorAll('#filter-category .pill').forEach(p => {
+            const on = p === pill;
+            p.classList.toggle('active', on);
+            p.setAttribute('aria-pressed', String(on));
+        });
+        renderBadgeLibrary();
+    });
     document.getElementById('filter-search').addEventListener('input', debounce(renderBadgeLibrary, 250));
 
     document.getElementById('add-badge-btn').addEventListener('click', () => openBadgeModal());
@@ -190,8 +202,7 @@ function setupEventListeners() {
     document.getElementById('claims-category-filter').addEventListener('change', renderClaims);
 
     document.getElementById('review-decision').addEventListener('change', (e) => {
-        document.getElementById('decline-reason-group').style.display =
-            e.target.value === 'declined' ? 'block' : 'none';
+        document.getElementById('decline-reason-group').classList.toggle('hidden', e.target.value !== 'declined');
     });
 
     populateEventSelectors();
@@ -209,9 +220,15 @@ function populateEventSelectors() {
     });
 }
 
+function categoryBadge(category) {
+    const catConfig = CATEGORIES[category];
+    if (!catConfig) return category ? `<span class="badge">${escapeHtml(category)}</span>` : '';
+    return `<span class="badge">${icon(catConfig.icon, 'icon-sm')}${catConfig.label}</span>`;
+}
+
 function renderBadgeLibrary() {
     const container = document.getElementById('badges-container');
-    const filterCategory = document.getElementById('filter-category').value;
+    const filterCategory = document.querySelector('#filter-category .pill.active')?.dataset.category || '';
     const filterSearch = document.getElementById('filter-search').value.toLowerCase();
 
     let badges = [...allBadges];
@@ -233,7 +250,7 @@ function renderBadgeLibrary() {
     document.getElementById('stat-sponsor').textContent = allBadges.filter(b => b.category === 'sponsor').length;
 
     if (badges.length === 0) {
-        container.innerHTML = `<div class="empty-state"><p>No badges found</p></div>`;
+        container.innerHTML = `<div class="panel"><div class="empty-state"><span class="empty-state-icon">${icon('award')}</span><p>No badges found</p></div></div>`;
         return;
     }
 
@@ -248,13 +265,15 @@ function renderBadgeLibrary() {
         if (!grouped[cat]) continue;
         const catConfig = CATEGORIES[cat];
         html += `
-            <div class="category-header">
-                <h3>${catConfig.icon} ${catConfig.label}</h3>
-                <span class="category-count">${grouped[cat].length} badge${grouped[cat].length !== 1 ? 's' : ''}</span>
-            </div>
-            <div class="badge-grid">
-                ${grouped[cat].map(badge => renderBadgeCard(badge)).join('')}
-            </div>
+            <section class="badge-category">
+                <div class="badge-category-header">
+                    <h2>${icon(catConfig.icon)}${catConfig.label}</h2>
+                    <span class="badge count">${grouped[cat].length} badge${grouped[cat].length !== 1 ? 's' : ''}</span>
+                </div>
+                <div class="badge-grid">
+                    ${grouped[cat].map(badge => renderBadgeCard(badge)).join('')}
+                </div>
+            </section>
         `;
     }
 
@@ -262,24 +281,30 @@ function renderBadgeLibrary() {
 }
 
 function renderBadgeCard(badge) {
-    const catConfig = CATEGORIES[badge.category] || { label: badge.category, emoji: '⬜' };
-    const claimLabel = (badge.claimType || 'common') === 'exclusive' ? '🏆 Exclusive' : '🎯 Common';
+    const catConfig = CATEGORIES[badge.category] || { label: badge.category, icon: 'award' };
+    const isExclusive = (badge.claimType || 'common') === 'exclusive';
+    const claimLabel = isExclusive
+        ? `<span class="meta-item" title="Judges award it to one team">${icon('gem')}Exclusive</span>`
+        : `<span class="meta-item" title="Teams claim it with a blog post">${icon('target')}Common</span>`;
+    const name = escapeHtml(badge.name);
     return `
-        <div class="badge-card">
-            <div class="badge-header">
-                <span class="badge-name">${escapeHtml(badge.name)}</span>
-                <span class="category-pill ${escapeHtml(badge.category)}">${escapeHtml(catConfig.label)}</span>
-            </div>
-            <div class="badge-desc">${escapeHtml(badge.description)}</div>
-            <div class="badge-footer">
-                <span class="badge-points">🏆 ${Number(badge.points) || 0} pts</span>
-                <span style="font-size: 0.75rem; color: var(--admin-text-muted);">${claimLabel}</span>
+        <article class="badge-card">
+            <div class="badge-card-top">
+                <span class="badge-card-icon">${icon(catConfig.icon)}</span>
+                <div class="badge-card-text">
+                    <h3 class="badge-name">${name}</h3>
+                    ${badge.description ? `<p class="badge-desc">${escapeHtml(badge.description)}</p>` : ''}
+                </div>
                 <div class="badge-actions">
-                    <button type="button" class="btn-sm" data-action="edit-badge" data-badge-id="${escapeHtml(badge.id)}" title="Edit">✏️</button>
-                    <button type="button" class="btn-sm danger" data-action="delete-badge" data-badge-id="${escapeHtml(badge.id)}" title="Delete">🗑️</button>
+                    <button type="button" class="btn-sm icon-only" data-action="edit-badge" data-badge-id="${escapeHtml(badge.id)}" aria-label="Edit ${name}" title="Edit">${icon('pencil')}</button>
+                    <button type="button" class="btn-sm icon-only danger-ghost" data-action="delete-badge" data-badge-id="${escapeHtml(badge.id)}" aria-label="Delete ${name}" title="Delete">${icon('trash-2')}</button>
                 </div>
             </div>
-        </div>
+            <div class="meta-list badge-card-meta">
+                <span class="meta-item badge-points">${icon('trophy')}${Number(badge.points) || 0} pts</span>
+                ${claimLabel}
+            </div>
+        </article>
     `;
 }
 
@@ -311,32 +336,34 @@ function renderEventBadges() {
         const assignedInCat = catBadges.filter(b => assignedBadgeIds.has(b.id)).length;
 
         html += `
-            <div class="panel" style="margin-bottom: 16px;">
+            <section class="panel event-badge-panel">
                 <div class="panel-header">
-                    <span class="panel-title">${catConfig.icon} ${catConfig.label} <span class="category-count">(${assignedInCat}/${catBadges.length} assigned)</span></span>
-                    <div>
-                        <button type="button" class="btn-sm" data-action="toggle-category" data-category="${cat}" data-checked="true">Select All</button>
-                        <button type="button" class="btn-sm" data-action="toggle-category" data-category="${cat}" data-checked="false">Deselect All</button>
+                    <h3 class="panel-title">${icon(catConfig.icon)}${catConfig.label}<span class="badge count">${assignedInCat}/${catBadges.length} offered</span></h3>
+                    <div class="row-actions">
+                        <button type="button" class="btn-sm ghost" data-action="toggle-category" data-category="${cat}" data-checked="true">Select all<span class="visually-hidden"> ${catConfig.label.toLowerCase()} badges</span></button>
+                        <button type="button" class="btn-sm ghost" data-action="toggle-category" data-category="${cat}" data-checked="false">Clear<span class="visually-hidden"> ${catConfig.label.toLowerCase()} badges</span></button>
                     </div>
                 </div>
-                <div class="panel-body">
+                <div class="event-badge-list">
         `;
 
         for (const badge of catBadges) {
             const assignment = allEventBadges.find(eb => eb.badgeId === badge.id);
             const isAssigned = !!assignment;
             const currentJudge = assignment ? assignment.judgeUserId : '';
+            const name = escapeHtml(badge.name);
 
             html += `
                 <div class="event-badge-row">
-                    <input type="checkbox" class="event-badge-toggle" data-badge-id="${escapeHtml(badge.id)}"
-                        ${isAssigned ? 'checked' : ''} style="width: auto; cursor: pointer;">
-                    <div class="event-badge-info">
-                        <div class="name">${escapeHtml(badge.name)} <span style="color: var(--admin-primary); font-size: 0.75rem;">${Number(badge.points) || 0} pts</span></div>
-                        <div class="desc">${escapeHtml(badge.description)}</div>
-                    </div>
+                    <label class="event-badge-check">
+                        <input type="checkbox" class="event-badge-toggle" data-badge-id="${escapeHtml(badge.id)}" ${isAssigned ? 'checked' : ''}>
+                        <span class="event-badge-info">
+                            <span class="name">${name}<span class="points">${Number(badge.points) || 0} pts</span></span>
+                            ${badge.description ? `<span class="desc">${escapeHtml(badge.description)}</span>` : ''}
+                        </span>
+                    </label>
                     <div class="event-badge-judge">
-                        <select data-badge-id="${escapeHtml(badge.id)}" class="judge-select" ${!isAssigned ? 'disabled' : ''}>
+                        <select data-badge-id="${escapeHtml(badge.id)}" class="judge-select" aria-label="Judge for ${name}" ${!isAssigned ? 'disabled' : ''}>
                             <option value="">No judge</option>
                             ${judges.map(j => `<option value="${escapeHtml(j.id)}" ${sameId(currentJudge, j.id) ? 'selected' : ''}>${escapeHtml(j.name)}</option>`).join('')}
                         </select>
@@ -345,7 +372,7 @@ function renderEventBadges() {
             `;
         }
 
-        html += '</div></div>';
+        html += '</div></section>';
     }
 
     container.innerHTML = html;
@@ -380,7 +407,7 @@ function toggleAllCategory(category, checked) {
 async function saveEventBadges() {
     const btn = document.getElementById('save-event-badges-btn');
     btn.disabled = true;
-    btn.textContent = 'Saving...';
+    btn.textContent = 'Saving…';
 
     try {
         const selectedBadgeIds = [];
@@ -411,13 +438,13 @@ async function saveEventBadges() {
         await loadEventBadges(selectedEventId);
         renderEventBadges();
 
-        btn.textContent = '✅ Saved!';
-        setTimeout(() => { btn.textContent = '💾 Save Changes'; btn.disabled = false; }, 2000);
+        btn.textContent = 'Saved';
+        setTimeout(() => { btn.textContent = 'Save assignments'; btn.disabled = false; }, 2000);
 
     } catch (error) {
         console.error('Save event badges error:', error);
         alert('Failed to save: ' + error.message);
-        btn.textContent = '💾 Save Changes';
+        btn.textContent = 'Save assignments';
         btn.disabled = false;
     }
 }
@@ -456,29 +483,31 @@ function renderClaims() {
         if (exclusiveBadges.length > 0) {
             const awardedCount = exclusiveBadges.filter(b => b.awardedTeamId).length;
             html += `
-                <div class="judge-group exclusive-group">
-                    <div class="judge-group-header">
-                        <div class="judge-group-title">🏆 Exclusive Badges</div>
-                        <div class="judge-group-stats">
-                            <span class="jg-stat total">${exclusiveBadges.length} badge${exclusiveBadges.length !== 1 ? 's' : ''}</span>
-                            ${awardedCount ? `<span class="jg-stat approved">✅ ${awardedCount} awarded</span>` : ''}
+                <section class="panel claims-group exclusive-group">
+                    <div class="panel-header">
+                        <h2 class="panel-title">${icon('gem')}Exclusive badges</h2>
+                        <div class="claims-group-stats">
+                            <span class="badge">${exclusiveBadges.length} badge${exclusiveBadges.length !== 1 ? 's' : ''}</span>
+                            ${awardedCount ? `<span class="badge badge-success">${icon('circle-check', 'icon-sm')}${awardedCount} awarded</span>` : ''}
                         </div>
                     </div>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Badge</th>
-                                <th>Category</th>
-                                <th>Points</th>
-                                <th>Awarded To</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${exclusiveBadges.map(b => renderExclusiveRow(b)).join('')}
-                        </tbody>
-                    </table>
-                </div>
+                    <div class="panel-body">
+                        <table class="data-table stack-sm">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Badge</th>
+                                    <th scope="col">Category</th>
+                                    <th scope="col">Points</th>
+                                    <th scope="col">Awarded to</th>
+                                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${exclusiveBadges.map(b => renderExclusiveRow(b)).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
             `;
         }
     }
@@ -516,11 +545,16 @@ function renderClaims() {
         const canReview = isMyGroup || isPortalAdmin || isCommittee;
 
         let judgeName;
+        let judgeIcon = 'scale';
         if (judgeId === '__unassigned__') {
-            judgeName = 'Unassigned';
+            judgeName = 'No judge assigned';
+            judgeIcon = 'circle-dot';
+        } else if (isMyGroup) {
+            judgeName = 'Assigned to you';
+            judgeIcon = 'user-check';
         } else {
             const judge = allJudgeUsers.find(j => j.id === judgeId);
-            judgeName = judge ? judge.name : 'Unknown Judge';
+            judgeName = judge ? judge.name : 'Unknown judge';
         }
 
         const pendingCount = groupClaims.filter(c => c.status === 'pending').length;
@@ -528,36 +562,35 @@ function renderClaims() {
         const declinedCount = groupClaims.filter(c => c.status === 'declined').length;
 
         html += `
-            <div class="judge-group ${isMyGroup ? 'my-group' : ''}">
-                <div class="judge-group-header">
-                    <div class="judge-group-title">
-                        ${isMyGroup ? '👤 ' : ''}${escapeHtml(judgeName)}
-                        ${isMyGroup ? '<span class="my-badge">You</span>' : ''}
-                    </div>
-                    <div class="judge-group-stats">
-                        <span class="jg-stat total">${groupClaims.length} claim${groupClaims.length !== 1 ? 's' : ''}</span>
-                        ${pendingCount ? `<span class="jg-stat pending">⏳ ${pendingCount}</span>` : ''}
-                        ${approvedCount ? `<span class="jg-stat approved">✅ ${approvedCount}</span>` : ''}
-                        ${declinedCount ? `<span class="jg-stat declined">❌ ${declinedCount}</span>` : ''}
+            <section class="panel claims-group ${isMyGroup ? 'my-group' : ''}">
+                <div class="panel-header">
+                    <h2 class="panel-title">${icon(judgeIcon)}${escapeHtml(judgeName)}</h2>
+                    <div class="claims-group-stats">
+                        <span class="badge">${groupClaims.length} claim${groupClaims.length !== 1 ? 's' : ''}</span>
+                        ${pendingCount ? `<span class="badge badge-warning">${icon('hourglass', 'icon-sm')}${pendingCount} pending</span>` : ''}
+                        ${approvedCount ? `<span class="badge badge-success">${icon('circle-check', 'icon-sm')}${approvedCount} approved</span>` : ''}
+                        ${declinedCount ? `<span class="badge badge-danger">${icon('circle-x', 'icon-sm')}${declinedCount} declined</span>` : ''}
                     </div>
                 </div>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Badge</th>
-                            <th>Category</th>
-                            <th>Team</th>
-                            <th>Evidence</th>
-                            <th>Status</th>
-                            <th>Claimed</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${groupClaims.map(claim => renderClaimRow(claim, canReview)).join('')}
-                    </tbody>
-                </table>
-            </div>
+                <div class="panel-body">
+                    <table class="data-table stack-sm">
+                        <thead>
+                            <tr>
+                                <th scope="col">Badge</th>
+                                <th scope="col">Category</th>
+                                <th scope="col">Team</th>
+                                <th scope="col">Evidence</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Claimed</th>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${groupClaims.map(claim => renderClaimRow(claim, canReview)).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         `;
     }
 
@@ -565,29 +598,49 @@ function renderClaims() {
     loadTeamsForExclusiveDropdowns();
 }
 
+// Evidence is usually the team's blog post URL; link it so judges can open it in one tap.
+function evidenceLink(claim, className) {
+    const text = claim.evidence || '';
+    const href = safeHttpUrl(claim.evidence) || safeHttpUrl(claim.blogUrl);
+    if (!text) return '';
+    if (!href) return `<span class="${className}" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+    return `<a class="${className}" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(text)}">${escapeHtml(text)}</a>`;
+}
+
+function claimStatusBadge(status) {
+    const meta = {
+        pending: { tone: 'badge-warning', icon: 'hourglass' },
+        approved: { tone: 'badge-success', icon: 'circle-check' },
+        declined: { tone: 'badge-danger', icon: 'circle-x' }
+    }[status];
+    if (!meta) return `<span class="badge">${escapeHtml(capitalize(status))}</span>`;
+    return `<span class="badge ${meta.tone}">${icon(meta.icon, 'icon-sm')}${escapeHtml(capitalize(status))}</span>`;
+}
+
 function renderClaimRow(claim, canReview) {
     const badgeName = claim.badge ? claim.badge.name : 'Unknown';
     const badgeCategory = claim.badge ? claim.badge.category : '';
     const teamName = claim.team ? claim.team.teamName : 'Unknown';
-    const catConfig = CATEGORIES[badgeCategory] || { label: badgeCategory };
     const claimedDate = claim.claimedAt ? new Date(claim.claimedAt).toLocaleDateString() : '';
+
+    let actions = '';
+    if (claim.status === 'pending' && canReview) {
+        actions = `<button type="button" class="btn-sm" data-action="review-claim" data-claim-id="${escapeHtml(claim.id)}">${icon('square-pen', 'icon-sm')}Review<span class="visually-hidden"> ${escapeHtml(badgeName)} for ${escapeHtml(teamName)}</span></button>`;
+    } else if (claim.status === 'pending') {
+        actions = '<span class="text-muted">Awaiting review</span>';
+    } else if (claim.status === 'declined' && claim.declineReason) {
+        actions = `<button type="button" class="btn-sm ghost" data-action="view-comments" data-claim-id="${escapeHtml(claim.id)}">${icon('message-square', 'icon-sm')}View reason</button>`;
+    }
 
     return `
         <tr>
-            <td><strong>${escapeHtml(badgeName)}</strong></td>
-            <td><span class="category-pill ${escapeHtml(badgeCategory)}">${escapeHtml(catConfig.label || badgeCategory)}</span></td>
-            <td>${escapeHtml(teamName)}</td>
-            <td class="claim-evidence" title="${escapeHtml(claim.evidence || '')}">${escapeHtml(claim.evidence || '—')}</td>
-            <td><span class="status-pill ${escapeHtml(claim.status)}">${statusIcon(claim.status)} ${escapeHtml(capitalize(claim.status))}</span></td>
-            <td style="font-size: 0.8rem; color: var(--admin-text-muted);">${claimedDate}</td>
-            <td>
-                <div class="claim-actions">
-                    ${claim.status === 'pending' && canReview ? `<button type="button" class="btn-sm primary" data-action="review-claim" data-claim-id="${escapeHtml(claim.id)}">Review</button>` : ''}
-                    ${claim.status === 'pending' && !canReview ? `<span style="font-size: 0.75rem; color: var(--admin-text-muted);">Awaiting review</span>` : ''}
-                    ${claim.status === 'declined' && claim.declineReason ? `<button type="button" class="btn-sm" style="font-size: 0.7rem; padding: 2px 8px;" data-action="view-comments" data-claim-id="${escapeHtml(claim.id)}">💬 Comments</button>` : ''}
-                    ${claim.status === 'approved' ? `<span style="font-size: 0.75rem; color: var(--admin-success);">✅</span>` : ''}
-                </div>
-            </td>
+            <td class="cell-title" data-label="Badge"><strong>${escapeHtml(badgeName)}</strong></td>
+            <td data-label="Category">${categoryBadge(badgeCategory)}</td>
+            <td data-label="Team">${escapeHtml(teamName)}</td>
+            <td data-label="Evidence">${evidenceLink(claim, 'claim-evidence') || '<span class="text-muted">—</span>'}</td>
+            <td data-label="Status">${claimStatusBadge(claim.status)}</td>
+            <td data-label="Claimed" class="text-muted">${claimedDate}</td>
+            <td class="cell-actions">${actions}</td>
         </tr>
     `;
 }
@@ -600,7 +653,7 @@ function openBadgeModal(badgeId = null) {
         const badge = allBadges.find(b => sameId(b.id, badgeId));
         if (!badge) return;
 
-        title.textContent = 'Edit Badge';
+        title.textContent = 'Edit badge';
         document.getElementById('badge-edit-id').value = badge.id;
         document.getElementById('badge-name').value = badge.name;
         document.getElementById('badge-category').value = badge.category;
@@ -609,7 +662,7 @@ function openBadgeModal(badgeId = null) {
         document.getElementById('badge-points').value = badge.points;
         document.getElementById('badge-imageUrl').value = badge.imageUrl || '';
     } else {
-        title.textContent = 'Add Badge';
+        title.textContent = 'Add badge';
         document.getElementById('badge-edit-id').value = '';
         document.getElementById('badge-name').value = '';
         document.getElementById('badge-category').value = '';
@@ -642,7 +695,7 @@ async function saveBadge() {
 
     const btn = document.getElementById('badge-save-btn');
     btn.disabled = true;
-    btn.textContent = 'Saving...';
+    btn.textContent = 'Saving…';
 
     try {
         if (id) {
@@ -658,7 +711,7 @@ async function saveBadge() {
         alert('Failed to save: ' + error.message);
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Save Badge';
+        btn.textContent = 'Save badge';
     }
 }
 
@@ -668,7 +721,8 @@ async function deleteBadge(badgeId, button) {
 
     if (!confirm(`Delete "${badge.name}"? This will also remove it from all event assignments.`)) return;
 
-    await withBusy(button, '⏳', async () => {
+    // No busy label: the button is icon-only, so it just stays disabled while the request runs.
+    await withBusy(button, null, async () => {
         try {
             await API.request(`/badges/${encodeURIComponent(badge.id)}`, { method: 'DELETE' });
             await loadAllData();
@@ -679,28 +733,40 @@ async function deleteBadge(badgeId, button) {
     });
 }
 
+// Fills the claim summary at the top of the review dialog.
+function fillReviewSummary(claim) {
+    document.getElementById('review-badge-name').textContent = claim.badge ? claim.badge.name : 'Unknown badge';
+    document.getElementById('review-team-name').textContent = claim.team ? claim.team.teamName : 'Unknown team';
+    const link = evidenceLink(claim, 'review-evidence-link');
+    document.getElementById('review-evidence').innerHTML = link
+        ? `<div class="review-label">Evidence</div>${link}`
+        : '<div class="review-label">Evidence</div><span class="text-muted">No evidence provided</span>';
+}
+
+function setReviewComments(title, reason) {
+    const commentsEl = document.getElementById('review-previous-comments');
+    commentsEl.innerHTML = `${icon('message-square')}<div><div class="notice-title">${title}</div><div class="notice-body">${escapeHtml(reason)}</div></div>`;
+    commentsEl.classList.remove('hidden');
+}
+
 function openReviewModal(claimId) {
     const claim = allClaims.find(c => sameId(c.id, claimId));
     if (!claim) return;
 
     document.getElementById('review-claim-id').value = claimId;
-    document.getElementById('review-badge-name').textContent = `🏅 ${claim.badge ? claim.badge.name : 'Unknown Badge'}`;
-    document.getElementById('review-team-name').textContent = `Team: ${claim.team ? claim.team.teamName : 'Unknown'}`;
-    document.getElementById('review-evidence').innerHTML = claim.evidence
-        ? `<strong>Evidence:</strong><br>${escapeHtml(claim.evidence)}`
-        : '<em>No evidence provided</em>';
+    document.getElementById('review-modal-title').textContent = 'Review claim';
+    document.getElementById('cancel-review-modal-btn').textContent = 'Cancel';
+    fillReviewSummary(claim);
 
-    const commentsEl = document.getElementById('review-previous-comments');
     if (claim.declineReason) {
-        commentsEl.innerHTML = `<strong>Previous reviewer comments:</strong><br>${escapeHtml(claim.declineReason)}`;
-        commentsEl.style.display = 'block';
+        setReviewComments('Previous reviewer comments', claim.declineReason);
     } else {
-        commentsEl.style.display = 'none';
+        document.getElementById('review-previous-comments').classList.add('hidden');
     }
 
     document.getElementById('review-decision').value = '';
     document.getElementById('review-decline-reason').value = '';
-    document.getElementById('decline-reason-group').style.display = 'none';
+    document.getElementById('decline-reason-group').classList.add('hidden');
 
     document.getElementById('review-modal').classList.add('visible');
 }
@@ -710,27 +776,22 @@ function viewDeclineComments(claimId) {
     if (!claim || !claim.declineReason) return;
 
     document.getElementById('review-claim-id').value = claimId;
-    document.getElementById('review-badge-name').textContent = `🏅 ${claim.badge ? claim.badge.name : 'Unknown Badge'}`;
-    document.getElementById('review-team-name').textContent = `Team: ${claim.team ? claim.team.teamName : 'Unknown'}`;
-    document.getElementById('review-evidence').innerHTML = claim.evidence
-        ? `<strong>Evidence:</strong><br>${escapeHtml(claim.evidence)}`
-        : '<em>No evidence provided</em>';
+    document.getElementById('review-modal-title').textContent = 'Declined claim';
+    document.getElementById('cancel-review-modal-btn').textContent = 'Close';
+    fillReviewSummary(claim);
+    setReviewComments('Reason for declining', claim.declineReason);
 
-    const commentsEl = document.getElementById('review-previous-comments');
-    commentsEl.innerHTML = `<strong>Reviewer comments:</strong><br>${escapeHtml(claim.declineReason)}`;
-    commentsEl.style.display = 'block';
-
-    document.getElementById('review-decision').parentElement.style.display = 'none';
-    document.getElementById('decline-reason-group').style.display = 'none';
-    document.querySelector('#review-modal .modal-footer .primary').style.display = 'none';
+    document.getElementById('review-decision').parentElement.classList.add('hidden');
+    document.getElementById('decline-reason-group').classList.add('hidden');
+    document.querySelector('#review-modal .modal-footer .primary').classList.add('hidden');
 
     document.getElementById('review-modal').classList.add('visible');
 }
 
 function closeReviewModal() {
     document.getElementById('review-modal').classList.remove('visible');
-    document.getElementById('review-decision').parentElement.style.display = '';
-    document.querySelector('#review-modal .modal-footer .primary').style.display = '';
+    document.getElementById('review-decision').parentElement.classList.remove('hidden');
+    document.querySelector('#review-modal .modal-footer .primary').classList.remove('hidden');
 }
 
 async function submitReview() {
@@ -741,7 +802,7 @@ async function submitReview() {
     if (!status) return alert('Please select a decision');
     if (status === 'declined' && !declineReason) return alert('Please provide a reason for declining');
 
-    await withBusy(document.getElementById('submit-review-btn'), 'Submitting...', async () => {
+    await withBusy(document.getElementById('submit-review-btn'), 'Submitting…', async () => {
         try {
             await API.request(`/badge-claims/${encodeURIComponent(claimId)}/review`, {
                 method: 'PUT',
@@ -797,32 +858,36 @@ function getExclusiveBadgesForUser(eventFilter) {
 }
 
 function renderExclusiveRow(badge) {
-    const catConfig = CATEGORIES[badge.category] || { label: badge.category };
+    const title = `
+        <td class="cell-title" data-label="Badge">
+            <strong>${escapeHtml(badge.badgeName)}</strong>
+            ${badge.eventName ? `<div class="cell-sub">${escapeHtml(badge.eventName)}</div>` : ''}
+        </td>`;
 
     if (badge.awardedTeamId) {
         return `
             <tr>
-                <td><strong>${escapeHtml(badge.badgeName)}</strong></td>
-                <td><span class="category-pill ${escapeHtml(badge.category)}">${escapeHtml(catConfig.label || badge.category)}</span></td>
-                <td>${Number(badge.points) || 0}p</td>
-                <td><span style="color: #d97706; font-weight: 600;">🏆 ${escapeHtml(badge.awardedTeamName || 'Unknown')}</span></td>
-                <td><span style="font-size: 0.75rem; color: var(--admin-success);">✅ Awarded</span></td>
+                ${title}
+                <td data-label="Category">${categoryBadge(badge.category)}</td>
+                <td data-label="Points">${Number(badge.points) || 0} pts</td>
+                <td data-label="Awarded to"><span class="awarded-team">${icon('trophy')}${escapeHtml(badge.awardedTeamName || 'Unknown')}</span></td>
+                <td class="cell-actions"><span class="badge badge-success">${icon('circle-check', 'icon-sm')}Awarded</span></td>
             </tr>
         `;
     }
 
     return `
         <tr>
-            <td><strong>${escapeHtml(badge.badgeName)}</strong></td>
-            <td><span class="category-pill ${escapeHtml(badge.category)}">${escapeHtml(catConfig.label || badge.category)}</span></td>
-            <td>${Number(badge.points) || 0}p</td>
-            <td>
-                <select class="award-team-select" data-event-badge-id="${escapeHtml(badge.eventBadgeId)}" style="font-size: 0.8rem; padding: 4px 8px; border: 1px solid var(--admin-border); border-radius: 4px;">
-                    <option value="">Select team...</option>
+            ${title}
+            <td data-label="Category">${categoryBadge(badge.category)}</td>
+            <td data-label="Points">${Number(badge.points) || 0} pts</td>
+            <td data-label="Award to">
+                <select class="award-team-select" data-event-badge-id="${escapeHtml(badge.eventBadgeId)}" aria-label="Team to award ${escapeHtml(badge.badgeName)}">
+                    <option value="">Choose a team</option>
                 </select>
             </td>
-            <td>
-                <button type="button" class="btn-sm primary" style="font-size: 0.75rem;" data-action="award-badge" data-event-badge-id="${escapeHtml(badge.eventBadgeId)}">🏆 Award</button>
+            <td class="cell-actions">
+                <button type="button" class="btn-sm" data-action="award-badge" data-event-badge-id="${escapeHtml(badge.eventBadgeId)}">Award</button>
             </td>
         </tr>
     `;
@@ -876,7 +941,7 @@ async function awardBadgeInline(eventBadgeId, btn) {
         return;
     }
 
-    await withBusy(btn, 'Awarding...', async () => {
+    await withBusy(btn, 'Awarding…', async () => {
         try {
             await API.request('/badge-claims/award', {
                 method: 'POST',
@@ -901,13 +966,4 @@ function capitalize(str) {
 
 function truncate(str, len) {
     return str.length > len ? str.substring(0, len) + '...' : str;
-}
-
-function statusIcon(status) {
-    switch (status) {
-        case 'pending': return '⏳';
-        case 'approved': return '✅';
-        case 'declined': return '❌';
-        default: return '';
-    }
 }

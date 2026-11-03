@@ -1,204 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Badges - ACDC Committee</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <title>Badges - ACDC Admin</title>
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <style>        .main-content { padding: 24px 40px; }
-
-        .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--admin-border); margin-bottom: 24px; }
-        .tab-btn {
-            padding: 10px 20px; font-size: 0.85rem; font-weight: 500; color: var(--admin-text-muted);
-            background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px;
-            cursor: pointer; transition: all 0.15s;
-        }
-        .tab-btn:hover { color: var(--admin-text); }
-        .tab-btn.active { color: var(--admin-primary); border-bottom-color: var(--admin-primary); font-weight: 600; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-
-        .badge-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 16px; margin-bottom: 24px;
-        }
-        .badge-card {
-            background: white; border: 1px solid var(--admin-border); border-radius: 8px;
-            padding: 16px; transition: all 0.15s; position: relative;
-        }
-        .badge-card:hover { border-color: var(--admin-primary); box-shadow: 0 2px 8px rgba(59,130,246,0.1); }
-        .badge-card .badge-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-        .badge-card .badge-name { font-weight: 600; font-size: 0.95rem; color: var(--admin-sidebar); }
-        .badge-card .badge-desc { font-size: 0.8rem; color: var(--admin-text-muted); line-height: 1.4; margin-bottom: 12px; }
-        .badge-card .badge-footer { display: flex; justify-content: space-between; align-items: center; }
-        .badge-card .badge-points { font-weight: 600; color: var(--admin-primary); font-size: 0.85rem; }
-        .badge-card .badge-actions { display: flex; gap: 6px; }
-
-        .category-pill {
-            display: inline-flex; padding: 2px 8px; border-radius: 12px;
-            font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
-        }
-        .category-pill.soft { background: #dbeafe; color: #1e40af; }
-        .category-pill.low-code { background: #d1fae5; color: #065f46; }
-        .category-pill.pro-code { background: #ede9fe; color: #5b21b6; }
-        .category-pill.sponsor { background: #fef3c7; color: #92400e; }
-
-        .status-pill {
-            display: inline-flex; padding: 2px 8px; border-radius: 12px;
-            font-size: 0.7rem; font-weight: 600;
-        }
-        .status-pill.pending { background: #fef3c7; color: #92400e; }
-        .status-pill.approved { background: #d1fae5; color: #065f46; }
-        .status-pill.declined { background: #fee2e2; color: #991b1b; }
-
-        .judge-group {
-            background: white;
-            border: 1px solid var(--admin-border);
-            border-radius: 8px;
-            margin-bottom: 16px;
-            overflow: hidden;
-        }
-        .judge-group.my-group {
-            border-color: #818cf8;
-            box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15);
-        }
-        .judge-group.exclusive-group {
-            border-color: #f59e0b;
-            box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.15);
-        }
-        .judge-group.exclusive-group .judge-group-header {
-            background: #fffbeb;
-        }
-        .judge-group.exclusive-group .judge-group-title {
-            color: #92400e;
-        }
-        .judge-group-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 16px;
-            background: var(--admin-bg);
-            border-bottom: 1px solid var(--admin-border);
-        }
-        .judge-group.my-group .judge-group-header {
-            background: #eef2ff;
-        }
-        .judge-group-title {
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: var(--admin-sidebar);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .my-badge {
-            font-size: 0.65rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            background: #6366f1;
-            color: white;
-            padding: 1px 6px;
-            border-radius: 8px;
-        }
-        .judge-group-stats {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .jg-stat {
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-        .jg-stat.total { color: var(--admin-text-muted); }
-        .jg-stat.pending { color: #b45309; }
-        .jg-stat.approved { color: #059669; }
-        .jg-stat.declined { color: #dc2626; }
-        .judge-group .data-table {
-            margin: 0;
-            border: none;
-        }
-
-        .category-header {
-            display: flex; align-items: center; gap: 8px;
-            margin: 24px 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid var(--admin-border);
-        }
-        .category-header:first-child { margin-top: 0; }
-        .category-header h3 { font-size: 0.9rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
-        .category-count { font-size: 0.75rem; color: var(--admin-text-muted); }
-
-        .modal-overlay {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
-        }
-        .modal-overlay.visible { display: flex; }
-        .modal {
-            background: white; border-radius: 12px; width: 500px; max-width: 90vw;
-            max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        .modal-header {
-            padding: 20px 24px 16px; border-bottom: 1px solid var(--admin-border);
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .modal-header h2 { margin: 0; font-size: 1.1rem; color: var(--admin-sidebar); }
-        .modal-close { background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--admin-text-muted); padding: 4px; }
-        .modal-close:hover { color: var(--admin-text); }
-        .modal-body { padding: 24px; }
-        .modal-footer { padding: 16px 24px; border-top: 1px solid var(--admin-border); display: flex; justify-content: flex-end; gap: 8px; }
-
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--admin-text); margin-bottom: 4px; }
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%; padding: 8px 12px; border: 1px solid var(--admin-border); border-radius: 6px;
-            font-size: 0.85rem; font-family: inherit;
-        }
-        .form-group textarea { resize: vertical; min-height: 80px; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none; border-color: var(--admin-primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
-        }
-
-        .event-badge-row {
-            display: flex; align-items: center; gap: 12px; padding: 10px 16px;
-            border-bottom: 1px solid var(--admin-border); transition: background 0.1s;
-        }
-        .event-badge-row:hover { background: var(--admin-bg); }
-        .event-badge-row:last-child { border-bottom: none; }
-        .event-badge-toggle { width: auto; cursor: pointer; }
-        .event-badge-info { flex: 1; }
-        .event-badge-info .name { font-weight: 500; font-size: 0.85rem; }
-        .event-badge-info .desc { font-size: 0.75rem; color: var(--admin-text-muted); }
-        .event-badge-judge { width: 200px; }
-        .event-badge-judge select {
-            width: 100%; padding: 4px 8px; font-size: 0.8rem;
-            border: 1px solid var(--admin-border); border-radius: 4px;
-        }
-
-        .claim-evidence { max-width: 300px; font-size: 0.8rem; color: var(--admin-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .claim-actions { display: flex; gap: 6px; }
-
-        .stat-row { display: flex; gap: 16px; margin-bottom: 24px; }
-        .stat-card {
-            flex: 1; background: white; border: 1px solid var(--admin-border); border-radius: 8px;
-            padding: 16px 20px; text-align: center;
-        }
-        .stat-card .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--admin-sidebar); }
-        .stat-card .stat-label { font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px; }
-
-        .filter-bar { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
-        .filter-bar select, .filter-bar input {
-            padding: 6px 12px; font-size: 0.8rem; border: 1px solid var(--admin-border);
-            border-radius: 6px; background: white;
-        }
-
-        .event-selector { margin-bottom: 24px; }
-        .event-selector select {
-            padding: 8px 16px; font-size: 0.9rem; border: 1px solid var(--admin-border);
-            border-radius: 6px; background: white; min-width: 300px;
-        }
-    </style></head>
-<body>
+</head>
+<body class="page-badges">
     <div class="admin-layout">
         <div id="sidebar-container"></div>
 
@@ -210,140 +20,156 @@
 
             <div id="admin-content" class="hidden">
                 <div class="page-header">
-                    <h1 class="page-title">🏅 Badges</h1>
+                    <div>
+                        <h1 class="page-title">Badges</h1>
+                        <p class="page-subtitle" id="badges-subtitle">Build the badge library, choose which badges each event offers, and review what teams claim.</p>
+                    </div>
                 </div>
 
                 <div class="tabs">
-                    <button class="tab-btn active" data-tab="master">Badge Library</button>
-                    <button class="tab-btn" data-tab="event-badges">Event Badges</button>
-                    <button class="tab-btn" data-tab="claims">Badge Claims</button>
+                    <button type="button" class="tab-btn active" data-tab="master"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#award"></use></svg>Badge library</button>
+                    <button type="button" class="tab-btn" data-tab="event-badges"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#calendar-days"></use></svg>Event badges</button>
+                    <button type="button" class="tab-btn" data-tab="claims"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#inbox"></use></svg>Claims</button>
                 </div>
 
                 <div id="tab-master" class="tab-content active">
-                    <div class="stat-row">
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-total">0</div>
-                            <div class="stat-label">Total Badges</div>
+                    <div class="toolbar">
+                        <div class="search-field">
+                            <svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#search"></use></svg>
+                            <input type="search" id="filter-search" placeholder="Search badges" aria-label="Search badges">
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-soft">0</div>
-                            <div class="stat-label">Soft Code</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-lowcode">0</div>
-                            <div class="stat-label">Low Code</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-procode">0</div>
-                            <div class="stat-label">Pro Code</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-sponsor">0</div>
-                            <div class="stat-label">Sponsor</div>
+                        <div class="toolbar-right">
+                            <button type="button" class="btn btn-primary" id="add-badge-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#plus"></use></svg>Add badge</button>
                         </div>
                     </div>
 
-                    <div class="filter-bar">
-                        <select id="filter-category">
-                            <option value="">All Categories</option>
-                            <option value="soft">🟦 Soft Code</option>
-                            <option value="low-code">🟩 Low Code</option>
-                            <option value="pro-code">🟪 Pro Code</option>
-                            <option value="sponsor">🟨 Sponsor</option>
-                        </select>
-                        <input type="text" id="filter-search" placeholder="Search badges..." style="flex: 1; max-width: 300px;">
-                        <div style="margin-left: auto;">
-                            <button class="btn-sm primary" id="add-badge-btn">+ Add Badge</button>
-                        </div>
+                    <div class="pill-group category-filter" id="filter-category" role="group" aria-label="Filter by category">
+                        <button type="button" class="pill active" data-category="" aria-pressed="true">All<span class="pill-count" id="stat-total">0</span></button>
+                        <button type="button" class="pill" data-category="soft" aria-pressed="false"><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="/images/icons.svg#handshake"></use></svg>Soft code<span class="pill-count" id="stat-soft">0</span></button>
+                        <button type="button" class="pill" data-category="low-code" aria-pressed="false"><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="/images/icons.svg#zap"></use></svg>Low code<span class="pill-count" id="stat-lowcode">0</span></button>
+                        <button type="button" class="pill" data-category="pro-code" aria-pressed="false"><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="/images/icons.svg#laptop"></use></svg>Pro code<span class="pill-count" id="stat-procode">0</span></button>
+                        <button type="button" class="pill" data-category="sponsor" aria-pressed="false"><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="/images/icons.svg#building-2"></use></svg>Sponsor<span class="pill-count" id="stat-sponsor">0</span></button>
                     </div>
 
                     <div id="badges-container"></div>
                 </div>
 
                 <div id="tab-event-badges" class="tab-content">
-                    <div class="event-selector">
-                        <label style="font-size: 0.85rem; font-weight: 600; margin-right: 8px;">Select Event:</label>
+                    <div class="form-group event-selector">
+                        <label for="event-badge-selector">Event</label>
                         <select id="event-badge-selector">
-                            <option value="">— Choose an event —</option>
+                            <option value="">Choose an event</option>
                         </select>
                     </div>
 
                     <div id="event-badges-content" class="hidden">
-                        <div class="stat-row">
+                        <div class="stats-row compact">
                             <div class="stat-card">
-                                <div class="stat-value" id="eb-stat-assigned">0</div>
-                                <div class="stat-label">Badges Assigned</div>
+                                <div class="stat-icon tone-accent"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#award"></use></svg></div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="eb-stat-assigned">0</div>
+                                    <div class="stat-label">Badges offered</div>
+                                </div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-value" id="eb-stat-judges">0</div>
-                                <div class="stat-label">Judges Assigned</div>
+                                <div class="stat-icon tone-accent"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#scale"></use></svg></div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="eb-stat-judges">0</div>
+                                    <div class="stat-label">Judges assigned</div>
+                                </div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-value" id="eb-stat-claims">0</div>
-                                <div class="stat-label">Total Claims</div>
+                                <div class="stat-icon tone-accent"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#inbox"></use></svg></div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="eb-stat-claims">0</div>
+                                    <div class="stat-label">Claims</div>
+                                </div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-value" id="eb-stat-points">0</div>
-                                <div class="stat-label">Max Points Available</div>
+                                <div class="stat-icon tone-accent"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#trophy"></use></svg></div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="eb-stat-points">0</div>
+                                    <div class="stat-label">Points available</div>
+                                </div>
                             </div>
                         </div>
 
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                            <h3 style="margin: 0; font-size: 0.95rem; color: var(--admin-sidebar);">Badge Assignments</h3>
-                            <button class="btn-sm primary" id="save-event-badges-btn">💾 Save Changes</button>
+                        <div class="section-bar">
+                            <div>
+                                <h2 class="section-title">Badge assignments</h2>
+                                <p class="field-hint">Tick the badges this event offers and choose the judge who reviews each one.</p>
+                            </div>
+                            <button type="button" class="btn btn-primary" id="save-event-badges-btn">Save assignments</button>
                         </div>
 
                         <div id="event-badges-list"></div>
                     </div>
 
-                    <div id="event-badges-empty" class="empty-state">
-                        <p style="font-size: 1.5rem; margin: 0 0 8px;">📅</p>
-                        <p>Select an event to manage badge assignments</p>
+                    <div id="event-badges-empty" class="panel">
+                        <div class="empty-state">
+                            <span class="empty-state-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#calendar-days"></use></svg></span>
+                            <p>Choose an event to pick its badges and assign judges.</p>
+                        </div>
                     </div>
                 </div>
 
                 <div id="tab-claims" class="tab-content">
-                    <div class="filter-bar">
-                        <select id="claims-event-filter">
-                            <option value="">All Events</option>
+                    <div class="toolbar claims-filters">
+                        <select id="claims-event-filter" aria-label="Event">
+                            <option value="">All events</option>
                         </select>
-                        <select id="claims-status-filter">
-                            <option value="">All Statuses</option>
-                            <option value="pending">⏳ Pending</option>
-                            <option value="approved">✅ Approved</option>
-                            <option value="declined">❌ Declined</option>
+                        <select id="claims-status-filter" aria-label="Status">
+                            <option value="">All statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="declined">Declined</option>
                         </select>
-                        <select id="claims-category-filter">
-                            <option value="">All Categories</option>
-                            <option value="soft">Soft Code</option>
-                            <option value="low-code">Low Code</option>
-                            <option value="pro-code">Pro Code</option>
+                        <select id="claims-category-filter" aria-label="Category">
+                            <option value="">All categories</option>
+                            <option value="soft">Soft code</option>
+                            <option value="low-code">Low code</option>
+                            <option value="pro-code">Pro code</option>
                             <option value="sponsor">Sponsor</option>
                         </select>
                     </div>
 
-                    <div class="stat-row">
+                    <div class="stats-row compact">
                         <div class="stat-card">
-                            <div class="stat-value" id="cl-stat-total">0</div>
-                            <div class="stat-label">Total Claims</div>
+                            <div class="stat-icon tone-accent"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#inbox"></use></svg></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="cl-stat-total">0</div>
+                                <div class="stat-label">Claims</div>
+                            </div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value" id="cl-stat-pending" style="color: var(--admin-warning);">0</div>
-                            <div class="stat-label">Pending Review</div>
+                            <div class="stat-icon tone-warning"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#hourglass"></use></svg></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="cl-stat-pending">0</div>
+                                <div class="stat-label">Pending</div>
+                            </div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value" id="cl-stat-approved" style="color: var(--admin-success);">0</div>
-                            <div class="stat-label">Approved</div>
+                            <div class="stat-icon tone-success"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#circle-check"></use></svg></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="cl-stat-approved">0</div>
+                                <div class="stat-label">Approved</div>
+                            </div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value" id="cl-stat-declined" style="color: var(--admin-danger);">0</div>
-                            <div class="stat-label">Declined</div>
+                            <div class="stat-icon tone-danger"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#circle-x"></use></svg></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="cl-stat-declined">0</div>
+                                <div class="stat-label">Declined</div>
+                            </div>
                         </div>
                     </div>
 
                     <div id="claims-grouped-container"></div>
-                    <div id="claims-empty" class="empty-state hidden">
-                        <p>No badge claims found</p>
+                    <div id="claims-empty" class="panel hidden">
+                        <div class="empty-state">
+                            <span class="empty-state-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#inbox"></use></svg></span>
+                            <p>No badge claims found</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -351,84 +177,94 @@
     </div>
 
     <div class="modal-overlay" id="badge-modal">
-        <div class="modal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="badge-modal-title">
             <div class="modal-header">
-                <h2 id="badge-modal-title">Add Badge</h2>
-                <button type="button" class="modal-close" id="close-badge-modal-btn">✕</button>
+                <h2 id="badge-modal-title">Add badge</h2>
+                <button type="button" class="modal-close" id="close-badge-modal-btn" aria-label="Close"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#x"></use></svg></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="badge-edit-id">
                 <div class="form-group">
-                    <label>Badge Name *</label>
-                    <input type="text" id="badge-name" placeholder="e.g. Community Champion">
+                    <label for="badge-name">Badge name <span class="required" aria-hidden="true">*</span></label>
+                    <input type="text" id="badge-name" placeholder="e.g. Community champion" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="badge-category">Category <span class="required" aria-hidden="true">*</span></label>
+                        <select id="badge-category" required>
+                            <option value="">Choose a category</option>
+                            <option value="soft">Soft code</option>
+                            <option value="low-code">Low code</option>
+                            <option value="pro-code">Pro code</option>
+                            <option value="sponsor">Sponsor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="badge-points">Points</label>
+                        <input type="number" id="badge-points" placeholder="0" min="0" inputmode="numeric">
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label>Category *</label>
-                    <select id="badge-category">
-                        <option value="">Select category...</option>
-                        <option value="soft">🟦 Soft Code</option>
-                        <option value="low-code">🟩 Low Code</option>
-                        <option value="pro-code">🟪 Pro Code</option>
-                        <option value="sponsor">🟨 Sponsor</option>
+                    <label for="badge-claimType">How teams get it <span class="required" aria-hidden="true">*</span></label>
+                    <select id="badge-claimType" aria-describedby="badge-claimType-hint">
+                        <option value="common">Common: teams claim it with a blog post</option>
+                        <option value="exclusive">Exclusive: judges award it to one team</option>
                     </select>
+                    <p class="field-hint" id="badge-claimType-hint">Common badges can be claimed by every team. An exclusive badge goes to a single team.</p>
                 </div>
                 <div class="form-group">
-                    <label>Claim Type *</label>
-                    <select id="badge-claimType">
-                        <option value="common">🎯 Common — teams claim with blog post</option>
-                        <option value="exclusive">🏆 Exclusive — awarded by judges</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Description</label>
+                    <label for="badge-description">Description</label>
                     <textarea id="badge-description" placeholder="What does this badge reward?"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Points</label>
-                    <input type="number" id="badge-points" placeholder="0" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Image URL</label>
-                    <input type="text" id="badge-imageUrl" placeholder="https://...">
+                    <label for="badge-imageUrl">Image URL</label>
+                    <input type="url" id="badge-imageUrl" placeholder="https://..." inputmode="url">
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn-sm" id="cancel-badge-modal-btn">Cancel</button>
-                <button type="button" class="btn-sm primary" id="badge-save-btn">Save Badge</button>
+                <button type="button" class="btn btn-secondary" id="cancel-badge-modal-btn">Cancel</button>
+                <button type="button" class="btn btn-primary" id="badge-save-btn">Save badge</button>
             </div>
         </div>
     </div>
 
     <div class="modal-overlay" id="review-modal">
-        <div class="modal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="review-modal-title">
             <div class="modal-header">
-                <h2>Review Badge Claim</h2>
-                <button type="button" class="modal-close" id="close-review-modal-btn">✕</button>
+                <h2 id="review-modal-title">Review claim</h2>
+                <button type="button" class="modal-close" id="close-review-modal-btn" aria-label="Close"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#x"></use></svg></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="review-claim-id">
-                <div style="background: var(--admin-bg); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                    <div style="font-weight: 600; margin-bottom: 4px;" id="review-badge-name"></div>
-                    <div style="font-size: 0.8rem; color: var(--admin-text-muted);" id="review-team-name"></div>
-                    <div style="margin-top: 12px; font-size: 0.85rem;" id="review-evidence"></div>
-                    <div id="review-previous-comments" style="display: none; margin-top: 12px; font-size: 0.85rem; padding: 10px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; color: #92400e;"></div>
+                <div class="review-summary">
+                    <div class="review-summary-title">
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#award"></use></svg>
+                        <span id="review-badge-name"></span>
+                    </div>
+                    <div class="review-team">
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg>
+                        <span id="review-team-name"></span>
+                    </div>
+                    <div class="review-evidence" id="review-evidence"></div>
                 </div>
-                <div class="form-group">
-                    <label>Decision</label>
+                <div id="review-previous-comments" class="notice notice-warning review-comments hidden"></div>
+                <div class="form-group" id="review-decision-group">
+                    <label for="review-decision">Decision</label>
                     <select id="review-decision">
-                        <option value="">Select...</option>
-                        <option value="approved">✅ Approve</option>
-                        <option value="declined">❌ Decline</option>
+                        <option value="">Choose a decision</option>
+                        <option value="approved">Approve</option>
+                        <option value="declined">Decline</option>
                     </select>
                 </div>
-                <div class="form-group" id="decline-reason-group" style="display: none;">
-                    <label>Reason for Declining *</label>
-                    <textarea id="review-decline-reason" placeholder="Explain why the claim was declined..."></textarea>
+                <div class="form-group hidden" id="decline-reason-group">
+                    <label for="review-decline-reason">Reason for declining <span class="required" aria-hidden="true">*</span></label>
+                    <textarea id="review-decline-reason" placeholder="Explain what the team needs to change" aria-describedby="review-decline-hint"></textarea>
+                    <p class="field-hint" id="review-decline-hint">The team sees this reason on their event page.</p>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn-sm" id="cancel-review-modal-btn">Cancel</button>
-                <button type="button" class="btn-sm primary" id="submit-review-btn">Submit Review</button>
+                <button type="button" class="btn btn-secondary" id="cancel-review-modal-btn">Cancel</button>
+                <button type="button" class="btn btn-primary primary" id="submit-review-btn">Submit review</button>
             </div>
         </div>
     </div>
