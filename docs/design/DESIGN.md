@@ -186,3 +186,15 @@ Headings use `--weight-bold` and slight negative letter spacing.
 - 2026-11-03: Admin links stay in the admin area: event names go to `admin-events.html?event=`, teams to
   `admin-teams.html?team=`, people to `admin-person.html?email=`. Claim evidence that is an http(s) URL is a link that
   opens the team's post in a new tab (`safeHttpUrl`, `rel="noopener noreferrer"`).
+- 2026-11-03: Email admin pages migrated (Send email, Email templates, Email sequences). Edit forms sit on the
+  left with a sticky live preview on the right (stacked below 1180px). `.email-preview` shows the fixed 600px
+  email in a sandboxed iframe scaled in steps to fit its panel (phones get an overview) and stays light in dark
+  mode, because it shows what recipients get. HTML that becomes an email keeps its inline styles and colours.
+- 2026-11-03: Quill editors are wrapped in `.rich-editor`, which themes the "snow" toolbar and container with
+  tokens (strong border, accent focus and active buttons, dark mode); page scripts give its buttons aria-labels.
+- 2026-11-03: Script-filled status lines are `.status-bar` + `.notice notice-{success,warning,danger}`, hidden
+  while empty. Status colours on the email pages: sequence email Draft = neutral, Scheduled = info, Live =
+  violet; delivery Sent = success, Pending = info, Failed = danger; send history Sent = success, Partial =
+  warning. "View only" is a neutral notice; a sequence without an event is a warning.
+- 2026-11-03: Choices that act on click are `<button class="option-card" aria-pressed>`; form choices stay
+  `<label class="option-card">` with the radio inside.

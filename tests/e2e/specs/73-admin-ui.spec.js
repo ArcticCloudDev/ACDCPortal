@@ -134,7 +134,7 @@ test.describe('strict CSP: every admin page loads with no violations and no thir
 
         await page.goto(`/admin-email.html?mode=sequence&sequenceId=${w.seq.id}&eventId=${w.event.id}&emailId=${w.campaign.id}`);
         await expect(page.locator('#subject')).toHaveValue('Hotel info for {{eventName}}');
-        await expect(page.locator('#send-btn')).toHaveText(/Update Email/);
+        await expect(page.locator('#send-btn')).toHaveText(/Save changes/);
 
         await page.goto('/admin-email-templates.html');
         await page.locator('.template-option[data-template="invitation-judge"]').click();
@@ -144,7 +144,7 @@ test.describe('strict CSP: every admin page loads with no violations and no thir
         await page.goto('/admin-campaigns.html');
         await page.locator('#sequences-list .sequence-header', { hasText: 'ACDC 2027 drip' }).click();
         await expect(page.locator('#emails-body')).toContainText('Hotel info for');
-        await expect(page.locator('#sequence-stats')).toContainText('Team Members');
+        await expect(page.locator('#sequence-stats')).toContainText('Team members');
 
         noThirdParty(context);
     });

@@ -1,253 +1,117 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Templates - ACDC Committee</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <title>Email templates - ACDC Admin</title>
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="vendor/quill/quill.snow.css">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <link href="vendor/quill/quill.snow.css" rel="stylesheet">
-    <style>
-        .template-selector {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .template-option {
-            padding: 14px;
-            border: 2px solid var(--admin-border);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-        }
-
-        .template-option:hover {
-            border-color: var(--admin-primary);
-            background: var(--admin-bg);
-        }
-
-        .template-option.selected {
-            border-color: var(--admin-primary);
-            background: #eff6ff;
-        }
-
-        .template-option .icon {
-            font-size: 1.5rem;
-            margin-bottom: 6px;
-        }
-
-        .template-option .name {
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: var(--admin-sidebar);
-        }
-
-        .editor-section {
-            margin-bottom: 24px;
-        }
-
-        .editor-section label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--admin-sidebar);
-            margin-bottom: 8px;
-        }
-
-        .editor-container {
-            border: 1px solid var(--admin-border);
-            border-radius: 6px;
-            background: white;
-            min-height: 120px;
-        }
-
-        .theme-upload {
-            border: 2px dashed var(--admin-border);
-            border-radius: 8px;
-            padding: 24px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .theme-upload:hover {
-            border-color: var(--admin-primary);
-            background: var(--admin-bg);
-        }
-
-        .theme-upload.has-image {
-            border-style: solid;
-            padding: 0;
-        }
-
-        .theme-preview {
-            width: 100%;
-            max-height: 200px;
-            object-fit: cover;
-            border-radius: 6px;
-        }
-
-        .preview-pane {
-            position: sticky;
-            top: 20px;
-            background: white;
-            border: 1px solid var(--admin-border);
-            border-radius: 8px;
-            padding: 20px;
-            max-height: calc(100vh - 40px);
-            overflow-y: auto;
-        }
-
-        .preview-header {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--admin-sidebar);
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .preview-content {
-            font-size: 0.875rem;
-            overflow: hidden;
-        }
-
-        .two-column {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-        }
-
-        .merge-fields {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-
-        .merge-field-tag {
-            padding: 4px 12px;
-            background: var(--admin-bg);
-            border: 1px solid var(--admin-border);
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-family: monospace;
-            color: var(--admin-text-muted);
-            cursor: copy;
-        }
-
-        .merge-field-tag:hover {
-            background: #dbeafe;
-            border-color: #3b82f6;
-            color: #1e40af;
-        }
-    </style></head>
+</head>
 <body>
     <div class="admin-layout">
         <main class="main-content">
-            <div class="page-header">
-                <h1 class="page-title">📧 Email Templates</h1>
-                <p style="color: var(--admin-text-muted);">Manage automated system email templates with custom themes and text</p>
-            </div>
-
-            <div class="panel" style="margin-bottom: 24px;">
-                <div class="panel-header" style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border);">
-                    <span style="font-weight: 600;">Select Template Type</span>
+            <header class="page-header">
+                <div>
+                    <h1 class="page-title">Email templates</h1>
+                    <p class="page-subtitle">Edit the emails the portal sends automatically. Each event has its own version of the text.</p>
                 </div>
-                <div class="panel-body padded">
-                    <div class="template-selector" id="template-selector">
-                        <div class="template-option selected" data-template="welcome">
-                            <div class="icon">👋</div>
-                            <div class="name">Welcome</div>
-                        </div>
-                        <div class="template-option" data-template="interest-acknowledgment">
-                            <div class="icon">✉️</div>
-                            <div class="name">Interest</div>
-                        </div>
-                        <div class="template-option" data-template="invitation-judge">
-                            <div class="icon">⚖️</div>
-                            <div class="name">Judge Invite</div>
-                        </div>
-                        <div class="template-option" data-template="invitation-committee">
-                            <div class="icon">👔</div>
-                            <div class="name">Committee Invite</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            </header>
 
-            <div class="panel" style="margin-bottom: 24px;">
-                <div class="panel-header" style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border);">
-                    <span style="font-weight: 600;">Event & Theme</span>
+            <section class="panel" aria-labelledby="choose-title">
+                <div class="panel-header">
+                    <h2 class="panel-title" id="choose-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#file-text"></use></svg>Template and event</h2>
                 </div>
                 <div class="panel-body padded">
                     <div class="form-group">
-                        <label for="event-select">Select Event</label>
-                        <select id="event-select" style="width: 100%;">
+                        <span class="form-label" id="template-type-label">Template</span>
+                        <div class="option-cards" id="template-selector" role="group" aria-labelledby="template-type-label">
+                            <button type="button" class="option-card template-option selected" data-template="welcome" aria-pressed="true">
+                                <span class="option-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#party-popper"></use></svg>Team welcome</span>
+                                <span class="option-card-desc">Sent when someone joins a team</span>
+                            </button>
+                            <button type="button" class="option-card template-option" data-template="interest-acknowledgment" aria-pressed="false">
+                                <span class="option-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#mail-check"></use></svg>Interest received</span>
+                                <span class="option-card-desc">Sent when someone registers interest</span>
+                            </button>
+                            <button type="button" class="option-card template-option" data-template="invitation-judge" aria-pressed="false">
+                                <span class="option-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#scale"></use></svg>Judge invitation</span>
+                                <span class="option-card-desc">Invites someone to judge the event</span>
+                            </button>
+                            <button type="button" class="option-card template-option" data-template="invitation-committee" aria-pressed="false">
+                                <span class="option-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#briefcase"></use></svg>Committee invitation</span>
+                                <span class="option-card-desc">Invites someone to the organising committee</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group template-event-field">
+                        <label for="event-select">Event</label>
+                        <select id="event-select" aria-describedby="event-select-hint">
                             <option value="">Loading events...</option>
                         </select>
+                        <p class="field-hint" id="event-select-hint">Choose an event to load and edit its version of this email.</p>
                     </div>
                 </div>
+            </section>
+
+            <div class="email-workspace">
+                <section class="panel" aria-labelledby="text-title">
+                    <div class="panel-header">
+                        <h2 class="panel-title" id="text-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#square-pen"></use></svg>Email text</h2>
+                    </div>
+                    <div class="panel-body padded">
+                        <div class="merge-fields-box">
+                            <p class="form-label" id="merge-fields-label">Merge fields</p>
+                            <div class="merge-fields" id="merge-fields" role="group" aria-labelledby="merge-fields-label"></div>
+                            <p class="field-hint">Click a field to copy it, then paste it into the text. Each recipient sees their own details in its place.</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="field-header-title">Heading</label>
+                            <input type="text" id="field-header-title" placeholder="Welcome to {{eventName}}!" aria-describedby="header-title-hint">
+                            <p class="field-hint" id="header-title-hint">Shown at the top of the email and used as its subject line.</p>
+                        </div>
+
+                        <div class="form-group">
+                            <span class="form-label" id="body-label">Message</span>
+                            <div class="rich-editor">
+                                <div id="body-editor"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="button-text-row">
+                            <label for="field-button-text">Button text <span class="required" aria-hidden="true">*</span></label>
+                            <input type="text" id="field-button-text" placeholder="Open the portal" aria-required="true">
+                        </div>
+
+                        <div class="form-group">
+                            <span class="form-label" id="closing-label">Signature</span>
+                            <div class="rich-editor rich-editor-short">
+                                <div id="closing-editor"></div>
+                            </div>
+                        </div>
+
+                        <div id="status-bar" class="status-bar" role="status" aria-live="polite"></div>
+
+                        <div class="form-actions">
+                            <button type="button" id="save-template-btn" class="btn btn-primary">Save template</button>
+                            <button type="button" id="send-test-email-btn" class="btn btn-secondary">Send test email</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel email-preview-panel" aria-labelledby="template-preview-title">
+                    <div class="panel-header">
+                        <h2 class="panel-title" id="template-preview-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#eye"></use></svg>Preview</h2>
+                    </div>
+                    <div class="email-preview" id="preview-content">
+                        <div class="empty-state">Choose an event to see the preview.</div>
+                    </div>
+                    <p class="email-preview-note">Uses sample names. The message and signature update as you type; the heading and button text update after you save.</p>
+                </section>
             </div>
-
-            <div class="two-column">
-                <div>
-                    <div class="panel">
-                        <div class="panel-header" style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border);">
-                            <span style="font-weight: 600;">Customize Text</span>
-                        </div>
-                        <div class="panel-body padded">
-                            <div style="margin-bottom: 20px; padding: 12px; background: #fef3c7; border-radius: 6px;">
-                                <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 8px;">Available Merge Fields:</div>
-                                <div class="merge-fields" id="merge-fields"></div>
-                                <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px;">Click to copy • Paste into text sections below</div>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--admin-border);">
-                                <label for="field-header-title">Header</label>
-                                <input type="text" id="field-header-title" style="width:100%;" placeholder="Welcome to {{eventName}}!">
-                            </div>
-
-                            <div class="editor-section">
-                                <label for="body-editor">Body Text</label>
-                                <div id="body-editor" class="editor-container"></div>
-                            </div>
-
-                            <div class="form-group" id="button-text-row" style="margin-top: 16px;">
-                                <label for="field-button-text">Button Text <span style="color:var(--admin-danger)">*</span></label>
-                                <input type="text" id="field-button-text" style="width:100%;" placeholder="Open Portal">
-                            </div>
-
-                            <div class="editor-section">
-                                <label for="closing-editor">Signature</label>
-                                <div id="closing-editor" class="editor-container"></div>
-                            </div>
-
-                            <div style="display: flex; gap: 12px; margin-top: 20px; align-items: center; flex-wrap: wrap;">
-                                <button type="button" id="save-template-btn" class="btn btn-primary">💾 Save Template</button>
-                                <button type="button" id="send-test-email-btn" class="btn">📤 Send Test Email</button>
-                                <span id="status-bar" class="status-bar" style="flex: 1; margin: 0;"></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <div class="preview-pane">
-                        <div class="preview-header">📧 Email Preview</div>
-                        <div class="preview-content" id="preview-content">
-                            <p style="color: var(--admin-text-muted); text-align: center; padding: 40px 20px;">
-                                Select an event to preview
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         </main>
     </div>
 

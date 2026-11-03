@@ -90,26 +90,34 @@ function renderSequences() {
     const container = document.getElementById('sequences-list');
 
     if (allSequences.length === 0) {
-        container.innerHTML = '<div class="empty-state">No sequences yet. Open an event in Events and use its Sequence tab to create one.</div>';
+        container.innerHTML = '<div class="empty-state">No sequences yet. Open an event in <a href="admin-events.html">Events</a> and use its Sequence tab to create one.</div>';
         return;
     }
 
     container.innerHTML = allSequences.map(seq => {
         const createdDate = new Date(seq.createdAt).toLocaleDateString();
+        const emailCount = seq.emailCount || 0;
+        const failed = Number(seq.stats?.failed) || 0;
+        const usedBy = allEvents.filter(e => sameId(e.sequenceId, seq.id)).map(e => e.name);
+        const usage = usedBy.length
+            ? `<span class="badge badge-accent">${icon('calendar-days')}${escapeHtml(usedBy.join(', '))}</span>`
+            : '<span class="badge">Not assigned to an event</span>';
 
         return `
             <div class="sequence-card">
-                <div class="sequence-header" data-sequence-id="${escapeHtml(seq.id)}">
-                    <div class="sequence-info">
-                        <h3>${escapeHtml(seq.name)}</h3>
-                        <div class="sequence-meta">
-                            ${seq.emailCount || 0} email${(seq.emailCount || 0) !== 1 ? 's' : ''} ·
-                            ${seq.stats?.sent || 0} sent ·
-                            ${seq.stats?.failed || 0} failed ·
-                            Created ${createdDate}
-                        </div>
-                    </div>
-                </div>
+                <button type="button" class="sequence-header" data-sequence-id="${escapeHtml(seq.id)}">
+                    <span class="sequence-info">
+                        <span class="sequence-name">${escapeHtml(seq.name)}</span>
+                        <span class="sequence-meta meta-list">
+                            <span class="meta-item">${icon('mail')}${emailCount} email${emailCount !== 1 ? 's' : ''}</span>
+                            <span class="meta-item">${icon('send')}${Number(seq.stats?.sent) || 0} sent</span>
+                            ${failed ? `<span class="meta-item failed-count">${icon('circle-x')}${failed} failed</span>` : ''}
+                            <span class="meta-item">${icon('calendar')}Created ${createdDate}</span>
+                        </span>
+                    </span>
+                    <span class="sequence-usage">${usage}</span>
+                    ${icon('chevron-right', 'sequence-chevron')}
+                </button>
             </div>
         `;
     }).join('');
@@ -175,11 +183,14 @@ async function loadSequenceStats(sequenceId) {
         const eventsUsingSequence = allEvents.filter(e => sameId(e.sequenceId, sequenceId));
 
         if (eventsUsingSequence.length === 0) {
-            statsEl.innerHTML =
-                `<p style="color: var(--admin-text-muted); font-size: 0.9rem;">
-                    This sequence is not assigned to any events yet.
-                    <strong>Assign it to exactly one event</strong> to start sending emails to interest leads.
-                </p>`;
+            statsEl.innerHTML = `
+                <div class="notice notice-warning">
+                    ${icon('triangle-alert')}
+                    <div>
+                        <div class="notice-title">Not assigned to an event</div>
+                        <div class="notice-body">This sequence sends nothing yet. Assign it to exactly one event, in that event's Sequence tab, to start sending emails to interest leads.</div>
+                    </div>
+                </div>`;
             return;
         }
 
@@ -207,6 +218,7 @@ async function loadSequenceStats(sequenceId) {
             totalTeamMembers += teamMemberCount;
 
             return {
+                id: event.id,
                 name: event.name,
                 leads: eventLeads.length,
                 verified: verifiedLeads.length,
@@ -214,38 +226,59 @@ async function loadSequenceStats(sequenceId) {
             };
         });
 
+        const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
         statsEl.innerHTML = `
-            <div style="background: var(--admin-bg-secondary); padding: 12px; border-radius: 4px; margin-bottom: 16px;">
-                <strong style="color: var(--admin-accent);">📊 Sequence Recipients</strong>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 8px;">
-                    <div>
-                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--admin-success);">${verifiedInterestLeads}</div>
-                        <div style="font-size: 0.85rem; color: var(--admin-text-muted);">Verified Interest Leads</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--admin-text-muted);">${totalInterestLeads - verifiedInterestLeads}</div>
-                        <div style="font-size: 0.85rem; color: var(--admin-text-muted);">Unverified Leads</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--admin-info);">${totalTeamMembers}</div>
-                        <div style="font-size: 0.85rem; color: var(--admin-text-muted);">Team Members</div>
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon tone-accent">${icon('mail-check')}</div>
+                    <div class="stat-content">
+                        <div class="stat-value">${verifiedInterestLeads}</div>
+                        <div class="stat-label">Verified interest leads</div>
                     </div>
                 </div>
-                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--admin-border);">
-                    <strong style="font-size: 0.9rem;">Events using this sequence:</strong>
-                    ${eventStats.map(e => `
-                        <div style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;">
-                            • ${escapeHtml(e.name)}: ${e.verified} verified leads, ${e.teams} team members
-                        </div>
-                    `).join('')}
+                <div class="stat-card">
+                    <div class="stat-icon tone-neutral">${icon('hourglass')}</div>
+                    <div class="stat-content">
+                        <div class="stat-value">${totalInterestLeads - verifiedInterestLeads}</div>
+                        <div class="stat-label">Unverified leads (not emailed)</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon tone-accent">${icon('users')}</div>
+                    <div class="stat-content">
+                        <div class="stat-value">${totalTeamMembers}</div>
+                        <div class="stat-label">Team members</div>
+                    </div>
                 </div>
             </div>
+            <section class="panel" aria-labelledby="sequence-events-title">
+                <div class="panel-header">
+                    <h2 class="panel-title" id="sequence-events-title">${icon('calendar-days')}Used by</h2>
+                </div>
+                ${eventStats.map(e => `
+                    <div class="event-row">
+                        <div class="event-info">
+                            <a class="event-name" href="admin-events.html?event=${encodeURIComponent(e.id)}">${escapeHtml(e.name)}</a>
+                            <div class="event-meta">
+                                <span>${icon('mail-check')}${plural(e.verified, 'verified lead')}</span>
+                                <span>${icon('users')}${plural(e.teams, 'team member')}</span>
+                            </div>
+                        </div>
+                        <div class="row-actions">
+                            <a class="btn-sm" href="admin-events.html?event=${encodeURIComponent(e.id)}&amp;tab=sequence">${icon('pencil')}Edit sequence</a>
+                        </div>
+                    </div>
+                `).join('')}
+            </section>
         `;
 
     } catch (err) {
         console.error('[STATS] Failed to load sequence stats:', err);
-        statsEl.innerHTML =
-            `<p style="color: var(--admin-danger); font-size: 0.9rem;">Failed to load recipient statistics: ${escapeHtml(err.message)}</p>`;
+        statsEl.innerHTML = `
+            <div class="notice notice-danger">
+                ${icon('circle-alert')}
+                <div>Failed to load recipient statistics: ${escapeHtml(err.message)}</div>
+            </div>`;
     }
 }
 
@@ -253,7 +286,7 @@ function renderEmails() {
     const tbody = document.getElementById('emails-body');
 
     if (currentEmails.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-state-small">No emails yet. Add emails from the event\'s Sequence tab.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No emails yet. Add emails from the event\'s Sequence tab.</td></tr>';
         return;
     }
 
@@ -274,20 +307,22 @@ function renderEmails() {
                     const offsetSign = offsetMinutes <= 0 ? '+' : '-';
                     const timezoneStr = `GMT${offsetSign}${Math.floor(offsetHours)}`;
 
-                    statusBadge = '<span class="badge" style="background: var(--admin-warning);">⏰ Scheduled</span>';
-                    scheduleBadge = `<br><small style="color: var(--admin-text-muted);">
-                        Sends: ${schedDate.toLocaleDateString()} ${schedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        <span style="font-weight: bold;">${timezoneStr}</span>
-                    </small>`;
+                    statusBadge = `<span class="badge badge-info">${icon('clock')}Scheduled</span>`;
+                    scheduleBadge = `<div class="sequence-email-schedule">
+                        Sends ${schedDate.toLocaleDateString()} ${schedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        <strong>${timezoneStr}</strong>
+                    </div>`;
                 } else {
-                    statusBadge = '<span class="badge" style="background: var(--admin-success);">✅ Live</span>';
+                    statusBadge = '<span class="badge badge-violet badge-dot">Live</span>';
                 }
             } else {
-                statusBadge = '<span class="badge" style="background: var(--admin-success);">✅ Live</span>';
+                statusBadge = '<span class="badge badge-violet badge-dot">Live</span>';
             }
         } else {
-            statusBadge = '<span class="badge" style="background: var(--admin-text-muted);">📝 Draft</span>';
+            statusBadge = '<span class="badge">Draft</span>';
         }
+
+        const failed = Number(email.stats?.failed) || 0;
 
         return `
             <tr>
@@ -297,12 +332,9 @@ function renderEmails() {
                     ${scheduleBadge}
                 </td>
                 <td>${statusBadge}</td>
-                <td><span style="color: var(--admin-success);">${Number(email.stats?.sent) || 0}</span></td>
-                <td><span style="color: var(--admin-danger);">${Number(email.stats?.failed) || 0}</span></td>
-                <td>${createdDate}</td>
-                <td>
-                    <span style="color: var(--admin-text-muted); font-size: 0.85rem;">View only</span>
-                </td>
+                <td class="num">${Number(email.stats?.sent) || 0}</td>
+                <td class="num${failed ? ' failed-count' : ' text-muted'}">${failed}</td>
+                <td class="text-muted">${createdDate}</td>
             </tr>
         `;
     }).join('');

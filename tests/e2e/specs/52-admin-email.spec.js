@@ -77,7 +77,7 @@ test('admin customises the team welcome template for an event and sends a test',
     await page.locator('#event-select').selectOption(w.event.id);
     await page.locator('#field-header-title').fill('Welcome to the Arctic');
     await page.locator('#body-editor .ql-editor').fill('Your team is in. See you in Oslo!');
-    await page.getByRole('button', { name: /Save Template/ }).click();
+    await page.getByRole('button', { name: /Save template/ }).click();
     await expect(page.locator('#status-bar')).toContainText('Template saved successfully!');
 
     const [cfg] = await rows("SELECT EventThemes FROM SystemEmailConfig WHERE TemplateKey = 'welcome'");
@@ -86,7 +86,7 @@ test('admin customises the team welcome template for an event and sends a test',
     expect(theme.body).toContain('See you in Oslo!');
 
     dialogs.next({ value: 'tester@e2e.test' });
-    await page.getByRole('button', { name: /Send Test Email/ }).click();
+    await page.getByRole('button', { name: /Send test email/ }).click();
     await expect(page.locator('#status-bar')).toContainText('Test email sent!');
     const mail = await harness.waitForMail('tester@e2e.test');
     expect(mail.html).toContain('See you in Oslo!');
