@@ -138,7 +138,8 @@
 
 /* Dark mode follows the device setting on pages that opt in with <html data-theme="auto">.
    Pages opt in once they are migrated to the tokens (hardcoded colours would clash). */
-@media (prefers-color-scheme: dark) {
+/* screen only: printing from a dark-mode device stays dark-on-light */
+@media screen and (prefers-color-scheme: dark) {
     :root[data-theme="auto"] {
         color-scheme: dark;
         --color-navy: #060d18;

@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentPermissions = await Permissions.initAdminPage('dashboard', {
         loadingEl: loadingDiv,
         accessDeniedEl: notCommitteeDiv,
-        contentEl: mainContent
+        contentEl: dashboardContent // #not-committee lives inside <main>, so hide only the dashboard
     });
 
     if (!currentPermissions) return;

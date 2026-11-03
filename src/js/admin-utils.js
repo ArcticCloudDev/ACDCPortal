@@ -43,7 +43,8 @@ function debounce(func, wait) {
 async function withBusy(button, busyLabel, action) {
     if (!button) return action();
     if (button.disabled) return undefined;
-    const originalText = button.textContent;
+    // Keep the original nodes (icon + label) so they come back intact after the busy label.
+    const originalNodes = Array.from(button.childNodes);
     button.disabled = true;
     button.setAttribute('aria-busy', 'true');
     if (busyLabel) button.textContent = busyLabel;
@@ -52,7 +53,7 @@ async function withBusy(button, busyLabel, action) {
     } finally {
         button.disabled = false;
         button.removeAttribute('aria-busy');
-        if (busyLabel) button.textContent = originalText;
+        if (busyLabel) button.replaceChildren(...originalNodes);
     }
 }
 
