@@ -139,3 +139,15 @@ Headings use `--weight-bold` and slight negative letter spacing.
   accent, Participant = neutral. Placeholders (add member, unlock slot) are dashed neutral tiles, not tinted.
 - 2026-11-02: `:has()` is allowed as a progressive enhancement (checked option rows, joining an empty state
   with its call to action). Without it the page must still work and read correctly.
+- 2026-11-03: Email admin pages migrated (Send email, Email templates, Email sequences). Edit forms sit on the
+  left with a sticky live preview on the right (stacked below 1180px). `.email-preview` shows the fixed 600px
+  email in a sandboxed iframe scaled in steps to fit its panel (phones get an overview) and stays light in dark
+  mode, because it shows what recipients get. HTML that becomes an email keeps its inline styles and colours.
+- 2026-11-03: Quill editors are wrapped in `.rich-editor`, which themes the "snow" toolbar and container with
+  tokens (strong border, accent focus and active buttons, dark mode); page scripts give its buttons aria-labels.
+- 2026-11-03: Script-filled status lines are `.status-bar` + `.notice notice-{success,warning,danger}`, hidden
+  while empty. Status colours on the email pages: sequence email Draft = neutral, Scheduled = info, Live =
+  violet; delivery Sent = success, Pending = info, Failed = danger; send history Sent = success, Partial =
+  warning. "View only" is a neutral notice; a sequence without an event is a warning.
+- 2026-11-03: Choices that act on click are `<button class="option-card" aria-pressed>`; form choices stay
+  `<label class="option-card">` with the radio inside.

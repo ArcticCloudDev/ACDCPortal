@@ -1437,3 +1437,450 @@ a.event-name:hover {
         flex-basis: 100%;
     }
 }
+
+/* Page: admin-email ------------------------------------------------- */
+
+/* candidate shared: icon-sm (mirrors styles.css; admin pages do not load it) */
+.icon-sm {
+    width: 1em;
+    height: 1em;
+}
+
+/* candidate shared: status-bar (a .notice that a script fills in; hidden until it has a tone).
+   Also used by admin-email-templates. */
+.status-bar {
+    display: none;
+}
+
+.status-bar.notice {
+    display: flex;
+}
+
+/* candidate shared: option-card as a <button> (a choice that acts on click, state in aria-pressed) */
+button.option-card {
+    width: 100%;
+    font: inherit;
+    text-align: left;
+}
+
+button.option-card:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* candidate shared: label-optional (muted "(optional)" or unit after a label) */
+.label-optional {
+    font-weight: var(--weight-medium);
+    color: var(--color-text-muted);
+}
+
+/* candidate shared: data-table numeric column */
+.data-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* candidate shared: rich-editor. The Quill "snow" editor themed with tokens (borders, focus, dark mode).
+   Wrap the element Quill mounts on: <div class="rich-editor"><div id="…"></div></div>.
+   Also used by admin-email-templates. */
+.rich-editor .ql-toolbar.ql-snow {
+    padding: var(--space-2);
+    font-family: var(--font-sans);
+    background: var(--color-surface-muted);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.rich-editor .ql-container.ql-snow {
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-top: 0;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+
+.rich-editor .ql-container.ql-snow:focus-within {
+    border-color: var(--color-accent);
+    box-shadow: var(--focus-ring);
+}
+
+.rich-editor .ql-container.ql-disabled {
+    background: var(--color-surface-muted);
+}
+
+.rich-editor .ql-editor {
+    min-height: 160px;
+    padding: var(--space-3);
+    line-height: var(--leading-normal);
+}
+
+.rich-editor .ql-editor.ql-blank::before {
+    left: var(--space-3);
+    right: var(--space-3);
+    font-style: normal;
+    color: var(--color-text-subtle);
+}
+
+.rich-editor .ql-snow.ql-toolbar button {
+    border-radius: var(--radius-sm);
+}
+
+.rich-editor .ql-snow.ql-toolbar button:hover {
+    background: var(--color-surface);
+}
+
+.rich-editor .ql-snow .ql-stroke,
+.rich-editor .ql-snow .ql-stroke-miter {
+    stroke: var(--color-text-muted);
+}
+
+.rich-editor .ql-snow .ql-fill,
+.rich-editor .ql-snow .ql-stroke.ql-fill {
+    fill: var(--color-text-muted);
+}
+
+.rich-editor .ql-snow.ql-toolbar button:hover .ql-stroke,
+.rich-editor .ql-snow.ql-toolbar button:focus .ql-stroke,
+.rich-editor .ql-snow.ql-toolbar button.ql-active .ql-stroke,
+.rich-editor .ql-snow.ql-toolbar button:hover .ql-stroke-miter,
+.rich-editor .ql-snow.ql-toolbar button:focus .ql-stroke-miter,
+.rich-editor .ql-snow.ql-toolbar button.ql-active .ql-stroke-miter {
+    stroke: var(--color-accent);
+}
+
+.rich-editor .ql-snow.ql-toolbar button:hover .ql-fill,
+.rich-editor .ql-snow.ql-toolbar button:focus .ql-fill,
+.rich-editor .ql-snow.ql-toolbar button.ql-active .ql-fill,
+.rich-editor .ql-snow.ql-toolbar button:hover .ql-stroke.ql-fill,
+.rich-editor .ql-snow.ql-toolbar button:focus .ql-stroke.ql-fill,
+.rich-editor .ql-snow.ql-toolbar button.ql-active .ql-stroke.ql-fill {
+    fill: var(--color-accent);
+}
+
+.rich-editor .ql-snow a {
+    color: var(--color-accent-text);
+}
+
+.rich-editor .ql-snow .ql-tooltip {
+    z-index: 20;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+.rich-editor .ql-snow .ql-tooltip input[type="text"] {
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+}
+
+/* candidate shared: email-preview. A sandboxed <iframe> showing a fixed 600px-wide email, scaled down
+   in steps to fit narrower panels so the whole email stays visible (phones get an overview);
+   below 320px it scrolls inside the frame. Also used by admin-email-templates. */
+.email-preview {
+    container-type: inline-size;
+    overflow: hidden;
+    background: var(--color-surface-muted);
+}
+
+.email-preview-stage {
+    --preview-height: 760px;
+    --preview-scale: 1;
+    height: calc(var(--preview-height) * var(--preview-scale));
+}
+
+.email-preview-frame {
+    display: block;
+    width: 640px;
+    height: var(--preview-height);
+    border: 0;
+    transform: scale(var(--preview-scale));
+    transform-origin: 0 0;
+}
+
+@container (max-width: 639px) { .email-preview-stage { --preview-scale: 0.9375; } }
+@container (max-width: 599px) { .email-preview-stage { --preview-scale: 0.875; } }
+@container (max-width: 559px) { .email-preview-stage { --preview-scale: 0.8125; } }
+@container (max-width: 519px) { .email-preview-stage { --preview-scale: 0.75; } }
+@container (max-width: 479px) { .email-preview-stage { --preview-scale: 0.6875; } }
+@container (max-width: 439px) { .email-preview-stage { --preview-scale: 0.625; } }
+@container (max-width: 399px) { .email-preview-stage { --preview-scale: 0.5625; } }
+@container (max-width: 359px) { .email-preview-stage { --preview-scale: 0.53125; } }
+@container (max-width: 339px) { .email-preview-stage { --preview-scale: 0.5; } }
+
+@container (max-width: 319px) {
+    .email-preview-stage { --preview-scale: 1; }
+    .email-preview-frame { width: 100%; }
+}
+
+.email-preview-note {
+    margin: 0;
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+}
+
+/* Compose (or edit) on the left, live preview on the right; stacked below 1180px. */
+.email-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: var(--space-6);
+    align-items: start;
+}
+
+.email-preview-panel {
+    position: sticky;
+    top: var(--space-6);
+}
+
+@media (max-width: 1180px) {
+    .email-workspace {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+    }
+
+    .email-preview-panel {
+        position: static;
+    }
+}
+
+.custom-recipients {
+    display: none;
+}
+
+.custom-recipients.visible {
+    display: flex;
+}
+
+.custom-recipients textarea {
+    min-height: 112px;
+    font-family: var(--font-mono);
+}
+
+.recipient-summary-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-5);
+}
+
+.recipient-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-full);
+    background: var(--color-accent-subtle);
+    color: var(--color-accent-text);
+    font-weight: var(--weight-medium);
+}
+
+.status-fieldset {
+    min-width: 0;
+    margin: 0 0 var(--space-5);
+    padding: 0;
+    border: 0;
+}
+
+.status-fieldset > legend {
+    margin-bottom: var(--space-2);
+    padding: 0;
+}
+
+.schedule-preview {
+    margin: 0;
+}
+
+.editor-lock-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    cursor: not-allowed;
+}
+
+/* Page: admin-email-templates ------------------------------------------------- */
+/* Also uses .email-workspace, .email-preview, .rich-editor and .status-bar from the admin-email section. */
+
+.template-event-field {
+    max-width: 420px;
+    margin-bottom: 0;
+}
+
+.merge-fields-box {
+    margin-bottom: var(--space-5);
+    padding: var(--space-4);
+    background: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.merge-fields-box > .form-label {
+    margin: 0 0 var(--space-2);
+}
+
+.merge-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.merge-field-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 28px;
+    padding: var(--space-1) var(--space-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    cursor: copy;
+    transition: background-color var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast);
+}
+
+.merge-field-tag .icon {
+    color: var(--color-text-subtle);
+}
+
+.merge-field-tag:hover {
+    color: var(--color-accent-text);
+    background: var(--color-accent-subtle);
+    border-color: var(--color-accent);
+}
+
+.merge-field-tag:hover .icon {
+    color: inherit;
+}
+
+.rich-editor-short .ql-editor {
+    min-height: 96px;
+}
+
+.email-preview > .empty-state {
+    padding: var(--space-16) var(--space-6);
+}
+
+.preview-error {
+    margin: var(--space-5);
+}
+
+/* Page: admin-campaigns ------------------------------------------------- */
+
+/* candidate shared: tone-neutral (stat icon without a status meaning) */
+.tone-neutral {
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+}
+
+.sequence-card {
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sequence-card:last-child {
+    border-bottom: 0;
+}
+
+/* Whole row is one button that opens the sequence detail. */
+.sequence-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    width: 100%;
+    padding: var(--space-4) var(--space-5);
+    font: inherit;
+    text-align: left;
+    color: var(--color-text);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    cursor: pointer;
+    transition: background-color var(--duration-fast);
+}
+
+.sequence-header:hover {
+    background: var(--color-surface-hover);
+}
+
+.sequence-header:focus-visible {
+    box-shadow: none;
+    border-radius: 0;
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+}
+
+.sequence-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.sequence-name {
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+}
+
+.sequence-header:hover .sequence-name {
+    color: var(--color-accent-text);
+}
+
+.sequence-meta {
+    font-size: var(--text-sm);
+}
+
+.sequence-usage {
+    flex-shrink: 0;
+    max-width: 40%;
+}
+
+.sequence-usage .badge {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sequence-chevron {
+    color: var(--color-text-subtle);
+}
+
+.failed-count,
+.failed-count .icon {
+    color: var(--color-danger-text);
+    font-weight: var(--weight-semibold);
+}
+
+.sequence-email-schedule {
+    margin-top: 2px;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+}
+
+@media (max-width: 640px) {
+    .sequence-header {
+        flex-wrap: wrap;
+        gap: var(--space-2) var(--space-4);
+    }
+
+    .sequence-chevron {
+        order: 2;
+    }
+
+    .sequence-usage {
+        order: 3;
+        flex-basis: 100%;
+        max-width: 100%;
+    }
+}

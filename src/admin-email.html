@@ -1,318 +1,170 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Composer - ACDC Committee</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <title>Send email - ACDC Admin</title>
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="vendor/quill/quill.snow.css">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <link href="vendor/quill/quill.snow.css" rel="stylesheet">
-    <style>        .main-content {
-            flex: 1;
-            padding: 24px 32px;
-        }
-
-        .page-header {
-            margin-bottom: 20px;
-        }
-
-        .page-title { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
-
-        .status-bar {
-            padding: 12px 16px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            display: none;
-        }
-        .status-bar.error { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; display: block; }
-        .status-bar.success { background: #dcfce7; border: 1px solid #86efac; color: #166534; display: block; }
-        .status-bar.warning { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; display: block; }
-
-        .email-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-        }
-
-        .panel {
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--admin-border);
-        }
-
-        .panel-header {
-            padding: 14px 18px;
-            border-bottom: 1px solid var(--admin-border);
-            font-weight: 600;
-            color: var(--admin-sidebar);
-        }
-
-        .panel-body { padding: 18px; }
-
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.85rem; }
-
-        .form-group input[type="text"],
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid var(--admin-border);
-            border-radius: 6px;
-            font-size: 0.875rem;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: var(--admin-primary);
-            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
-        }
-
-        .template-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-        }
-
-        .template-card {
-            padding: 12px 8px;
-            border: 2px solid var(--admin-border);
-            border-radius: 6px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .template-card:hover { border-color: var(--admin-primary); }
-        .template-card.selected { border-color: var(--admin-primary); background: rgba(59,130,246,0.05); }
-        .template-card .icon { font-size: 1.25rem; margin-bottom: 4px; }
-        .template-card .name { font-size: 0.7rem; font-weight: 500; }
-
-        .recipient-info {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            margin-top: 8px;
-            padding: 4px 10px;
-            background: #dbeafe;
-            color: #1d4ed8;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        .custom-recipients { display: none; margin-top: 8px; }
-        .custom-recipients.visible { display: block; }
-        .custom-recipients textarea { height: 80px; font-family: monospace; font-size: 0.8rem; }
-
-        #editor-container { height: 200px; background: white; }
-        .ql-toolbar { border-radius: 6px 6px 0 0 !important; background: #f8fafc; }
-        .ql-container { border-radius: 0 0 6px 6px !important; }
-
-        .preview-frame {
-            width: 100%;
-            height: calc(100vh - 200px);
-            min-height: 500px;
-            border: 1px solid var(--admin-border);
-            border-radius: 6px;
-            background: white;
-        }
-
-        .btn-row { display: flex; gap: 10px; margin-top: 16px; }
-
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .btn-primary { background: var(--admin-primary); color: white; }
-        .btn-primary:hover { background: #2563eb; }
-        .btn-secondary { background: var(--admin-border); color: var(--admin-text); }
-        .btn-secondary:hover { background: #cbd5e1; }
-
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 0.75rem;
-            border-radius: 4px;
-            border: 1px solid var(--admin-border);
-            background: white;
-            color: var(--admin-text);
-            cursor: pointer;
-        }
-        .btn-sm:hover { background: var(--admin-bg); }
-
-        .history-section { margin-top: 24px; }
-
-        .data-table { width: 100%; border-collapse: collapse; }
-
-        .data-table th {
-            text-align: left;
-            padding: 10px 16px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--admin-text-muted);
-            background: var(--admin-bg);
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .data-table td {
-            padding: 10px 16px;
-            border-bottom: 1px solid var(--admin-border);
-            font-size: 0.85rem;
-        }
-
-        .data-table tbody tr:hover { background: var(--admin-bg); }
-
-        .badge {
-            display: inline-flex;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            font-weight: 500;
-            text-transform: uppercase;
-        }
-
-        .badge-success { background: #dcfce7; color: #166534; }
-        .badge-warning { background: #fef3c7; color: #92400e; }
-        .badge-error { background: #fee2e2; color: #991b1b; }
-
-        .empty-state { text-align: center; padding: 30px; color: var(--admin-text-muted); }
-    </style></head>
+</head>
 <body>
     <div class="admin-layout">
         <div id="sidebar-container"></div>
 
         <main class="main-content">
-            <div class="page-header">
-                <h1 class="page-title">Email Composer</h1>
-            </div>
+            <nav class="breadcrumb hidden" id="sequence-breadcrumb" aria-label="Breadcrumb">
+                <a href="admin-events.html">Events</a>
+                <svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="/images/icons.svg#chevron-right"></use></svg>
+                <a href="admin-events.html" id="breadcrumb-event">Event</a>
+                <svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="/images/icons.svg#chevron-right"></use></svg>
+                <a href="admin-events.html" id="breadcrumb-sequence">Email sequence</a>
+            </nav>
 
-            <div id="status-bar" class="status-bar"></div>
+            <header class="page-header">
+                <div>
+                    <h1 class="page-title" id="page-title">Send email</h1>
+                    <p class="page-subtitle" id="page-subtitle">Write a one-off email and send it right away to the people you choose.</p>
+                </div>
+            </header>
 
-            <div class="email-container">
-                <div class="panel">
-                    <div class="panel-header">Compose Email</div>
-                    <div class="panel-body">
+            <div id="status-bar" class="status-bar" role="status" aria-live="polite"></div>
+
+            <div class="email-workspace">
+                <section class="panel" aria-labelledby="compose-title">
+                    <div class="panel-header">
+                        <h2 class="panel-title" id="compose-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#square-pen"></use></svg>Compose</h2>
+                    </div>
+                    <div class="panel-body padded">
                         <div class="form-group">
-                            <label>Template</label>
-                            <div class="template-grid" id="template-cards">
-                                <div class="template-card selected" data-template="announcement">
-                                    <div class="icon">📢</div>
-                                    <div class="name">Announcement</div>
-                                </div>
-                                <div class="template-card" data-template="reminder">
-                                    <div class="icon">⏰</div>
-                                    <div class="name">Reminder</div>
-                                </div>
+                            <span class="form-label" id="template-label">Template</span>
+                            <div class="option-cards" id="template-cards" role="group" aria-labelledby="template-label">
+                                <button type="button" class="option-card template-card selected" data-template="announcement" aria-pressed="true">
+                                    <span class="option-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#megaphone"></use></svg>Announcement</span>
+                                    <span class="option-card-desc">Navy header with your subject</span>
+                                </button>
+                                <button type="button" class="option-card template-card" data-template="reminder" aria-pressed="false">
+                                    <span class="option-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#alarm-clock"></use></svg>Reminder</span>
+                                    <span class="option-card-desc">Amber "Reminder" header with the event date</span>
+                                </button>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label for="subject">Subject</label>
-                            <input type="text" id="subject" placeholder="Enter email subject...">
+                            <input type="text" id="subject" placeholder="What is this email about?">
                         </div>
 
-                        <div class="form-group">
-                            <label>Target Event</label>
-                            <select id="event-select" style="width: 100%;">
-                                <option value="">Loading events...</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Recipients</label>
-                            <select id="recipient-filter" style="width: 100%;">
-                                <option value="all-participants">All Participants</option>
-                                <option value="team-admins">Team Admins Only</option>
-                                <option value="team-members">Team Members (non-admins)</option>
-                                <option value="solo-queue">Solo Queue Participants</option>
-                                <option value="pending-invites">Pending Invitations</option>
-                                <option value="interest-queue">Interest Queue (No Event)</option>
-                                <option value="custom">Custom List</option>
-                            </select>
-                            <div class="custom-recipients" id="custom-recipients">
-                                <textarea id="custom-emails" placeholder="Enter email addresses, one per line..."></textarea>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="event-select">Event</label>
+                                <select id="event-select">
+                                    <option value="">Loading events...</option>
+                                </select>
                             </div>
-                            <div class="recipient-info">
-                                <span id="recipient-count">0</span> recipients selected
+
+                            <div class="form-group">
+                                <label for="recipient-filter">Send to</label>
+                                <select id="recipient-filter">
+                                    <option value="all-participants">All participants</option>
+                                    <option value="team-admins">Team admins only</option>
+                                    <option value="team-members">Team members (not admins)</option>
+                                    <option value="solo-queue">Solo queue participants</option>
+                                    <option value="pending-invites">Pending invitations</option>
+                                    <option value="interest-queue">Interest queue (no event)</option>
+                                    <option value="custom">Custom list</option>
+                                </select>
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label>Message Content</label>
-                            <div id="editor-container"></div>
+                        <div class="form-group custom-recipients" id="custom-recipients">
+                            <label for="custom-emails">Email addresses</label>
+                            <textarea id="custom-emails" placeholder="name@example.com" aria-describedby="custom-emails-hint"></textarea>
+                            <p class="field-hint" id="custom-emails-hint">One address per line.</p>
+                        </div>
+
+                        <div class="recipient-summary-row">
+                            <p class="recipient-summary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg><span><strong id="recipient-count">0</strong> recipients selected</span></p>
+                            <p class="field-hint hidden" id="sequence-recipients-hint">Sequence emails go to everyone registered for the event and to its verified interest leads.</p>
                         </div>
 
                         <div class="form-group">
-                            <label for="cta-url">Call-to-Action URL (optional)</label>
-                            <input type="text" id="cta-url" placeholder="https://...">
+                            <span class="form-label" id="message-label">Message</span>
+                            <div class="rich-editor">
+                                <div id="editor-container"></div>
+                            </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="cta-text">Button Text</label>
-                            <input type="text" id="cta-text" placeholder="Learn More" value="Learn More">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cta-url">Button link <span class="label-optional">(optional)</span></label>
+                                <input type="url" id="cta-url" placeholder="https://..." aria-describedby="cta-url-hint">
+                                <p class="field-hint" id="cta-url-hint">Leave empty for no button.</p>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="cta-text">Button text</label>
+                                <input type="text" id="cta-text" placeholder="Learn More" value="Learn More">
+                            </div>
                         </div>
 
-                        <div class="form-group" id="status-group">
-                            <label>Status *</label>
-                            <div style="display: flex; gap: 16px; margin-top: 8px;">
-                                <label style="display: flex; align-items: center; cursor: pointer;">
-                                    <input type="radio" name="email-status" value="draft" checked style="margin-right: 6px;">
-                                    <span>📝 Draft (save without sending)</span>
+                        <fieldset class="form-group status-fieldset hidden" id="status-group">
+                            <legend class="form-label">Status</legend>
+                            <div class="option-cards">
+                                <label class="option-card">
+                                    <span class="option-card-title"><input type="radio" name="email-status" value="draft" checked>Draft</span>
+                                    <span class="option-card-desc">Saved, not sent</span>
                                 </label>
-                                <label style="display: flex; align-items: center; cursor: pointer;">
-                                    <input type="radio" name="email-status" value="live" style="margin-right: 6px;">
-                                    <span>✅ Live (will send)</span>
+                                <label class="option-card">
+                                    <span class="option-card-title"><input type="radio" name="email-status" value="live">Live</span>
+                                    <span class="option-card-desc">Sends on the date you set, or right away</span>
                                 </label>
                             </div>
+                        </fieldset>
+
+                        <div class="form-group hidden" id="schedule-group">
+                            <label for="scheduled-send-time">Send on <span class="label-optional">(optional) <span id="timezone-display"></span></span></label>
+                            <input type="datetime-local" id="scheduled-send-time" aria-describedby="schedule-hint">
+                            <p class="field-hint" id="schedule-hint">Leave empty to send as soon as the email is saved as live.</p>
+                            <div id="schedule-preview" class="notice notice-info schedule-preview hidden"></div>
                         </div>
 
-                        <div class="form-group" id="schedule-group" style="display: none;">
-                            <label>Send On (optional) <span id="timezone-display" style="font-weight: normal; color: var(--admin-text-muted);"></span></label>
-                            <input type="datetime-local" id="scheduled-send-time">
-                            <p style="font-size: 0.85rem; color: var(--admin-text-muted); margin-top: 4px;">
-                                Leave empty to send immediately when status changes to Live.
-                            </p>
-                            <p id="schedule-preview" style="font-size: 0.85rem; color: var(--admin-accent); margin-top: 8px; padding: 8px; background: var(--admin-bg-secondary); border-radius: 4px; display: none;"></p>
-                        </div>
-
-                        <div class="btn-row">
-                            <button type="button" class="btn btn-secondary" id="preview-btn">👁️ Preview</button>
-                            <button type="button" class="btn btn-primary" id="send-btn">📤 Send Email</button>
-                            <button type="button" class="btn btn-secondary" id="cancel-btn" style="display: none;">Cancel</button>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" id="send-btn">Send email</button>
+                            <button type="button" class="btn btn-secondary hidden" id="cancel-btn">Cancel</button>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="panel">
-                    <div class="panel-header">Preview</div>
-                    <div class="panel-body" style="padding: 0;">
-                        <iframe id="preview-frame" class="preview-frame" sandbox="" title="Email preview"></iframe>
+                <section class="panel email-preview-panel" aria-labelledby="preview-title">
+                    <div class="panel-header">
+                        <h2 class="panel-title" id="preview-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#eye"></use></svg>Preview</h2>
+                        <button type="button" class="btn-sm ghost" id="preview-btn"><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="/images/icons.svg#refresh-cw"></use></svg>Refresh preview</button>
                     </div>
-                </div>
+                    <div class="email-preview">
+                        <div class="email-preview-stage">
+                            <iframe id="preview-frame" class="email-preview-frame" sandbox="" title="Email preview"></iframe>
+                        </div>
+                    </div>
+                    <p class="email-preview-note">"Preview User" stands in for each recipient's first name.</p>
+                </section>
             </div>
 
-            <div class="history-section">
-                <div class="panel">
-                    <div class="panel-header">Send History</div>
+            <section class="panel" id="history-panel" aria-labelledby="history-title">
+                <div class="panel-header">
+                    <h2 class="panel-title" id="history-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#inbox"></use></svg><span id="history-title-text">Send history</span></h2>
+                    <span class="text-muted" id="history-meta">The last 10 emails sent from this page</span>
+                </div>
+                <div class="panel-body">
                     <table class="data-table">
                         <thead id="history-header">
                             <tr>
-                                <th>Date</th>
-                                <th>Subject</th>
-                                <th>Template</th>
-                                <th>Recipients</th>
-                                <th>Status</th>
+                                <th scope="col">Date</th>
+                                <th scope="col">Subject</th>
+                                <th scope="col">Template</th>
+                                <th scope="col">Recipients</th>
+                                <th scope="col">Status</th>
                             </tr>
                         </thead>
                         <tbody id="history-body">
@@ -320,7 +172,7 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </section>
         </main>
     </div>
 

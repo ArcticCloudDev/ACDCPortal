@@ -4,6 +4,8 @@ let recipients = [];
 let allEvents = [];
 let currentPermissions = null;
 
+const TEMPLATE_NAMES = { announcement: 'Announcement', reminder: 'Reminder', sequence: 'Sequence' };
+
 const urlParams = new URLSearchParams(window.location.search);
 const isSequenceMode = urlParams.get('mode') === 'sequence';
 const sequenceId = urlParams.get('sequenceId');
@@ -28,11 +30,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             ]
         }
     });
+    labelRichEditor(quill, 'message-label');
 
     document.querySelectorAll('.template-card').forEach(card => {
         card.addEventListener('click', () => {
-            document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
-            card.classList.add('selected');
+            selectTemplateCard(card);
             selectedTemplate = card.dataset.template;
             previewEmail();
         });
@@ -58,10 +60,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('input[name="email-status"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
             if (e.target.value === 'live') {
-                document.getElementById('schedule-group').style.display = 'block';
+                document.getElementById('schedule-group').classList.remove('hidden');
                 displayUserTimezone();
             } else {
-                document.getElementById('schedule-group').style.display = 'none';
+                document.getElementById('schedule-group').classList.add('hidden');
                 lockFormFields(false);
             }
         });
@@ -83,15 +85,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadEvents();
 
     if (isSequenceMode) {
-        await loadSequenceEmail();
-
         const sendBtn = document.getElementById('send-btn');
         const cancelBtn = document.getElementById('cancel-btn');
-        sendBtn.textContent = emailId ? '💾 Update Email' : '💾 Save Email';
-        cancelBtn.style.display = 'inline-block';
+        sendBtn.textContent = emailId ? 'Save changes' : 'Save email';
+        cancelBtn.classList.remove('hidden');
+        document.getElementById('status-group').classList.remove('hidden');
+        showSequenceContext();
+
+        await loadSequenceEmail();
     } else {
         // Quick emails go out immediately; draft/live scheduling only applies to sequence emails.
-        document.getElementById('status-group').style.display = 'none';
+        document.getElementById('status-group').classList.add('hidden');
         await loadRecipients();
     }
 
@@ -104,6 +108,56 @@ function cancelSequenceEdit() {
     window.location.href = `admin-events.html?event=${encodeURIComponent(eventId || '')}&tab=sequence`;
 }
 
+// Sequence mode is opened from an event's Sequence tab: title, breadcrumb and history say so.
+function showSequenceContext() {
+    const event = allEvents.find(e => sameId(e.id, eventId));
+    const eventName = event ? event.name : 'Event';
+    const eventParam = encodeURIComponent(eventId || '');
+
+    document.getElementById('page-title').textContent = emailId ? 'Edit sequence email' : 'New sequence email';
+    document.title = `${emailId ? 'Edit' : 'New'} sequence email - ACDC Admin`;
+    document.getElementById('page-subtitle').textContent =
+        `Part of the email sequence for ${eventName}. Save it as a draft to keep it from sending.`;
+
+    const eventLink = document.getElementById('breadcrumb-event');
+    eventLink.textContent = eventName;
+    eventLink.href = `admin-events.html?event=${eventParam}`;
+    document.getElementById('breadcrumb-sequence').href = `admin-events.html?event=${eventParam}&tab=sequence`;
+    document.getElementById('sequence-breadcrumb').classList.remove('hidden');
+
+    document.getElementById('sequence-recipients-hint').classList.remove('hidden');
+
+    if (emailId) {
+        document.getElementById('history-title-text').textContent = 'Deliveries';
+        document.getElementById('history-meta').textContent = 'Everyone this email has been sent to';
+    } else {
+        // A new sequence email has no deliveries; the quick-email history is unrelated here.
+        document.getElementById('history-panel').classList.add('hidden');
+    }
+}
+
+function selectTemplateCard(card) {
+    document.querySelectorAll('.template-card').forEach(c => {
+        c.classList.remove('selected');
+        c.setAttribute('aria-pressed', 'false');
+    });
+    card.classList.add('selected');
+    card.setAttribute('aria-pressed', 'true');
+}
+
+// Quill renders icon-only toolbar buttons and an unlabelled editable area; name them for screen readers.
+function labelRichEditor(editor, labelId) {
+    editor.root.setAttribute('role', 'textbox');
+    editor.root.setAttribute('aria-multiline', 'true');
+    editor.root.setAttribute('aria-labelledby', labelId);
+    const names = { bold: 'Bold', italic: 'Italic', underline: 'Underline', link: 'Link', clean: 'Clear formatting' };
+    editor.getModule('toolbar').container.querySelectorAll('button').forEach(button => {
+        const format = [...button.classList].find(c => c.startsWith('ql-'))?.slice(3);
+        const label = format === 'list' ? (button.value === 'ordered' ? 'Numbered list' : 'Bulleted list') : names[format];
+        if (label) button.setAttribute('aria-label', label);
+    });
+}
+
 async function loadSequenceEmail() {
     try {
         const eventSelect = document.getElementById('event-select');
@@ -113,14 +167,10 @@ async function loadSequenceEmail() {
             if (match) eventSelect.value = match.value;
         }
         eventSelect.disabled = true;
-        eventSelect.style.background = 'var(--admin-bg)';
-        eventSelect.style.cursor = 'not-allowed';
 
         const recipientFilter = document.getElementById('recipient-filter');
-        recipientFilter.innerHTML = '<option value="event-contacts">Event Contacts (All)</option>';
+        recipientFilter.innerHTML = '<option value="event-contacts">All event contacts</option>';
         recipientFilter.disabled = true;
-        recipientFilter.style.background = 'var(--admin-bg)';
-        recipientFilter.style.cursor = 'not-allowed';
 
         await loadRecipients();
 
@@ -140,8 +190,7 @@ async function loadSequenceEmail() {
                 }
                 const card = Array.from(document.querySelectorAll('.template-card')).find(c => c.dataset.template === selectedTemplate);
                 if (card) {
-                    document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
+                    selectTemplateCard(card);
                 }
 
                 if (email.ctaUrl) document.getElementById('cta-url').value = email.ctaUrl;
@@ -151,7 +200,7 @@ async function loadSequenceEmail() {
                     const statusRadio = Array.from(document.querySelectorAll('input[name="email-status"]')).find(r => r.value === email.status);
                     if (statusRadio) statusRadio.checked = true;
                     if (email.status === 'live') {
-                        document.getElementById('schedule-group').style.display = 'block';
+                        document.getElementById('schedule-group').classList.remove('hidden');
                         displayUserTimezone();
                         if (sentCount > 0) {
                             lockFormFields(true);
@@ -170,7 +219,7 @@ async function loadSequenceEmail() {
         }
     } catch (error) {
         console.error('Error loading sequence email:', error);
-        showStatus('Error loading email data', 'error');
+        showStatus('Could not load this email', 'error');
     }
 }
 
@@ -320,11 +369,11 @@ async function sendEmail() {
     const sendBtn = document.getElementById('send-btn');
 
     if (isSequenceMode) {
-        return withBusy(sendBtn, '💾 Saving...', saveSequenceEmail);
+        return withBusy(sendBtn, 'Saving...', saveSequenceEmail);
     }
 
     if (recipients.length === 0) {
-        showStatus('Please select recipients', 'error');
+        showStatus('Choose who to send to first', 'error');
         return;
     }
 
@@ -338,7 +387,7 @@ async function sendEmail() {
         return;
     }
 
-    await withBusy(sendBtn, '📤 Sending...', async () => {
+    await withBusy(sendBtn, 'Sending...', async () => {
         try {
             // Contract: templateId + subject + recipients at the top level, the template merge
             // fields (subject, content, ctaUrl, ctaText) under `data`.
@@ -364,9 +413,9 @@ async function sendEmail() {
             }
 
             if (result.results.failed === 0) {
-                showStatus(`✅ Successfully sent to ${result.results.sent} recipient(s)`, 'success');
+                showStatus(`Successfully sent to ${result.results.sent} recipient(s)`, 'success');
             } else {
-                showStatus(`⚠️ Sent: ${result.results.sent}, Failed: ${result.results.failed}`, 'warning');
+                showStatus(`Sent to ${result.results.sent} recipient(s), failed for ${result.results.failed}`, 'warning');
             }
 
             await loadHistory();
@@ -426,18 +475,18 @@ async function saveSequenceEmail() {
         }
 
         if (response.ok) {
-            showStatus('✅ Email saved successfully', 'success');
+            showStatus('Email saved successfully. Returning to the sequence...', 'success');
 
             setTimeout(() => {
                 window.location.href = `admin-events.html?event=${encodeURIComponent(eventId || '')}&tab=sequence`;
             }, 1000);
         } else {
             const error = await response.json().catch(() => ({}));
-            showStatus('❌ Failed to save: ' + (error.error || 'Unknown error'), 'error');
+            showStatus('Could not save the email: ' + (error.error || 'Unknown error'), 'error');
         }
     } catch (error) {
         console.error('Error saving sequence email:', error);
-        showStatus('❌ Error saving email: ' + error.message, 'error');
+        showStatus('Could not save the email: ' + error.message, 'error');
     }
 }
 
@@ -449,11 +498,9 @@ async function loadHistory() {
 
             thead.innerHTML = `
                 <tr>
-                    <th>Date & Time</th>
-                    <th>Recipient</th>
-                    <th>Send Type</th>
-                    <th></th>
-                    <th>Status</th>
+                    <th scope="col">Date and time</th>
+                    <th scope="col">Recipient</th>
+                    <th scope="col">Status</th>
                 </tr>
             `;
 
@@ -468,7 +515,7 @@ async function loadHistory() {
             const thisEmailDeliveries = (data.deliveries || []).filter(d => sameId(d.campaignId, emailId));
 
             if (thisEmailDeliveries.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Not sent yet</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Not sent to anyone yet</td></tr>`;
                 return;
             }
 
@@ -476,16 +523,14 @@ async function loadHistory() {
                 const date = new Date(delivery.sentAt || delivery.createdAt).toLocaleDateString();
                 const time = new Date(delivery.sentAt || delivery.createdAt).toLocaleTimeString();
                 const statusClass = delivery.status === 'sent' ? 'success' :
-                                  delivery.status === 'failed' ? 'error' : 'warning';
+                                  delivery.status === 'failed' ? 'danger' : 'info';
                 const statusText = delivery.status === 'sent' ? 'Sent' :
                                  delivery.status === 'failed' ? 'Failed' : 'Pending';
 
                 return `
                     <tr>
-                        <td>${date} ${time}</td>
+                        <td class="text-muted">${date} ${time}</td>
                         <td>${escapeHtml(delivery.email)}</td>
-                        <td>Sequence</td>
-                        <td></td>
                         <td><span class="badge badge-${statusClass}">${statusText}</span></td>
                     </tr>
                 `;
@@ -496,11 +541,11 @@ async function loadHistory() {
 
         thead.innerHTML = `
             <tr>
-                <th>Date</th>
-                <th>Subject</th>
-                <th>Template</th>
-                <th>Recipients</th>
-                <th>Status</th>
+                <th scope="col">Date</th>
+                <th scope="col">Subject</th>
+                <th scope="col">Template</th>
+                <th scope="col" class="num">Delivered</th>
+                <th scope="col">Status</th>
             </tr>
         `;
 
@@ -520,16 +565,18 @@ async function loadHistory() {
         tbody.innerHTML = history.slice(0, 10).map(email => {
             const date = new Date(email.sentAt).toLocaleDateString();
             const statusClass = email.status === 'completed' ? 'success' :
-                               email.status === 'completed-with-errors' ? 'warning' : 'error';
+                               email.status === 'completed-with-errors' ? 'warning' : 'danger';
             const statusText = email.status === 'completed' ? 'Sent' :
                               email.status === 'completed-with-errors' ? 'Partial' : email.status;
 
+            const templateName = TEMPLATE_NAMES[email.templateId] || email.templateId || '-';
+
             return `
                 <tr>
-                    <td>${date}</td>
-                    <td>${escapeHtml(email.subject || '-')}</td>
-                    <td>${escapeHtml(email.templateId || '-')}</td>
-                    <td>${Number(email.results?.sent) || 0}/${Number(email.recipientCount) || 0}</td>
+                    <td class="text-muted">${date}</td>
+                    <td><strong>${escapeHtml(email.subject || '-')}</strong></td>
+                    <td>${escapeHtml(templateName)}</td>
+                    <td class="num">${Number(email.results?.sent) || 0} / ${Number(email.recipientCount) || 0}</td>
                     <td><span class="badge badge-${statusClass}">${escapeHtml(statusText)}</span></td>
                 </tr>
             `;
@@ -557,13 +604,13 @@ function updateSchedulePreview() {
     const preview = document.getElementById('schedule-preview');
 
     if (!scheduleInput) {
-        preview.style.display = 'none';
+        preview.classList.add('hidden');
         return;
     }
 
     const localDate = new Date(scheduleInput);
     if (Number.isNaN(localDate.getTime())) {
-        preview.style.display = 'none';
+        preview.classList.add('hidden');
         return;
     }
     const utcDate = localDate.toISOString();
@@ -574,8 +621,8 @@ function updateSchedulePreview() {
     const sign = offset <= 0 ? '+' : '-';
     const gmtOffset = `GMT${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
-    preview.innerHTML = `📅 Will send on: <strong>${escapeHtml(localDate.toLocaleString())}</strong> (${gmtOffset})<br>UTC: ${utcDate}`;
-    preview.style.display = 'block';
+    preview.innerHTML = `${icon('clock')}<div>Sends on <strong>${escapeHtml(localDate.toLocaleString())}</strong> (${gmtOffset})<div class="notice-body">UTC: ${escapeHtml(utcDate)}</div></div>`;
+    preview.classList.remove('hidden');
 }
 
 function lockFormFields(lock) {
@@ -587,36 +634,39 @@ function lockFormFields(lock) {
 
     const editorContainer = document.getElementById('editor-container');
     if (lock) {
-        editorContainer.style.opacity = '1';
-        editorContainer.style.background = '';
         let overlay = document.getElementById('editor-lock-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.id = 'editor-lock-overlay';
-            overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;z-index:10;cursor:not-allowed;';
-            editorContainer.style.position = 'relative';
+            overlay.className = 'editor-lock-overlay';
             editorContainer.appendChild(overlay);
         }
-        overlay.style.display = 'block';
+        overlay.classList.remove('hidden');
     } else {
         const overlay = document.getElementById('editor-lock-overlay');
-        if (overlay) overlay.style.display = 'none';
+        if (overlay) overlay.classList.add('hidden');
     }
 
     document.querySelectorAll('.template-card').forEach(card => {
-        card.style.pointerEvents = lock ? 'none' : 'auto';
-        card.style.opacity = lock ? '0.6' : '1';
+        card.disabled = lock;
     });
 
     if (lock) {
-        showStatus('Email is live — switch to Draft to make changes', 'warning');
+        showStatus('This email is live and has been sent. Switch it to draft to make changes.', 'warning');
     }
 }
 
+const STATUS_TONES = {
+    success: ['success', 'circle-check'],
+    warning: ['warning', 'triangle-alert'],
+    error: ['danger', 'circle-alert']
+};
+
 function showStatus(message, type) {
     const bar = document.getElementById('status-bar');
-    bar.textContent = message;
-    bar.className = `status-bar ${type}`;
+    const [tone, iconName] = STATUS_TONES[type] || ['info', 'info'];
+    bar.innerHTML = `${icon(iconName)}<div>${escapeHtml(message)}</div>`;
+    bar.className = `status-bar notice notice-${tone}`;
 
     if (type === 'success') {
         setTimeout(() => {

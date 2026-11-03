@@ -106,6 +106,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    labelRichEditor(bodyEditor, 'body-label');
+    labelRichEditor(closingEditor, 'closing-label');
+
     const debouncedPreview = debounce(updatePreview, 400);
     bodyEditor.on('text-change', debouncedPreview);
     closingEditor.on('text-change', debouncedPreview);
@@ -114,8 +117,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.querySelectorAll('.template-option').forEach(option => {
         option.addEventListener('click', () => {
-            document.querySelectorAll('.template-option').forEach(o => o.classList.remove('selected'));
+            document.querySelectorAll('.template-option').forEach(o => {
+                o.classList.remove('selected');
+                o.setAttribute('aria-pressed', 'false');
+            });
             option.classList.add('selected');
+            option.setAttribute('aria-pressed', 'true');
             currentTemplate = option.dataset.template;
             renderMergeFields();
             if (currentEvent) {
@@ -146,6 +153,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderMergeFields();
 });
 
+// Quill renders icon-only toolbar buttons and an unlabelled editable area; name them for screen readers.
+function labelRichEditor(editor, labelId) {
+    editor.root.setAttribute('role', 'textbox');
+    editor.root.setAttribute('aria-multiline', 'true');
+    editor.root.setAttribute('aria-labelledby', labelId);
+    const names = { bold: 'Bold', italic: 'Italic', underline: 'Underline', list: 'Bulleted list', clean: 'Clear formatting' };
+    editor.getModule('toolbar').container.querySelectorAll('button').forEach(button => {
+        const format = [...button.classList].find(c => c.startsWith('ql-'))?.slice(3);
+        if (names[format]) button.setAttribute('aria-label', names[format]);
+    });
+}
+
 async function loadEvents() {
     try {
         const response = await fetch(`${CONFIG.api.baseUrl}/events`);
@@ -154,7 +173,7 @@ async function loadEvents() {
         allEvents = Permissions.filterByEvent(currentPermissions, Array.isArray(events) ? events : [], 'id');
 
         const select = document.getElementById('event-select');
-        select.innerHTML = '<option value="">Select an event...</option>';
+        select.innerHTML = '<option value="">Choose an event...</option>';
         allEvents.forEach(e => {
             const option = document.createElement('option');
             option.value = e.id;
@@ -193,7 +212,7 @@ function loadTemplateForEvent() {
     document.getElementById('field-header-title').value = eventTheme.headerTitle || template.headerTitle || '';
 
     const hasButton = !!template.buttonUrlField;
-    document.getElementById('button-text-row').style.display = hasButton ? '' : 'none';
+    document.getElementById('button-text-row').classList.toggle('hidden', !hasButton);
     if (hasButton) {
         document.getElementById('field-button-text').value = eventTheme.buttonText !== undefined ? (eventTheme.buttonText || '') : (template.buttonText || '');
     }
@@ -208,7 +227,7 @@ function renderMergeFields() {
     }
 
     container.innerHTML = (template.mergeFields || []).map(field =>
-        `<span class="merge-field-tag" data-field="${escapeHtml(field)}">{{${escapeHtml(field)}}}</span>`
+        `<button type="button" class="merge-field-tag" data-field="${escapeHtml(field)}" title="Copy {{${escapeHtml(field)}}}">${icon('copy', 'icon-sm')}{{${escapeHtml(field)}}}</button>`
     ).join('');
 }
 
@@ -246,31 +265,29 @@ async function updatePreview() {
 
         let iframe = previewEl.querySelector('iframe');
         if (!iframe) {
-            previewEl.innerHTML = '';
+            previewEl.innerHTML = '<div class="email-preview-stage"></div>';
             iframe = document.createElement('iframe');
             iframe.id = 'template-preview-frame';
+            iframe.className = 'email-preview-frame';
             iframe.title = 'Email preview';
-            iframe.style.cssText = 'width:100%;height:900px;border:none;display:block;';
-            previewEl.appendChild(iframe);
+            previewEl.firstElementChild.appendChild(iframe);
         }
 
         // The template HTML is rendered without scripts and without access to this page.
         renderSandboxedHtml(iframe, response.html);
-        previewEl.style.height = '';
-        previewEl.style.overflow = 'hidden';
     } catch (err) {
         if (requestId !== previewRequestSeq) return;
-        previewEl.innerHTML = `<p style="color: red; text-align: center; padding: 40px 20px;">Preview failed: ${escapeHtml(err.message)}</p>`;
+        previewEl.innerHTML = `<div class="notice notice-danger preview-error">${icon('circle-alert')}<div>Preview failed: ${escapeHtml(err.message)}</div></div>`;
     }
 }
 
 async function saveTemplate() {
     if (!currentEvent) {
-        showStatus('Please select an event', 'error');
+        showStatus('Choose an event first', 'error');
         return;
     }
 
-    await withBusy(document.getElementById('save-template-btn'), '💾 Saving...', async () => {
+    await withBusy(document.getElementById('save-template-btn'), 'Saving...', async () => {
         try {
             const template = templateConfig.templates[currentTemplate];
 
@@ -317,14 +334,14 @@ async function saveTemplate() {
 
 async function sendTestEmail() {
     if (!currentEvent) {
-        showStatus('Please select an event', 'error');
+        showStatus('Choose an event first', 'error');
         return;
     }
 
-    const email = prompt('Enter email address to send test:');
+    const email = prompt('Send a test of this email to which address?');
     if (!email) return;
 
-    await withBusy(document.getElementById('send-test-email-btn'), '📤 Sending...', async () => {
+    await withBusy(document.getElementById('send-test-email-btn'), 'Sending...', async () => {
         try {
             const response = await fetch(`${CONFIG.api.baseUrl}/system-emails/test`, {
                 method: 'POST',
@@ -353,10 +370,17 @@ async function sendTestEmail() {
     });
 }
 
+const STATUS_TONES = {
+    success: ['success', 'circle-check'],
+    warning: ['warning', 'triangle-alert'],
+    error: ['danger', 'circle-alert']
+};
+
 function showStatus(message, type) {
     const bar = document.getElementById('status-bar');
-    bar.textContent = message;
-    bar.className = `status-bar ${type}`;
+    const [tone, iconName] = STATUS_TONES[type] || ['info', 'info'];
+    bar.innerHTML = `${icon(iconName)}<div>${escapeHtml(message)}</div>`;
+    bar.className = `status-bar notice notice-${tone}`;
 
     if (type === 'success') {
         setTimeout(() => {
