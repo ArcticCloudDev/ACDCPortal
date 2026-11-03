@@ -14,12 +14,87 @@ function normalizeId(value) {
 
 const STATUS_ORDER = ['draft', 'pre-registration', 'registration', 'live', 'completed'];
 const STATUS_LABELS = {
-    draft: '📝 Draft',
-    'pre-registration': '🔔 Pre-Registration',
-    registration: '✅ Registration Open',
-    live: '🚀 Live',
-    completed: '✓ Completed'
+    draft: 'Draft',
+    'pre-registration': 'Pre-registration',
+    registration: 'Registration open',
+    live: 'Live',
+    completed: 'Completed'
 };
+
+// withBusy (admin-utils.js) restores a button with textContent, which drops its icon.
+// This keeps the button's markup and only swaps in the busy label while the action runs.
+async function withBusyButton(button, busyLabel, action) {
+    const markup = button ? button.innerHTML : '';
+    try {
+        return await withBusy(button, busyLabel, action);
+    } finally {
+        if (button && !button.disabled) button.innerHTML = markup;
+    }
+}
+
+function formatEventDate(value) {
+    if (!value) return '';
+    return new Date(value + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function eventStatusOf(event) {
+    return event.status || (event.registrationOpen ? 'registration' : 'draft');
+}
+
+function statusBadge(status) {
+    return `<span class="badge badge-dot ${escapeHtml(status)}">${escapeHtml(STATUS_LABELS[status] || status)}</span>`;
+}
+
+// Page header of the editor: breadcrumb, title, facts and the participants link follow the event.
+function renderFormHeader(event) {
+    const meta = document.getElementById('form-meta');
+    const participantsLink = document.getElementById('view-participants-link');
+    const saveBtn = document.getElementById('save-btn');
+
+    if (event) {
+        document.getElementById('form-title').textContent = 'Edit event';
+        document.getElementById('breadcrumb-current').textContent = event.name || 'Untitled event';
+        const dates = [formatEventDate(event.startDate), formatEventDate(event.endDate)].filter(Boolean).join(' – ');
+        meta.innerHTML = `
+            ${statusBadge(eventStatusOf(event))}
+            <span class="meta-item">${icon('calendar')}${escapeHtml(dates || 'No dates')}</span>
+            <span class="meta-item">${icon('map-pin')}${escapeHtml(event.location || 'Location TBD')}</span>
+        `;
+        participantsLink.href = `admin-event-participants.html?id=${encodeURIComponent(event.id)}`;
+        participantsLink.classList.remove('hidden');
+        saveBtn.innerHTML = `${icon('save')}Save event`;
+    } else {
+        document.getElementById('form-title').textContent = 'Create event';
+        document.getElementById('breadcrumb-current').textContent = 'New event';
+        meta.textContent = 'Save the event first; then you can add people, sponsors, budget and emails.';
+        participantsLink.classList.add('hidden');
+        saveBtn.innerHTML = `${icon('save')}Create event`;
+    }
+}
+
+// One-line summaries shown on the collapsed settings groups of the General tab.
+function updateDisclosureMeta() {
+    const checked = id => document.getElementById(id).checked;
+    const emailIds = ['event-team-registration-email', 'event-team-welcome-email', 'event-interest-acknowledgment',
+        'event-judge-invitation-email', 'event-committee-invitation-email'];
+    const emailsOn = emailIds.filter(checked).length;
+    document.getElementById('email-notifications-meta').textContent = `${emailsOn} of ${emailIds.length} emails on`;
+
+    const textIds = ['event-team-registration-terms', 'event-solo-queue-terms', 'event-single-registration-terms'];
+    const textsSet = textIds.filter(id => document.getElementById(id).value.trim() !== '').length;
+    document.getElementById('confirmation-texts-meta').textContent = textsSet === 0
+        ? 'None set, no confirmation dialogs'
+        : `${textsSet} of ${textIds.length} set`;
+
+    let hotel = 'Off';
+    if (checked('event-hotel-enabled')) {
+        const before = parseInt(document.getElementById('event-hotel-days-before').value, 10) || 0;
+        const after = parseInt(document.getElementById('event-hotel-days-after').value, 10) || 0;
+        hotel = `On, ${before} ${before === 1 ? 'night' : 'nights'} before and ${after} after`;
+        if (checked('event-hotel-mandatory')) hotel += ', event nights mandatory';
+    }
+    document.getElementById('hotel-booking-meta').textContent = hotel;
+}
 
 function canTransitionTo(currentStatus, targetStatus) {
     const currentIndex = STATUS_ORDER.indexOf(currentStatus);
@@ -100,7 +175,7 @@ function renderEventsList() {
 
     if (allEvents.length === 0) {
         eventsTableBody.innerHTML = `
-            <tr><td colspan="6" class="empty-state">No events yet. Create your first event!</td></tr>
+            <tr><td colspan="6" class="empty-state">No events yet. Create the first one to get started.</td></tr>
         `;
         return;
     }
@@ -114,31 +189,25 @@ function renderEventsList() {
     });
 
     eventsTableBody.innerHTML = sortedEvents.map(event => {
-        const startDate = new Date(event.startDate + 'T12:00:00').toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric'
-        });
-        const endDate = new Date(event.endDate + 'T12:00:00').toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric'
-        });
-
-        const status = event.status || (event.registrationOpen ? 'registration' : 'draft');
-        const statusLabel = STATUS_LABELS[status] || status;
-
+        const status = eventStatusOf(event);
         const regType = event.registrationType || 'team';
-        const regTypeLabel = regType === 'team' ? '👥 Team' : '👤 Single';
+        const regTypeLabel = regType === 'team' ? `${icon('users')}Team` : `${icon('user')}Single`;
+        const location = event.location
+            ? `${icon('map-pin')}${escapeHtml(event.location)}`
+            : `${icon('map-pin')}<span class="text-muted">TBD</span>`;
 
         return `
             <tr>
-                <td>
-                    <strong>${escapeHtml(event.name)}</strong>
-                </td>
-                <td><span class="badge ${escapeHtml(regType)}">${regTypeLabel}</span></td>
-                <td>${startDate} - ${endDate}</td>
-                <td>${escapeHtml(event.location || 'TBD')}</td>
-                <td><span class="badge ${escapeHtml(status)}">${escapeHtml(statusLabel)}</span></td>
-                <td>
-                    <a href="admin-event-participants.html?id=${encodeURIComponent(event.id)}" class="btn-sm">👥 Participants</a>
-                    <button type="button" class="btn-sm primary edit-event-btn" data-id="${escapeHtml(event.id)}">✏️ Edit</button>
+                <td class="cell-name"><a class="event-name" href="admin-events.html?event=${encodeURIComponent(event.id)}">${escapeHtml(event.name)}</a></td>
+                <td class="cell-type"><span class="meta-item">${regTypeLabel}</span></td>
+                <td class="cell-dates"><span class="meta-item">${icon('calendar')}${escapeHtml(formatEventDate(event.startDate))} – ${escapeHtml(formatEventDate(event.endDate))}</span></td>
+                <td class="cell-location"><span class="meta-item">${location}</span></td>
+                <td class="cell-status">${statusBadge(status)}</td>
+                <td class="cell-actions">
+                    <div class="row-actions">
+                        <a href="admin-event-participants.html?id=${encodeURIComponent(event.id)}" class="btn-sm ghost">${icon('users')}Participants</a>
+                        <button type="button" class="btn-sm edit-event-btn" data-id="${escapeHtml(event.id)}">${icon('pencil')}Edit</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -211,6 +280,20 @@ function setupEventListeners() {
     document.getElementById('close-create-sequence-btn').addEventListener('click', closeCreateSequenceModal);
     document.getElementById('confirm-create-sequence-btn').addEventListener('click', confirmCreateSequence);
 
+    // The close (x) button in each modal header does the same as that modal's Cancel button.
+    const modalClosers = {
+        'create-sequence-modal': closeCreateSequenceModal,
+        'sponsor-modal': closeSponsorModal,
+        'financial-modal': closeFinancialModal
+    };
+    document.querySelectorAll('[data-close-modal]').forEach(btn => {
+        btn.addEventListener('click', () => modalClosers[btn.dataset.closeModal]?.());
+    });
+
+    // Keep the collapsed settings summaries in step with the fields.
+    document.getElementById('event-form').addEventListener('input', updateDisclosureMeta);
+    document.getElementById('event-form').addEventListener('change', updateDisclosureMeta);
+
     // Generated rows carry data-action attributes; one listener per container dispatches them.
     const onAction = (containerId, handlers) => {
         document.getElementById(containerId).addEventListener('click', (e) => {
@@ -262,51 +345,37 @@ function setupEventListeners() {
     });
 }
 
+// Notice tones follow DESIGN.md: info = upcoming, success = open, violet = live; draft and completed are neutral.
 const STATUS_CONFIG = {
     draft: {
-        icon: '📝',
+        icon: 'square-pen',
+        tone: '',
         title: 'Draft',
-        description: 'Event is in draft mode. Only visible to committee members.',
-        bannerBg: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-        bannerBorder: '#64748b',
-        titleColor: '#334155',
-        descColor: '#64748b'
+        description: 'Only committee members can see this event.'
     },
     'pre-registration': {
-        icon: '🔔',
-        title: 'Pre-Registration',
-        description: 'Theme announced. People can register interest, but team registration is not yet open.',
-        bannerBg: 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)',
-        bannerBorder: '#eab308',
-        titleColor: '#a16207',
-        descColor: '#ca8a04'
+        icon: 'bell',
+        tone: 'info',
+        title: 'Pre-registration',
+        description: 'The theme is announced. People can register interest, but team registration is not open yet.'
     },
     registration: {
-        icon: '✅',
-        title: 'Registration Open',
-        description: 'Registration is open. Participants can create teams and register.',
-        bannerBg: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-        bannerBorder: '#2563eb',
-        titleColor: '#1e40af',
-        descColor: '#3b82f6'
+        icon: 'user-plus',
+        tone: 'success',
+        title: 'Registration open',
+        description: 'Participants can create teams and register.'
     },
     live: {
-        icon: '🚀',
-        title: 'Event Live',
-        description: 'Event is running! No new registrations allowed.',
-        bannerBg: 'linear-gradient(135deg, #ecfdf5 0%, #a7f3d0 100%)',
-        bannerBorder: '#10b981',
-        titleColor: '#047857',
-        descColor: '#10b981'
+        icon: 'rocket',
+        tone: 'violet',
+        title: 'Live',
+        description: 'The event is running. New registrations are closed.'
     },
     completed: {
-        icon: '✓',
+        icon: 'circle-check',
+        tone: '',
         title: 'Completed',
-        description: 'Event has ended. Read-only mode (only admins can edit).',
-        bannerBg: 'linear-gradient(135deg, #faf5ff 0%, #e9d5ff 100%)',
-        bannerBorder: '#8b5cf6',
-        titleColor: '#6b21a8',
-        descColor: '#8b5cf6'
+        description: 'The event has ended and is read-only. Only admins can edit it.'
     }
 };
 
@@ -320,44 +389,46 @@ function updateStatusUI(status) {
     steps.forEach((step, index) => {
         const indicator = step.querySelector('.step-indicator');
         step.classList.remove('completed', 'current', 'available', 'disabled');
+        step.removeAttribute('aria-current');
 
         if (index < currentIndex) {
             step.classList.add('completed');
-            indicator.innerHTML = '✓';
+            indicator.innerHTML = `${icon('check')}<span class="visually-hidden">Done:</span>`;
         } else if (index === currentIndex) {
             step.classList.add('current');
-            indicator.innerHTML = index + 1;
+            step.setAttribute('aria-current', 'step');
+            indicator.textContent = index + 1;
         } else if (index === currentIndex + 1) {
             step.classList.add('available');
-            indicator.innerHTML = index + 1;
+            indicator.textContent = index + 1;
         } else {
             step.classList.add('disabled');
-            indicator.innerHTML = index + 1;
+            indicator.textContent = index + 1;
         }
     });
-
-    const progressLine = document.getElementById('progress-line');
-    if (progressLine) {
-        const progressPercent = currentIndex / (STATUS_ORDER.length - 1) * 100;
-        const containerWidth = document.querySelector('.status-stepper').offsetWidth - 80;
-        progressLine.style.width = `${(containerWidth * progressPercent) / 100}px`;
-    }
 
     const config = STATUS_CONFIG[status];
     if (config) {
         const banner = document.getElementById('status-banner');
-        const icon = document.getElementById('status-icon');
-        const title = document.getElementById('status-title');
-        const description = document.getElementById('status-description');
-
-        banner.style.background = config.bannerBg;
-        banner.style.borderLeftColor = config.bannerBorder;
-        icon.textContent = config.icon;
-        title.textContent = config.title;
-        title.style.color = config.titleColor;
-        description.textContent = config.description;
-        description.style.color = config.descColor;
+        banner.className = `notice status-notice${config.tone ? ` notice-${config.tone}` : ''}`;
+        document.querySelector('#status-icon use').setAttribute('href', `/images/icons.svg#${config.icon}`);
+        document.getElementById('status-title').textContent = config.title;
+        document.getElementById('status-description').textContent = config.description;
     }
+
+    // Flag a status that was picked on the stepper but not saved yet.
+    const savedStatus = currentEvent ? eventStatusOf(currentEvent) : status;
+    document.getElementById('status-unsaved').classList.toggle('hidden', status === savedStatus);
+
+    // On narrow screens the stepper scrolls sideways: bring the current step into view.
+    requestAnimationFrame(() => {
+        const scroller = document.querySelector('.status-stepper-scroll');
+        const currentStep = steps[currentIndex];
+        if (!scroller || !currentStep || scroller.scrollWidth <= scroller.clientWidth) return;
+        const stepBox = currentStep.getBoundingClientRect();
+        const scrollerBox = scroller.getBoundingClientRect();
+        scroller.scrollLeft += (stepBox.left + stepBox.width / 2) - (scrollerBox.left + scrollerBox.width / 2);
+    });
 }
 
 function handleStatusChange(newStatus) {
@@ -375,8 +446,8 @@ function handleStatusChange(newStatus) {
         return;
     }
 
-    const direction = STATUS_ORDER.indexOf(newStatus) > STATUS_ORDER.indexOf(currentStatus) ? 'advance to' : 'revert to';
-    const confirmMsg = `${direction === 'advance to' ? '▶️' : '◀️'} ${direction.charAt(0).toUpperCase() + direction.slice(1)} "${STATUS_LABELS[newStatus]}"?\n\nCurrent: ${STATUS_LABELS[currentStatus]}`;
+    const direction = STATUS_ORDER.indexOf(newStatus) > STATUS_ORDER.indexOf(currentStatus) ? 'Advance' : 'Move back';
+    const confirmMsg = `${direction} to "${STATUS_LABELS[newStatus]}"?\n\nCurrent: ${STATUS_LABELS[currentStatus]}\nThe new status applies when you save the event.`;
     if (!confirm(confirmMsg)) return;
 
     updateStatusUI(newStatus);
@@ -390,7 +461,6 @@ function showForm(event = null) {
     document.getElementById('events-list-view').classList.add('hidden');
     document.getElementById('event-form-view').classList.remove('hidden');
 
-    const formTitle = document.getElementById('form-title');
     const deleteBtn = document.getElementById('delete-btn');
     const statusSection = document.getElementById('status-section');
     const committeeTab = document.getElementById('committee-tab-btn');
@@ -406,8 +476,9 @@ function showForm(event = null) {
     document.querySelector('.tab-btn[data-tab="general"]').classList.add('active');
     document.getElementById('general-panel').classList.add('active');
 
+    renderFormHeader(event);
+
     if (event) {
-        formTitle.textContent = 'Edit Event';
         deleteBtn.classList.remove('hidden');
         statusSection.classList.remove('hidden');
 
@@ -449,7 +520,6 @@ function showForm(event = null) {
         updateStatusUI(status);
 
     } else {
-        formTitle.textContent = 'Create Event';
         deleteBtn.classList.add('hidden');
         statusSection.classList.add('hidden');
         form.reset();
@@ -468,6 +538,8 @@ function showForm(event = null) {
         currentStatus = 'draft';
         document.getElementById('event-status').value = 'draft';
     }
+
+    updateDisclosureMeta();
 }
 
 // Committee, judges, leads, sponsors, budget, teams and sequence all need a saved event.
@@ -502,24 +574,28 @@ async function verifySharePointUrl() {
     const resultDiv = document.getElementById('sharepoint-verify-result');
     const btn = document.getElementById('verify-sharepoint-btn');
 
+    const verifyMessage = (tone, iconName, text) =>
+        `<p class="inline-status is-${tone}">${icon(iconName)}<span>${text}</span></p>`;
+
     if (!url) {
-        resultDiv.innerHTML = '<span style="color: var(--admin-warning-color, #e67e22);">⚠️ Please enter a URL first</span>';
+        resultDiv.innerHTML = verifyMessage('warning', 'triangle-alert', 'Enter a URL first.');
         return;
     }
 
     try {
         const parsed = new URL(url);
         if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.sharepoint.com')) {
-            resultDiv.innerHTML = '<span style="color: var(--admin-danger-color, #e74c3c);">❌ URL must be a SharePoint domain (*.sharepoint.com)</span>';
+            resultDiv.innerHTML = verifyMessage('danger', 'circle-x', 'The URL must be on a SharePoint domain (*.sharepoint.com).');
             return;
         }
     } catch {
-        resultDiv.innerHTML = '<span style="color: var(--admin-danger-color, #e74c3c);">❌ Invalid URL format</span>';
+        resultDiv.innerHTML = verifyMessage('danger', 'circle-x', 'That is not a valid URL.');
         return;
     }
 
+    const btnMarkup = btn.innerHTML;
     btn.disabled = true;
-    btn.textContent = '⏳ Checking...';
+    btn.textContent = 'Checking…';
     resultDiv.innerHTML = '';
 
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -535,20 +611,20 @@ async function verifySharePointUrl() {
                 body: JSON.stringify({ categories })
             });
             if (res.ok) {
-                resultDiv.innerHTML = '<span style="color: var(--admin-success-color, #27ae60);">✅ URL opened for verification. FileCategory column ensured on SharePoint library.</span>';
+                resultDiv.innerHTML = verifyMessage('success', 'circle-check', 'Folder opened in a new tab. The file category column is set up on the SharePoint library.');
             } else {
                 const err = await res.json().catch(() => ({}));
-                resultDiv.innerHTML = `<span style="color: var(--admin-warning-color, #e67e22);">⚠️ URL opened, but column setup failed: ${escapeHtml(err.error || err.details || 'Unknown error')}. Check SharePoint configuration.</span>`;
+                resultDiv.innerHTML = verifyMessage('warning', 'triangle-alert', `Folder opened, but setting up the column failed: ${escapeHtml(err.error || err.details || 'Unknown error')}. Check the SharePoint configuration.`);
             }
         } catch (err) {
-            resultDiv.innerHTML = `<span style="color: var(--admin-warning-color, #e67e22);">⚠️ URL opened, but could not reach the API to set up columns. Is the API running?</span>`;
+            resultDiv.innerHTML = verifyMessage('warning', 'triangle-alert', 'Folder opened, but the API could not be reached to set up the column. Is the API running?');
         }
     } else {
-        resultDiv.innerHTML = '<span style="color: var(--admin-success-color, #27ae60);">✅ URL opened for verification. Add File Upload Categories above and verify again to set up the SharePoint column.</span>';
+        resultDiv.innerHTML = verifyMessage('success', 'circle-check', 'Folder opened in a new tab. Add file upload categories above and verify again to set up the SharePoint column.');
     }
 
     btn.disabled = false;
-    btn.textContent = '🔗 Verify';
+    btn.innerHTML = btnMarkup;
 }
 
 function editEvent(eventId) {
@@ -565,8 +641,10 @@ async function handleFormSubmit(e) {
     e.preventDefault();
 
     const saveBtn = document.getElementById('save-btn');
+    const saveBtnMarkup = saveBtn.innerHTML;
+    let relabelled = false;
     saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving...';
+    saveBtn.textContent = 'Saving…';
 
     try {
         const registrationType = document.querySelector('input[name="registration-type"]:checked').value;
@@ -626,7 +704,13 @@ async function handleFormSubmit(e) {
                 setDataTabsEnabled(true);
                 document.getElementById('event-id').value = savedEvent.id;
                 updateURL();
+                // The new event now exists: show the controls an existing event has.
+                document.getElementById('delete-btn').classList.remove('hidden');
+                document.getElementById('status-section').classList.remove('hidden');
             }
+            renderFormHeader(savedEvent); // also relabels the save button ("Save event")
+            updateStatusUI(document.getElementById('event-status').value || 'draft');
+            relabelled = true;
         } else {
             hideForm();
         }
@@ -636,7 +720,7 @@ async function handleFormSubmit(e) {
         alert('Error saving event: ' + error.message);
     } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = '💾 Save Event';
+        if (!relabelled) saveBtn.innerHTML = saveBtnMarkup;
     }
 }
 
@@ -648,7 +732,7 @@ async function handleDelete() {
         return;
     }
 
-    await withBusy(document.getElementById('delete-btn'), '⏳ Deleting...', async () => {
+    await withBusyButton(document.getElementById('delete-btn'), 'Deleting…', async () => {
         try {
             await API.events.delete(eventId);
             await loadEvents();
@@ -795,19 +879,38 @@ function renderCommitteeMembers() {
 
     const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
 
-    tbody.innerHTML = members.map(m => `
+    tbody.innerHTML = members.map(m => staffRow(m, 'committee', canDelete)).join('');
+}
+
+function initials(name) {
+    return (name || '').split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('');
+}
+
+// One row of the committee or judges table: a registered person or a pending invitation.
+function staffRow(m, role, canDelete) {
+    const isInvite = m.type === 'invite';
+    const nameCell = isInvite
+        ? `<span class="person-cell"><span class="avatar" aria-hidden="true">${icon('mail')}</span><span class="text-muted">Not registered yet</span></span>`
+        : `<span class="person-cell"><span class="avatar" aria-hidden="true">${escapeHtml(initials(m.name))}</span><strong>${escapeHtml(m.name)}</strong></span>`;
+    const statusCell = isInvite
+        ? '<span class="badge badge-warning">Invited</span>'
+        : '<span class="badge badge-success">Registered</span>';
+    let action = '';
+    if (isInvite) {
+        action = `<button type="button" class="btn-sm danger-ghost" data-action="revoke-invite" data-invite-id="${escapeHtml(m.id)}" data-role="${role}">${icon('x')}Revoke invitation</button>`;
+    } else if (canDelete) {
+        action = `<button type="button" class="btn-sm danger-ghost" data-action="remove-member" data-participation-id="${escapeHtml(m.participationId)}" data-role="${role}">${icon('trash-2')}Remove</button>`;
+    }
+
+    return `
         <tr>
-            <td>${escapeHtml(m.name)}</td>
+            <td>${nameCell}</td>
             <td>${escapeHtml(m.email)}</td>
-            <td><span class="badge ${m.status === 'registered' ? 'live' : 'waitlist'}">${m.status}</span></td>
-            <td>${escapeHtml(m.registeredDate)}</td>
-            <td>
-                ${m.type === 'invite' ?
-                    `<button type="button" class="btn-sm danger" data-action="revoke-invite" data-invite-id="${escapeHtml(m.id)}" data-role="committee">✕ Revoke</button>` :
-                    (canDelete ? `<button type="button" class="btn-sm danger" data-action="remove-member" data-participation-id="${escapeHtml(m.participationId)}" data-role="committee">🗑️ Remove</button>` : '')}
-            </td>
+            <td>${statusCell}</td>
+            <td class="text-muted">${escapeHtml(m.registeredDate)}</td>
+            <td class="cell-actions"><div class="row-actions">${action}</div></td>
         </tr>
-    `).join('');
+    `;
 }
 
 function renderJudgesMembers() {
@@ -859,19 +962,7 @@ function renderJudgesMembers() {
 
     const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
 
-    tbody.innerHTML = members.map(m => `
-        <tr>
-            <td>${escapeHtml(m.name)}</td>
-            <td>${escapeHtml(m.email)}</td>
-            <td><span class="badge ${m.status === 'registered' ? 'live' : 'waitlist'}">${m.status}</span></td>
-            <td>${escapeHtml(m.registeredDate)}</td>
-            <td>
-                ${m.type === 'invite' ?
-                    `<button type="button" class="btn-sm danger" data-action="revoke-invite" data-invite-id="${escapeHtml(m.id)}" data-role="judge">✕ Revoke</button>` :
-                    (canDelete ? `<button type="button" class="btn-sm danger" data-action="remove-member" data-participation-id="${escapeHtml(m.participationId)}" data-role="judge">🗑️ Remove</button>` : '')}
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = members.map(m => staffRow(m, 'judge', canDelete)).join('');
 }
 
 async function sendInvitation(role) {
@@ -895,7 +986,7 @@ async function sendInvitation(role) {
     }
 
     const inviteBtn = document.getElementById(role === 'committee' ? 'invite-committee-btn' : 'invite-judge-btn');
-    await withBusy(inviteBtn, '⏳ Sending...', async () => {
+    await withBusyButton(inviteBtn, 'Sending…', async () => {
         try {
             await API.invitations.create({
                 email: email,
@@ -930,7 +1021,7 @@ async function revokeInvite(inviteId, role, button) {
         return;
     }
 
-    await withBusy(button, '⏳', async () => {
+    await withBusyButton(button, '…', async () => {
         try {
             await API.invitations.delete(inviteId);
 
@@ -958,7 +1049,7 @@ async function removeRegisteredMember(participationId, role, button) {
         return;
     }
 
-    await withBusy(button, '⏳', async () => {
+    await withBusyButton(button, '…', async () => {
         try {
             await API.participations.delete(participationId);
 
@@ -1014,7 +1105,7 @@ async function loadInterestLeads() {
     } catch (error) {
         console.error('Error loading leads:', error);
         document.getElementById('leads-table-body').innerHTML =
-            '<tr><td colspan="6" class="empty-state">Error loading leads</td></tr>';
+            '<tr><td colspan="5" class="empty-state">Could not load the leads. Reload the page to try again.</td></tr>';
     }
 }
 
@@ -1022,7 +1113,7 @@ function renderLeadsTable() {
     const tbody = document.getElementById('leads-table-body');
 
     if (allLeads.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No interest leads yet. Share the interest link to collect leads!</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No interest leads yet. Share the event\'s interest link to collect them.</td></tr>';
         return;
     }
 
@@ -1050,8 +1141,8 @@ function renderLeadsTable() {
                     let roleLabel = 'Participant';
                     if (roles.includes('committee')) roleLabel = 'Committee';
                     else if (roles.includes('judge')) roleLabel = 'Judge';
-                    convertedDetail = teamName ? `<br><small style="color:var(--admin-text-muted);">${escapeHtml(teamName)}</small>` : '';
-                    statusCell = `<span class="lead-status-pill status-converted">✅ ${roleLabel}</span>${convertedDetail}`;
+                    convertedDetail = teamName ? `<div class="cell-sub">${escapeHtml(teamName)}</div>` : '';
+                    statusCell = `<span class="badge badge-success">${icon('user-check')}${roleLabel}</span>${convertedDetail}`;
                 }
             }
 
@@ -1061,24 +1152,26 @@ function renderLeadsTable() {
                     const pos = allSoloQueueForEvent
                         .sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt))
                         .findIndex(q => sameId(q.userId, matchedUser.id)) + 1;
-                    statusCell = `<span class="lead-status-pill status-queued">🎲 In Queue</span><br><small style="color:var(--admin-text-muted);">Position ${pos} of ${allSoloQueueForEvent.length}</small>`;
+                    statusCell = `<span class="badge badge-info">${icon('dices')}In solo queue</span><div class="cell-sub">Position ${pos} of ${allSoloQueueForEvent.length}</div>`;
                 }
             }
         }
 
         if (!statusCell) {
-            statusCell = `<span class="lead-status-pill status-interest">🔔 Interest</span>`;
+            statusCell = `<span class="badge">${icon('bell')}Interested</span>`;
         }
 
         return `
         <tr>
             <td><strong>${escapeHtml(displayFirst)} ${escapeHtml(displayLast)}</strong></td>
             <td>${escapeHtml(lead.email)}</td>
-            <td>${new Date(lead.verifiedAt || lead.createdAt).toLocaleDateString()}</td>
+            <td class="text-muted">${new Date(lead.verifiedAt || lead.createdAt).toLocaleDateString()}</td>
             <td>${statusCell}</td>
-            <td>
-                <button type="button" class="btn-sm" data-action="restart-sequence" data-lead-id="${escapeHtml(lead.id)}">🔄 Restart Sequence</button>
-                <button type="button" class="btn-sm danger" data-action="delete-lead" data-lead-id="${escapeHtml(lead.id)}">🗑️</button>
+            <td class="cell-actions">
+                <div class="row-actions">
+                    <button type="button" class="btn-sm" data-action="restart-sequence" data-lead-id="${escapeHtml(lead.id)}">${icon('refresh-cw')}Restart sequence</button>
+                    <button type="button" class="btn-sm icon-only danger-ghost" data-action="delete-lead" data-lead-id="${escapeHtml(lead.id)}" aria-label="Delete lead" title="Delete lead">${icon('trash-2')}</button>
+                </div>
             </td>
         </tr>
     `;
@@ -1090,7 +1183,7 @@ async function deleteLead(leadId, button) {
         return;
     }
 
-    await withBusy(button, '⏳', async () => {
+    await withBusyButton(button, '…', async () => {
         try {
             const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads/${encodeURIComponent(leadId)}`, {
                 method: 'DELETE'
@@ -1108,7 +1201,7 @@ async function deleteLead(leadId, button) {
 
 async function clearRecipientDeliveries(email, button) {
     if (!confirm(`Clear all sequence delivery records for ${email}?\n\nThis will NOT resend emails. Use this to remove stale records so the recipient shows as fresh.`)) return;
-    await withBusy(button, '⏳', async () => {
+    await withBusyButton(button, '…', async () => {
         try {
             const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/recipient`, {
                 method: 'DELETE',
@@ -1129,7 +1222,7 @@ async function clearRecipientDeliveries(email, button) {
 async function restartSequence(leadId, userId, button) {
     if (!confirm('Restart sequence emails for this recipient?\n\nThis will send all unsent sequence emails. Check the browser console for detailed logs.')) return;
 
-    await withBusy(button, '⏳', () => restartSequenceRequest(leadId, userId));
+    await withBusyButton(button, '…', () => restartSequenceRequest(leadId, userId));
 }
 
 async function restartSequenceRequest(leadId, userId) {
@@ -1227,8 +1320,8 @@ function renderTeamsTable() {
 
         const adminUser = adminMembership ? allUsers.find(u => sameId(u.id, adminMembership.userId)) : null;
         const adminName = adminUser
-            ? `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || adminUser.email || 'N/A'
-            : (adminMembership?.email || 'N/A');
+            ? `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || adminUser.email || 'No admin'
+            : (adminMembership?.email || 'No admin');
         const teamDisplayName = team.teamName || team.name || 'Unnamed Team';
         const maxMembers = team.numberOfParticipants || team.maxSize || 5;
         const createdDate = new Date(team.createdAt).toLocaleDateString();
@@ -1236,11 +1329,11 @@ function renderTeamsTable() {
         return `
             <tr>
                 <td><strong>${escapeHtml(teamDisplayName)}</strong></td>
-                <td>${escapeHtml(adminName)}</td>
-                <td>${memberCount} / ${maxMembers}</td>
-                <td>${createdDate}</td>
-                <td>
-                    <a href="admin-teams.html?team=${encodeURIComponent(team.id)}" class="btn-sm" style="text-decoration: none;">View →</a>
+                <td class="text-muted">${escapeHtml(adminName)}</td>
+                <td><span class="badge count" title="Members / committed team size">${memberCount} / ${Number(maxMembers) || 0}</span></td>
+                <td class="text-muted">${createdDate}</td>
+                <td class="cell-actions">
+                    <a href="admin-teams.html?team=${encodeURIComponent(team.id)}" class="btn-sm">View team</a>
                 </td>
             </tr>
         `;
@@ -1266,8 +1359,8 @@ function resetSponsorForm() {
     form.reset();
     document.getElementById('sponsor-id').value = '';
     document.getElementById('sponsor-status').value = 'reached-out';
-    document.getElementById('sponsor-modal-title').textContent = '➕ Add Sponsor';
-    document.getElementById('save-sponsor-btn').textContent = '➕ Add Sponsor';
+    document.getElementById('sponsor-modal-title').textContent = 'Add sponsor';
+    document.getElementById('save-sponsor-btn').textContent = 'Add sponsor';
 }
 
 function openSponsorCreateModal() {
@@ -1323,29 +1416,32 @@ function renderSponsorsTable() {
         const status = row.sponsorStatus || 'reached-out';
 
         const parts = [];
-        if (row.contactPerson) parts.push(`<span style="font-weight:600">${escapeHtml(row.contactPerson)}</span>`);
-        if (row.phoneNumber)   parts.push(`<span style="color:var(--admin-text-muted);font-size:0.82rem">📞 ${escapeHtml(row.phoneNumber)}</span>`);
+        if (row.contactPerson) parts.push(`<span class="contact-name">${escapeHtml(row.contactPerson)}</span>`);
+        if (row.phoneNumber)   parts.push(`<span class="meta-item">${icon('phone')}${escapeHtml(row.phoneNumber)}</span>`);
         const contactEmail = row.contactEmail || row.email;
-        if (contactEmail)      parts.push(`<a href="mailto:${escapeHtml(contactEmail)}" style="font-size:0.82rem">✉️ ${escapeHtml(contactEmail)}</a>`);
+        if (contactEmail)      parts.push(`<a class="meta-item" href="mailto:${escapeHtml(contactEmail)}">${icon('mail')}${escapeHtml(contactEmail)}</a>`);
         if (row.notes) {
             const preview = row.notes.length > 80 ? row.notes.slice(0, 80) + '…' : row.notes;
-            parts.push(`<span style="color:var(--admin-text-muted);font-size:0.8rem;font-style:italic" title="${escapeHtml(row.notes)}">${escapeHtml(preview)}</span>`);
+            parts.push(`<span class="contact-note" title="${escapeHtml(row.notes)}">${escapeHtml(preview)}</span>`);
         }
-        const contactCell = parts.length ? parts.join('<br>') : '<span style="color:var(--admin-text-muted)">—</span>';
+        const contactCell = parts.length ? `<div class="contact-lines">${parts.join('')}</div>` : '<span class="text-muted">—</span>';
 
-        const statusSelect = `<select class="paidby-select sponsor-status-select ${escapeHtml(status)}" data-sponsor-id="${escapeHtml(row.id)}">
+        const company = escapeHtml(row.description || '');
+        const statusSelect = `<select class="paidby-select sponsor-status-select ${escapeHtml(status)}" data-sponsor-id="${escapeHtml(row.id)}" aria-label="Status for ${company}">
             ${statusOptions.map(o => `<option value="${o.value}"${o.value === status ? ' selected' : ''}>${o.label}</option>`).join('')}
         </select>`;
 
         return `
             <tr>
-                <td><strong>${escapeHtml(row.description || '')}</strong></td>
+                <td><strong>${company}</strong></td>
                 <td>${contactCell}</td>
-                <td>${fmt(row.amount)}</td>
+                <td class="cell-num">${fmt(row.amount)}</td>
                 <td>${statusSelect}</td>
-                <td style="white-space:nowrap">
-                    <button type="button" class="btn-sm" data-action="edit-sponsor" data-sponsor-id="${escapeHtml(row.id)}">✏️ Edit</button>
-                    <button type="button" class="btn-sm danger" data-action="delete-sponsor" data-sponsor-id="${escapeHtml(row.id)}">🗑️</button>
+                <td class="cell-actions">
+                    <div class="row-actions">
+                        <button type="button" class="btn-sm" data-action="edit-sponsor" data-sponsor-id="${escapeHtml(row.id)}">${icon('pencil')}Edit</button>
+                        <button type="button" class="btn-sm icon-only danger-ghost" data-action="delete-sponsor" data-sponsor-id="${escapeHtml(row.id)}" aria-label="Delete sponsor ${company}" title="Delete sponsor">${icon('trash-2')}</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -1356,7 +1452,7 @@ function startEditSponsor(sponsorId) {
     const row = (allFinancials || []).find(r => sameId(r.id, sponsorId));
     if (!row) return;
 
-    document.getElementById('sponsor-modal-title').textContent = '✏️ Edit Sponsor';
+    document.getElementById('sponsor-modal-title').textContent = 'Edit sponsor';
     document.getElementById('sponsor-id').value = sponsorId;
     document.getElementById('sponsor-company-name').value = row.description || '';
     document.getElementById('sponsor-contact-person').value = row.contactPerson || '';
@@ -1365,7 +1461,7 @@ function startEditSponsor(sponsorId) {
     document.getElementById('sponsor-amount').value = row.amount == null || row.amount === 0 ? '' : row.amount;
     document.getElementById('sponsor-status').value = row.sponsorStatus || 'reached-out';
     document.getElementById('sponsor-notes').value = row.notes || '';
-    document.getElementById('save-sponsor-btn').textContent = '💾 Update Sponsor';
+    document.getElementById('save-sponsor-btn').textContent = 'Save sponsor';
     document.getElementById('sponsor-modal').classList.add('active');
     document.getElementById('sponsor-company-name').focus();
 }
@@ -1418,7 +1514,7 @@ async function handleSponsorSubmit(e) {
 async function deleteSponsor(sponsorId, button) {
     if (!confirm('Delete this sponsor entry?')) return;
 
-    await withBusy(button, '⏳', async () => {
+    await withBusyButton(button, '…', async () => {
         try {
             await API.events.sponsors.delete(currentEventId, sponsorId);
             await loadEventSponsors();
@@ -1455,13 +1551,17 @@ function setNoSequenceStateMessage(message, isError = false) {
     if (!descriptionEl) return;
 
     descriptionEl.textContent = message;
-    descriptionEl.style.color = isError ? '#dc2626' : 'var(--admin-text-muted)';
+    descriptionEl.classList.toggle('is-error', isError);
+}
+
+function showSequenceState(exists) {
+    document.getElementById('no-sequence-state').classList.toggle('hidden', exists);
+    document.getElementById('sequence-exists-state').classList.toggle('hidden', !exists);
 }
 
 async function loadEventSequence() {
     if (!currentEvent || !currentEvent.sequenceId) {
-        document.getElementById('no-sequence-state').style.display = 'block';
-        document.getElementById('sequence-exists-state').style.display = 'none';
+        showSequenceState(false);
         setNoSequenceStateMessage('Create an email sequence to send automated emails to interest leads for this event.');
         currentEventSequence = null;
         return;
@@ -1472,15 +1572,13 @@ async function loadEventSequence() {
         currentEventSequence = response.sequence;
         currentEventSequence.emails = response.emails || [];
 
-        document.getElementById('no-sequence-state').style.display = 'none';
-        document.getElementById('sequence-exists-state').style.display = 'block';
+        showSequenceState(true);
         setNoSequenceStateMessage('Create an email sequence to send automated emails to interest leads for this event.');
 
         renderSequenceEmails();
     } catch (error) {
         console.error('Failed to load sequence:', error);
-        document.getElementById('no-sequence-state').style.display = 'block';
-        document.getElementById('sequence-exists-state').style.display = 'none';
+        showSequenceState(false);
         currentEventSequence = null;
 
         if (error.status === 404) {
@@ -1496,8 +1594,8 @@ function renderSequenceEmails() {
     const container = document.getElementById('sequence-emails-list');
 
     if (!currentEventSequence || !currentEventSequence.emails || currentEventSequence.emails.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--admin-text-muted); padding: 40px;">No emails yet. Click "Add Email" to create the first email.</p>';
-        document.getElementById('recipient-delivery-overview').style.display = 'none';
+        container.innerHTML = '<div class="empty-state">No emails in this sequence yet. Add the first one to start it.</div>';
+        document.getElementById('recipient-delivery-overview').classList.add('hidden');
         return;
     }
 
@@ -1506,34 +1604,38 @@ function renderSequenceEmails() {
     loadEmailDeliveryStats(emails).then(emailStats => {
         container.innerHTML = emails.map(email => {
             const order = email.sequenceOrder || email.order || 1;
-            const statusBadge = email.status === 'live' ? '✅ Live' : '📝 Draft';
-            const scheduleText = email.scheduledSendTime
-                ? `⏰ ${new Date(email.scheduledSendTime).toLocaleString()}`
+            const isLive = email.status === 'live';
+            const statusBadge = isLive
+                ? '<span class="badge badge-violet badge-dot">Live</span>'
+                : '<span class="badge badge-dot">Draft</span>';
+            const schedule = email.scheduledSendTime
+                ? `<span class="meta-item">${icon('clock')}${escapeHtml(new Date(email.scheduledSendTime).toLocaleString())}</span>`
                 : '';
 
             const stats = emailStats[email.id] || { sent: 0, total: 0 };
-            const deliveryBadge = stats.total > 0
-                ? `📊 Sent: ${stats.sent}/${stats.total}`
+            const delivery = stats.total > 0
+                ? `<span class="meta-item">${icon('send')}Sent to ${stats.sent} of ${stats.total}</span>`
                 : '';
 
-            const isLive = email.status === 'live';
-            const editButtonText = isLive ? '👁️ View' : '✏️ Edit';
+            const editButton = isLive ? `${icon('eye')}View` : `${icon('pencil')}Edit`;
+            const subject = escapeHtml(email.subject);
 
             const emailIdAttr = escapeHtml(email.id);
             return `
-                <div class="email-card">
-                    <div class="email-card-header">
-                        <div>
-                            <div class="email-card-title">#${Number(order) || 1}: ${escapeHtml(email.subject)}</div>
-                            <div class="email-card-meta">
-                                ${statusBadge} ${escapeHtml(scheduleText)} ${deliveryBadge}
-                            </div>
-                        </div>
-                        <div class="email-card-actions">
-                            ${order > 1 ? `<button type="button" class="btn-sm" data-action="move-up" data-email-id="${emailIdAttr}">↑</button>` : ''}
-                            ${order < emails.length ? `<button type="button" class="btn-sm" data-action="move-down" data-email-id="${emailIdAttr}">↓</button>` : ''}
-                            <button type="button" class="btn-sm" data-action="edit-email" data-email-id="${emailIdAttr}">${editButtonText}</button>
-                        </div>
+                <div class="email-card sequence-email">
+                    <span class="sequence-order"><span class="visually-hidden">Email </span>${Number(order) || 1}</span>
+                    <div class="sequence-email-body">
+                        <div class="email-card-title sequence-email-subject">${subject}</div>
+                        <div class="meta-list email-card-meta">${statusBadge}${schedule}${delivery}</div>
+                    </div>
+                    <div class="row-actions email-card-actions">
+                        ${order > 1
+                            ? `<button type="button" class="btn-sm icon-only" data-action="move-up" data-email-id="${emailIdAttr}" aria-label="Move earlier: ${subject}" title="Move earlier">${icon('arrow-up')}</button>`
+                            : `<button type="button" class="btn-sm icon-only" disabled aria-label="Already the first email" title="Already the first email">${icon('arrow-up')}</button>`}
+                        ${order < emails.length
+                            ? `<button type="button" class="btn-sm icon-only" data-action="move-down" data-email-id="${emailIdAttr}" aria-label="Move later: ${subject}" title="Move later">${icon('arrow-down')}</button>`
+                            : `<button type="button" class="btn-sm icon-only" disabled aria-label="Already the last email" title="Already the last email">${icon('arrow-down')}</button>`}
+                        <button type="button" class="btn-sm" data-action="edit-email" data-email-id="${emailIdAttr}">${editButton}</button>
                     </div>
                 </div>
             `;
@@ -1581,7 +1683,7 @@ async function loadRecipientDeliveryOverview() {
     const bodyEl = document.getElementById('recipient-overview-body');
 
     if (!currentEvent || !currentEvent.sequenceId) {
-        overviewSection.style.display = 'none';
+        overviewSection.classList.add('hidden');
         return;
     }
 
@@ -1593,19 +1695,19 @@ async function loadRecipientDeliveryOverview() {
         const { deliveries = [], leads = [], recipients = [], campaigns } = data;
 
         if (!campaigns || campaigns.length === 0) {
-            overviewSection.style.display = 'none';
+            overviewSection.classList.add('hidden');
             return;
         }
 
-        overviewSection.style.display = 'block';
+        overviewSection.classList.remove('hidden');
 
         const sortedCampaigns = campaigns.sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0));
         headerEl.innerHTML = `
             <tr>
-                <th style="text-align: left;">Recipient</th>
-                ${sortedCampaigns.map((c, i) => `<th style="text-align: center;">#${i+1}</th>`).join('')}
-                <th style="text-align: center;">Total</th>
-                <th style="text-align: center;">Action</th>
+                <th scope="col">Recipient</th>
+                ${sortedCampaigns.map((c, i) => `<th scope="col" class="cell-center"${c.subject ? ` title="${escapeHtml(c.subject)}"` : ''}><span class="visually-hidden">Email </span>#${i + 1}</th>`).join('')}
+                <th scope="col" class="cell-center">Total</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
             </tr>
         `;
 
@@ -1631,7 +1733,7 @@ async function loadRecipientDeliveryOverview() {
         ];
 
         if (allRecipients.length === 0) {
-            bodyEl.innerHTML = '<tr><td colspan="' + (campaigns.length + 3) + '" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">No recipients yet</td></tr>';
+            bodyEl.innerHTML = '<tr><td colspan="' + (campaigns.length + 3) + '" class="empty-state">No recipients yet</td></tr>';
             return;
         }
 
@@ -1643,10 +1745,10 @@ async function loadRecipientDeliveryOverview() {
             const emailStatuses = sortedCampaigns.map(campaign => {
                 const campaignId = normalizeId(campaign.id);
                 const delivery = recipientDeliveries.find(d => normalizeId(d.campaignId) === campaignId);
-                if (!delivery) return { sent: false, symbol: '-', style: 'color: var(--admin-text-muted);' };
-                if (delivery.status === 'sent') return { sent: true, symbol: '✓', style: 'color: #10b981;' };
-                if (delivery.status === 'failed') return { sent: false, symbol: '✗', style: 'color: #ef4444;' };
-                return { sent: false, symbol: '⏳', style: 'color: var(--admin-text-muted);' };
+                if (!delivery) return { sent: false, mark: '<span class="delivery-mark" aria-hidden="true">–</span><span class="visually-hidden">Not sent</span>' };
+                if (delivery.status === 'sent') return { sent: true, mark: `<span class="delivery-mark is-sent">${icon('check')}</span><span class="visually-hidden">Sent</span>` };
+                if (delivery.status === 'failed') return { sent: false, mark: `<span class="delivery-mark is-failed">${icon('x')}</span><span class="visually-hidden">Failed</span>` };
+                return { sent: false, mark: `<span class="delivery-mark">${icon('hourglass')}</span><span class="visually-hidden">Pending</span>` };
             });
 
             const sentCount = emailStatuses.filter(s => s.sent).length;
@@ -1654,12 +1756,12 @@ async function loadRecipientDeliveryOverview() {
             const completion = totalCount > 0 ? Math.round((sentCount / totalCount) * 100) : 0;
 
             const typeLabels = {
-                'interest': '<span style="font-size: 0.75rem; background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 3px;">Interest</span>',
-                'judge': '<span style="font-size: 0.75rem; background: #ede9fe; color: #6d28d9; padding: 1px 6px; border-radius: 3px;">Judge</span>',
-                'committee': '<span style="font-size: 0.75rem; background: #e0e7ff; color: #4338ca; padding: 1px 6px; border-radius: 3px;">Committee</span>',
-                'participant': '<span style="font-size: 0.75rem; background: #d1fae5; color: #065f46; padding: 1px 6px; border-radius: 3px;">Participant</span>'
+                'interest': '<span class="badge">Interest</span>',
+                'judge': '<span class="badge">Judge</span>',
+                'committee': '<span class="badge">Committee</span>',
+                'participant': '<span class="badge">Participant</span>'
             };
-            const typeLabel = typeLabels[recipient.type] ? ' ' + typeLabels[recipient.type] : '';
+            const typeLabel = typeLabels[recipient.type] || '';
 
             return {
                 name: recipient.name,
@@ -1679,18 +1781,18 @@ async function loadRecipientDeliveryOverview() {
         // Names and emails come from the public interest form: always rendered as text.
         bodyEl.innerHTML = rows.map(row => `
             <tr>
-                <td style="text-align: left;">
-                    <div style="font-weight: 500;">${escapeHtml(row.name)}${row.typeLabel || ''}</div>
-                    <div style="font-size: 0.85rem; color: var(--admin-text-muted);">${escapeHtml(row.email)}</div>
+                <td>
+                    <div class="recipient-name"><strong>${escapeHtml(row.name)}</strong>${row.typeLabel || ''}</div>
+                    <div class="cell-sub">${escapeHtml(row.email)}</div>
                 </td>
-                ${row.statuses.map(s => `<td style="text-align: center; ${s.style}">${s.symbol}</td>`).join('')}
-                <td style="text-align: center; font-weight: 600;">${row.sentCount}/${row.totalCount}</td>
-                <td style="text-align: center;">
-                    <div style="display:flex;gap:4px;justify-content:center;">
+                ${row.statuses.map(s => `<td class="cell-center">${s.mark}</td>`).join('')}
+                <td class="cell-center cell-total">${row.sentCount}/${row.totalCount}</td>
+                <td class="cell-actions">
+                    <div class="row-actions">
                     ${row.leadId
-                        ? `<button type="button" class="btn-sm" data-action="restart-lead" data-lead-id="${escapeHtml(row.leadId)}">🔄 Restart</button>`
-                        : `<button type="button" class="btn-sm" data-action="restart-user" data-user-id="${escapeHtml(row.userId)}">🔄 Restart</button>`}
-                    <button type="button" class="btn-sm" style="background:var(--admin-danger,#dc2626);color:#fff;" data-action="clear-deliveries" data-email="${escapeHtml(row.email)}">🗑 Clear</button>
+                        ? `<button type="button" class="btn-sm" data-action="restart-lead" data-lead-id="${escapeHtml(row.leadId)}" title="Send this recipient every sequence email they have not received">${icon('refresh-cw')}Restart</button>`
+                        : `<button type="button" class="btn-sm" data-action="restart-user" data-user-id="${escapeHtml(row.userId)}" title="Send this recipient every sequence email they have not received">${icon('refresh-cw')}Restart</button>`}
+                    <button type="button" class="btn-sm danger-ghost" data-action="clear-deliveries" data-email="${escapeHtml(row.email)}" title="Remove the delivery records for this recipient (sends nothing)">${icon('trash-2')}Clear records</button>
                     </div>
                 </td>
             </tr>
@@ -1698,7 +1800,7 @@ async function loadRecipientDeliveryOverview() {
 
     } catch (error) {
         console.error('Failed to load recipient delivery overview:', error);
-        overviewSection.style.display = 'none';
+        overviewSection.classList.add('hidden');
     }
 }
 
@@ -1715,10 +1817,10 @@ document.addEventListener('DOMContentLoaded', () => {
         radio.addEventListener('change', (e) => {
             const copySection = document.getElementById('copy-from-event-section');
             if (e.target.value === 'copy') {
-                copySection.style.display = 'block';
+                copySection.classList.remove('hidden');
                 loadEventsWithSequences();
             } else {
-                copySection.style.display = 'none';
+                copySection.classList.add('hidden');
             }
         });
     });
@@ -1759,7 +1861,7 @@ async function loadEventsWithSequences() {
 }
 
 async function confirmCreateSequence() {
-    await withBusy(document.getElementById('confirm-create-sequence-btn'), '⏳ Creating...', createSequenceFromModal);
+    await withBusyButton(document.getElementById('confirm-create-sequence-btn'), 'Creating…', createSequenceFromModal);
 }
 
 async function createSequenceFromModal() {
@@ -1851,7 +1953,7 @@ async function reorderEmail(emailId, direction, button) {
 
     [sorted[idx], sorted[swapIdx]] = [sorted[swapIdx], sorted[idx]];
 
-    await withBusy(button, '⏳', async () => {
+    await withBusyButton(button, '…', async () => {
         try {
             await Promise.all([
                 API.campaigns.update(sorted[idx].id,    { sequenceOrder: idx + 1 }),
@@ -1876,7 +1978,7 @@ let allFinancials = [];
 async function loadEventBudget() {
     const tbody = document.getElementById('budget-table-body');
     if (!currentEventId) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Save the event first to manage budget</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Save the event first to manage the budget</td></tr>';
         return;
     }
 
@@ -1899,18 +2001,21 @@ async function loadEventBudget() {
         renderBudgetTable();
     } catch (error) {
         console.error('Error loading budget:', error);
-        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Error loading budget</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Could not load the budget. Reload the page to try again.</td></tr>';
     }
 }
 
 function renderBudgetSummary(summary) {
     const currency = eventCurrency();
     const fmt = (val) => val != null ? Number(val).toLocaleString(currencyLocale(currency), { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0';
-    document.getElementById('budget-total-income').textContent = fmt(summary?.totalIncome);
-    document.getElementById('budget-total-org-expense').textContent = fmt(summary?.totalOrgExpense);
-    document.getElementById('budget-total-participant-expense').textContent = fmt(summary?.totalParticipantExpense);
+    const show = (id, val) => {
+        document.getElementById(id).innerHTML = `${escapeHtml(fmt(val))} <span class="stat-unit">${escapeHtml(currency)}</span>`;
+    };
+    show('budget-total-income', summary?.totalIncome);
+    show('budget-total-org-expense', summary?.totalOrgExpense);
+    show('budget-total-participant-expense', summary?.totalParticipantExpense);
     const net = summary?.netBalance ?? 0;
-    document.getElementById('budget-net-balance').textContent = fmt(net);
+    show('budget-net-balance', net);
     const netCard = document.getElementById('budget-net-card');
     netCard.classList.toggle('positive', net >= 0);
     netCard.classList.toggle('negative', net < 0);
@@ -1931,12 +2036,17 @@ function renderBudgetTable() {
             `<option value="participant"${row.paidBy === 'participant' ? ' selected' : ''}>Participant pays</option>`,
             `<option value="event"${row.paidBy === 'event' ? ' selected' : ''}>Event pays</option>`
         ].join('');
-        return `<select class="paidby-select" data-row-id="${escapeHtml(row.id)}">${opts}</select>`;
+        return `<select class="paidby-select" data-row-id="${escapeHtml(row.id)}" aria-label="Paid by">${opts}</select>`;
     };
 
     const typeLabel = (row) => row.type === 'income'
-        ? '<span style="color:#166534;font-size:0.75rem;font-weight:700;">INCOME</span>'
-        : '<span style="color:#991b1b;font-size:0.75rem;font-weight:700;">EXPENSE</span>';
+        ? '<span class="badge badge-success">Income</span>'
+        : '<span class="badge">Expense</span>';
+
+    const CATEGORY_LABELS = {
+        venue: 'Venue', food: 'Food', hotel: 'Hotel', activity: 'Activity',
+        sponsorship: 'Sponsorship', registration: 'Registration fee', other: 'Other'
+    };
 
     const amountCell = (row) => {
         const sign = row.type === 'income' ? '+' : '−';
@@ -1946,21 +2056,29 @@ function renderBudgetTable() {
 
     const actionCell = (row) => {
         if (row.source === 'manual') {
-            return `<button type="button" class="btn-sm" data-action="edit-financial" data-row-id="${escapeHtml(row.id)}">✏️</button>
-                    <button type="button" class="btn-sm danger" data-action="delete-financial" data-row-id="${escapeHtml(row.id)}">🗑️</button>`;
+            const label = escapeHtml(row.description || 'row');
+            return `<div class="row-actions">
+                    <button type="button" class="btn-sm icon-only" data-action="edit-financial" data-row-id="${escapeHtml(row.id)}" aria-label="Edit ${label}" title="Edit row">${icon('pencil')}</button>
+                    <button type="button" class="btn-sm icon-only danger-ghost" data-action="delete-financial" data-row-id="${escapeHtml(row.id)}" aria-label="Delete ${label}" title="Delete row">${icon('trash-2')}</button>
+                </div>`;
         }
-        return `<span style="color:var(--admin-text-muted);font-size:0.75rem;">auto</span>`;
+        return '<span class="text-muted" title="Generated by Recalculate rows">Automatic</span>';
+    };
+
+    const SPONSOR_STATUS = {
+        'reached-out': ['', 'Reached out'],
+        negotiating: ['badge-warning', 'Negotiating'],
+        declined: ['badge-danger', 'Declined']
     };
 
     const descCell = (row) => {
         let desc = escapeHtml(row.description || '');
         if (row.unitCost != null && row.days != null) {
-            desc += `<span style="color:var(--admin-text-muted);font-size:0.75rem;margin-left:6px;">(${fmt(row.unitCost)} × ${Number(row.days) || 0})</span>`;
+            desc += ` <span class="cell-note">(${fmt(row.unitCost)} × ${Number(row.days) || 0})</span>`;
         }
         if (row.category === 'sponsorship' && row.sponsorStatus && row.sponsorStatus !== 'confirmed') {
-            const statusColors = { 'reached-out': '#64748b', negotiating: '#d97706', declined: '#dc2626' };
-            const color = statusColors[row.sponsorStatus] || '#64748b';
-            desc += ` <span style="color:${color};font-size:0.75rem;font-style:italic;white-space:nowrap">(${escapeHtml(row.sponsorStatus)})</span>`;
+            const [tone, label] = SPONSOR_STATUS[row.sponsorStatus] || ['', row.sponsorStatus];
+            desc += ` <span class="badge ${tone}">${escapeHtml(label)}</span>`;
         }
         return desc;
     };
@@ -1968,11 +2086,11 @@ function renderBudgetTable() {
     const dataRow = (row) => `
         <tr class="${row.source === 'auto' ? 'financial-auto-row' : ''}">
             <td>${typeLabel(row)}</td>
-            <td>${escapeHtml(row.category || '')}</td>
+            <td>${escapeHtml(CATEGORY_LABELS[row.category] || row.category || '')}</td>
             <td>${descCell(row)}</td>
-            <td>${amountCell(row)}</td>
+            <td class="cell-num">${amountCell(row)}</td>
             <td>${paidBySelect(row)}</td>
-            <td style="white-space:nowrap;">${actionCell(row)}</td>
+            <td class="cell-actions">${actionCell(row)}</td>
         </tr>`;
 
     const participantMap = new Map();
@@ -2004,10 +2122,10 @@ function renderBudgetTable() {
     let html = '';
 
     for (const [, group] of participantMap) {
-        const roleLabel = group.roles ? ` — ${escapeHtml(group.roles)}` : '';
+        const roleLabel = group.roles ? ` <span class="budget-group-roles">${escapeHtml(group.roles)}</span>` : '';
         html += `<tr class="budget-group-header">
-            <td colspan="6">👤 ${escapeHtml(group.email)}${roleLabel}
-                <span class="budget-group-total">Net: ${groupTotal(group.rows)}</span>
+            <td colspan="6"><span class="budget-group-name">${icon('user')}${escapeHtml(group.email)}</span>${roleLabel}
+                <span class="budget-group-total">Net ${groupTotal(group.rows)}</span>
             </td>
         </tr>`;
         html += group.rows.map(dataRow).join('');
@@ -2015,8 +2133,8 @@ function renderBudgetTable() {
 
     if (eventRows.length > 0) {
         html += `<tr class="budget-group-header">
-            <td colspan="6">🏢 Event-level rows
-                <span class="budget-group-total">Net: ${groupTotal(eventRows)}</span>
+            <td colspan="6"><span class="budget-group-name">${icon('building-2')}Event-level rows</span>
+                <span class="budget-group-total">Net ${groupTotal(eventRows)}</span>
             </td>
         </tr>`;
         html += eventRows.map(dataRow).join('');
@@ -2030,10 +2148,10 @@ function openFinancialModal() {
         alert('Save the event first before adding financial rows.');
         return;
     }
-    document.getElementById('financial-modal-title').textContent = '➕ Add Financial Row';
+    document.getElementById('financial-modal-title').textContent = 'Add financial row';
     document.getElementById('financial-id').value = '';
     document.getElementById('financial-form').reset();
-    document.getElementById('save-financial-btn').textContent = '➕ Add Row';
+    document.getElementById('save-financial-btn').textContent = 'Add row';
     document.getElementById('financial-modal').classList.add('active');
     toggleFinancialPaidBy();
 }
@@ -2044,14 +2162,14 @@ function closeFinancialModal() {
 
 function toggleFinancialPaidBy() {
     const type = document.getElementById('financial-type').value;
-    document.getElementById('financial-paidby-group').style.display = type === 'expense' ? '' : 'none';
+    document.getElementById('financial-paidby-group').classList.toggle('hidden', type !== 'expense');
 }
 
 function startEditFinancial(rowId) {
     const row = allFinancials.find(r => sameId(r.id, rowId));
     if (!row) return;
 
-    document.getElementById('financial-modal-title').textContent = '✏️ Edit Financial Row';
+    document.getElementById('financial-modal-title').textContent = 'Edit financial row';
     document.getElementById('financial-id').value = row.id;
     document.getElementById('financial-type').value = row.type;
     document.getElementById('financial-category').value = row.category;
@@ -2059,7 +2177,7 @@ function startEditFinancial(rowId) {
     document.getElementById('financial-amount').value = row.amount;
     document.getElementById('financial-paid-by').value = row.paidBy || 'event';
     document.getElementById('financial-notes').value = row.notes || '';
-    document.getElementById('save-financial-btn').textContent = '💾 Update Row';
+    document.getElementById('save-financial-btn').textContent = 'Save row';
     document.getElementById('financial-modal').classList.add('active');
     toggleFinancialPaidBy();
 }
@@ -2102,7 +2220,7 @@ async function handleFinancialSubmit(e) {
 
 async function deleteFinancialRow(rowId, button) {
     if (!confirm('Delete this financial row?')) return;
-    await withBusy(button, '⏳', async () => {
+    await withBusyButton(button, '…', async () => {
         try {
             await API.events.financials.delete(currentEventId, rowId);
             await loadEventBudget();
@@ -2133,8 +2251,9 @@ async function recalculateFinancials() {
     if (!currentEventId) return;
 
     const btn = document.getElementById('recalculate-btn');
+    const btnMarkup = btn.innerHTML;
     btn.disabled = true;
-    btn.textContent = '⏳ Recalculating...';
+    btn.textContent = 'Recalculating…';
 
     try {
         const result = await API.events.financials.recalculate(currentEventId);
@@ -2143,13 +2262,13 @@ async function recalculateFinancials() {
         const errMsg = result.errors && result.errors.length
             ? `\n\n${result.errors.length} participant(s) had errors.`
             : '';
-        alert(`✅ Recalculated ${result.updated} of ${result.total} participants.${errMsg}`);
+        alert(`Recalculated ${result.updated} of ${result.total} participants.${errMsg}`);
     } catch (error) {
         console.error('Recalculate failed:', error);
         alert(`Error recalculating: ${error.message}`);
     } finally {
         btn.disabled = false;
-        btn.textContent = '♻️ Recalculate';
+        btn.innerHTML = btnMarkup;
     }
 }
 
@@ -2166,13 +2285,13 @@ async function saveEventRates() {
         foodDays:          foodDays  !== '' ? parseInt(foodDays, 10) : null
     };
 
-    await withBusy(document.getElementById('save-rates-btn'), '⏳ Saving...', async () => {
+    await withBusyButton(document.getElementById('save-rates-btn'), 'Saving…', async () => {
         try {
             const updated = await API.events.update(currentEventId, payload);
             if (updated) {
                 currentEvent = { ...currentEvent, ...payload };
             }
-            alert('Rates saved. Click Recalculate to regenerate the auto rows with the new rates.');
+            alert('Rates saved. Select Recalculate rows to regenerate the automatic rows with the new rates.');
         } catch (error) {
             console.error('Error saving rates:', error);
             alert(`Error saving rates: ${error.message}`);

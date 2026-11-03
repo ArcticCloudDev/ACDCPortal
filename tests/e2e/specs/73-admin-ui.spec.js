@@ -107,7 +107,7 @@ test.describe('strict CSP: every admin page loads with no violations and no thir
         await expect(page.locator('#recipient-delivery-overview')).toContainText(w.lead.email);
 
         await page.goto('/admin-events.html?action=create');
-        await expect(page.locator('#form-title')).toHaveText('Create Event');
+        await expect(page.locator('#form-title')).toHaveText('Create event');
 
         await page.goto(`/admin-event-participants.html?id=${w.event.id}`);
         await expect(page.locator('#participant-count')).toHaveText('3 participants');
@@ -345,7 +345,7 @@ test.describe('sequence flows from the event editor', () => {
             await loginAs(w.admin);
             await page.goto(`/admin-events.html?event=${w.event.id}&tab=sequence`);
             await page.locator('#create-sequence-btn').click();
-            await page.getByText('📋 Copy from another event').click();
+            await page.getByText('Copy from another event').click();
             await page.locator('#copy-from-event-select').selectOption(source.id);
             const req = page.waitForRequest(r => r.method() === 'POST' && /\/api\/sequences\/[^/]+\/copy$/.test(r.url()));
             await page.locator('#confirm-create-sequence-btn').click();
