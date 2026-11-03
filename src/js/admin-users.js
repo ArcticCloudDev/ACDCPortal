@@ -108,7 +108,11 @@ function setupActions() {
         if (row) openDrawer(Number(row.dataset.rowIndex));
     });
 
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+    document.addEventListener('keydown', e => {
+        if (!document.getElementById('person-drawer').classList.contains('open')) return;
+        if (e.key === 'Escape') closeDrawer();
+        if (e.key === 'Tab') keepFocusInDrawer(e);
+    });
 }
 
 function setView(v) {
@@ -436,8 +440,11 @@ async function openDrawer(idx) {
     const row = displayRows[idx];
     if (!row) return;
 
+    // aria-modal dialog: focus moves in, stays in, and returns to the row's button on close.
+    drawerOpener = document.activeElement;
     document.getElementById('drawer-backdrop').classList.add('open');
     document.getElementById('person-drawer').classList.add('open');
+    document.getElementById('drawer-close-btn').focus();
 
     document.getElementById('drawer-avatar').textContent = getInitials(row.displayName, row.email);
     document.getElementById('drawer-name').textContent   = row.displayName || row.email;
@@ -531,16 +538,32 @@ async function openDrawer(idx) {
     }
 }
 
+let drawerOpener = null;
+
 function closeDrawer() {
+    const drawer = document.getElementById('person-drawer');
+    if (!drawer.classList.contains('open')) return;
     document.getElementById('drawer-backdrop').classList.remove('open');
-    document.getElementById('person-drawer').classList.remove('open');
+    drawer.classList.remove('open');
+    if (drawerOpener && drawerOpener.isConnected) drawerOpener.focus();
+    drawerOpener = null;
+}
+
+function keepFocusInDrawer(e) {
+    const focusable = [...document.getElementById('person-drawer')
+        .querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
 }
 
 function exportCSV() {
     // Rendering is debounced; export always reflects the filters as they are right now.
     const exportRows = buildRows();
     if (!exportRows.length) return;
-    const q = s => `"${String(s || '').replace(/"/g, '""')}"`;
+    const q = csvCell;
     const lines = [
         'Name,Email,Event,Roles,Team,Account,Since',
         ...exportRows.map(r => [

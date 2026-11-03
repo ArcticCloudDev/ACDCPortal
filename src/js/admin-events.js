@@ -21,17 +21,6 @@ const STATUS_LABELS = {
     completed: 'Completed'
 };
 
-// withBusy (admin-utils.js) restores a button with textContent, which drops its icon.
-// This keeps the button's markup and only swaps in the busy label while the action runs.
-async function withBusyButton(button, busyLabel, action) {
-    const markup = button ? button.innerHTML : '';
-    try {
-        return await withBusy(button, busyLabel, action);
-    } finally {
-        if (button && !button.disabled) button.innerHTML = markup;
-    }
-}
-
 function formatEventDate(value) {
     if (!value) return '';
     return new Date(value + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -732,7 +721,7 @@ async function handleDelete() {
         return;
     }
 
-    await withBusyButton(document.getElementById('delete-btn'), 'Deleting…', async () => {
+    await withBusy(document.getElementById('delete-btn'), 'Deleting…', async () => {
         try {
             await API.events.delete(eventId);
             await loadEvents();
@@ -986,7 +975,7 @@ async function sendInvitation(role) {
     }
 
     const inviteBtn = document.getElementById(role === 'committee' ? 'invite-committee-btn' : 'invite-judge-btn');
-    await withBusyButton(inviteBtn, 'Sending…', async () => {
+    await withBusy(inviteBtn, 'Sending…', async () => {
         try {
             await API.invitations.create({
                 email: email,
@@ -1021,7 +1010,7 @@ async function revokeInvite(inviteId, role, button) {
         return;
     }
 
-    await withBusyButton(button, '…', async () => {
+    await withBusy(button, '…', async () => {
         try {
             await API.invitations.delete(inviteId);
 
@@ -1049,7 +1038,7 @@ async function removeRegisteredMember(participationId, role, button) {
         return;
     }
 
-    await withBusyButton(button, '…', async () => {
+    await withBusy(button, '…', async () => {
         try {
             await API.participations.delete(participationId);
 
@@ -1183,7 +1172,7 @@ async function deleteLead(leadId, button) {
         return;
     }
 
-    await withBusyButton(button, '…', async () => {
+    await withBusy(button, '…', async () => {
         try {
             const response = await fetch(`${CONFIG.api.baseUrl}/interest/leads/${encodeURIComponent(leadId)}`, {
                 method: 'DELETE'
@@ -1201,7 +1190,7 @@ async function deleteLead(leadId, button) {
 
 async function clearRecipientDeliveries(email, button) {
     if (!confirm(`Clear all sequence delivery records for ${email}?\n\nThis will NOT resend emails. Use this to remove stale records so the recipient shows as fresh.`)) return;
-    await withBusyButton(button, '…', async () => {
+    await withBusy(button, '…', async () => {
         try {
             const response = await fetch(`${CONFIG.api.baseUrl}/deliveries/recipient`, {
                 method: 'DELETE',
@@ -1222,7 +1211,7 @@ async function clearRecipientDeliveries(email, button) {
 async function restartSequence(leadId, userId, button) {
     if (!confirm('Restart sequence emails for this recipient?\n\nThis will send all unsent sequence emails. Check the browser console for detailed logs.')) return;
 
-    await withBusyButton(button, '…', () => restartSequenceRequest(leadId, userId));
+    await withBusy(button, '…', () => restartSequenceRequest(leadId, userId));
 }
 
 async function restartSequenceRequest(leadId, userId) {
@@ -1338,14 +1327,6 @@ function renderTeamsTable() {
             </tr>
         `;
     }).join('');
-}
-
-function formatSponsorAmount(amount) {
-    if (amount === null || amount === undefined || amount === '') return '-';
-    const numeric = Number(amount);
-    if (!Number.isFinite(numeric)) return '-';
-    const currency = eventCurrency();
-    return numeric.toLocaleString(currencyLocale(currency), { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + '\u00a0' + currency;
 }
 
 function eventCurrency() {
@@ -1514,7 +1495,7 @@ async function handleSponsorSubmit(e) {
 async function deleteSponsor(sponsorId, button) {
     if (!confirm('Delete this sponsor entry?')) return;
 
-    await withBusyButton(button, '…', async () => {
+    await withBusy(button, '…', async () => {
         try {
             await API.events.sponsors.delete(currentEventId, sponsorId);
             await loadEventSponsors();
@@ -1861,7 +1842,7 @@ async function loadEventsWithSequences() {
 }
 
 async function confirmCreateSequence() {
-    await withBusyButton(document.getElementById('confirm-create-sequence-btn'), 'Creating…', createSequenceFromModal);
+    await withBusy(document.getElementById('confirm-create-sequence-btn'), 'Creating…', createSequenceFromModal);
 }
 
 async function createSequenceFromModal() {
@@ -1953,7 +1934,7 @@ async function reorderEmail(emailId, direction, button) {
 
     [sorted[idx], sorted[swapIdx]] = [sorted[swapIdx], sorted[idx]];
 
-    await withBusyButton(button, '…', async () => {
+    await withBusy(button, '…', async () => {
         try {
             await Promise.all([
                 API.campaigns.update(sorted[idx].id,    { sequenceOrder: idx + 1 }),
@@ -2220,7 +2201,7 @@ async function handleFinancialSubmit(e) {
 
 async function deleteFinancialRow(rowId, button) {
     if (!confirm('Delete this financial row?')) return;
-    await withBusyButton(button, '…', async () => {
+    await withBusy(button, '…', async () => {
         try {
             await API.events.financials.delete(currentEventId, rowId);
             await loadEventBudget();
@@ -2285,7 +2266,7 @@ async function saveEventRates() {
         foodDays:          foodDays  !== '' ? parseInt(foodDays, 10) : null
     };
 
-    await withBusyButton(document.getElementById('save-rates-btn'), 'Saving…', async () => {
+    await withBusy(document.getElementById('save-rates-btn'), 'Saving…', async () => {
         try {
             const updated = await API.events.update(currentEventId, payload);
             if (updated) {

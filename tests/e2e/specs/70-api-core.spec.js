@@ -289,14 +289,9 @@ test.describe('teams', () => {
         expect((await leader.put(`/api/teams/${BOGUS}`, { data: { teamName: 'x' } })).status()).toBe(404);
     });
 
-    test('members are derived from participations and the count is members-only', async ({ apiAs, harness }) => {
+    test('the team count is members-only and needs team membership', async ({ apiAs, harness }) => {
         const w = buildWorld();
         await harness.seed(w.seed());
-        const members = await (await (await apiAs(w.member)).get(`/api/teams/${w.team.id}/members`)).json();
-        expect(members.map(m => m.email).sort()).toEqual([w.leader.email, w.member.email].sort());
-        expect(members.find(m => m.id === w.leader.id).isTeamAdmin).toBe(true);
-        expect(members[0].phone).toBeUndefined();
-
         const loner = await apiAs(w.loner);
         expect((await loner.get(`/api/participations/team/${w.team.id}/count`)).status()).toBe(403);
         const count = await (await (await apiAs(w.leader)).get(`/api/participations/team/${w.team.id}/count`)).json();
@@ -385,7 +380,7 @@ test.describe('malformed ids never produce a 500', () => {
         await harness.seed(w.seed());
         const admin = await apiAs(w.admin);
         const checks = [
-            ['get', `/api/teams/${BOGUS}`], ['delete', `/api/teams/${BOGUS}`], ['get', `/api/teams/${BOGUS}/members`],
+            ['get', `/api/teams/${BOGUS}`], ['delete', `/api/teams/${BOGUS}`],
             ['get', `/api/teams?eventId=${BOGUS}`], ['get', `/api/users/${BOGUS}`],
             ['put', `/api/participations/${BOGUS}/hotel`, { hotelNights: {} }],
             ['put', `/api/participations/${BOGUS}/roles`, { add: ['participant'] }], ['delete', `/api/participations/${BOGUS}`],

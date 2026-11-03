@@ -3,7 +3,7 @@
   "roles": {
     "portalAdmin": {
       "label": "Portal Admin",
-      "description": "Full access to all pages and all events (god mode)",
+      "description": "Super admin that bootstraps the portal. Same access as the committee; the portal-admin flag itself is set in the database only.",
       "pages": [
         "dashboard",
         "events",
@@ -21,23 +21,25 @@
     },
     "committee": {
       "label": "Committee Member",
-      "description": "Admin access scoped to events where they have the committee role",
+      "description": "Full admin: every page and every event",
       "pages": [
         "dashboard",
         "events",
         "teams",
+        "users",
         "interest",
         "person",
         "badges",
         "email",
         "campaigns",
+        "email-templates",
         "event-participants"
       ],
-      "eventScoped": true
+      "eventScoped": false
     },
     "judge": {
       "label": "Judge",
-      "description": "Limited admin access scoped to events where they have the judge role",
+      "description": "Local admin for the events where they have the judge role: badges and the participant list",
       "pages": [
         "dashboard",
         "badges",

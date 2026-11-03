@@ -1,5 +1,4 @@
 const { app } = require('@azure/functions');
-const { logError } = require('../shared/error-log');
 const { loadSecrets } = require('../shared/keyvault');
 
 let secretsLoaded = false;

@@ -279,43 +279,6 @@ const SharePointStorage = {
         }));
     },
 
-    async getFile(filePath) {
-        const drive = await getDriveId();
-        const site = await getSiteId();
-
-        const result = await graphRequest(`/sites/${site}/drives/${drive}/root:/${filePath}`);
-
-        return {
-            id: result.id,
-            name: result.name,
-            size: result.size,
-            webUrl: result.webUrl,
-            createdDateTime: result.createdDateTime,
-            lastModifiedDateTime: result.lastModifiedDateTime,
-            downloadUrl: result['@microsoft.graph.downloadUrl']
-        };
-    },
-
-    async downloadFile(filePath) {
-        const drive = await getDriveId();
-        const site = await getSiteId();
-
-        const token = await getAccessToken();
-        const url = `https://graph.microsoft.com/v1.0/sites/${site}/drives/${drive}/root:/${filePath}:/content`;
-
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Download failed (${response.status})`);
-        }
-
-        return response.buffer();
-    },
-
     async deleteFile(filePath) {
         const drive = await getDriveId();
         const site = await getSiteId();
@@ -334,25 +297,6 @@ const SharePointStorage = {
             if (error.message.includes('(404)')) return false;
             throw error;
         }
-    },
-
-    async createSharingLink(filePath, type = 'view', scope = 'organization') {
-        const drive = await getDriveId();
-        const site = await getSiteId();
-
-        const result = await graphRequest(`/sites/${site}/drives/${drive}/root:/${filePath}:/createLink`, {
-            method: 'POST',
-            body: JSON.stringify({
-                type: type,
-                scope: scope
-            })
-        });
-
-        return {
-            webUrl: result.link.webUrl,
-            type: result.link.type,
-            scope: result.link.scope
-        };
     },
 
     async ensureChoiceColumn(columnName, choices) {

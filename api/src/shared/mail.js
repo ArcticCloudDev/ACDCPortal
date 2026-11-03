@@ -110,24 +110,6 @@ async function sendEmail({ to, subject, htmlContent, textContent }) {
     return { success: true, recipients: recipients.length };
 }
 
-async function sendBulkEmail({ to, subject, htmlContent }) {
-    const BATCH_SIZE = 100;
-    const results = { sent: 0, failed: 0, errors: [] };
-
-    for (let i = 0; i < to.length; i += BATCH_SIZE) {
-        const batch = to.slice(i, i + BATCH_SIZE);
-        try {
-            await sendEmail({ to: batch, subject, htmlContent });
-            results.sent += batch.length;
-        } catch (error) {
-            results.failed += batch.length;
-            results.errors.push({ batch: i / BATCH_SIZE, error: error.message });
-        }
-    }
-
-    return results;
-}
-
 // Merge keys whose values are trusted, already-built HTML fragments. Everything else
 // (names, team names, messages, URLs...) is user-supplied text and gets HTML-escaped.
 const RAW_HTML_KEYS = ['content', 'bodyText', 'closingText', 'digestContent', 'actionItems', 'teamBoxHtml'];
@@ -158,7 +140,6 @@ function processTemplate(template, data = {}, options = {}) {
 
 module.exports = {
     sendEmail,
-    sendBulkEmail,
     processTemplate,
     escapeHtml,
     extractInlineImages,

@@ -1,7 +1,7 @@
 // Who can see and change what: client-side gates on admin pages and the server-side
 // object-level checks behind them. BUG tests pin confirmed security defects.
 const { test, expect, f } = require('../fixtures');
-const { buildWorld } = require('../support/world');
+const { buildWorld, mergeSeeds } = require('../support/world');
 const db = require('../harness/db');
 
 async function rows(query, params = {}) {
@@ -54,12 +54,49 @@ test.describe('admin page gates', () => {
         await expect(page.getByText(/Access denied/i).first()).toBeVisible();
     });
 
-    test('a committee member reaches event admin but not people admin', async ({ page, harness, loginAs }) => {
+    // Committee members are full admins: every admin page and every event. Only the portal-admin
+    // flag (the bootstrap super admin) is out of their reach, and no endpoint sets it.
+    test('a committee member is a full admin across pages and events', async ({ page, harness, loginAs, apiAs }) => {
         const { w, seed } = worldWithStaff();
-        await harness.seed(seed);
+        const draft = f.event({ name: 'Next Year Draft', status: 'draft', isActive: false, registrationOpen: false });
+        await harness.seed(mergeSeeds(seed, { events: [draft] }));
         await loginAs(w.committee);
         await page.goto('/admin-events.html');
-        await expect(page.locator('#events-table-body')).toContainText('ACDC 2027');
+        await expect(page.locator('#events-table-body')).toContainText('Next Year Draft');
+        await page.goto('/admin-users.html');
+        await expect(page.locator('#main-tbody')).toContainText('mats.member@e2e.test');
+        await page.goto(`/admin-person.html?email=${encodeURIComponent(w.member.email)}`);
+        await expect(page.locator('#results-container')).toContainText('Mats Member');
+
+        const api = await apiAs(w.committee);
+        expect((await api.put(`/api/events/${draft.id}`, { data: { name: 'Next Year' } })).status()).toBe(200);
+        expect((await api.get('/api/interest/leads')).status()).toBe(200);
+        const [u] = await rows('SELECT IsPortalAdmin FROM Users WHERE Id = @id', { id: w.committee.id });
+        expect(u.IsPortalAdmin).toBe(false);
+    });
+
+    test('a judge runs their own event: names, teams and the participant list', async ({ page, harness, loginAs }) => {
+        const { w, seed } = worldWithStaff();
+        const jon = f.user({ firstName: 'Jon', lastName: 'Judge', email: 'jon.judge@e2e.test' });
+        const common = f.badge({ name: 'Best demo' });
+        const exclusive = f.badge({ name: 'Grand prize', claimType: 'exclusive' });
+        const jonsBadge = f.eventBadge(w.event, common, { judgeUserId: jon.id });
+        const judysBadge = f.eventBadge(w.event, exclusive, { judgeUserId: w.judge.id });
+        const claim = { id: f.id(), eventBadgeId: jonsBadge.id, badgeId: common.id, teamId: w.team.id, eventId: w.event.id,
+            status: 'pending', evidence: 'https://example.com/demo', claimedBy: w.leader.id, claimedAt: new Date().toISOString() };
+        await harness.seed(mergeSeeds(seed, {
+            users: [jon], participations: [f.participation(jon, w.event, { roles: ['judge'] })],
+            badges: [common, exclusive], 'event-badges': [jonsBadge, judysBadge], 'badge-claims': [claim]
+        }));
+        await loginAs(w.judge);
+
+        await page.goto('/admin-badges.html');
+        await expect(page.locator('.claims-group .panel-title', { hasText: 'Jon Judge' })).toBeVisible();
+        await expect(page.locator('.award-team-select option', { hasText: 'Power Rangers' })).toBeAttached();
+
+        await page.goto(`/admin-event-participants.html?id=${w.event.id}`);
+        await expect(page.locator('#participants-body')).toContainText('Mats');
+        await expect(page.locator('#participants-body')).toContainText('mats.member@e2e.test');
         await page.goto('/admin-users.html');
         await expect(page.getByText(/Access denied/i).first()).toBeVisible();
     });
@@ -110,7 +147,7 @@ test.describe('object-level authorization in the API', () => {
         expect(move.status()).toBe(403);
     });
 
-    test('only portal admins can delete teams', async ({ apiAs, harness }) => {
+    test('only admins can delete teams', async ({ apiAs, harness }) => {
         const w = buildWorld();
         await harness.seed(w.seed());
         expect((await (await apiAs(w.leader)).delete(`/api/teams/${w.team.id}`)).status()).toBe(403);

@@ -35,7 +35,7 @@ app.http('users-get-all', {
     route: 'users/all',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return {
                     status: auth.status,
@@ -65,7 +65,7 @@ app.http('users-get', {
     route: 'users',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return {
                     status: auth.status,
@@ -80,7 +80,7 @@ app.http('users-get', {
                     return { status: 400, jsonBody: { message: 'Invalid email' } };
                 }
                 const isSelf = auth.user.email && auth.user.email.toLowerCase() === email.trim().toLowerCase();
-                if (!isSelf && !auth.user.isPortalAdmin) {
+                if (!isSelf && !auth.user.isAdmin) {
                     return {
                         status: 403,
                         jsonBody: { message: 'You do not have permission to view this profile' }
@@ -122,7 +122,7 @@ app.http('users-get-by-id', {
     route: 'users/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return {
                     status: auth.status,
@@ -173,7 +173,7 @@ app.http('users-update', {
     route: 'users/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return {
                     status: auth.status,
@@ -208,8 +208,8 @@ app.http('users-update', {
             const v = new Validator();
             const updates = profileUpdates(body, v);
 
-            // Email is identity (it is what the OTP login proves); only a portal admin may change it.
-            if (auth.user.isPortalAdmin && body.email !== undefined) {
+            // Email is identity (it is what the OTP login proves); only an admin may change it.
+            if (auth.user.isAdmin && body.email !== undefined) {
                 const email = v.email(body.email, 'email');
                 if (email && email !== existingUser.email?.toLowerCase()) {
                     const taken = await Storage.users.getByEmail(email);
@@ -248,7 +248,7 @@ app.http('users-create', {
     route: 'users',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -261,7 +261,7 @@ app.http('users-create', {
             if (v.failed) return v.failure();
 
             const isSelf = auth.user.email && auth.user.email.toLowerCase() === email;
-            if (!isSelf && !auth.user.isPortalAdmin) {
+            if (!isSelf && !auth.user.isAdmin) {
                 return {
                     status: 403,
                     jsonBody: { message: 'You can only create your own user record' }

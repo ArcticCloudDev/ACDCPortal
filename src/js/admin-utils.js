@@ -30,6 +30,14 @@ function sameId(a, b) {
     return String(a).toLowerCase() === String(b).toLowerCase();
 }
 
+// One quoted CSV cell. A leading = + - @ (or tab/CR) is defused with an apostrophe so a
+// spreadsheet never runs a name someone typed as a formula.
+function csvCell(value) {
+    let text = String(value ?? '');
+    if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
+}
+
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {

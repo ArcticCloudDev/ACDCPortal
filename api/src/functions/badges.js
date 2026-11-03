@@ -99,7 +99,7 @@ app.http('badges-create', {
     route: 'badges',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -140,7 +140,7 @@ app.http('badges-update', {
     route: 'badges/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -187,7 +187,7 @@ app.http('badges-delete', {
     route: 'badges/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

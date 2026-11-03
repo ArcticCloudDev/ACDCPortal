@@ -90,7 +90,7 @@ app.http('event-sponsors-list', {
     route: 'events/{eventId}/sponsors',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -121,7 +121,7 @@ app.http('event-sponsors-create', {
     route: 'events/{eventId}/sponsors',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -170,7 +170,7 @@ app.http('event-sponsors-update', {
     route: 'events/{eventId}/sponsors/{sponsorId}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -237,7 +237,7 @@ app.http('event-sponsors-delete', {
     route: 'events/{eventId}/sponsors/{sponsorId}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

@@ -17,6 +17,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentPermissions = await Permissions.initAdminPage('email');
 
     if (!currentPermissions) return;
+    // A sequence email belongs to its event, so the sidebar marks Events as the current section.
+    if (isSequenceMode) renderAdminSidebar('events', currentPermissions);
 
     quill = new Quill('#editor-container', {
         theme: 'snow',

@@ -42,7 +42,7 @@ async function teamForEventBadge(teamId, eventBadge) {
 }
 
 async function isJudgeOrAdmin(actor, eventId) {
-    if (actor.isPortalAdmin) return true;
+    if (actor.isAdmin) return true;
     const participations = await q.participationsForUser(actor.userId);
     return hasEventRole(actor, upperId(eventId), 'judge', participations);
 }
@@ -53,7 +53,7 @@ app.http('badge-claims-list', {
     route: 'badge-claims',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -73,7 +73,7 @@ app.http('badge-claims-list', {
             const actor = q.asActor(auth.user);
             let claims = await q.claims({ eventId, teamId, status, badgeId: badgeId || undefined });
 
-            if (!actor.isPortalAdmin) {
+            if (!actor.isAdmin) {
                 const participations = await q.participationsForUser(actor.userId);
                 claims = claims.filter(c => {
                     if (c.eventId && (hasEventRole(actor, upperId(c.eventId), 'judge', participations)
@@ -113,7 +113,7 @@ app.http('badge-claims-create', {
     route: 'badge-claims',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -221,7 +221,7 @@ app.http('badge-claims-review', {
     route: 'badge-claims/{id}/review',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -252,9 +252,9 @@ app.http('badge-claims-review', {
                 return { status: 403, jsonBody: { error: 'Only judges or admins can review badge claims' } };
             }
 
-            // A badge with a dedicated judge is reviewed by that judge (or a portal admin) only.
+            // A badge with a dedicated judge is reviewed by that judge (or an admin) only.
             const eventBadge = await eventBadgesStorage.getById(claim.eventBadgeId);
-            if (eventBadge?.judgeUserId && !actor.isPortalAdmin && !sameId(eventBadge.judgeUserId, actor.userId)) {
+            if (eventBadge?.judgeUserId && !actor.isAdmin && !sameId(eventBadge.judgeUserId, actor.userId)) {
                 return { status: 403, jsonBody: { error: 'This badge is reviewed by its assigned judge' } };
             }
 
@@ -285,7 +285,7 @@ app.http('badge-claims-update', {
     route: 'badge-claims/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -338,7 +338,7 @@ app.http('badge-claims-delete', {
     route: 'badge-claims/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -374,7 +374,7 @@ app.http('badge-claims-award', {
     route: 'badge-claims/award',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -402,7 +402,7 @@ app.http('badge-claims-award', {
             if (!(await isJudgeOrAdmin(actor, eventBadge.eventId))) {
                 return { status: 403, jsonBody: { error: 'Only judges or admins can award badges' } };
             }
-            if (eventBadge.judgeUserId && !actor.isPortalAdmin && !sameId(eventBadge.judgeUserId, actor.userId)) {
+            if (eventBadge.judgeUserId && !actor.isAdmin && !sameId(eventBadge.judgeUserId, actor.userId)) {
                 return { status: 403, jsonBody: { error: 'This badge is awarded by its assigned judge' } };
             }
 
@@ -457,7 +457,7 @@ app.http('badge-claims-assign', {
     route: 'badge-claims/assign',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

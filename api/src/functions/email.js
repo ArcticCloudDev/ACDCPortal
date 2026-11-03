@@ -52,63 +52,13 @@ function dedupeByEmail(list) {
     });
 }
 
-app.http('email-templates', {
-    methods: ['GET'],
-    authLevel: 'function',
-    route: 'email/templates',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const templates = (await listTemplateIds()).map(id => ({
-                id,
-                name: id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-            }));
-
-            return { status: 200, jsonBody: templates };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Error listing templates:', error);
-            return { status: 500, jsonBody: { message: 'Internal server error' } };
-        }
-    }
-});
-
-app.http('email-template-get', {
-    methods: ['GET'],
-    authLevel: 'function',
-    route: 'email/templates/{id}',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const id = request.params.id;
-            const template = await getTemplate(id);
-            if (template === null) {
-                return { status: 404, jsonBody: { error: 'Template not found' } };
-            }
-            return { status: 200, jsonBody: { id, content: template } };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Error getting template:', error);
-            return { status: 500, jsonBody: { error: 'Failed to get template' } };
-        }
-    }
-});
-
 app.http('email-preview', {
     methods: ['POST'],
     authLevel: 'function',
     route: 'email/preview',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -154,7 +104,7 @@ app.http('email-recipients', {
     route: 'email/recipients',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -247,7 +197,7 @@ app.http('email-send', {
     route: 'email/send',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -356,7 +306,7 @@ app.http('email-history', {
     route: 'email/history',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

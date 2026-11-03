@@ -30,10 +30,23 @@ const DATA = {
             teamMemberships: [{ teamId: 'team-2', isAdmin: false, isParticipant: true }],
             hotelNights: { 'sun-mon': true },
             profileVerification: false
+        },
+        {
+            id: 'p-judge', userId: 'user-5', email: 'judge@example.com', eventId: 'event-1',
+            teamId: null, isTeamAdmin: false, roles: ['judge'], teamMemberships: []
+        },
+        // Committee on another event: committee members are admins everywhere, not only on their event.
+        {
+            id: 'p-committee', userId: 'user-4', email: 'committee@example.com', eventId: 'event-2',
+            teamId: null, isTeamAdmin: false, roles: ['committee'], teamMemberships: []
         }
     ],
     events: [{ id: 'event-1', name: 'Test Event', status: 'live' }],
-    users: [],
+    users: [
+        { id: 'user-2', email: 'teammate@example.com', firstName: 'Tia', lastName: 'Mate', phone: '+47 1', allergies: 'nuts' },
+        { id: 'user-3', email: 'stranger@example.com', firstName: 'Sam', lastName: 'Stranger', phone: '+47 2', allergies: null },
+        { id: 'user-5', email: 'judge@example.com', firstName: 'Judy', lastName: 'Judge', phone: '+47 3', allergies: null }
+    ],
     'solo-queue': [
         { id: 'q1', userId: 'user-1', eventId: 'event-1', status: 'waiting', joinedAt: '2026-01-01' },
         { id: 'q2', userId: 'user-3', eventId: 'event-1', status: 'waiting', joinedAt: '2026-01-02' }
@@ -106,6 +119,8 @@ function tokenFor(user) {
 }
 const SELF = { email: 'self@example.com', userId: 'user-1', isPortalAdmin: false };
 const ADMIN = { email: 'admin@example.com', userId: 'admin-1', isPortalAdmin: true };
+const COMMITTEE = { email: 'committee@example.com', userId: 'user-4', isPortalAdmin: false };
+const JUDGE = { email: 'judge@example.com', userId: 'user-5', isPortalAdmin: false };
 
 function request(user, { params = {}, query = '' } = {}) {
     return {
@@ -135,6 +150,10 @@ function endpoint(name) {
     assert.equal(res.status, 200, 'self lookup must work');
     res = await byPerson(request(ADMIN, { params: { email: 'stranger%40example.com' } }), ctx());
     assert.equal(res.status, 200, 'admin lookup must work');
+    res = await byPerson(request(COMMITTEE, { params: { email: 'stranger%40example.com' } }), ctx());
+    assert.equal(res.status, 200, 'committee members are admins: person lookup works for them');
+    res = await byPerson(request(JUDGE, { params: { email: 'stranger%40example.com' } }), ctx());
+    assert.equal(res.status, 403, 'judges are local admins only, not global person lookup');
 
     // by-event: non-staff callers get projected rows without emails; hotel data only for shared teams.
     const byEvent = endpoint('participations-by-event');
@@ -150,6 +169,15 @@ function endpoint(name) {
     assert.equal(stranger.profileVerification, undefined, 'other teams\' confirmation state stays hidden');
     res = await byEvent(request(ADMIN, { params: { eventId: 'event-1' } }), ctx());
     assert.ok(res.jsonBody.every(r => r.email !== undefined), 'admin keeps full records');
+    assert.equal(stranger.phone, undefined, 'participants never get other people\'s phone numbers');
+    assert.equal(teammate.firstName, undefined, 'the participant roster carries no contact details');
+    res = await byEvent(request(COMMITTEE, { params: { eventId: 'event-1' } }), ctx());
+    assert.ok(res.jsonBody.every(r => r.email !== undefined), 'committee of another event still gets full records');
+    res = await byEvent(request(JUDGE, { params: { eventId: 'event-1' } }), ctx());
+    const judged = res.jsonBody.find(r => r.id === 'p-stranger');
+    assert.equal(judged.firstName, 'Sam', 'judges see the names of everyone in their event');
+    assert.equal(judged.phone, '+47 2', 'judges get the contact details the participant list shows');
+    assert.equal(res.jsonBody.find(r => r.id === 'p-judge').lastName, 'Judge', 'judges see each other');
 
     // solo-queue position: own position only.
     const position = endpoint('solo-queue-position');
@@ -165,6 +193,12 @@ function endpoint(name) {
         json: async () => ({ userId: 'user-1', email: 'other@example.com', eventId: 'event-1', roles: ['judge'] })
     }, ctx());
     assert.equal(res.status, 403, 'non-admin must not self-assign privileged roles');
+    res = await upsert({
+        ...request(JUDGE),
+        method: 'POST',
+        json: async () => ({ userId: 'user-5', email: 'judge@example.com', eventId: 'event-1', roles: ['committee'] })
+    }, ctx());
+    assert.equal(res.status, 403, 'a judge cannot promote themselves to committee');
 
     const update = endpoint('participations-update');
     res = await update({

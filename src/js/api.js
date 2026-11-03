@@ -131,10 +131,6 @@ const API = {
             return API.request('/teams');
         },
 
-        async get(teamId) {
-            return API.request(`/teams/${teamId}`);
-        },
-
         async create(data) {
             return API.request('/teams', {
                 method: 'POST',
@@ -149,22 +145,9 @@ const API = {
             });
         },
 
-        async getMembers(teamId) {
-            return API.request(`/teams/${teamId}/members`);
-        },
-
         async delete(teamId) {
             return API.request(`/teams/${teamId}`, {
                 method: 'DELETE'
-            });
-        }
-    },
-
-    members: {
-        async remove(teamId, userId) {
-            return API.request(`/members/${userId}`, {
-                method: 'DELETE',
-                body: JSON.stringify({ teamId })
             });
         }
     },
@@ -180,10 +163,6 @@ const API = {
         async list(teamId) {
             const url = teamId ? `/invitations?teamId=${teamId}` : '/invitations';
             return API.request(url);
-        },
-
-        async listByEmail(email) {
-            return API.request(`/invitations?email=${encodeURIComponent(email)}`);
         },
 
         async get(id) {
@@ -216,48 +195,9 @@ const API = {
         }
     },
 
-    email: {
-        async getTemplates() {
-            return API.request('/email/templates');
-        },
-
-        async getTemplate(id) {
-            return API.request(`/email/templates/${id}`);
-        },
-
-        async preview(templateId, data) {
-            return API.request('/email/preview', {
-                method: 'POST',
-                body: JSON.stringify({ templateId, data })
-            });
-        },
-
-        async getRecipients(filter, options = {}) {
-            let url = `/email/recipients?filter=${filter}`;
-            if (options.teamId) url += `&teamId=${options.teamId}`;
-            if (options.year) url += `&year=${options.year}`;
-            return API.request(url);
-        },
-
-        async send(data) {
-            return API.request('/email/send', {
-                method: 'POST',
-                body: JSON.stringify(data)
-            });
-        },
-
-        async getHistory() {
-            return API.request('/email/history');
-        }
-    },
-
     events: {
         async list() {
             return API.request('/events');
-        },
-
-        async getActive() {
-            return API.request('/events/active');
         },
 
         async get(eventId) {
@@ -389,13 +329,6 @@ const API = {
             });
         },
 
-        async update(participationId, data) {
-            return API.request(`/participations/${participationId}`, {
-                method: 'PUT',
-                body: JSON.stringify(data)
-            });
-        },
-
         async delete(participationId) {
             return API.request(`/participations/${participationId}`, {
                 method: 'DELETE'
@@ -411,24 +344,10 @@ const API = {
             });
         },
 
-        async addRoles(participationId, roles) {
-            return API.request(`/participations/${participationId}/roles`, {
-                method: 'PUT',
-                body: JSON.stringify({ add: roles })
-            });
-        },
-
         async removeRoles(participationId, roles) {
             return API.request(`/participations/${participationId}/roles`, {
                 method: 'PUT',
                 body: JSON.stringify({ remove: roles })
-            });
-        },
-
-        async setRoles(participationId, roles) {
-            return API.request(`/participations/${participationId}/roles`, {
-                method: 'PUT',
-                body: JSON.stringify({ set: roles })
             });
         },
 
@@ -446,10 +365,6 @@ const API = {
             });
         },
 
-        async getTeamCount(teamId) {
-            return API.request(`/participations/team/${teamId}/count`);
-        },
-
         async getByEvent(eventId, role = null) {
             let url = `/participations/event/${eventId}`;
             if (role) url += `?role=${role}`;
@@ -458,10 +373,6 @@ const API = {
 
         async getByPerson(email) {
             return API.request(`/participations/person/${encodeURIComponent(email)}`);
-        },
-
-        async getAll() {
-            return API.request('/participations/all');
         }
     },
 
@@ -499,45 +410,10 @@ const API = {
             return API.request(url);
         },
 
-        async get(campaignId) {
-            return API.request(`/email/campaigns/${campaignId}`);
-        },
-
-        async create(data) {
-            return API.request('/email/campaigns', {
-                method: 'POST',
-                body: JSON.stringify(data)
-            });
-        },
-
         async update(campaignId, data) {
             return API.request(`/email/campaigns/${campaignId}`, {
                 method: 'PUT',
                 body: JSON.stringify(data)
-            });
-        },
-
-        async delete(campaignId) {
-            return API.request(`/email/campaigns/${campaignId}`, {
-                method: 'DELETE'
-            });
-        },
-
-        async send(campaignId, recipients) {
-            return API.request(`/email/campaigns/${campaignId}/send`, {
-                method: 'POST',
-                body: JSON.stringify({ recipients })
-            });
-        },
-
-        async getDeliveries(campaignId) {
-            return API.request(`/email/campaigns/${campaignId}/deliveries`);
-        },
-
-        async triggerSequence(userId, eventId) {
-            return API.request('/email/trigger-sequence', {
-                method: 'POST',
-                body: JSON.stringify({ userId, eventId })
             });
         }
     },
@@ -566,12 +442,6 @@ const API = {
             });
         },
 
-        async delete(sequenceId) {
-            return API.request(`/sequences/${sequenceId}`, {
-                method: 'DELETE'
-            });
-        },
-
         async copy(sequenceId, targetEventId) {
             return API.request(`/sequences/${sequenceId}/copy`, {
                 method: 'POST',
@@ -580,25 +450,7 @@ const API = {
         }
     },
 
-    deliveries: {
-        async getEventDeliveries(eventId) {
-            return API.request(`/deliveries/event/${eventId}`);
-        },
-
-        async retry(deliveryId) {
-            return API.request('/deliveries/retry', {
-                method: 'POST',
-                body: JSON.stringify({ deliveryId })
-            });
-        }
-    },
-
     badges: {
-        async list(category = null) {
-            const url = category ? `/badges?category=${category}` : '/badges';
-            return API.request(url);
-        },
-
         async getEventBadges(eventId) {
             return API.request(`/events/${eventId}/badges`);
         }
@@ -619,26 +471,6 @@ const API = {
             return API.request('/badge-claims', {
                 method: 'POST',
                 body: JSON.stringify(data)
-            });
-        },
-
-        async update(claimId, data) {
-            return API.request(`/badge-claims/${claimId}`, {
-                method: 'PUT',
-                body: JSON.stringify(data)
-            });
-        },
-
-        async review(claimId, data) {
-            return API.request(`/badge-claims/${claimId}/review`, {
-                method: 'PUT',
-                body: JSON.stringify(data)
-            });
-        },
-
-        async delete(claimId) {
-            return API.request(`/badge-claims/${claimId}`, {
-                method: 'DELETE'
             });
         },
 

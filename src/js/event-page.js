@@ -94,7 +94,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadEventTeams();
 
         populateEventBanner();
-        setupCostHint();
         await renderTeams();
 
         if (urlParams.get('action') === 'create-team') {
@@ -186,27 +185,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     function isRegistrationOpen() {
         if (!currentEvent) return false;
         return currentEvent.status === 'registration' || !!currentEvent.registrationOpen;
-    }
-
-    function setupCostHint() {
-        if (!currentEvent || currentEvent.costPerParticipant == null) return;
-        const participantSelect = document.getElementById('expectedParticipants');
-        const costHint = document.getElementById('cost-hint');
-        if (!participantSelect || !costHint) return;
-        const currency = escapeHtml(currentEvent.currency || '');
-        const locale = currencyLocale(currentEvent.currency);
-        const costPer = Number(currentEvent.costPerParticipant) || 0;
-        function updateCostHint() {
-            const count = parseInt(participantSelect.value) || 0;
-            if (count > 0) {
-                const total = (count * costPer).toLocaleString(locale);
-                costHint.innerHTML = `Total commitment: <strong>${total}\u00a0${currency}</strong> (${count}\u00a0\u00d7\u00a0${costPer.toLocaleString(locale)}\u00a0${currency})`;
-            } else {
-                costHint.textContent = `${costPer.toLocaleString(locale)}\u00a0${currentEvent.currency || ''} per participant \u2014 select a count to see total.`;
-            }
-        }
-        participantSelect.addEventListener('change', updateCostHint);
-        updateCostHint();
     }
 
     function populateEventBanner() {
@@ -1775,162 +1753,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    async function openTeamDetails(teamId) {
-        const team = eventTeams.find(t => sameId(t.id, teamId));
-        if (!team) return;
-
-        const modal = document.getElementById('team-details-modal');
-        const title = document.getElementById('team-modal-title');
-        const membersList = document.getElementById('team-members-list');
-        const adminActions = document.getElementById('team-admin-actions');
-
-        title.textContent = team.teamName;
-        membersList.innerHTML = '<p>Loading members…</p>';
-
-        modal.classList.add('active');
-
-        const userMembership = currentParticipation?.teamMemberships?.find(m => sameId(m.teamId, teamId));
-        const isTeamAdmin = userMembership?.isAdmin;
-
-        try {
-            const teamParticipations = allParticipations.filter(p => {
-                const membership = (p.teamMemberships || []).find(m => sameId(m.teamId, teamId));
-                return membership;
-            });
-
-            const memberDetails = await Promise.all(
-                teamParticipations.map(async (p) => {
-                    try {
-                        const user = await API.request(`/users/${p.userId}`);
-                        const membership = (p.teamMemberships || []).find(m => sameId(m.teamId, teamId));
-                        return {
-                            participation: p,
-                            user,
-                            membership
-                        };
-                    } catch (err) {
-                        return null;
-                    }
-                })
-            );
-
-            const validMembers = memberDetails.filter(m => m !== null);
-
-            let pendingInvitations = [];
-            if (isTeamAdmin) {
-                try {
-                    const allInvitations = await API.invitations.list(teamId);
-                    pendingInvitations = allInvitations.filter(inv => inv.status === 'pending' && !inv.isExpired);
-                } catch (err) {
-                    console.warn('Could not load invitations:', err);
-                }
-            }
-
-            let html = '';
-
-            if (validMembers.length > 0) {
-                html += validMembers.map(m => {
-                    const initials = getInitials(m.user.firstName, m.user.lastName);
-                    return `
-                        <div class="member-row member-item">
-                            <div class="member-info">
-                                <span class="avatar" aria-hidden="true">${escapeHtml(initials)}</span>
-                                <div>
-                                    <div class="name member-name">${escapeHtml(m.user.firstName)} ${escapeHtml(m.user.lastName)}</div>
-                                    <div class="email member-email">${escapeHtml(m.user.email)}</div>
-                                </div>
-                            </div>
-                            <div class="member-roles">
-                                ${m.membership.isAdmin ? '<span class="role-badge admin badge badge-accent">Admin</span>' : ''}
-                                ${m.membership.isParticipant ? '<span class="role-badge participant badge">Participant</span>' : ''}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-
-            if (pendingInvitations.length > 0) {
-                html += `<div class="pending-invitations-section member-section">
-                    <p class="member-section-title">Pending invitations</p>
-                `;
-                html += pendingInvitations.map(inv => {
-                    const sentDate = new Date(inv.createdAt).toLocaleDateString();
-                    return `
-                        <div class="member-row member-item invitation-pending">
-                            <div class="member-info">
-                                <span class="avatar avatar-muted" aria-hidden="true">${icon('mail')}</span>
-                                <div>
-                                    <div class="name member-name">${escapeHtml(inv.email)}</div>
-                                    <div class="email member-email">Invited ${sentDate} • Awaiting response</div>
-                                </div>
-                            </div>
-                            <div class="member-roles">
-                                <span class="role-badge badge badge-warning">Pending</span>
-                                <button type="button" class="btn btn-small btn-icon btn-danger-ghost cancel-pending-invite-btn" data-invite-id="${escapeHtml(inv.id)}" title="Cancel invitation" aria-label="Cancel invitation">${icon('x')}</button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                html += '</div>';
-            }
-
-            const committedSpots = team.numberOfParticipants || team.committedParticipants || 3;
-            const filledSpots = validMembers.length;
-            const pendingSpots = pendingInvitations.length;
-            const remainingSpots = Math.max(0, committedSpots - filledSpots - pendingSpots);
-
-            if (isTeamAdmin && remainingSpots > 0) {
-                html += `<div class="empty-spots-section member-section">
-                    <p class="member-section-title">Available spots (${remainingSpots})</p>
-                `;
-                for (let i = 0; i < remainingSpots; i++) {
-                    html += `
-                        <div class="member-row member-item empty-spot">
-                            <div class="member-info">
-                                <span class="avatar avatar-muted" aria-hidden="true">${icon('user')}</span>
-                                <div>
-                                    <div class="name member-name">Empty spot</div>
-                                    <div class="email member-email">Invite a team member</div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }
-                html += '</div>';
-            }
-
-            if (html === '') {
-                html = '<p class="text-muted">No members yet</p>';
-            }
-
-            membersList.innerHTML = html;
-
-            if (isTeamAdmin) {
-                adminActions.classList.remove('hidden');
-            } else {
-                adminActions.classList.add('hidden');
-            }
-
-        } catch (error) {
-            console.error('Error loading team members:', error);
-            membersList.innerHTML = '<p class="error-message">Error loading members</p>';
-        }
-    }
-
-    async function cancelInvitation(invitationId) {
-        if (!confirm('Are you sure you want to cancel this invitation?')) return;
-
-        try {
-            await API.invitations.cancel(invitationId);
-            const teamIdInput = document.getElementById('invite-teamId');
-            if (teamIdInput) {
-                openTeamDetails(teamIdInput.value);
-            }
-        } catch (error) {
-            alert('Error cancelling invitation: ' + error.message);
-        }
-    }
-
     function getInitials(firstName, lastName) {
         return ((firstName?.[0] || '') + (lastName?.[0] || '')).toUpperCase() || '?';
     }
@@ -1982,16 +1804,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById(id)?.addEventListener('click', closeAwardModal);
         });
         document.getElementById('badge-award-submit-btn')?.addEventListener('click', submitBadgeAward);
-
-        ['registration-terms-close', 'registration-terms-cancel'].forEach(id => {
-            document.getElementById(id)?.addEventListener('click', closeRegistrationTermsModal);
-        });
-        document.getElementById('registration-terms-confirm')?.addEventListener('click', confirmRegistrationTerms);
-
-        document.getElementById('team-members-list')?.addEventListener('click', (e) => {
-            const btn = e.target.closest('.cancel-pending-invite-btn');
-            if (btn) cancelInvitation(btn.dataset.inviteId);
-        });
 
         const createTeamModal = document.getElementById('create-team-modal');
         document.getElementById('create-team-btn').addEventListener('click', () => {
@@ -2101,10 +1913,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById(id)?.addEventListener('click', () => {
                 document.getElementById('create-team-btn')?.click();
             });
-        });
-
-        document.getElementById('close-team-details').addEventListener('click', () => {
-            document.getElementById('team-details-modal').classList.remove('active');
         });
 
         document.getElementById('close-edit-participant').addEventListener('click', () => {
@@ -2383,24 +2191,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    let _termsOnConfirm = null;
-
-    function showRegistrationTermsModal(actionTitle, terms, onConfirm) {
-        _termsOnConfirm = onConfirm;
-        document.getElementById('registration-terms-title').textContent = `Before you continue: ${actionTitle}`;
-        renderTerms(document.getElementById('registration-terms-body'), terms);
-        document.getElementById('registration-terms-modal').classList.add('active');
-    }
-
-    function closeRegistrationTermsModal() {
-        document.getElementById('registration-terms-modal').classList.remove('active');
-        _termsOnConfirm = null;
-    }
-
-    function confirmRegistrationTerms() {
-        const cb = _termsOnConfirm;
-        closeRegistrationTermsModal();
-        if (cb) cb();
-    }
 });
 

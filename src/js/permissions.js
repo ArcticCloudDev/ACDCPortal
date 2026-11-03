@@ -49,11 +49,14 @@ const Permissions = {
             let highestRole = null;
 
             const rolePriority = { committee: 2, judge: 1 };
+            // Committee (eventScoped: false) is a full admin on every event, like the API's isAdmin.
+            let eventScoped = true;
 
             for (const p of (participations || [])) {
                 for (const role of (p.roles || [])) {
                     const roleConfig = this.ROLE_CONFIG[role];
                     if (roleConfig && roleConfig.pages) {
+                        if (roleConfig.eventScoped === false) eventScoped = false;
                         roleConfig.pages.forEach(page => allowedPages.add(page));
                         allowedEventIds.add(p.eventId);
                         if (!rolesByEvent[p.eventId]) rolesByEvent[p.eventId] = [];
@@ -71,7 +74,7 @@ const Permissions = {
             this._cached = {
                 isPortalAdmin: false,
                 allowedPages: [...allowedPages],
-                eventScoped: true,
+                eventScoped,
                 allowedEventIds: [...allowedEventIds],
                 rolesByEvent: rolesByEvent,
                 highestRole: highestRole,
@@ -157,15 +160,16 @@ const Permissions = {
                 if (accessDeniedEl) {
                     accessDeniedEl.classList.remove('hidden');
                 } else {
-                    document.body.innerHTML = `
-                        <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;">
-                            <div style="text-align:center;max-width:400px;">
-                                <h2>🔒 Access Denied</h2>
-                                <p>You don't have permission to access this page.</p>
-                                <a href="index.html" style="color:#2563eb;">Back to Portal</a>
-                            </div>
-                        </div>`;
+                    // Same card as the pages that ship their own #not-committee block.
+                    const denied = document.createElement('div');
+                    denied.className = 'access-denied';
+                    denied.innerHTML = `
+                        <h2>Access denied</h2>
+                        <p class="page-subtitle">You don't have access to this page.</p>
+                        <p><a href="events.html" class="btn-sm primary">Go to events</a></p>`;
+                    (document.querySelector('.main-content') || document.body).replaceChildren(denied);
                 }
+                if (permissions) renderAdminSidebar(pageName, permissions);
                 return null;
             }
 

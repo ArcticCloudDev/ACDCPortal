@@ -88,18 +88,26 @@ async function loadAllData() {
     await loadJudgeUsersForClaims();
 }
 
+// Judges of an event, named. The event roster carries names for event staff, so judges see
+// each other without access to the global people list.
+async function loadEventJudges(eventId) {
+    const participations = await API.participations.getByEvent(eventId, 'judge');
+    return (participations || [])
+        .filter(p => p.userId)
+        .map(p => ({
+            id: p.userId,
+            name: `${p.firstName || ''} ${p.lastName || ''}`.trim() || p.email || 'Unknown'
+        }));
+}
+
 async function loadJudgeUsersForClaims() {
-    const judgeUserIds = [...new Set(allClaimsEventBadges.filter(eb => eb.judgeUserId).map(eb => eb.judgeUserId))];
-    if (judgeUserIds.length === 0) { allJudgeUsers = []; return; }
+    const eventIds = [...new Set(allClaimsEventBadges.filter(eb => eb.judgeUserId).map(eb => eb.eventId))];
+    if (eventIds.length === 0) { allJudgeUsers = []; return; }
     try {
-        const allUsersData = await API.users.list();
-        allJudgeUsers = judgeUserIds.map(id => {
-            const user = allUsersData.find(u => u.id === id);
-            return {
-                id,
-                name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'Unknown'
-            };
-        }).sort((a, b) => a.name.localeCompare(b.name));
+        const judgesByEvent = await Promise.all(eventIds.map(loadEventJudges));
+        const byId = new Map();
+        for (const judge of judgesByEvent.flat()) byId.set(String(judge.id).toLowerCase(), judge);
+        allJudgeUsers = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
     } catch (e) {
         console.warn('Could not load judge users:', e);
         allJudgeUsers = [];
@@ -111,20 +119,7 @@ async function loadEventBadges(eventId) {
 
     judgeUsers = [];
     try {
-        const participations = await API.participations.getByEvent(eventId, 'judge');
-        if (participations && participations.length > 0) {
-            const allUsersData = await API.users.list();
-            judgeUsers = participations
-                .filter(p => p.userId)
-                .map(p => {
-                    const user = allUsersData.find(u => u.id === p.userId);
-                    return {
-                        id: p.userId,
-                        name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : (p.email || 'Unknown')
-                    };
-                })
-                .sort((a, b) => a.name.localeCompare(b.name));
-        }
+        judgeUsers = (await loadEventJudges(eventId)).sort((a, b) => a.name.localeCompare(b.name));
     } catch (e) {
         console.warn('Could not load judges:', e);
     }
@@ -534,8 +529,8 @@ function renderClaims() {
         if (b === currentUserId) return 1;
         if (a === '__unassigned__') return 1;
         if (b === '__unassigned__') return -1;
-        const nameA = allJudgeUsers.find(j => j.id === a)?.name || '';
-        const nameB = allJudgeUsers.find(j => j.id === b)?.name || '';
+        const nameA = allJudgeUsers.find(j => sameId(j.id, a))?.name || '';
+        const nameB = allJudgeUsers.find(j => sameId(j.id, b))?.name || '';
         return nameA.localeCompare(nameB);
     });
 
@@ -553,7 +548,7 @@ function renderClaims() {
             judgeName = 'Assigned to you';
             judgeIcon = 'user-check';
         } else {
-            const judge = allJudgeUsers.find(j => j.id === judgeId);
+            const judge = allJudgeUsers.find(j => sameId(j.id, judgeId));
             judgeName = judge ? judge.name : 'Unknown judge';
         }
 
@@ -940,6 +935,10 @@ async function awardBadgeInline(eventBadgeId, btn) {
         alert('Please select a team to award');
         return;
     }
+    // An exclusive badge goes to one team only and the award has no undo.
+    const badgeName = getExclusiveBadgesForUser('').find(b => sameId(b.eventBadgeId, eventBadgeId))?.badgeName || 'this badge';
+    const teamName = teamSelect.options[teamSelect.selectedIndex]?.text || 'this team';
+    if (!confirm(`Award "${badgeName}" to ${teamName}? Only one team can get it, and it can't be undone here.`)) return;
 
     await withBusy(btn, 'Awarding…', async () => {
         try {
@@ -964,6 +963,3 @@ function capitalize(str) {
     return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
 
-function truncate(str, len) {
-    return str.length > len ? str.substring(0, len) + '...' : str;
-}

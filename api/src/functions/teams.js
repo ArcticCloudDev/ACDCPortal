@@ -48,29 +48,13 @@ async function validateTeamName(v, rawName, eventId, excludeTeamId = null) {
     return { name };
 }
 
-function memberProjection(user, participation, full) {
-    const base = {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        gamertag: user.gamertag ?? null,
-        profileComplete: !!user.profileComplete,
-        participationId: participation?.id ?? null,
-        isTeamAdmin: !!participation?.isTeamAdmin,
-        roles: participation?.roles || [],
-        profileVerification: !!participation?.profileVerification
-    };
-    return full ? { ...base, phone: user.phone ?? null, allergies: user.allergies ?? null } : base;
-}
-
 app.http('teams-list', {
     methods: ['GET'],
     authLevel: 'function',
     route: 'teams',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return {
                     status: auth.status,
@@ -85,9 +69,14 @@ app.http('teams-list', {
 
             let teams = eventId ? await Storage.teams.findByEvent(eventId) : await Storage.teams.getAll();
 
-            if (!auth.user.isPortalAdmin) {
+            if (!auth.user.isAdmin) {
                 const participations = await participationsStorage.findBy({ userId: auth.user.userId });
-                teams = teams.filter(t => isTeamMember(auth.user, t.id, participations));
+                // Judges are local admins of their event: they see all of its teams (to award badges).
+                const judgedEventIds = new Set(participations
+                    .filter(p => (p.roles || []).includes('judge'))
+                    .map(p => String(p.eventId).toLowerCase()));
+                teams = teams.filter(t => judgedEventIds.has(String(t.eventId).toLowerCase())
+                    || isTeamMember(auth.user, t.id, participations));
             }
 
             return {
@@ -112,7 +101,7 @@ app.http('teams-get', {
     route: 'teams/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return {
                     status: auth.status,
@@ -168,7 +157,7 @@ app.http('teams-create', {
     route: 'teams',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return {
                     status: auth.status,
@@ -289,7 +278,7 @@ app.http('teams-update', {
     route: 'teams/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return {
                     status: auth.status,
@@ -382,7 +371,7 @@ app.http('teams-delete', {
     route: 'teams/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return {
                     status: auth.status,
@@ -408,10 +397,10 @@ app.http('teams-delete', {
                 };
             }
 
-            if (!auth.user.isPortalAdmin) {
+            if (!auth.user.isAdmin) {
                 return {
                     status: 403,
-                    jsonBody: { message: 'Only portal administrators can delete teams' }
+                    jsonBody: { message: 'Only admins can delete teams' }
                 };
             }
 
@@ -506,66 +495,6 @@ app.http('teams-delete', {
         } catch (error) {
             await logError(context, error);
             context.error('Teams DELETE error:', error);
-            return {
-                status: 500,
-                jsonBody: { message: 'Internal server error' }
-            };
-        }
-    }
-});
-
-app.http('teams-members', {
-    methods: ['GET'],
-    authLevel: 'function',
-    route: 'teams/{id}/members',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context);
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const teamId = request.params.id;
-
-            if (!teamId) {
-                return {
-                    status: 400,
-                    jsonBody: { message: 'Team ID required' }
-                };
-            }
-
-            const team = await Storage.teams.getById(teamId);
-
-            if (!team) {
-                return {
-                    status: 404,
-                    jsonBody: { message: 'Team not found' }
-                };
-            }
-
-            const participations = await participationsStorage.findBy({ userId: auth.user.userId });
-            if (!isTeamMember(auth.user, teamId, participations)) {
-                return {
-                    status: 403,
-                    jsonBody: { message: 'You do not have permission to view this team\'s members' }
-                };
-            }
-
-            // Membership lives in Participations; the legacy Users.TeamId column is never set.
-            const memberParticipations = await participationsStorage.findBy({ teamId });
-            const userIds = [...new Set(memberParticipations.map(p => p.userId).filter(Boolean))];
-            const users = userIds.length > 0 ? await Storage.users.getByIds(userIds) : [];
-            const full = isTeamAuthorized(auth.user, team, participations);
-            const members = users.map(user => memberProjection(user, memberParticipations.find(p => sameId(p.userId, user.id)), full));
-
-            return {
-                status: 200,
-                jsonBody: members
-            };
-
-        } catch (error) {
-            await logError(context, error);
-            context.error('Teams members GET error:', error);
             return {
                 status: 500,
                 jsonBody: { message: 'Internal server error' }

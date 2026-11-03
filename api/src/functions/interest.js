@@ -26,7 +26,7 @@ app.http('interest-record', {
     handler: async (request, context) => {
         try {
             // Interest is recorded for the signed-in person only: the OTP session proves the email.
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -162,7 +162,7 @@ app.http('interest-list', {
     route: 'interest/leads',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -205,7 +205,7 @@ app.http('interest-delete', {
     route: 'interest/leads/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -267,7 +267,7 @@ app.http('interest-restart-sequence', {
     route: 'interest/restart-sequence',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

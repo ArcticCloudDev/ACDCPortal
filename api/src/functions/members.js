@@ -34,7 +34,7 @@ function isProvisional(user) {
     return !!user.invitationPending && !user.profileComplete;
 }
 
-// Self or portal admin: the whole account goes, child rows first so no FK can block it.
+// Self or an admin: the whole account goes, child rows first so no FK can block it.
 async function removeAccount(user, participations) {
     const cleaned = { participations: 0, invitations: 0, deliveries: 0, interestLeads: 0, soloQueue: 0, teamsReleased: 0 };
 
@@ -115,7 +115,7 @@ app.http('members-remove', {
     route: 'members/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -144,7 +144,7 @@ app.http('members-remove', {
             }
 
             const isSelf = sameId(auth.user.userId, memberId);
-            const isAdmin = !!auth.user.isPortalAdmin;
+            const isAdmin = !!auth.user.isAdmin;
             let scopeTeamIds = teamId ? [teamId] : [...targetTeamIds];
 
             if (!isSelf && !isAdmin) {

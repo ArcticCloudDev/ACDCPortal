@@ -30,7 +30,7 @@ function safeFileName(name) {
     return base.length > 200 ? base.slice(-200) : base;
 }
 
-// Caller must be on the team (or a portal admin) and the team must belong to the event.
+// Caller must be on the team (or an admin) and the team must belong to the event.
 async function authorizeTeamPath(user, eventId, teamId, action) {
     if (!isGuid(eventId) || !isGuid(teamId)) {
         return { status: 400, jsonBody: { error: 'eventId and teamId must be GUIDs' } };
@@ -60,7 +60,7 @@ app.http('files-upload', {
     route: 'files/upload',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -171,7 +171,7 @@ app.http('files-list', {
     route: 'files/list',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -219,75 +219,13 @@ app.http('files-list', {
     }
 });
 
-app.http('files-download', {
-    methods: ['GET'],
-    authLevel: 'function',
-    route: 'files/download',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context);
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            if (!SharePointStorage.isConfigured()) {
-                return {
-                    status: 503,
-                    jsonBody: { error: 'File storage not configured' }
-                };
-            }
-
-            const filePath = request.query.get('path');
-
-            if (!filePath) {
-                return {
-                    status: 400,
-                    jsonBody: { error: 'File path is required' }
-                };
-            }
-
-            const segments = parseTeamPathSegments(filePath);
-            if (!segments) {
-                return { status: 400, jsonBody: { error: 'Invalid file path' } };
-            }
-            const denied = await authorizeTeamPath(auth.user, segments.eventId, segments.teamId, 'access this file');
-            if (denied) return denied;
-
-            let file;
-            try {
-                file = await SharePointStorage.getFile(filePath);
-            } catch (error) {
-                if (isNotFound(error)) return { status: 404, jsonBody: { error: 'File not found' } };
-                throw error;
-            }
-
-            return {
-                status: 200,
-                jsonBody: {
-                    name: file.name,
-                    downloadUrl: file.downloadUrl,
-                    webUrl: file.webUrl
-                }
-            };
-
-        } catch (error) {
-            await logError(context, error);
-            context.error('File download error:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to get file' }
-            };
-        }
-    }
-});
-
 app.http('files-delete', {
     methods: ['DELETE'],
     authLevel: 'function',
     route: 'files/delete',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -346,7 +284,7 @@ app.http('files-setup-columns', {
     route: 'files/setup-columns',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

@@ -251,10 +251,6 @@ function emailLogRowToJs(row) {
     return obj;
 }
 
-function scheduledRunRowToJs(row) {
-    return rowToJs(row);
-}
-
 function systemEmailConfigToJs(rows) {
     const templates = {};
     for (const row of rows) {

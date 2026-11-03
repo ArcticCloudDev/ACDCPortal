@@ -1,5 +1,5 @@
 const { app } = require('@azure/functions');
-const { requireAuth, getTokenFromRequest, verifyToken } = require('../shared/auth');
+const { requireAuth, getTokenFromRequest } = require('../shared/auth');
 const { logError } = require('../shared/error-log');
 const StorageModule = require('../shared/storage');
 const { Storage } = StorageModule;
@@ -25,14 +25,14 @@ function isActiveStatus(status) {
     return status === 'pre-registration' || status === 'registration' || status === 'live';
 }
 
-function isAdminRequest(request) {
-    const token = getTokenFromRequest(request);
-    if (!token) return false;
-    const result = verifyToken(token);
-    return result.valid && !!result.payload.isPortalAdmin;
+// Admins (portal admin or committee) see drafts and full event records.
+async function isAdminRequest(request) {
+    if (!getTokenFromRequest(request)) return false;
+    const auth = await requireAuth(request, null);
+    return auth.authorized && auth.user.isAdmin;
 }
 
-// Shape returned to anyone who is not a portal admin.
+// Shape returned to anyone who is not an admin.
 function toPublicEvent(event) {
     const { eventImageData, ...publicEvent } = event;
     return publicEvent;
@@ -191,7 +191,7 @@ app.http('events-list', {
     handler: async (request, context) => {
         try {
             const events = await eventsStorage.getAll();
-            if (isAdminRequest(request)) {
+            if (await isAdminRequest(request)) {
                 return { status: 200, jsonBody: events };
             }
             return {
@@ -209,37 +209,6 @@ app.http('events-list', {
     }
 });
 
-app.http('events-active', {
-    methods: ['GET'],
-    authLevel: 'anonymous',
-    route: 'events/active',
-    handler: async (request, context) => {
-        try {
-            const events = await eventsStorage.getAll();
-            const activeEvent = events.find(e => isActiveStatus(e.status));
-
-            if (!activeEvent) {
-                return {
-                    status: 404,
-                    jsonBody: { error: 'No active event found' }
-                };
-            }
-
-            return {
-                status: 200,
-                jsonBody: toPublicEvent(activeEvent)
-            };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Error getting active event:', error);
-            return {
-                status: 500,
-                jsonBody: { error: 'Failed to get active event' }
-            };
-        }
-    }
-});
-
 app.http('events-get', {
     methods: ['GET'],
     authLevel: 'anonymous',
@@ -248,7 +217,7 @@ app.http('events-get', {
         try {
             const id = request.params.id;
             const event = isGuid(id) ? await StorageModule.events.getById(id) : null;
-            const admin = isAdminRequest(request);
+            const admin = await isAdminRequest(request);
 
             if (!event || (event.status === 'draft' && !admin)) {
                 return {
@@ -278,7 +247,7 @@ app.http('events-create', {
     route: 'events',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -366,7 +335,7 @@ app.http('events-update', {
     route: 'events/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -449,7 +418,7 @@ app.http('events-delete', {
     route: 'events/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

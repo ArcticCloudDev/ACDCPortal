@@ -62,7 +62,22 @@ function verifyToken(token) {
     }
 }
 
-function requireAuth(request, context, options = {}) {
+// Portal admin (Users.IsPortalAdmin) is the bootstrap super admin. Committee members are full
+// admins on every event and page; only the portal-admin flag itself stays out of their reach (no
+// endpoint sets it). Looked up per request so a role change applies at once, not at next sign-in.
+let participationsStore = null;
+async function holdsCommitteeRole(userId) {
+    if (!userId) return false;
+    if (!participationsStore) {
+        const { Storage } = require('./storage');
+        participationsStore = new Storage('participations');
+    }
+    const rows = await participationsStore.findBy({ userId });
+    return rows.some(p => (p.roles || []).includes('committee'));
+}
+
+// Resolves to { authorized, user } where user.isAdmin covers portal admins and committee members.
+async function requireAuth(request, context, options = {}) {
     const token = getTokenFromRequest(request);
     if (!token) {
         context?.warn?.('Auth required but no bearer token provided');
@@ -91,8 +106,9 @@ function requireAuth(request, context, options = {}) {
         };
     }
     const payload = result.payload;
+    const user = { ...payload, isAdmin: !!payload.isPortalAdmin || await holdsCommitteeRole(payload.userId) };
 
-    if (options.requireAdmin && !payload.isPortalAdmin) {
+    if (options.requireAdmin && !user.isAdmin) {
         context?.warn?.(`Admin access denied for ${payload.email || 'unknown user'}`);
         return {
             authorized: false,
@@ -103,7 +119,7 @@ function requireAuth(request, context, options = {}) {
 
     return {
         authorized: true,
-        user: payload
+        user
     };
 }
 
@@ -151,7 +167,7 @@ function membershipsFor(participation) {
 // contain the rows of the users involved (caller and, where relevant, target).
 function isTeamAuthorized(user, team, participations = []) {
     if (!user || !team) return false;
-    if (user.isPortalAdmin) return true;
+    if (user.isAdmin) return true;
     if (team.adminUserId && user.userId && sameId(team.adminUserId, user.userId)) return true;
 
     return participations.some(p => {
@@ -163,7 +179,7 @@ function isTeamAuthorized(user, team, participations = []) {
 function canManageUser(callerUser, targetUserId, participations = []) {
     if (!callerUser) return false;
     if (callerUser.userId && sameId(callerUser.userId, targetUserId)) return true;
-    if (callerUser.isPortalAdmin) return true;
+    if (callerUser.isAdmin) return true;
 
     const adminTeamIds = new Set();
     const targetTeamIds = new Set();
@@ -184,7 +200,7 @@ function canManageUser(callerUser, targetUserId, participations = []) {
 
 function isTeamMember(user, teamId, participations = []) {
     if (!user) return false;
-    if (user.isPortalAdmin) return true;
+    if (user.isAdmin) return true;
     return participations.some(p => {
         if (!sameId(p.userId, user.userId)) return false;
         return membershipsFor(p).some(m => sameId(m.teamId, teamId));
@@ -193,7 +209,7 @@ function isTeamMember(user, teamId, participations = []) {
 
 function hasEventRole(user, eventId, role, participations = []) {
     if (!user) return false;
-    if (user.isPortalAdmin) return true;
+    if (user.isAdmin) return true;
     return participations.some(p =>
         sameId(p.userId, user.userId) && sameId(p.eventId, eventId) && (p.roles || []).includes(role)
     );

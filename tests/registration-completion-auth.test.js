@@ -8,7 +8,7 @@ const source = fs.readFileSync(
 );
 
 assert.match(source, /const \{ requireAuth \} = require\('\.\.\/shared\/auth'\)/);
-assert.match(source, /const auth = requireAuth\(request, context\)/);
+assert.match(source, /const auth = await requireAuth\(request, context\)/);
 assert.match(source, /auth\.user\.email\?\.toLowerCase\(\) !== normalizedEmail/);
 assert.match(source, /status: 403/);
 

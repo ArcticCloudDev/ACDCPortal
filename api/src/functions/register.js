@@ -173,7 +173,7 @@ app.http('register-complete', {
         context.log('Register complete called');
 
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

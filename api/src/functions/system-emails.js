@@ -10,102 +10,6 @@ const { generateId, isGuid } = require('../shared/id');
 const { isEmail } = require('../shared/validate');
 
 const KNOWN_TEMPLATE_KEYS = ['invitation-judge', 'invitation-committee', 'interest-acknowledgment', 'welcome'];
-const MAX_THEME_IMAGE_BYTES = 512 * 1024;
-
-// Image type from the file's leading bytes; the client-supplied type/extension is not trusted.
-function sniffImageType(buffer) {
-    if (buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47
-        && buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a) return 'png';
-    if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpeg';
-    if (buffer.length >= 6 && buffer.toString('latin1', 0, 6).match(/^GIF8[79]a$/)) return 'gif';
-    if (buffer.length >= 12 && buffer.toString('latin1', 0, 4) === 'RIFF' && buffer.toString('latin1', 8, 12) === 'WEBP') return 'webp';
-    return null;
-}
-
-function extractImageSrc(html) {
-    if (!html) return '';
-
-    if (html.startsWith('data:') || html.startsWith('http')) {
-        return html;
-    }
-
-    const srcMatch = html.match(/src="([^"]+)"/);
-    if (srcMatch) {
-        return srcMatch[1];
-    }
-
-    return '';
-}
-
-app.http('system-emails-upload-theme', {
-    methods: ['POST'],
-    authLevel: 'function',
-    route: 'system-emails/upload-theme',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            let formData;
-            try {
-                formData = await request.formData();
-            } catch (e) {
-                return { status: 400, jsonBody: { error: 'Expected multipart/form-data with an image' } };
-            }
-            const imageFile = formData.get('image');
-            const eventId = formData.get('eventId');
-            const templateType = formData.get('templateType');
-
-            if (!imageFile || typeof imageFile === 'string' || !eventId || !templateType) {
-                return { status: 400, jsonBody: { error: 'Missing required fields' } };
-            }
-            if (!KNOWN_TEMPLATE_KEYS.includes(templateType)) {
-                return { status: 400, jsonBody: { error: `templateType must be one of: ${KNOWN_TEMPLATE_KEYS.join(', ')}` } };
-            }
-            if (!isGuid(eventId)) {
-                return { status: 400, jsonBody: { error: 'eventId must be a GUID' } };
-            }
-            if (typeof imageFile.size === 'number' && imageFile.size > MAX_THEME_IMAGE_BYTES) {
-                return { status: 400, jsonBody: { error: 'Image too large. Maximum size is 512 KB.' } };
-            }
-
-            const event = await Storage.events.getById(eventId);
-            if (!event) {
-                return { status: 404, jsonBody: { error: 'Event not found' } };
-            }
-
-            const buffer = Buffer.from(await imageFile.arrayBuffer());
-            if (buffer.length === 0 || buffer.length > MAX_THEME_IMAGE_BYTES) {
-                return { status: 400, jsonBody: { error: 'Image too large. Maximum size is 512 KB.' } };
-            }
-            const imageType = sniffImageType(buffer);
-            if (!imageType) {
-                return { status: 400, jsonBody: { error: 'Image must be a PNG, JPEG, GIF or WebP file' } };
-            }
-
-            // Inline data URI: mail.js converts base64 images into CID attachments when sending,
-            // and nothing is written to the (non-durable, unserved) Functions filesystem.
-            const contentType = `image/${imageType}`;
-            const filename = `${templateType}_${eventId.toLowerCase()}_${Date.now()}.${imageType === 'jpeg' ? 'jpg' : imageType}`;
-
-            return {
-                status: 200,
-                jsonBody: {
-                    url: `data:${contentType};base64,${buffer.toString('base64')}`,
-                    filename,
-                    contentType,
-                    size: buffer.length
-                }
-            };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Error uploading theme:', error);
-            return { status: 500, jsonBody: { message: 'Internal server error' } };
-        }
-    }
-});
 
 app.http('system-emails-config-get', {
     methods: ['GET'],
@@ -113,7 +17,7 @@ app.http('system-emails-config-get', {
     route: 'system-emails/config',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -150,7 +54,7 @@ app.http('system-emails-config-put', {
     route: 'system-emails/config',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -193,7 +97,7 @@ app.http('system-emails-test', {
     route: 'system-emails/test',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -281,7 +185,7 @@ app.http('system-emails-preview', {
     route: 'system-emails/preview',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -339,62 +243,3 @@ app.http('system-emails-preview', {
         }
     }
 });
-
-app.http('system-emails-send', {
-    methods: ['POST'],
-    authLevel: 'function',
-    route: 'system-emails/send',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const { templateType, eventId, to, data } = await request.json();
-
-            const recipients = Array.isArray(to) ? to : [to];
-            if (recipients.length === 0 || recipients.length > 100 || !recipients.every(isEmail)) {
-                return { status: 400, jsonBody: { error: 'to must be a valid email address or a list of at most 100 addresses' } };
-            }
-
-            const resolved = await resolveTemplateAndEvent(templateType, eventId);
-            if (resolved.error) {
-                return { status: resolved.error.status, jsonBody: resolved.error.body };
-            }
-            const { template, event } = resolved;
-
-            const eventTheme = template.eventThemes[eventId] || {};
-            const globalDefaults = template.editableSections;
-
-            const baseData = {
-                ...(data && typeof data === 'object' ? data : {}),
-                eventName: event.name,
-                portalUrl: process.env.PORTAL_URL || 'https://your-portal.com'
-            };
-            const mergeData = {
-                ...baseData,
-                bodyText: processTemplate(eventTheme.body || globalDefaults.body || '', baseData),
-                closingText: processTemplate(eventTheme.closing || globalDefaults.closing || '', baseData)
-            };
-
-            const htmlContent = buildEmailHtml(template, mergeData, eventTheme);
-
-            const subject = processTemplate(eventTheme.subject || template.subject, mergeData, { html: false });
-
-            await sendEmail({
-                to: to,
-                subject: subject,
-                htmlContent: htmlContent
-            });
-
-            return { status: 200, jsonBody: { message: 'Email sent' } };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Error sending email:', error);
-            return { status: 500, jsonBody: { message: 'Internal server error' } };
-        }
-    }
-});
-
-module.exports = { sniffImageType, extractImageSrc };

@@ -36,7 +36,7 @@ app.http('event-badges-list', {
     route: 'events/{eventId}/badges',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -48,7 +48,7 @@ app.http('event-badges-list', {
             const actor = q.asActor(auth.user);
             const eventKey = upperId(eventId);
             const participations = await q.participationsForUser(actor.userId);
-            const canManageAssignments = actor.isPortalAdmin
+            const canManageAssignments = actor.isAdmin
                 || hasEventRole(actor, eventKey, 'judge', participations)
                 || hasEventRole(actor, eventKey, 'committee', participations);
             const isEventParticipant = participations.some(p => sameId(p.eventId, eventId));
@@ -95,7 +95,7 @@ app.http('event-badges-add', {
     route: 'events/{eventId}/badges',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -171,7 +171,7 @@ app.http('event-badges-update', {
     route: 'events/{eventId}/badges/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -212,7 +212,7 @@ app.http('event-badges-remove', {
     route: 'events/{eventId}/badges/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -244,7 +244,7 @@ app.http('event-badges-bulk', {
     route: 'events/{eventId}/badges/bulk',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

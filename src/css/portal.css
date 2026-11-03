@@ -557,7 +557,6 @@ button.interest-cta-btn:hover { border-color: var(--color-accent); box-shadow: v
 .modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-3); }
 .modal-actions .btn-grow { flex: 1; }
 .modal-step-panel { display: flex; flex-direction: column; gap: var(--space-5); }
-#registration-terms-body,
 #solo-terms-display { margin-bottom: var(--space-5); }
 
 .terms-box {
@@ -695,8 +694,7 @@ button.interest-cta-btn:hover { border-color: var(--color-accent); box-shadow: v
 .member-row:is(.invitation-pending, .empty-spot) { border-style: dashed; border-color: var(--color-border-strong); }
 .member-row.empty-spot .member-name { color: var(--color-text-muted); }
 .member-roles { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
-.member-section,
-.team-admin-actions { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
+.member-section { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
 .member-section-title {
     margin-bottom: var(--space-3);
     color: var(--color-text-subtle);
@@ -705,7 +703,6 @@ button.interest-cta-btn:hover { border-color: var(--color-accent); box-shadow: v
     letter-spacing: 0.06em;
     text-transform: uppercase;
 }
-.team-admin-actions h4 { margin-bottom: var(--space-3); font-size: var(--text-sm); }
 
 /* Badge claim / award dialogs (own markup: backdrop + dialog, toggled with .hidden) */
 .badge-modal {

@@ -113,7 +113,7 @@ async function leaveSoloQueue(userId, eventId, context) {
 }
 
 async function isEventStaff(user, eventId) {
-    if (user.isPortalAdmin) return true;
+    if (user.isAdmin) return true;
     const own = await participationsStorage.findBy({ userId: user.userId, eventId });
     return hasEventRole(user, eventId, 'judge', own) || hasEventRole(user, eventId, 'committee', own);
 }
@@ -124,7 +124,7 @@ app.http('participations-get-all', {
     route: 'participations/all',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -148,7 +148,7 @@ app.http('participations-get', {
     route: 'participations',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -210,7 +210,7 @@ app.http('participations-upsert', {
     route: 'participations',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -228,11 +228,11 @@ app.http('participations-upsert', {
 
             const isSelfById = userId && sameId(userId, auth.user.userId);
             const isSelfByEmail = email && auth.user.email && String(email).toLowerCase() === auth.user.email.toLowerCase();
-            if (!isSelfById && !isSelfByEmail && !auth.user.isPortalAdmin) {
+            if (!isSelfById && !isSelfByEmail && !auth.user.isAdmin) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            const isAdmin = auth.user.isPortalAdmin;
+            const isAdmin = auth.user.isAdmin;
             if (!isAdmin && roles !== undefined) {
                 return { status: 403, jsonBody: { error: 'Only administrators can assign participation roles' } };
             }
@@ -326,7 +326,7 @@ app.http('participations-update', {
     route: 'participations/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -345,7 +345,7 @@ app.http('participations-update', {
                 return { status: 403, jsonBody: { error: 'You do not have permission to modify this participation' } };
             }
 
-            if (!auth.user.isPortalAdmin && Object.keys(body).some(key => key !== 'hotelNights')) {
+            if (!auth.user.isAdmin && Object.keys(body).some(key => key !== 'hotelNights')) {
                 return { status: 403, jsonBody: { error: 'Only administrators can modify participation identity or membership fields' } };
             }
 
@@ -400,7 +400,7 @@ app.http('participations-delete', {
     route: 'participations/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -465,7 +465,7 @@ app.http('participations-update-roles-v2', {
     route: 'participations/{id}/roles',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -487,7 +487,7 @@ app.http('participations-update-roles-v2', {
 
             // Roles of a team member may only be changed by that team's administrator.
             const requestedTeamId = participation.teamId;
-            if (!auth.user.isPortalAdmin && requestedTeamId) {
+            if (!auth.user.isAdmin && requestedTeamId) {
                 const team = await teamsStorage.getById(requestedTeamId);
                 if (!team || !isTeamAuthorized(auth.user, team, related)) {
                     return { status: 403, jsonBody: { error: 'Only the team administrator can change team assignment' } };
@@ -496,8 +496,8 @@ app.http('participations-update-roles-v2', {
 
             const requestedRoles = [...(Array.isArray(set) ? set : []), ...(Array.isArray(add) ? add : [])];
             const grantsPrivilegedRole = requestedRoles.some(r => ['judge', 'committee'].includes(r));
-            if (grantsPrivilegedRole && !auth.user.isPortalAdmin) {
-                return { status: 403, jsonBody: { error: 'Only portal admins can grant judge or committee roles' } };
+            if (grantsPrivilegedRole && !auth.user.isAdmin) {
+                return { status: 403, jsonBody: { error: 'Only admins can grant judge or committee roles' } };
             }
 
             let roles = participation.roles || migrateRoles(participation);
@@ -560,7 +560,7 @@ app.http('participations-assign-team', {
     route: 'participations/{id}/team',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -581,7 +581,7 @@ app.http('participations-assign-team', {
             }
 
             const assignedTeamId = teamId || participation.teamId;
-            if (!auth.user.isPortalAdmin && assignedTeamId) {
+            if (!auth.user.isAdmin && assignedTeamId) {
                 const team = await teamsStorage.getById(assignedTeamId);
                 if (!team || !isTeamAuthorized(auth.user, team, related)) {
                     return { status: 403, jsonBody: { error: 'Only the team administrator can change team assignment' } };
@@ -645,7 +645,7 @@ app.http('participations-update-hotel', {
     route: 'participations/{id}/hotel',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -696,7 +696,7 @@ app.http('participations-by-event', {
     route: 'participations/event/{eventId}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -717,7 +717,24 @@ app.http('participations-by-event', {
 
             const isStaff = await isEventStaff(auth.user, eventId);
 
-            if (!isStaff) {
+            if (isStaff) {
+                // Staff (judges, committee, admins) run the event: they get each person's name and
+                // contact details with the roster, so judges need no access to the global people list.
+                const userIds = [...new Set(results.map(p => p.userId).filter(Boolean))];
+                const people = userIds.length ? await usersStorage.findBy({ id: userIds }) : [];
+                results = results.map(p => {
+                    const person = people.find(u => sameId(u.id, p.userId));
+                    if (!person) return p;
+                    return {
+                        ...p,
+                        email: person.email || p.email,
+                        firstName: person.firstName,
+                        lastName: person.lastName,
+                        phone: person.phone,
+                        allergies: person.allergies
+                    };
+                });
+            } else {
                 const callerTeamIds = new Set(
                     results
                         .filter(p => sameId(p.userId, auth.user.userId))
@@ -756,7 +773,7 @@ app.http('participations-by-person', {
     route: 'participations/person/{email}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -764,7 +781,7 @@ app.http('participations-by-person', {
             const email = decodeURIComponent(request.params.email);
 
             const isSelf = auth.user.email && email.toLowerCase() === auth.user.email.toLowerCase();
-            if (!isSelf && !auth.user.isPortalAdmin) {
+            if (!isSelf && !auth.user.isAdmin) {
                 return { status: 403, jsonBody: { error: 'You do not have permission to view these participations' } };
             }
 
@@ -805,7 +822,7 @@ app.http('participations-team-count', {
     route: 'participations/team/{teamId}/count',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -858,7 +875,7 @@ app.http('participations-update-team-roles', {
     route: 'participations/{id}/team-membership/{teamId}/roles',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -880,7 +897,7 @@ app.http('participations-update-team-roles', {
             }
 
             const team = await teamsStorage.getById(teamId);
-            if (!team || (!auth.user.isPortalAdmin && !isTeamAuthorized(auth.user, team, related))) {
+            if (!team || (!auth.user.isAdmin && !isTeamAuthorized(auth.user, team, related))) {
                 return { status: 403, jsonBody: { error: 'Only the team administrator can change team roles' } };
             }
             if (!sameId(team.eventId, participation.eventId)) {

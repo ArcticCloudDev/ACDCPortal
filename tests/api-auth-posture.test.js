@@ -18,7 +18,6 @@ const PUBLIC_ENDPOINTS = new Set([
     'invitations-get',
     'invitations-accept',
     'events-list',
-    'events-active',
     'events-get',
     'badges-list',
     'badges-get'

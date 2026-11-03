@@ -27,7 +27,7 @@ function isTeamInvitation(invitation) {
 
 async function isInvitationAuthorized(user, invitation) {
     if (!user) return false;
-    if (user.isPortalAdmin) return true;
+    if (user.isAdmin) return true;
     if (invitation.teamId) {
         const team = await Storage.teams.getById(invitation.teamId);
         if (!team) return false;
@@ -138,7 +138,7 @@ app.http('invitations-create', {
     route: 'invitations',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -184,9 +184,9 @@ app.http('invitations-create', {
                 if (bodyEventId && !sameId(team.eventId, bodyEventId)) {
                     return { status: 400, jsonBody: { error: 'Team does not belong to that event' } };
                 }
-            } else if (!auth.user.isPortalAdmin) {
+            } else if (!auth.user.isAdmin) {
                 // No team to be authorized on: judge/committee/event-level invitations are admin-only.
-                return { status: 403, jsonBody: { error: 'Only portal admins can send invitations without a team' } };
+                return { status: 403, jsonBody: { error: 'Only admins can send invitations without a team' } };
             }
 
             const resolvedEventId = team ? team.eventId : bodyEventId;
@@ -380,7 +380,7 @@ app.http('invitations-list', {
     route: 'invitations',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -404,11 +404,11 @@ app.http('invitations-list', {
                     return { status: 400, jsonBody: { error: 'Invalid email' } };
                 }
                 const isSelf = auth.user.email && auth.user.email.toLowerCase() === email.toLowerCase();
-                if (!isSelf && !auth.user.isPortalAdmin) {
+                if (!isSelf && !auth.user.isAdmin) {
                     return { status: 403, jsonBody: { error: 'You do not have permission to view these invitations' } };
                 }
                 invitations = await InvitationsStore.findBy({ email, status: 'pending' });
-            } else if (!auth.user.isPortalAdmin) {
+            } else if (!auth.user.isAdmin) {
                 return { status: 403, jsonBody: { error: 'Admin access required to list all invitations' } };
             } else {
                 invitations = await InvitationsStore.getAll();
@@ -496,7 +496,7 @@ app.http('invitations-accept', {
     route: 'invitations/{id}/accept',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -726,7 +726,7 @@ app.http('invitations-cancel', {
     route: 'invitations/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -769,7 +769,7 @@ app.http('invitations-resend', {
     route: 'invitations/{id}/resend',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

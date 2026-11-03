@@ -12,7 +12,6 @@ async function rows(query, params = {}) {
 }
 test.afterAll(async () => { await db.closePool(); });
 
-const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
 
 function sequenceSeed(evt, { status = 'draft' } = {}) {
     const seq = { id: f.id(), name: 'Drip', description: 'Pre-event emails', createdAt: new Date().toISOString() };
@@ -68,7 +67,6 @@ test.describe('events', () => {
         expect(publicList[0]).not.toHaveProperty('eventImageData');
         expect((await anon.get(`/api/events/${draft.id}`)).status()).toBe(404);
         expect((await (await anon.get(`/api/events/${w.event.id}`)).json())).not.toHaveProperty('eventImageData');
-        expect((await (await anon.get('/api/events/active')).json())).not.toHaveProperty('eventImageData');
 
         const member = await apiAs(w.member);
         expect((await member.get(`/api/events/${draft.id}`)).status()).toBe(404);
@@ -182,20 +180,10 @@ test.describe('sequences', () => {
         expect((await admin.post('/api/email/campaigns', { data: { sequenceId: seq.id, subject: 'x', content: 'y', ctaUrl: 'javascript:alert(1)' } })).status()).toBe(400);
         expect((await admin.post('/api/email/campaigns', { data: { sequenceId: f.id(), subject: 'x', content: 'y' } })).status()).toBe(404);
 
-        // Retrying a participant delivery (no leadId) works and reuses the campaign.
-        const retry = await admin.post('/api/deliveries/retry', { data: { deliveryId: delivery.id } });
-        expect(retry.status()).toBe(200);
-        await harness.waitForMail(w.leader.email, { subject: 'Hotel info' });
-        expect((await rows('SELECT Status s FROM EmailDeliveries WHERE Id = @id', { id: delivery.id }))[0].s).toBe('sent');
-
-        const trigger = await (await admin.post('/api/email/trigger-sequence', { data: { userId: w.member.id, eventId: w.event.id } })).json();
-        expect(trigger).toMatchObject({ sent: 1, skipped: 0 });
-        expect((await (await admin.post('/api/email/trigger-sequence', { data: { userId: w.member.id, eventId: w.event.id } })).json()).skipped).toBe(1);
-
         // Both the seeded campaign and the one created above belong to the event's sequence (ordered by sequenceOrder).
         const deliveriesView = await (await admin.get(`/api/deliveries/event/${w.event.id}`)).json();
         expect(deliveriesView.campaigns.map(c => c.id.toUpperCase())).toEqual([campaign.id, second.id.toUpperCase()]);
-        expect(deliveriesView.deliveries).toHaveLength(2);
+        expect(deliveriesView.deliveries).toHaveLength(1);
     });
 });
 
@@ -333,7 +321,7 @@ test.describe('files', () => {
         expect(up.status()).toBe(200);
 
         const good = `Events/${w.event.id}/${w.team.id}/demo.mp4`;
-        expect((await member.get(`/api/files/download?path=${encodeURIComponent(good)}`)).status()).toBe(200);
+        expect((await (await member.get(`/api/files/list?${q(w)}`)).json()).map(x => x.name)).toEqual(['demo.mp4']);
 
         const badPaths = [
             `Events/${w.event.id}/${w.team.id}/../${f.id()}/demo.mp4`,
@@ -344,12 +332,11 @@ test.describe('files', () => {
             `Shared/Events/${w.event.id}/${w.team.id}/demo.mp4`
         ];
         for (const p of badPaths) {
-            expect((await member.get(`/api/files/download?path=${encodeURIComponent(p)}`)).status(), p).toBe(400);
             expect((await member.delete(`/api/files/delete?path=${encodeURIComponent(p)}`)).status(), p).toBe(400);
         }
         // Right team, wrong event.
         const wrongEvent = `Events/${other.id}/${w.team.id}/demo.mp4`;
-        expect((await member.get(`/api/files/download?path=${encodeURIComponent(wrongEvent)}`)).status()).toBe(400);
+        expect((await member.delete(`/api/files/delete?path=${encodeURIComponent(wrongEvent)}`)).status()).toBe(400);
         expect((await member.get(`/api/files/list?eventId=${other.id}&teamId=${w.team.id}`)).status()).toBe(400);
         expect((await member.post(`/api/files/upload?eventId=${other.id}&teamId=${w.team.id}`, {
             multipart: { file: { name: 'x.txt', mimeType: 'text/plain', buffer: Buffer.from('x') } }
@@ -358,7 +345,7 @@ test.describe('files', () => {
         expect((await member.post(`/api/files/upload?${q(w)}`, {
             multipart: { attachment: { name: 'x.txt', mimeType: 'text/plain', buffer: Buffer.from('x') } }
         })).status()).toBe(400);
-        expect((await member.get(`/api/files/download?path=${encodeURIComponent(`Events/${w.event.id}/${w.team.id}/missing.txt`)}`)).status()).toBe(404);
+        expect((await member.delete(`/api/files/delete?path=${encodeURIComponent(`Events/${w.event.id}/${w.team.id}/missing.txt`)}`)).status()).toBe(404);
 
         const sp = await harness.sharepoint();
         expect(sp.files.map(x => x.path)).toEqual([good]);
@@ -415,7 +402,6 @@ test.describe('email', () => {
         expect((await admin.post('/api/email/send', { data: { templateId: '../../package', subject: 's', content: 'c', recipients: [{ email: 'x@e2e.test' }] } })).status()).toBe(404);
         expect((await admin.post('/api/email/send', { data: { templateId: 'announcement', subject: 's', content: 'c', ctaUrl: 'javascript:alert(1)', recipients: [{ email: 'x@e2e.test' }] } })).status()).toBe(400);
         expect((await admin.post('/api/email/send', { data: { templateId: 'announcement', subject: 's', content: 'c', recipients: [{ email: 'not an email' }] } })).status()).toBe(400);
-        expect((await admin.get('/api/email/templates/..%2F..%2Fpackage')).status()).toBe(404);
         expect((await admin.post('/api/email/preview', { data: { templateId: 'nope', data: {} } })).status()).toBe(404);
         expect((await harness.outbox()).length).toBe(2);
     });
@@ -440,27 +426,6 @@ test.describe('email', () => {
         expect(await emails('all-participants')).toEqual(['lena.leader@e2e.test', 'mats.member@e2e.test']);
         expect(await emails('all-event-contacts')).toEqual(['judy.judge@e2e.test', 'lead.lars@e2e.test', 'lena.leader@e2e.test', 'mats.member@e2e.test', 'solo.sverre@e2e.test']);
         expect((await admin.get('/api/email/recipients?eventId=nope&filter=team-admins')).status()).toBe(400);
-    });
-
-    test('upload-theme returns an inline data URI and rejects bad type, size and templateType', async ({ apiAs, harness }) => {
-        const w = buildWorld();
-        await harness.seed(w.seed());
-        const admin = await apiAs(w.admin);
-        const send = fields => admin.post('/api/system-emails/upload-theme', { multipart: fields });
-        const image = (buffer, name = 'theme.png', mimeType = 'image/png') => ({ name, mimeType, buffer });
-
-        const ok = await send({ image: image(PNG), eventId: w.event.id, templateType: 'welcome' });
-        expect(ok.status()).toBe(200);
-        const body = await ok.json();
-        expect(body.url).toBe(`data:image/png;base64,${PNG.toString('base64')}`);
-        expect(body.filename).toMatch(/^welcome_[0-9a-f-]{36}_\d+\.png$/);
-        expect(body.contentType).toBe('image/png');
-
-        expect((await send({ image: image(Buffer.from('<svg onload=alert(1)>'), 'x.png'), eventId: w.event.id, templateType: 'welcome' })).status()).toBe(400);
-        expect((await send({ image: image(Buffer.concat([PNG, Buffer.alloc(600 * 1024)])), eventId: w.event.id, templateType: 'welcome' })).status()).toBe(400);
-        expect((await send({ image: image(PNG), eventId: w.event.id, templateType: '../../etc/passwd' })).status()).toBe(400);
-        expect((await send({ image: image(PNG), eventId: 'not-a-guid', templateType: 'welcome' })).status()).toBe(400);
-        expect((await send({ image: image(PNG), eventId: f.id(), templateType: 'welcome' })).status()).toBe(404);
     });
 });
 
@@ -547,9 +512,7 @@ test('malformed GUIDs are rejected with 4xx, never 500', async ({ apiAs, harness
         [admin, 'post', '/api/email/campaigns/not-a-guid/send', { recipients: [{ email: 'a@e2e.test' }] }],
         [admin, 'get', '/api/email/campaigns/not-a-guid/deliveries'],
         [admin, 'post', '/api/email/campaigns', { sequenceId: 'not-a-guid', subject: 's', content: 'c' }],
-        [admin, 'post', '/api/email/trigger-sequence', { userId: 'not-a-guid', eventId: e }],
         [admin, 'get', '/api/deliveries/event/not-a-guid'],
-        [admin, 'post', '/api/deliveries/retry', { deliveryId: 'not-a-guid' }],
         [admin, 'get', '/api/events/not-a-guid/financials'],
         [admin, 'get', '/api/events/not-a-guid/financials/summary'],
         [admin, 'post', '/api/events/not-a-guid/financials', { type: 'expense', category: 'venue', description: 'x', amount: 1 }],
@@ -562,7 +525,7 @@ test('malformed GUIDs are rejected with 4xx, never 500', async ({ apiAs, harness
         [admin, 'put', `/api/events/${e}/sponsors/not-a-guid`, { companyName: 'x' }],
         [admin, 'delete', `/api/events/${e}/sponsors/not-a-guid`],
         [member, 'get', '/api/files/list?eventId=not-a-guid&teamId=not-a-guid'],
-        [member, 'get', '/api/files/download?path=Events/not-a-guid/not-a-guid/x.txt'],
+        [member, 'delete', '/api/files/delete?path=Events/not-a-guid/not-a-guid/x.txt'],
         [admin, 'get', '/api/email/recipients?eventId=not-a-guid'],
         [admin, 'post', '/api/system-emails/preview', { templateType: 'welcome', eventId: 'not-a-guid' }],
         [admin, 'post', '/api/system-emails/test', { templateType: 'welcome', eventId: 'not-a-guid', testEmail: 'a@e2e.test' }]

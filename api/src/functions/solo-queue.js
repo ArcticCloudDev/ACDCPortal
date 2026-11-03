@@ -41,7 +41,7 @@ app.http('solo-queue-get', {
     route: 'solo-queue',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -57,7 +57,7 @@ app.http('solo-queue-get', {
             if (userId) where.userId = userId;
             const queue = (await soloQueueStorage.findBy(where)).sort(byJoinedAt);
 
-            if (!auth.user.isPortalAdmin) {
+            if (!auth.user.isAdmin) {
                 const own = queue.filter(e => sameId(e.userId, auth.user.userId));
                 return {
                     status: 200,
@@ -86,7 +86,7 @@ app.http('solo-queue-join', {
     route: 'solo-queue',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -101,7 +101,7 @@ app.http('solo-queue-join', {
                 };
             }
 
-            if (!sameId(body.userId, auth.user.userId) && !auth.user.isPortalAdmin) {
+            if (!sameId(body.userId, auth.user.userId) && !auth.user.isAdmin) {
                 return { status: 403, jsonBody: { error: 'You can only join the solo queue for yourself' } };
             }
 
@@ -174,7 +174,7 @@ app.http('solo-queue-leave', {
     route: 'solo-queue/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -189,7 +189,7 @@ app.http('solo-queue-leave', {
                 };
             }
 
-            if (!sameId(entryToRemove.userId, auth.user.userId) && !auth.user.isPortalAdmin) {
+            if (!sameId(entryToRemove.userId, auth.user.userId) && !auth.user.isAdmin) {
                 return { status: 403, jsonBody: { error: 'You can only remove your own solo queue entry' } };
             }
 
@@ -217,14 +217,14 @@ app.http('solo-queue-position', {
     route: 'solo-queue/position/{eventId}/{userId}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context);
+            const auth = await requireAuth(request, context);
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
 
             const { eventId, userId } = request.params;
 
-            if (!sameId(userId, auth.user.userId) && !auth.user.isPortalAdmin) {
+            if (!sameId(userId, auth.user.userId) && !auth.user.isAdmin) {
                 return { status: 403, jsonBody: { error: 'You can only check your own queue position' } };
             }
 

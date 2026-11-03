@@ -49,7 +49,6 @@ test('files are scoped to team members', async ({ apiAs, harness }) => {
 
     const outsider = await apiAs(w.loner);
     expect((await outsider.get(`/api/files/list?${q}`)).status()).toBe(403);
-    expect((await outsider.get(`/api/files/download?path=Events/${w.event.id}/${w.team.id}/demo.mp4`)).status()).toBe(403);
     expect((await outsider.delete(`/api/files/delete?path=Events/${w.event.id}/${w.team.id}/demo.mp4`)).status()).toBe(403);
 });
 

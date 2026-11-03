@@ -4,7 +4,7 @@ const { logError } = require('../shared/error-log');
 const { Storage } = require('../shared/storage');
 const StorageModule = require('../shared/storage');
 const { sendEmail } = require('../shared/mail');
-const { generateId, isGuid, sameId } = require('../shared/id');
+const { generateId, isGuid } = require('../shared/id');
 const { isHttpUrl, isEmail } = require('../shared/validate');
 const q = require('../shared/admin-queries');
 
@@ -67,7 +67,7 @@ app.http('email-campaigns-list', {
     route: 'email/campaigns',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -120,7 +120,7 @@ app.http('email-campaigns-get', {
     route: 'email/campaigns/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -162,7 +162,7 @@ app.http('email-campaigns-create', {
     route: 'email/campaigns',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -220,7 +220,7 @@ app.http('email-campaigns-update', {
     route: 'email/campaigns/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -265,7 +265,7 @@ app.http('email-campaigns-delete', {
     route: 'email/campaigns/{id}',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -296,7 +296,7 @@ app.http('email-campaigns-send', {
     route: 'email/campaigns/{id}/send',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }
@@ -373,109 +373,13 @@ app.http('email-campaigns-send', {
     }
 });
 
-app.http('email-trigger-sequence', {
-    methods: ['POST'],
-    authLevel: 'function',
-    route: 'email/trigger-sequence',
-    handler: async (request, context) => {
-        try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
-            if (!auth.authorized) {
-                return { status: auth.status, jsonBody: auth.jsonBody };
-            }
-
-            const body = await request.json();
-            const { userId, eventId } = body || {};
-
-            if (!userId || !eventId) {
-                return { status: 400, jsonBody: { error: 'userId and eventId are required' } };
-            }
-            if (!isGuid(userId) || !isGuid(eventId)) {
-                return { status: 400, jsonBody: { error: 'userId and eventId must be GUIDs' } };
-            }
-
-            const user = await StorageModule.users.getById(userId);
-            if (!user) {
-                return { status: 404, jsonBody: { error: 'User not found' } };
-            }
-
-            const event = await StorageModule.events.getById(eventId);
-            if (!event) {
-                return { status: 404, jsonBody: { error: 'Event not found' } };
-            }
-
-            // Campaigns belong to the event through its sequence; only live ones are sent.
-            const sequenceCampaigns = event.sequenceId
-                ? await q.campaignsForSequence(event.sequenceId, { type: 'sequence', status: 'live' })
-                : [];
-
-            if (sequenceCampaigns.length === 0) {
-                return { status: 200, jsonBody: { message: 'No sequence emails for this event', sent: 0 } };
-            }
-
-            const userDeliveries = new Set(
-                (await q.deliveriesForEmail(user.email))
-                    .filter(d => d.status === 'sent')
-                    .map(d => String(d.campaignId).toLowerCase())
-            );
-
-            const results = { sent: 0, failed: 0, skipped: 0 };
-
-            for (const campaign of sequenceCampaigns) {
-                if (userDeliveries.has(String(campaign.id).toLowerCase())) {
-                    results.skipped++;
-                    continue;
-                }
-
-                const delivery = {
-                    id: generateDeliveryId(),
-                    campaignId: campaign.id,
-                    email: user.email,
-                    userId: user.id,
-                    status: 'pending',
-                    createdAt: new Date().toISOString()
-                };
-
-                try {
-                    await sendEmail({
-                        to: user.email,
-                        subject: campaign.subject,
-                        htmlContent: campaign.content,
-                        firstName: user.firstName || 'Participant',
-                        ctaUrl: campaign.ctaUrl,
-                        ctaText: campaign.ctaText
-                    });
-
-                    delivery.status = 'sent';
-                    delivery.sentAt = new Date().toISOString();
-                    results.sent++;
-                } catch (err) {
-                    await logError(context, err);
-                    delivery.status = 'failed';
-                    delivery.errorMessage = err.message;
-                    results.failed++;
-                }
-
-                await deliveriesStorage.create(delivery);
-            }
-
-            context.log(`Sequence emails for user ${user.email} on event ${eventId}: sent=${results.sent}, skipped=${results.skipped}`);
-            return { status: 200, jsonBody: results };
-        } catch (error) {
-            await logError(context, error);
-            context.error('Trigger sequence error:', error);
-            return { status: 500, jsonBody: { error: 'Failed to trigger sequence emails' } };
-        }
-    }
-});
-
 app.http('email-campaigns-deliveries', {
     methods: ['GET'],
     authLevel: 'function',
     route: 'email/campaigns/{id}/deliveries',
     handler: async (request, context) => {
         try {
-            const auth = requireAuth(request, context, { requireAdmin: true });
+            const auth = await requireAuth(request, context, { requireAdmin: true });
             if (!auth.authorized) {
                 return { status: auth.status, jsonBody: auth.jsonBody };
             }

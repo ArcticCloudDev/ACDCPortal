@@ -2,7 +2,6 @@ let currentEvent = null;
 let currentUser = null;
 let allParticipants = [];
 let allTeams = [];
-let allUsers = [];
 let currentPermissions = null;
 
 let NIGHT_KEYS = [];
@@ -85,17 +84,15 @@ async function init() {
 
 async function loadEventData(eventId) {
     try {
-        const [eventsRes, teamsRes, usersRes, participationsRes] = await Promise.all([
+        // Event staff (judges included) get the roster with each person's name and contact details.
+        const [eventsRes, teamsRes, eventParticipations] = await Promise.all([
             API.events.list(),
             API.teams.list(),
-            API.users.list(),
-            API.participations.list()
+            API.participations.getByEvent(eventId)
         ]);
 
         const events = eventsRes.events || eventsRes || [];
         allTeams = teamsRes.teams || teamsRes || [];
-        allUsers = usersRes.users || usersRes || [];
-        const participations = participationsRes.participations || participationsRes || [];
 
         currentEvent = events.find(e => sameId(e.id, eventId));
         if (!currentEvent) {
@@ -109,21 +106,17 @@ async function loadEventData(eventId) {
         computeHotelColumns(currentEvent.startDate, currentEvent.endDate);
         buildTableHeaders();
 
-        const eventParticipations = participations.filter(p => sameId(p.eventId, currentEvent.id));
-
         allParticipants = eventParticipations.map(p => {
-            const user = allUsers.find(u => sameId(u.id, p.userId)) || {};
-
             const team = p.teamId ? allTeams.find(t => sameId(t.id, p.teamId)) : null;
 
             return {
                 id: p.id,
                 userId: p.userId,
-                firstName: user.firstName || 'Unknown',
-                lastName: user.lastName || '',
-                email: user.email || p.email || '',
-                phone: user.phone || '',
-                allergies: user.allergies || '',
+                firstName: p.firstName || 'Unknown',
+                lastName: p.lastName || '',
+                email: p.email || '',
+                phone: p.phone || '',
+                allergies: p.allergies || '',
                 teamId: team?.id || null,
                 teamName: team?.teamName || null,
                 isTeamAdmin: p.isTeamAdmin || false,

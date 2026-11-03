@@ -32,28 +32,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadData() {
     try {
-        let events = await API.events.list();
+        // Names live on the interest lead (what the person typed) and on their account; phone only on the account.
+        const [events, allParticipations, leadsRes, users] = await Promise.all([
+            API.events.list(),
+            API.participations.list(),
+            API.request('/interest/leads?verified=false'),
+            API.users.list()
+        ]);
         allEvents = Permissions.filterByEvent(currentPermissions, events, 'id');
+        const leads = leadsRes?.leads || [];
+        const sameEmail = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
 
-        const allParticipations = await API.participations.list();
         let interestParticipations = allParticipations.filter(p =>
             p.roles?.includes('interest')
         );
         interestParticipations = Permissions.filterByEvent(currentPermissions, interestParticipations);
 
         allEntries = interestParticipations.map(p => {
-            const firstName = p.interestFirstName || '';
-            const lastName = p.interestLastName || '';
+            const user = users.find(u => sameId(u.id, p.userId)) || users.find(u => sameEmail(u.email, p.email)) || {};
+            const lead = leads.find(l => sameId(l.eventId, p.eventId) && sameEmail(l.email, p.email || user.email));
             const hasUpgraded = p.roles?.some(r => r !== 'interest');
 
             return {
                 id: p.id,
-                email: p.email,
-                firstName,
-                lastName,
+                email: p.email || user.email || '',
+                firstName: lead?.firstName || user.firstName || '',
+                lastName: lead?.lastName || user.lastName || '',
+                phone: user.phone || '',
                 eventId: p.eventId,
-                createdAt: p.interestDate || p.createdAt,
-                verified: p.interestVerified !== false,
+                createdAt: lead?.createdAt || p.createdAt,
+                verified: lead ? !!lead.verified : true,
                 converted: hasUpgraded || !!p.teamId
             };
         });
@@ -140,12 +148,15 @@ function getSelectedIds() {
 function exportSelected() {
     const ids = getSelectedIds();
     const entries = allEntries.filter(e => ids.some(id => sameId(id, e.id)));
-    const q = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const q = csvCell;
+
+    const status = e => e.converted ? 'Registered' : (e.verified ? 'Verified' : 'Unverified');
+    const eventName = e => allEvents.find(ev => sameId(ev.id, e.eventId))?.name || '';
 
     const csv = [
-        'Email,First Name,Last Name,Company,Phone,Signed Up',
+        'Email,First Name,Last Name,Phone,Event,Status,Signed Up',
         ...entries.map(e =>
-            [q(e.email), q(e.firstName), q(e.lastName), q(e.company), q(e.phone), q(e.createdAt)].join(',')
+            [q(e.email), q(e.firstName), q(e.lastName), q(e.phone), q(eventName(e)), q(status(e)), q(e.createdAt)].join(',')
         )
     ].join('\n');
 
