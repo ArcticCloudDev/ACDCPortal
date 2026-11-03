@@ -1,662 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Events - ACDC Committee</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <title>Events - ACDC Admin</title>
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <style>        .main-content {
-            padding: 24px 40px;
-        }
-
-        .panel {
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--admin-border);
-        }
-
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 14px 18px;
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .panel-title { font-size: 0.9rem; font-weight: 600; color: var(--admin-sidebar); }
-        .panel-body { padding: 0; }
-        .panel-body.padded { padding: 20px; }
-
-        .data-table { width: 100%; border-collapse: collapse; }
-
-        .data-table th {
-            text-align: left;
-            padding: 10px 16px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--admin-text-muted);
-            background: var(--admin-bg);
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .data-table td {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--admin-border);
-            font-size: 0.85rem;
-        }
-
-        .data-table tbody tr:hover { background: var(--admin-bg); }
-        .data-table tbody tr:last-child td { border-bottom: none; }
-
-        .badge {
-            display: inline-flex;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 500;
-            text-transform: uppercase;
-        }
-
-        .badge.draft { background: #f1f5f9; color: #475569; }
-        .badge.pre-registration { background: #fef3c7; color: #92400e; }
-        .badge.registration { background: #dbeafe; color: #1d4ed8; }
-        .badge.live { background: #d1fae5; color: #065f46; }
-        .badge.completed { background: #f3e8ff; color: #7c3aed; }
-
-        .badge.team { background: #ede9fe; color: #7c3aed; }
-        .badge.single { background: #fce7f3; color: #be185d; }
-
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 0.75rem;
-            border-radius: 4px;
-            border: 1px solid var(--admin-border);
-            background: white;
-            color: var(--admin-text);
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        .btn-sm:hover { background: var(--admin-bg); }
-        .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
-        .btn-sm.primary:hover { background: #2563eb; }
-        .btn-sm.danger { background: var(--admin-danger); border-color: var(--admin-danger); color: white; }
-        .btn-sm.danger:hover { background: #dc2626; }
-
-        .lead-status-pill {
-            display: inline-block;
-            font-size: 0.73rem;
-            font-weight: 600;
-            padding: 3px 9px;
-            border-radius: 20px;
-            letter-spacing: 0.01em;
-            white-space: nowrap;
-        }
-        .status-converted { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
-        .status-queued    { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
-        .status-interest  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.85rem; color: var(--admin-text); }
-        .form-group input, .form-group textarea, .form-group select {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid var(--admin-border);
-            border-radius: 6px;
-            font-size: 0.875rem;
-        }
-        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
-            outline: none;
-            border-color: var(--admin-primary);
-            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
-        }
-        .form-group textarea { min-height: 80px; resize: vertical; }
-        .form-group .help-text { font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px; }
-
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-
-        .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-        .checkbox-row input { width: auto; }
-        .checkbox-row label { margin: 0; font-weight: normal; }
-
-        .form-actions { display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--admin-border); }
-
-        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
-
-        .error-message {
-            font-size: 0.75rem;
-            color: var(--admin-danger);
-            margin-top: 4px;
-        }
-
-        .access-denied {
-            max-width: 400px;
-            margin: 100px auto;
-            text-align: center;
-            padding: 40px;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--admin-border);
-        }
-
-        .status-section {
-            background: var(--admin-bg);
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 20px;
-        }
-
-        .status-section h3 {
-            margin: 0 0 12px 0;
-            font-size: 0.9rem;
-            color: var(--admin-sidebar);
-        }
-
-        .status-stepper {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            position: relative;
-            margin: 0 0 16px 0;
-            padding: 0;
-        }
-
-        .status-stepper::before {
-            content: '';
-            position: absolute;
-            top: 20px;
-            left: 40px;
-            right: 40px;
-            height: 3px;
-            background: #e2e8f0;
-            z-index: 0;
-        }
-
-        .status-step {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-            z-index: 1;
-            flex: 1;
-            max-width: 140px;
-        }
-
-        .step-indicator {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            font-weight: 600;
-            border: 3px solid #e2e8f0;
-            background: white;
-            color: #94a3b8;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            position: relative;
-        }
-
-        .step-indicator:hover:not(.disabled) {
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        .step-label {
-            margin-top: 10px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #94a3b8;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            line-height: 1.3;
-        }
-
-        .status-step.completed .step-indicator {
-            background: #10b981;
-            border-color: #10b981;
-            color: white;
-        }
-        .status-step.completed .step-label {
-            color: #10b981;
-        }
-
-        .status-step.current .step-indicator {
-            background: #2563eb;
-            border-color: #2563eb;
-            color: white;
-            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
-        }
-        .status-step.current .step-label {
-            color: #2563eb;
-            font-weight: 700;
-        }
-
-        .status-step.available .step-indicator {
-            border-color: #60a5fa;
-            color: #60a5fa;
-            cursor: pointer;
-        }
-        .status-step.available .step-indicator:hover {
-            background: #eff6ff;
-        }
-
-        .status-step.disabled .step-indicator {
-            cursor: not-allowed;
-            opacity: 0.5;
-        }
-
-        .status-step.completed .step-indicator {
-            cursor: pointer;
-        }
-        .status-step.completed .step-indicator:hover {
-            background: #059669;
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-        }
-
-        .status-stepper .progress-line {
-            position: absolute;
-            top: 20px;
-            left: 40px;
-            height: 3px;
-            background: linear-gradient(90deg, #10b981 0%, #2563eb 100%);
-            z-index: 0;
-            transition: width 0.3s ease;
-            border-radius: 2px;
-        }
-
-        .current-status-banner {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 16px 20px;
-            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-            border-radius: 10px;
-            border-left: 4px solid #2563eb;
-            margin-top: 16px;
-            transition: all 0.3s ease;
-        }
-
-        .current-status-banner .status-icon {
-            font-size: 1.75rem;
-            width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-
-        .current-status-banner .status-info {
-            flex: 1;
-        }
-
-        .current-status-banner .status-title {
-            font-weight: 700;
-            color: #1e40af;
-            font-size: 1rem;
-            margin: 0 0 4px 0;
-        }
-
-        .current-status-banner .status-description {
-            color: #3b82f6;
-            font-size: 0.875rem;
-            margin: 0;
-        }
-
-        .team-fields { display: none; }
-        .team-fields.visible { display: block; }
-
-        .form-layout {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 32px;
-        }
-
-        .form-column {
-            min-width: 0;
-        }
-
-        .form-column h3 {
-            margin: 0 0 16px 0;
-            font-size: 0.9rem;
-            color: var(--admin-sidebar);
-            padding-bottom: 8px;
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .collapsible-section {
-            margin-top: 20px;
-            border: 1px solid #bfdbfe;
-            border-left: 3px solid var(--admin-primary);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        .collapsible-section > summary {
-            list-style: none;
-            display: flex;
-            align-items: center;
-            padding: 11px 16px;
-            background: #eff6ff;
-            font-weight: 600;
-            font-size: 0.875rem;
-            color: #1e40af;
-            cursor: pointer;
-            user-select: none;
-            gap: 8px;
-            transition: background 0.15s;
-            letter-spacing: 0.01em;
-        }
-        .collapsible-section > summary .expand-hint {
-            margin-left: auto;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #1d4ed8;
-            letter-spacing: 0.02em;
-            text-transform: uppercase;
-        }
-        .collapsible-section > summary::-webkit-details-marker { display: none; }
-        .collapsible-section > summary::after {
-            content: '▼';
-            font-size: 0.65rem;
-            color: var(--admin-primary);
-            margin-left: 6px;
-            flex-shrink: 0;
-            transition: transform 0.2s ease;
-            transform: rotate(-90deg);
-        }
-        .collapsible-section[open] > summary .expand-hint { display: none; }
-        .collapsible-section[open] > summary { background: #dbeafe; }
-        .collapsible-section > summary:hover { background: #dbeafe; }
-        .collapsible-section .collapsible-body {
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 0;
-            border-top: 1px solid #bfdbfe;
-            background: #fff;
-        }
-
-        .radio-group {
-            display: flex;
-            gap: 20px;
-        }
-
-        .radio-option {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 16px;
-            border: 2px solid var(--admin-border);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .radio-option:hover { border-color: var(--admin-primary); }
-        .radio-option.selected { border-color: var(--admin-primary); background: #eff6ff; }
-        .radio-option input { display: none; }
-        .radio-option .icon { font-size: 1.2rem; }
-        .radio-option .label { font-weight: 500; }
-        .radio-option .desc { font-size: 0.75rem; color: var(--admin-text-muted); }
-
-        .tabs-container {
-            display: flex;
-            gap: 0;
-            border-bottom: 2px solid var(--admin-border);
-            margin-bottom: 24px;
-        }
-
-        .tab-btn {
-            padding: 12px 24px;
-            background: none;
-            border: none;
-            border-bottom: 3px solid transparent;
-            color: var(--admin-text-muted);
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.15s;
-            margin-bottom: -2px;
-        }
-
-        .tab-btn:hover:not(:disabled) {
-            color: var(--admin-text);
-            background: var(--admin-bg);
-        }
-
-        .tab-btn.active {
-            color: var(--admin-primary);
-            border-bottom-color: var(--admin-primary);
-            background: transparent;
-        }
-
-        .tab-btn:disabled {
-            cursor: not-allowed;
-            opacity: 0.4;
-        }
-
-        .tab-panel {
-            display: none;
-        }
-
-        .tab-panel.active {
-            display: block;
-        }
-
-        .invite-section {
-            margin-bottom: 24px;
-        }
-
-        .invite-form {
-            display: flex;
-            gap: 12px;
-            align-items: flex-end;
-            margin-bottom: 20px;
-        }
-
-        .invite-form .form-group {
-            flex: 1;
-            margin: 0;
-        }
-
-        .members-list {
-            margin-top: 16px;
-        }
-
-        .sponsor-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 12px 16px;
-            margin-bottom: 14px;
-        }
-
-        .sponsor-grid .full-width {
-            grid-column: 1 / -1;
-        }
-
-        .sponsor-status {
-            text-transform: uppercase;
-            font-size: 0.7rem;
-            font-weight: 700;
-            letter-spacing: 0.02em;
-            border-radius: 999px;
-            padding: 3px 10px;
-            display: inline-block;
-        }
-
-        .sponsor-status.reached-out { background: #e0f2fe; color: #0369a1; }
-        .sponsor-status.negotiating { background: #fef3c7; color: #92400e; }
-        .sponsor-status.declined { background: #fee2e2; color: #991b1b; }
-        .sponsor-status.confirmed { background: #dcfce7; color: #166534; }
-
-        .budget-card {
-            background: var(--admin-bg-secondary, #f8fafc);
-            border: 1px solid var(--admin-border, #e2e8f0);
-            border-radius: 8px;
-            padding: 16px 20px;
-            text-align: center;
-        }
-        .budget-card-label { font-size: 0.78rem; color: var(--admin-text-muted, #64748b); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
-        .budget-card-value { font-size: 1.5rem; font-weight: 700; }
-        .budget-card-hint { font-size: 0.72rem; color: var(--admin-text-muted, #94a3b8); margin-top: 4px; }
-        .budget-card.income .budget-card-value { color: #166534; }
-        .budget-card.expense .budget-card-value { color: #991b1b; }
-        .budget-card.participant .budget-card-value { color: #92400e; }
-        .budget-card.net.positive .budget-card-value { color: #166534; }
-        .budget-card.net.negative .budget-card-value { color: #991b1b; }
-        .financial-auto-row td { opacity: 0.7; }
-        .badge-auto { background: #e0f2fe; color: #0369a1; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
-        .badge-manual { background: #fef3c7; color: #92400e; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
-
-        .budget-group-header td {
-            background: var(--admin-bg-secondary, #f1f5f9);
-            font-weight: 600;
-            font-size: 0.82rem;
-            color: var(--admin-text-muted, #475569);
-            border-top: 2px solid var(--admin-border, #e2e8f0);
-            padding: 6px 10px;
-        }
-        .budget-group-total { font-size: 0.8rem; color: var(--admin-text-muted); margin-left: 8px; font-weight: 400; }
-        .financial-amount-income { color: #166534; font-weight: 600; }
-        .financial-amount-expense { color: #991b1b; font-weight: 600; }
-        .paidby-select {
-            font-size: 0.78rem;
-            padding: 2px 4px;
-            border: 1px solid var(--admin-border, #e2e8f0);
-            border-radius: 4px;
-            background: white;
-            cursor: pointer;
-            min-width: 100px;
-        }
-        .sponsor-status-select.reached-out { background: #f1f5f9; color: #475569; border-color: #94a3b8; }
-        .sponsor-status-select.negotiating  { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
-        .sponsor-status-select.confirmed    { background: #dcfce7; color: #166534; border-color: #86efac; }
-        .sponsor-status-select.declined     { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
-
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-        }
-
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        .modal-body {
-            padding: 20px;
-        }
-
-        .modal-footer {
-            padding: 16px 20px;
-            border-top: 1px solid var(--admin-border);
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
-        label:has(input[type="radio"]) {
-            position: relative;
-        }
-
-        label:has(input[type="radio"]:checked) {
-            border-color: var(--admin-primary) !important;
-            background: rgba(99, 102, 241, 0.05);
-        }
-
-        label:has(input[type="radio"]):hover {
-            border-color: var(--admin-primary);
-            background: rgba(99, 102, 241, 0.02);
-        }
-
-        #email-editor-container {
-            height: 300px;
-            background: white;
-        }
-
-        .email-card {
-            background: white;
-            border: 1px solid var(--admin-border);
-            border-radius: 6px;
-            padding: 16px;
-            margin-bottom: 12px;
-            transition: box-shadow 0.2s;
-        }
-
-        .email-card:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .email-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 8px;
-        }
-
-        .email-card-title {
-            font-weight: 600;
-            color: var(--admin-sidebar);
-            font-size: 1rem;
-        }
-
-        .email-card-meta {
-            font-size: 0.85rem;
-            color: var(--admin-text-muted);
-            margin-top: 4px;
-        }
-
-        .email-card-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        @media (max-width: 1000px) {
-            .form-layout {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style></head>
-<body>
+</head>
+<body class="page-events">
     <div class="admin-layout">
         <div id="sidebar-container"></div>
 
@@ -667,462 +19,455 @@
             </div>
 
             <div id="admin-content" class="hidden">
+                <!-- Events list -->
                 <div id="events-list-view">
                     <div class="page-header">
-                        <h1 class="page-title">Events</h1>
-                        <button id="create-event-btn" class="btn-sm primary">+ Create Event</button>
+                        <div>
+                            <h1 class="page-title">Events</h1>
+                            <p class="page-subtitle">Create events, move them through registration and manage their people, sponsors and budget.</p>
+                        </div>
+                        <div class="page-header-actions">
+                            <button type="button" id="create-event-btn" class="btn btn-primary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#plus"></use></svg>Create event</button>
+                        </div>
                     </div>
-                    <div class="panel">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Event Name</th>
-                                    <th>Type</th>
-                                    <th>Dates</th>
-                                    <th>Location</th>
-                                    <th>Status</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody id="events-table-body">
-                                <tr><td colspan="6" class="empty-state">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <section class="panel">
+                        <div class="panel-body">
+                            <table class="data-table events-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Event</th>
+                                        <th scope="col">Type</th>
+                                        <th scope="col">Dates</th>
+                                        <th scope="col">Location</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col"><span class="visually-hidden">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="events-table-body">
+                                    <tr><td colspan="6" class="empty-state">Loading events...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
 
+                <!-- Event editor -->
                 <div id="event-form-view" class="hidden">
                     <div class="page-header">
-                        <h1 class="page-title" id="form-title">Create Event</h1>
-                        <button id="back-to-list" class="btn-sm">← Back</button>
-                    </div>
-
-                    <div id="status-section" class="status-section hidden">
-                        <h3>Event Status</h3>
-                        <div class="status-stepper">
-                            <div class="progress-line" id="progress-line"></div>
-                            <div class="status-step" data-status="draft">
-                                <div class="step-indicator">1</div>
-                                <span class="step-label">Draft</span>
-                            </div>
-                            <div class="status-step" data-status="pre-registration">
-                                <div class="step-indicator">2</div>
-                                <span class="step-label">Pre-Reg</span>
-                            </div>
-                            <div class="status-step" data-status="registration">
-                                <div class="step-indicator">3</div>
-                                <span class="step-label">Registration</span>
-                            </div>
-                            <div class="status-step" data-status="live">
-                                <div class="step-indicator">4</div>
-                                <span class="step-label">Live</span>
-                            </div>
-                            <div class="status-step" data-status="completed">
-                                <div class="step-indicator">5</div>
-                                <span class="step-label">Completed</span>
-                            </div>
+                        <div>
+                            <nav class="breadcrumb" aria-label="Breadcrumb">
+                                <button type="button" id="back-to-list" class="back-link"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#arrow-left"></use></svg>Events</button>
+                                <span class="breadcrumb-sep" aria-hidden="true">/</span>
+                                <span id="breadcrumb-current" aria-current="page">New event</span>
+                            </nav>
+                            <h1 class="page-title" id="form-title">Create event</h1>
+                            <div class="page-subtitle meta-list" id="form-meta"></div>
                         </div>
-                        <div class="current-status-banner" id="status-banner">
-                            <span class="status-icon" id="status-icon">📝</span>
-                            <div class="status-info">
-                                <p class="status-title" id="status-title">Draft</p>
-                                <p class="status-description" id="status-description">Event is in draft mode. Only visible to committee members.</p>
-                            </div>
+                        <div class="page-header-actions">
+                            <a id="view-participants-link" class="btn btn-secondary hidden" href="admin-event-participants.html"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg>View participants</a>
                         </div>
                     </div>
 
                     <div class="tabs-container">
-                        <button class="tab-btn active" data-tab="general">📋 General</button>
-                        <button class="tab-btn" data-tab="committee" id="committee-tab-btn">👔 Committee</button>
-                        <button class="tab-btn" data-tab="judges" id="judges-tab-btn">⚖️ Judges</button>
-                        <button class="tab-btn" data-tab="leads" id="leads-tab-btn">📧 Interest Leads</button>
-                        <button class="tab-btn" data-tab="sponsors" id="sponsors-tab-btn">💼 Sponsors</button>
-                        <button class="tab-btn" data-tab="budget" id="budget-tab-btn">💰 Budget</button>
-                        <button class="tab-btn" data-tab="teams" id="teams-tab-btn">👥 Teams</button>
-                        <button class="tab-btn" data-tab="sequence" id="sequence-tab-btn">📧 Sequence</button>
+                        <button type="button" class="tab-btn active" data-tab="general"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#clipboard-list"></use></svg>General</button>
+                        <button type="button" class="tab-btn" data-tab="committee" id="committee-tab-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#landmark"></use></svg>Committee</button>
+                        <button type="button" class="tab-btn" data-tab="judges" id="judges-tab-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#scale"></use></svg>Judges</button>
+                        <button type="button" class="tab-btn" data-tab="leads" id="leads-tab-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bell"></use></svg>Interest leads</button>
+                        <button type="button" class="tab-btn" data-tab="sponsors" id="sponsors-tab-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#handshake"></use></svg>Sponsors</button>
+                        <button type="button" class="tab-btn" data-tab="budget" id="budget-tab-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#wallet"></use></svg>Budget</button>
+                        <button type="button" class="tab-btn" data-tab="teams" id="teams-tab-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg>Teams</button>
+                        <button type="button" class="tab-btn" data-tab="sequence" id="sequence-tab-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#mail"></use></svg>Email sequence</button>
                     </div>
 
+                    <!-- General -->
                     <div class="tab-panel active" id="general-panel">
-                        <div class="panel">
-                            <div class="panel-body padded">
-                                <form id="event-form">
-                                    <input type="hidden" id="event-id">
-                                    <input type="hidden" id="event-status" value="draft">
+                        <form id="event-form">
+                            <input type="hidden" id="event-id">
+                            <input type="hidden" id="event-status" value="draft">
 
-                                    <div class="form-layout">
-                                    <div class="form-column">
-                                        <h3>📋 Event Details</h3>
-
-                                        <div class="form-group">
-                                            <label>Event Name *</label>
-                                            <input type="text" id="event-name" required placeholder="ACDC 2026">
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label>Description</label>
-                                            <textarea id="event-description" placeholder="Arctic Cloud Developer Challenge..." style="min-height: 100px;"></textarea>
-                                        </div>
-
-                                        <div class="form-row">
-                                            <div class="form-group">
-                                                <label>Start Date *</label>
-                                                <input type="date" id="event-start" required>
+                            <section class="panel hidden" id="status-section" aria-labelledby="status-heading">
+                                <div class="panel-header">
+                                    <div>
+                                        <h2 class="panel-title" id="status-heading"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#circle-dot"></use></svg>Event status</h2>
+                                        <p class="panel-subtitle">Move one step forward or back. The new status applies when you save the event.</p>
+                                    </div>
+                                </div>
+                                <div class="panel-body padded">
+                                    <div class="status-stepper-scroll">
+                                        <ol class="status-stepper">
+                                            <li><button type="button" class="status-step" data-status="draft"><span class="step-indicator">1</span><span class="step-label">Draft</span></button></li>
+                                            <li><button type="button" class="status-step" data-status="pre-registration"><span class="step-indicator">2</span><span class="step-label">Pre-registration</span></button></li>
+                                            <li><button type="button" class="status-step" data-status="registration"><span class="step-indicator">3</span><span class="step-label">Registration</span></button></li>
+                                            <li><button type="button" class="status-step" data-status="live"><span class="step-indicator">4</span><span class="step-label">Live</span></button></li>
+                                            <li><button type="button" class="status-step" data-status="completed"><span class="step-indicator">5</span><span class="step-label">Completed</span></button></li>
+                                        </ol>
+                                    </div>
+                                    <div class="notice status-notice" id="status-banner" aria-live="polite">
+                                        <svg class="icon" id="status-icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#square-pen"></use></svg>
+                                        <div>
+                                            <div class="notice-title-row">
+                                                <p class="notice-title" id="status-title">Draft</p>
+                                                <span class="badge badge-warning hidden" id="status-unsaved">Not saved yet</span>
                                             </div>
-                                            <div class="form-group">
-                                                <label>End Date *</label>
-                                                <input type="date" id="event-end" required>
-                                            </div>
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label>Location</label>
-                                            <input type="text" id="event-location" placeholder="Soria Moria, Oslo">
-                                        </div>
-
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label>📁 File Upload Categories</label>
-                                            <input type="text" id="event-file-categories" placeholder="e.g. Presentation, Source Code, Architecture Diagram, Demo Video">
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Comma-separated list. Teams will pick from these when uploading files.</small>
-                                        </div>
-
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label>📂 SharePoint Document Folder URL</label>
-                                            <div style="display: flex; gap: 8px; align-items: flex-start;">
-                                                <input type="url" id="event-sharepoint-url" placeholder="https://yourtenant.sharepoint.com/:f:/s/site/..." style="flex: 1;">
-                                                <button type="button" class="btn-sm" id="verify-sharepoint-btn" style="white-space: nowrap;">🔗 Verify</button>
-                                            </div>
-                                            <div id="sharepoint-verify-result" style="margin-top: 6px;"></div>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Paste the SharePoint folder URL where teams should upload documents. Use the Verify button to confirm the link works.</small>
+                                            <p class="notice-body" id="status-description">Only committee members can see this event.</p>
                                         </div>
                                     </div>
+                                </div>
+                            </section>
 
-                                    <div class="form-column">
-                                        <h3>⚙️ Registration Settings</h3>
+                            <section class="panel">
+                                <div class="panel-body padded">
+                                    <div class="event-form-layout">
+                                        <div class="form-column">
+                                            <h2 class="form-section-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#calendar-days"></use></svg>Event details</h2>
 
-                                        <div class="form-group">
-                                            <label>Registration Type *</label>
-                                            <div class="radio-group">
-                                                <label class="radio-option selected" data-value="team">
-                                                    <input type="radio" name="registration-type" value="team" checked>
-                                                    <span class="icon">👥</span>
-                                                    <div>
-                                                        <div class="label">Team</div>
-                                                        <div class="desc">Register as teams</div>
-                                                    </div>
-                                                </label>
-                                                <label class="radio-option" data-value="single">
-                                                    <input type="radio" name="registration-type" value="single">
-                                                    <span class="icon">👤</span>
-                                                    <div>
-                                                        <div class="label">Single</div>
-                                                        <div class="desc">Individual only</div>
-                                                    </div>
-                                                </label>
+                                            <div class="form-group">
+                                                <label for="event-name">Event name <span class="required" aria-hidden="true">*</span></label>
+                                                <input type="text" id="event-name" required placeholder="ACDC 2026">
                                             </div>
-                                        </div>
 
-                                        <div id="team-fields" class="team-fields visible">
+                                            <div class="form-group">
+                                                <label for="event-description">Description</label>
+                                                <textarea id="event-description" rows="4" placeholder="Arctic Cloud Developer Challenge..."></textarea>
+                                            </div>
+
                                             <div class="form-row">
                                                 <div class="form-group">
-                                                    <label>Min Team Size</label>
-                                                    <input type="number" id="min-team-size" min="1" max="10" value="3">
+                                                    <label for="event-start">Start date <span class="required" aria-hidden="true">*</span></label>
+                                                    <input type="date" id="event-start" required>
                                                 </div>
                                                 <div class="form-group">
-                                                    <label>Max Team Size</label>
-                                                    <input type="number" id="max-team-size" min="1" max="10" value="5">
+                                                    <label for="event-end">End date <span class="required" aria-hidden="true">*</span></label>
+                                                    <input type="date" id="event-end" required>
                                                 </div>
+                                            </div>
+
+                                            <div class="form-group">
+                                                <label for="event-location">Location</label>
+                                                <input type="text" id="event-location" placeholder="Soria Moria, Oslo">
+                                            </div>
+
+                                            <div class="form-group">
+                                                <label for="event-file-categories">File upload categories</label>
+                                                <input type="text" id="event-file-categories" aria-describedby="file-categories-hint" placeholder="e.g. Presentation, Source code, Architecture diagram, Demo video">
+                                                <p class="field-hint" id="file-categories-hint">Comma-separated. Teams pick one of these when they upload a file.</p>
+                                            </div>
+
+                                            <div class="form-group">
+                                                <label for="event-sharepoint-url">SharePoint document folder URL</label>
+                                                <div class="input-group input-group-wrap">
+                                                    <input type="url" id="event-sharepoint-url" aria-describedby="sharepoint-hint" placeholder="https://yourtenant.sharepoint.com/:f:/s/site/...">
+                                                    <button type="button" class="btn btn-secondary" id="verify-sharepoint-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#external-link"></use></svg>Open and verify</button>
+                                                </div>
+                                                <div id="sharepoint-verify-result" aria-live="polite"></div>
+                                                <p class="field-hint" id="sharepoint-hint">The folder where teams upload documents. Open and verify opens it in a new tab and sets up the file category column.</p>
                                             </div>
                                         </div>
 
-                                        <div class="form-group" style="margin-top: 16px;">
-                                            <label>💰 Cost Per Participant</label>
-                                            <div style="display: flex; gap: 8px; align-items: center;">
-                                                <input type="number" id="event-cost-per-participant" min="0" step="1" placeholder="e.g. 2500" style="flex: 1;">
-                                                <select id="event-currency" style="width: 90px;">
-                                                    <option value="NOK">NOK</option>
-                                                    <option value="EUR">EUR</option>
-                                                    <option value="USD">USD</option>
-                                                    <option value="GBP">GBP</option>
-                                                    <option value="SEK">SEK</option>
-                                                    <option value="DKK">DKK</option>
-                                                </select>
-                                            </div>
-                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Leave blank if participation is free. Shown to participants when they register a team.</small>
-                                        </div>
+                                        <div class="form-column">
+                                            <h2 class="form-section-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#settings"></use></svg>Registration settings</h2>
 
-                                        <details class="collapsible-section" style="margin-top: 16px;">
-                                            <summary>📧 Email Notifications<span class="expand-hint">click to expand</span></summary>
-                                            <div class="collapsible-body">
-                                                <div class="form-group">
-                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                        <input type="checkbox" id="event-team-registration-email" style="width: auto;">
-                                                        <span>📋 Send Registration Confirmation Email</span>
+                                            <fieldset class="form-group">
+                                                <legend class="form-label">Registration type <span class="required" aria-hidden="true">*</span></legend>
+                                                <div class="option-cards">
+                                                    <label class="option-card radio-option selected" data-value="team">
+                                                        <input type="radio" class="visually-hidden" name="registration-type" value="team" checked>
+                                                        <span class="option-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg>Team</span>
+                                                        <span class="option-card-desc">Participants register as teams</span>
                                                     </label>
-                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                        <strong>Confirmation email sent when a registration is created.</strong> Supports both solo and team-based registrations.
-                                                        Customize the email in <strong>Email Templates</strong> under Welcome.
-                                                    </small>
-                                                </div>
-
-                                                <div class="form-group" style="margin-top: 16px;">
-                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                        <input type="checkbox" id="event-team-welcome-email" style="width: auto;">
-                                                        <span>👋 Send Welcome Email</span>
+                                                    <label class="option-card radio-option" data-value="single">
+                                                        <input type="radio" class="visually-hidden" name="registration-type" value="single">
+                                                        <span class="option-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#user"></use></svg>Single</span>
+                                                        <span class="option-card-desc">Individual registrations only</span>
                                                     </label>
-                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                        <strong>Welcome email for new participants.</strong> When enabled, participants receive a welcome email when they are added or registered.
-                                                        Customize the email theme and text in <strong>Email Templates</strong> under Theme section.
-                                                    </small>
                                                 </div>
+                                            </fieldset>
 
-                                                <div class="form-group" style="margin-top: 16px;">
-                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                        <input type="checkbox" id="event-interest-acknowledgment" style="width: auto;">
-                                                        <span>✉️ Send Interest Acknowledgment Email</span>
-                                                    </label>
-                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                        <strong>Acknowledgment email for interest leads joining a team.</strong> When enabled, members who previously registered interest will receive an acknowledgment email when they join a team.
-                                                        Customize the email in <strong>Email Templates</strong> under the Interest template.
-                                                    </small>
-                                                </div>
-
-                                                <div class="form-group" style="margin-top: 16px;">
-                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                        <input type="checkbox" id="event-judge-invitation-email" style="width: auto;">
-                                                        <span>⚖️ Send Judge Invitation Email</span>
-                                                    </label>
-                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                        <strong>Custom invitation email for judges.</strong> When enabled, judges will receive a role-specific invitation email with customizable content.
-                                                        Customize the email in <strong>Email Templates</strong> under Judge Invite.
-                                                    </small>
-                                                </div>
-
-                                                <div class="form-group" style="margin-top: 16px;">
-                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                        <input type="checkbox" id="event-committee-invitation-email" style="width: auto;">
-                                                        <span>👔 Send Committee Invitation Email</span>
-                                                    </label>
-                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                        <strong>Custom invitation email for committee members.</strong> When enabled, committee members will receive a role-specific invitation email with customizable content.
-                                                        Customize the email in <strong>Email Templates</strong> under Committee Invite.
-                                                    </small>
-                                                </div>
-                                            </div>
-                                        </details>
-
-                                        <details class="collapsible-section" style="margin-top: 20px;">
-                                            <summary>📋 Registration Confirmation Texts<span class="expand-hint">click to expand</span></summary>
-                                            <div class="collapsible-body">
-                                                <small style="color: var(--admin-text-muted); display: block; margin-bottom: 16px; line-height: 1.5;">
-                                                    Shown in a confirmation dialog <strong>before</strong> participants proceed. HTML is supported (e.g. <code>&lt;strong&gt;</code>, <code>&lt;ul&gt;</code>, <code>&lt;li&gt;</code>). Leave blank to skip the dialog for that action.
-                                                </small>
-
-                                                <div id="team-terms-field">
-                                                    <label style="font-weight: 600; margin-bottom: 4px; display: block;">👥 Team Registration</label>
-                                                    <textarea id="event-team-registration-terms" rows="5" placeholder="e.g. By registering a team you commit to participating in the event. No-shows will be invoiced for the full participation fee of 16 500 NOK per person." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
-                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant clicks "Register a Team".</small>
-                                                </div>
-
-                                                <div style="margin-top: 16px;" id="solo-terms-field">
-                                                    <label style="font-weight: 600; margin-bottom: 4px; display: block;">🎲 Solo Queue</label>
-                                                    <textarea id="event-solo-queue-terms" rows="4" placeholder="e.g. Joining the solo queue means you're open to being matched with a team or other solo participants. There is no commitment until you are matched and accept." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
-                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant clicks "Join Solo Queue".</small>
-                                                </div>
-
-                                                <div style="margin-top: 16px;" id="single-terms-field">
-                                                    <label style="font-weight: 600; margin-bottom: 4px; display: block;">👤 Individual Registration</label>
-                                                    <textarea id="event-single-registration-terms" rows="4" placeholder="e.g. By registering individually you commit to attending the event." style="width: 100%; font-family: inherit; font-size: 0.9rem; padding: 8px; border: 1px solid var(--admin-border); border-radius: 6px; resize: vertical;"></textarea>
-                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Shown when a participant registers for a solo/individual event.</small>
-                                                </div>
-                                            </div>
-                                        </details>
-
-                                        <details class="collapsible-section" style="margin-top: 20px;">
-                                            <summary>🏨 Hotel Booking<span class="expand-hint">click to expand</span></summary>
-                                            <div class="collapsible-body">
-                                                <small style="color: var(--admin-text-muted); display: block; margin-bottom: 16px; line-height: 1.5;">
-                                                    Configure hotel booking for this event. When enabled, participants will be prompted to acknowledge their hotel nights after registering. Default nights (event nights) are pre-selected. Optional nights (day before/after) can be added by the participant.
-                                                </small>
-
-                                                <div class="form-group">
-                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                        <input type="checkbox" id="event-hotel-enabled" style="width: auto;">
-                                                        <span>🏨 Hotel is part of this event</span>
-                                                    </label>
-                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                        When enabled, participants will see a hotel booking step after team registration and a hotel status indicator on the event page.
-                                                    </small>
-                                                </div>
-
-                                                <div class="form-group" style="margin-top: 16px;" id="hotel-mandatory-field">
-                                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                                        <input type="checkbox" id="event-hotel-mandatory" style="width: auto;">
-                                                        <span>🔒 Default nights are mandatory (locked)</span>
-                                                    </label>
-                                                    <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">
-                                                        When enabled, the pre-selected event nights cannot be unchecked by participants — only admins can change them. Optional nights (day before / day after) remain freely selectable.
-                                                    </small>
-                                                </div>
-
-                                                <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--admin-border);" id="hotel-days-fields">
-                                                    <label style="font-weight: 600; display: block; margin-bottom: 12px;">📅 Booking Window</label>
-                                                    <div style="display: flex; gap: 24px; flex-wrap: wrap;">
-                                                        <div class="form-group" style="flex: 1; min-width: 140px;">
-                                                            <label for="event-hotel-days-before" style="font-size: 0.9rem;">Nights available before event</label>
-                                                            <input type="number" id="event-hotel-days-before" min="0" max="7" value="1" style="width: 80px; margin-top: 4px;">
-                                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Nights bookable before the event start date. (0 = none)</small>
-                                                        </div>
-                                                        <div class="form-group" style="flex: 1; min-width: 140px;">
-                                                            <label for="event-hotel-days-after" style="font-size: 0.9rem;">Nights available after event</label>
-                                                            <input type="number" id="event-hotel-days-after" min="0" max="7" value="1" style="width: 80px; margin-top: 4px;">
-                                                            <small style="color: var(--admin-text-muted); display: block; margin-top: 4px;">Nights bookable after the event end date. (0 = none)</small>
-                                                        </div>
+                                            <div id="team-fields" class="team-fields visible">
+                                                <div class="form-row">
+                                                    <div class="form-group">
+                                                        <label for="min-team-size">Minimum team size</label>
+                                                        <input type="number" id="min-team-size" min="1" max="10" value="3">
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="max-team-size">Maximum team size</label>
+                                                        <input type="number" id="max-team-size" min="1" max="10" value="5">
                                                     </div>
                                                 </div>
                                             </div>
-                                        </details>
 
+                                            <div class="form-group">
+                                                <label for="event-cost-per-participant">Cost per participant</label>
+                                                <div class="input-group">
+                                                    <input type="number" id="event-cost-per-participant" min="0" step="1" aria-describedby="cost-hint" placeholder="e.g. 2500">
+                                                    <select id="event-currency" aria-label="Currency">
+                                                        <option value="NOK">NOK</option>
+                                                        <option value="EUR">EUR</option>
+                                                        <option value="USD">USD</option>
+                                                        <option value="GBP">GBP</option>
+                                                        <option value="SEK">SEK</option>
+                                                        <option value="DKK">DKK</option>
+                                                    </select>
+                                                </div>
+                                                <p class="field-hint" id="cost-hint">Leave blank if participation is free. Shown to participants when they register a team.</p>
+                                            </div>
+
+                                            <details class="disclosure">
+                                                <summary>
+                                                    <svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#mail"></use></svg>
+                                                    <span class="disclosure-heading">
+                                                        <span>Email notifications</span>
+                                                        <span class="disclosure-meta" id="email-notifications-meta"></span>
+                                                    </span>
+                                                </summary>
+                                                <div class="disclosure-body">
+                                                    <div class="setting-row">
+                                                        <label class="checkbox-row" for="event-team-registration-email">
+                                                            <input type="checkbox" id="event-team-registration-email">
+                                                            <span>Send registration confirmation email</span>
+                                                        </label>
+                                                        <p class="field-hint">Sent when a solo or team registration is created. Edit the text in Email templates, under Welcome.</p>
+                                                    </div>
+                                                    <div class="setting-row">
+                                                        <label class="checkbox-row" for="event-team-welcome-email">
+                                                            <input type="checkbox" id="event-team-welcome-email">
+                                                            <span>Send welcome email</span>
+                                                        </label>
+                                                        <p class="field-hint">Sent to participants when they are added or registered. Edit the theme and text in Email templates, under Theme.</p>
+                                                    </div>
+                                                    <div class="setting-row">
+                                                        <label class="checkbox-row" for="event-interest-acknowledgment">
+                                                            <input type="checkbox" id="event-interest-acknowledgment">
+                                                            <span>Send interest acknowledgment email</span>
+                                                        </label>
+                                                        <p class="field-hint">Sent when someone who registered interest joins a team. Edit the text in Email templates, under Interest.</p>
+                                                    </div>
+                                                    <div class="setting-row">
+                                                        <label class="checkbox-row" for="event-judge-invitation-email">
+                                                            <input type="checkbox" id="event-judge-invitation-email">
+                                                            <span>Send judge invitation email</span>
+                                                        </label>
+                                                        <p class="field-hint">Judges get a role-specific invitation. Edit the text in Email templates, under Judge invite.</p>
+                                                    </div>
+                                                    <div class="setting-row">
+                                                        <label class="checkbox-row" for="event-committee-invitation-email">
+                                                            <input type="checkbox" id="event-committee-invitation-email">
+                                                            <span>Send committee invitation email</span>
+                                                        </label>
+                                                        <p class="field-hint">Committee members get a role-specific invitation. Edit the text in Email templates, under Committee invite.</p>
+                                                    </div>
+                                                </div>
+                                            </details>
+
+                                            <details class="disclosure">
+                                                <summary>
+                                                    <svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#file-text"></use></svg>
+                                                    <span class="disclosure-heading">
+                                                        <span>Registration confirmation texts</span>
+                                                        <span class="disclosure-meta" id="confirmation-texts-meta"></span>
+                                                    </span>
+                                                </summary>
+                                                <div class="disclosure-body">
+                                                    <p class="field-hint disclosure-intro">Shown in a confirmation dialog before participants continue. HTML is supported (for example <code>&lt;strong&gt;</code>, <code>&lt;ul&gt;</code>, <code>&lt;li&gt;</code>). Leave a text blank to skip the dialog for that action.</p>
+
+                                                    <div class="form-group" id="team-terms-field">
+                                                        <label for="event-team-registration-terms">Team registration</label>
+                                                        <textarea id="event-team-registration-terms" rows="5" aria-describedby="team-terms-hint" placeholder="e.g. By registering a team you commit to participating in the event. No-shows will be invoiced for the full participation fee of 16 500 NOK per person."></textarea>
+                                                        <p class="field-hint" id="team-terms-hint">Shown before a participant registers a team.</p>
+                                                    </div>
+
+                                                    <div class="form-group" id="solo-terms-field">
+                                                        <label for="event-solo-queue-terms">Solo queue</label>
+                                                        <textarea id="event-solo-queue-terms" rows="4" aria-describedby="solo-terms-hint" placeholder="e.g. Joining the solo queue means you're open to being matched with a team or other solo participants. There is no commitment until you are matched and accept."></textarea>
+                                                        <p class="field-hint" id="solo-terms-hint">Shown before a participant joins the solo queue.</p>
+                                                    </div>
+
+                                                    <div class="form-group" id="single-terms-field">
+                                                        <label for="event-single-registration-terms">Individual registration</label>
+                                                        <textarea id="event-single-registration-terms" rows="4" aria-describedby="single-terms-hint" placeholder="e.g. By registering individually you commit to attending the event."></textarea>
+                                                        <p class="field-hint" id="single-terms-hint">Shown before a participant registers for an individual event.</p>
+                                                    </div>
+                                                </div>
+                                            </details>
+
+                                            <details class="disclosure">
+                                                <summary>
+                                                    <svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bed-double"></use></svg>
+                                                    <span class="disclosure-heading">
+                                                        <span>Hotel booking</span>
+                                                        <span class="disclosure-meta" id="hotel-booking-meta"></span>
+                                                    </span>
+                                                </summary>
+                                                <div class="disclosure-body">
+                                                    <p class="field-hint disclosure-intro">When hotel is part of the event, participants confirm their hotel nights after registering. The event nights are preselected; participants can add the optional nights before and after.</p>
+
+                                                    <div class="setting-row">
+                                                        <label class="checkbox-row" for="event-hotel-enabled">
+                                                            <input type="checkbox" id="event-hotel-enabled">
+                                                            <span>Hotel is part of this event</span>
+                                                        </label>
+                                                        <p class="field-hint">Participants see a hotel step after team registration and a hotel status on the event page.</p>
+                                                    </div>
+
+                                                    <div class="setting-row" id="hotel-mandatory-field">
+                                                        <label class="checkbox-row" for="event-hotel-mandatory">
+                                                            <input type="checkbox" id="event-hotel-mandatory">
+                                                            <span>Event nights are mandatory</span>
+                                                        </label>
+                                                        <p class="field-hint">Participants cannot untick the preselected event nights; only admins can change them. Optional nights stay selectable.</p>
+                                                    </div>
+
+                                                    <div class="setting-row" id="hotel-days-fields">
+                                                        <p class="form-label">Booking window</p>
+                                                        <div class="form-row">
+                                                            <div class="form-group">
+                                                                <label for="event-hotel-days-before">Nights before the event</label>
+                                                                <input type="number" class="input-narrow" id="event-hotel-days-before" min="0" max="7" value="1" aria-describedby="days-before-hint">
+                                                                <p class="field-hint" id="days-before-hint">Bookable before the start date. 0 = none.</p>
+                                                            </div>
+                                                            <div class="form-group">
+                                                                <label for="event-hotel-days-after">Nights after the event</label>
+                                                                <input type="number" class="input-narrow" id="event-hotel-days-after" min="0" max="7" value="1" aria-describedby="days-after-hint">
+                                                                <p class="field-hint" id="days-after-hint">Bookable after the end date. 0 = none.</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </details>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn btn-primary" id="save-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#save"></use></svg>Create event</button>
+                                        <button type="button" class="btn btn-ghost" id="cancel-btn">Cancel</button>
+                                        <button type="button" class="btn btn-danger-ghost push-end hidden" id="delete-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#trash-2"></use></svg>Delete event</button>
                                     </div>
                                 </div>
-
-                                <div class="form-actions">
-                                    <button type="submit" class="btn-sm primary" id="save-btn">💾 Save Event</button>
-                                    <button type="button" class="btn-sm" id="cancel-btn">Cancel</button>
-                                    <button type="button" class="btn-sm danger hidden" id="delete-btn" style="margin-left: auto;">🗑️ Delete Event</button>
-                                </div>
-                            </form>
-                        </div>
+                            </section>
+                        </form>
                     </div>
-                </div>
 
-                <div class="tab-panel" id="committee-panel">
-                    <div class="panel">
-                        <div class="panel-body padded">
-                            <div class="invite-section">
-                                <h3>👔 Committee Members</h3>
-                                <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 16px;">
-                                    Invite committee members to the event. They will receive an invitation to register.
-                                </p>
-
-                                <div class="invite-form">
-                                    <div class="form-group">
-                                        <label>Email Address</label>
-                                        <input type="email" id="committee-email" placeholder="name@example.com">
-                                    </div>
-                                    <button type="button" id="invite-committee-btn" class="btn-sm primary">✉️ Send Invitation</button>
-                                </div>
-
-                                <div class="members-list">
-                                    <table class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Name</th>
-                                                <th>Email</th>
-                                                <th>Status</th>
-                                                <th>Registered</th>
-                                                <th></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="committee-members-body">
-                                            <tr><td colspan="5" class="empty-state">No committee members yet</td></tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-panel" id="judges-panel">
-                    <div class="panel">
-                        <div class="panel-body padded">
-                            <div class="invite-section">
-                                <h3>⚖️ Judges</h3>
-                                <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 16px;">
-                                    Invite judges to the event. They will receive an invitation to register.
-                                </p>
-
-                                <div class="invite-form">
-                                    <div class="form-group">
-                                        <label>Email Address</label>
-                                        <input type="email" id="judge-email" placeholder="name@example.com">
-                                    </div>
-                                    <button type="button" id="invite-judge-btn" class="btn-sm primary">✉️ Send Invitation</button>
-                                </div>
-
-                                <div class="members-list">
-                                    <table class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Name</th>
-                                                <th>Email</th>
-                                                <th>Status</th>
-                                                <th>Registered</th>
-                                                <th></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="judges-members-body">
-                                            <tr><td colspan="5" class="empty-state">No judges yet</td></tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-panel" id="leads-panel">
-                    <div class="panel">
-                        <div class="panel-body padded">
-                            <div class="invite-section">
-                                <h3>📧 Interest Leads</h3>
-                                <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 16px;">
-                                    People who registered their interest in this event.
-                                </p>
-
-                                <div class="members-list">
-                                    <table class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Name</th>
-                                                <th>Email</th>
-                                                <th>Registered</th>
-                                                <th>Status</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="leads-table-body">
-                                            <tr><td colspan="6" class="empty-state">No interest leads yet</td></tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-panel" id="sponsors-panel">
-                    <div class="panel">
-                        <div class="panel-body padded">
-                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
+                    <!-- Committee -->
+                    <div class="tab-panel" id="committee-panel">
+                        <section class="panel">
+                            <div class="panel-header">
                                 <div>
-                                    <h3 style="margin: 0 0 6px 0;">💼 Sponsor Pipeline</h3>
-                                    <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin: 0;">
-                                        Keep sponsor outreach organized for this event. Track contacts, deal amount, status, and notes in one list.
-                                    </p>
+                                    <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#landmark"></use></svg>Committee members</h2>
+                                    <p class="panel-subtitle">Invite committee members to this event. They get an email invitation to register.</p>
                                 </div>
-                                <button type="button" id="open-sponsor-modal-btn" class="btn-sm primary">➕ Add New Sponsor</button>
                             </div>
-
-                            <div class="members-list">
+                            <div class="panel-body padded">
+                                <div class="invite-form">
+                                    <div class="form-group">
+                                        <label for="committee-email">Email address</label>
+                                        <input type="email" id="committee-email" placeholder="name@example.com" autocomplete="off">
+                                    </div>
+                                    <button type="button" id="invite-committee-btn" class="btn btn-primary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#send"></use></svg>Send invitation</button>
+                                </div>
+                            </div>
+                            <div class="panel-body">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
-                                            <th>Company</th>
-                                            <th>Contact &amp; Details</th>
-                                            <th>Amount</th>
-                                            <th>Status</th>
-                                            <th></th>
+                                            <th scope="col">Name</th>
+                                            <th scope="col">Email</th>
+                                            <th scope="col">Status</th>
+                                            <th scope="col">Registered</th>
+                                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="committee-members-body">
+                                        <tr><td colspan="5" class="empty-state">No committee members yet</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Judges -->
+                    <div class="tab-panel" id="judges-panel">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#scale"></use></svg>Judges</h2>
+                                    <p class="panel-subtitle">Invite judges to this event. They get an email invitation to register.</p>
+                                </div>
+                            </div>
+                            <div class="panel-body padded">
+                                <div class="invite-form">
+                                    <div class="form-group">
+                                        <label for="judge-email">Email address</label>
+                                        <input type="email" id="judge-email" placeholder="name@example.com" autocomplete="off">
+                                    </div>
+                                    <button type="button" id="invite-judge-btn" class="btn btn-primary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#send"></use></svg>Send invitation</button>
+                                </div>
+                            </div>
+                            <div class="panel-body">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Name</th>
+                                            <th scope="col">Email</th>
+                                            <th scope="col">Status</th>
+                                            <th scope="col">Registered</th>
+                                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="judges-members-body">
+                                        <tr><td colspan="5" class="empty-state">No judges yet</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Interest leads -->
+                    <div class="tab-panel" id="leads-panel">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bell"></use></svg>Interest leads</h2>
+                                    <p class="panel-subtitle">People who registered interest in this event, and whether they have joined since.</p>
+                                </div>
+                            </div>
+                            <div class="panel-body">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Name</th>
+                                            <th scope="col">Email</th>
+                                            <th scope="col">Registered</th>
+                                            <th scope="col">Status</th>
+                                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="leads-table-body">
+                                        <tr><td colspan="5" class="empty-state">No interest leads yet</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Sponsors -->
+                    <div class="tab-panel" id="sponsors-panel">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#handshake"></use></svg>Sponsors</h2>
+                                    <p class="panel-subtitle">Track sponsor outreach for this event: contacts, amount, status and notes.</p>
+                                </div>
+                                <button type="button" id="open-sponsor-modal-btn" class="btn btn-primary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#plus"></use></svg>Add sponsor</button>
+                            </div>
+                            <div class="panel-body">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Company</th>
+                                            <th scope="col">Contact and notes</th>
+                                            <th scope="col" class="cell-num">Amount</th>
+                                            <th scope="col">Status</th>
+                                            <th scope="col"><span class="visually-hidden">Actions</span></th>
                                         </tr>
                                     </thead>
                                     <tbody id="sponsors-table-body">
@@ -1130,266 +475,270 @@
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
+                        </section>
                     </div>
-                </div>
 
-                <div class="tab-panel" id="budget-panel">
-                    <div class="panel">
-                        <div class="panel-body padded">
-
-                            <div id="budget-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px;">
-                                <div class="budget-card income">
-                                    <div class="budget-card-label">Total Income</div>
-                                    <div class="budget-card-value" id="budget-total-income">—</div>
-                                    <div class="budget-card-hint">Sponsorships + registrations</div>
-                                </div>
-                                <div class="budget-card expense">
-                                    <div class="budget-card-label">Org Expenses</div>
-                                    <div class="budget-card-value" id="budget-total-org-expense">—</div>
-                                    <div class="budget-card-hint">Venue, activities, shared costs</div>
-                                </div>
-                                <div class="budget-card participant">
-                                    <div class="budget-card-label">Participant Expenses</div>
-                                    <div class="budget-card-value" id="budget-total-participant-expense">—</div>
-                                    <div class="budget-card-hint">Hotel + food across all participants</div>
-                                </div>
-                                <div class="budget-card net" id="budget-net-card">
-                                    <div class="budget-card-label">Net Balance</div>
-                                    <div class="budget-card-value" id="budget-net-balance">—</div>
-                                    <div class="budget-card-hint">Income − all expenses</div>
+                    <!-- Budget -->
+                    <div class="tab-panel" id="budget-panel">
+                        <div id="budget-summary" class="budget-summary">
+                            <div class="stat-card">
+                                <div class="stat-icon tone-success"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#coins"></use></svg></div>
+                                <div>
+                                    <div class="stat-value" id="budget-total-income">—</div>
+                                    <div class="stat-label">Total income</div>
+                                    <div class="stat-hint">Sponsorships and registrations</div>
                                 </div>
                             </div>
+                            <div class="stat-card">
+                                <div class="stat-icon tone-info"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#building-2"></use></svg></div>
+                                <div>
+                                    <div class="stat-value" id="budget-total-org-expense">—</div>
+                                    <div class="stat-label">Organisation expenses</div>
+                                    <div class="stat-hint">Venue, activities, shared costs</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon tone-violet"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bed-double"></use></svg></div>
+                                <div>
+                                    <div class="stat-value" id="budget-total-participant-expense">—</div>
+                                    <div class="stat-label">Participant expenses</div>
+                                    <div class="stat-hint">Hotel and food for all participants</div>
+                                </div>
+                            </div>
+                            <div class="stat-card budget-net" id="budget-net-card">
+                                <div class="stat-icon tone-accent"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#wallet"></use></svg></div>
+                                <div>
+                                    <div class="stat-value" id="budget-net-balance">—</div>
+                                    <div class="stat-label">Net balance</div>
+                                    <div class="stat-hint">Income minus all expenses</div>
+                                </div>
+                            </div>
+                        </div>
 
-                            <div class="panel" style="margin-bottom: 20px; background: var(--admin-bg-secondary); border: 1px solid var(--admin-border);">
-                                <div class="panel-body padded" style="padding: 16px 20px;">
-                                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-                                        <h4 style="margin:0; font-size:0.9rem; font-weight:600; color:var(--admin-text);">⚙️ Event Rates</h4>
-                                        <button type="button" class="btn-sm primary" id="save-rates-btn" style="white-space:nowrap;">💾 Save Rates</button>
-                                    </div>
-                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                                        <div style="background:var(--admin-bg); border:1px solid var(--admin-border); border-left:3px solid #6c8ebf; border-radius:6px; padding:14px 16px;">
-                                            <div style="font-size:0.8rem; font-weight:700; color:#6c8ebf; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:12px;">🏨 Hotel</div>
-                                            <div style="display:grid; grid-template-columns:1fr auto 80px; gap:8px; align-items:end;">
-                                                <div class="form-group" style="margin:0;">
-                                                    <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Rate per night</label>
-                                                    <input type="number" id="budget-hotel-rate" min="0" step="1" placeholder="e.g. 1500">
-                                                </div>
-                                                <span style="padding-bottom:9px; color:var(--admin-text-muted); font-weight:600; font-size:1rem;">×</span>
-                                                <div class="form-group" style="margin:0;">
-                                                    <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Default nights</label>
-                                                    <input type="number" id="budget-hotel-nights" min="0" step="1" placeholder="e.g. 3">
-                                                </div>
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#settings"></use></svg>Event rates</h2>
+                                    <p class="panel-subtitle">Per-person rates used when the hotel and food rows are recalculated.</p>
+                                </div>
+                                <button type="button" class="btn btn-secondary" id="save-rates-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#save"></use></svg>Save rates</button>
+                            </div>
+                            <div class="panel-body padded">
+                                <div class="rates-grid">
+                                    <div class="rate-card">
+                                        <h3 class="rate-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bed-double"></use></svg>Hotel</h3>
+                                        <div class="rate-formula">
+                                            <div class="form-group">
+                                                <label for="budget-hotel-rate">Rate per night</label>
+                                                <input type="number" id="budget-hotel-rate" min="0" step="1" placeholder="e.g. 1500">
                                             </div>
-                                            <div id="hotel-rate-preview" style="margin-top:8px; font-size:0.82rem; font-weight:600; color:#6c8ebf; min-height:18px;"></div>
-                                        </div>
-                                        <div style="background:var(--admin-bg); border:1px solid var(--admin-border); border-left:3px solid #82b97e; border-radius:6px; padding:14px 16px;">
-                                            <div style="font-size:0.8rem; font-weight:700; color:#82b97e; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:12px;">🍽️ Meals</div>
-                                            <div style="display:grid; grid-template-columns:1fr auto 80px; gap:8px; align-items:end;">
-                                                <div class="form-group" style="margin:0;">
-                                                    <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Rate per day</label>
-                                                    <input type="number" id="budget-food-rate" min="0" step="1" placeholder="e.g. 800">
-                                                </div>
-                                                <span style="padding-bottom:9px; color:var(--admin-text-muted); font-weight:600; font-size:1rem;">×</span>
-                                                <div class="form-group" style="margin:0;">
-                                                    <label style="font-size:0.73rem; color:var(--admin-text-muted); margin-bottom:3px;">Days</label>
-                                                    <input type="number" id="budget-food-days" min="0" step="1" placeholder="e.g. 3">
-                                                </div>
+                                            <span class="rate-times" aria-hidden="true">×</span>
+                                            <div class="form-group">
+                                                <label for="budget-hotel-nights">Default nights</label>
+                                                <input type="number" id="budget-hotel-nights" min="0" step="1" placeholder="e.g. 3">
                                             </div>
-                                            <div id="food-rate-preview" style="margin-top:8px; font-size:0.82rem; font-weight:600; color:#82b97e; min-height:18px;"></div>
                                         </div>
+                                        <p class="rate-preview" id="hotel-rate-preview" aria-live="polite"></p>
                                     </div>
-                                    <p style="font-size:0.75rem; color:var(--admin-text-muted); margin:12px 0 0 0;">Rates apply to the per-person hotel and food rows when you click Recalculate. Hotel rows use each participant's selected nights; the default-nights field only drives the preview above.</p>
+                                    <div class="rate-card">
+                                        <h3 class="rate-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#utensils"></use></svg>Meals</h3>
+                                        <div class="rate-formula">
+                                            <div class="form-group">
+                                                <label for="budget-food-rate">Rate per day</label>
+                                                <input type="number" id="budget-food-rate" min="0" step="1" placeholder="e.g. 800">
+                                            </div>
+                                            <span class="rate-times" aria-hidden="true">×</span>
+                                            <div class="form-group">
+                                                <label for="budget-food-days">Days</label>
+                                                <input type="number" id="budget-food-days" min="0" step="1" placeholder="e.g. 3">
+                                            </div>
+                                        </div>
+                                        <p class="rate-preview" id="food-rate-preview" aria-live="polite"></p>
+                                    </div>
+                                </div>
+                                <p class="field-hint rates-hint">Save the rates, then recalculate the rows below. Hotel rows use each participant's selected nights; Default nights only drives the preview above.</p>
+                            </div>
+                        </section>
+
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#list"></use></svg>Financial rows</h2>
+                                    <p class="panel-subtitle">Manual income and expenses, plus rows generated per participant.</p>
+                                </div>
+                                <div class="page-header-actions">
+                                    <button type="button" class="btn btn-secondary" id="recalculate-btn" title="Regenerate the hotel and food rows for all participants from the current rates"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#refresh-cw"></use></svg>Recalculate rows</button>
+                                    <button type="button" class="btn btn-primary" id="open-financial-modal-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#plus"></use></svg>Add row</button>
                                 </div>
                             </div>
-
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                <h3 style="margin: 0;">📋 Financial Rows</h3>
-                                <div style="display: flex; gap: 8px;">
-                                    <button type="button" class="btn-sm" id="recalculate-btn" title="Re-generate hotel and food rows for all participants based on current rates">♻️ Recalculate</button>
-                                    <button type="button" class="btn-sm primary" id="open-financial-modal-btn">➕ Add Row</button>
-                                </div>
-                            </div>
-
-                            <div class="members-list">
+                            <div class="panel-body">
                                 <table class="data-table" id="budget-table">
                                     <thead>
                                         <tr>
-                                            <th>Type</th>
-                                            <th>Category</th>
-                                            <th>Description</th>
-                                            <th>Amount</th>
-                                            <th>Paid By</th>
-                                            <th></th>
+                                            <th scope="col">Type</th>
+                                            <th scope="col">Category</th>
+                                            <th scope="col">Description</th>
+                                            <th scope="col" class="cell-num">Amount</th>
+                                            <th scope="col">Paid by</th>
+                                            <th scope="col"><span class="visually-hidden">Actions</span></th>
                                         </tr>
                                     </thead>
                                     <tbody id="budget-table-body">
-                                        <tr><td colspan="6" class="empty-state">Save the event first to manage budget</td></tr>
+                                        <tr><td colspan="6" class="empty-state">Save the event first to manage the budget</td></tr>
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
+                        </section>
                     </div>
-                </div>
 
-                <div class="tab-panel" id="teams-panel">
-                    <div class="panel">
-                        <div class="panel-body padded">
-                            <div class="invite-section">
-                                <h3>👥 Registered Teams</h3>
-                                <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin-bottom: 16px;">
-                                    Teams registered for this event. Navigate to the Teams section in the left menu for full details.
-                                </p>
-
-                                <div class="members-list">
-                                    <table class="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Team Name</th>
-                                                <th>Admin</th>
-                                                <th>Members</th>
-                                                <th>Created</th>
-                                                <th></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="teams-table-body">
-                                            <tr><td colspan="5" class="empty-state">No teams registered yet</td></tr>
-                                        </tbody>
-                                    </table>
+                    <!-- Teams -->
+                    <div class="tab-panel" id="teams-panel">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg>Registered teams</h2>
+                                    <p class="panel-subtitle">Teams registered for this event. Open a team for its members and details.</p>
                                 </div>
                             </div>
-                        </div>
+                            <div class="panel-body">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Team</th>
+                                            <th scope="col">Admin</th>
+                                            <th scope="col">Members</th>
+                                            <th scope="col">Created</th>
+                                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="teams-table-body">
+                                        <tr><td colspan="5" class="empty-state">No teams registered yet</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
                     </div>
-                </div>
 
-                <div class="tab-panel" id="sequence-panel">
-                    <div id="sequence-list-view">
-                        <div class="panel">
-                            <div class="panel-body padded">
-                                <div id="no-sequence-state">
-                                    <div style="text-align: center; padding: 40px 20px;">
-                                        <div style="font-size: 3rem; margin-bottom: 16px;">📧</div>
-                                        <h3 style="margin: 0 0 8px 0; color: var(--admin-sidebar);">No Email Sequence Yet</h3>
-                                        <p style="color: var(--admin-text-muted); margin-bottom: 24px;">
-                                            Create an email sequence to send automated emails to interest leads for this event.
-                                        </p>
-                                        <button type="button" id="create-sequence-btn" class="btn-sm primary">
-                                            ✉️ Create Email Sequence
-                                        </button>
-                                    </div>
+                    <!-- Email sequence -->
+                    <div class="tab-panel" id="sequence-panel">
+                        <div id="sequence-list-view">
+                            <section class="panel" id="no-sequence-state">
+                                <div class="empty-state">
+                                    <span class="empty-state-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#mail"></use></svg></span>
+                                    <h2 class="empty-state-title">No email sequence yet</h2>
+                                    <p>Create an email sequence to send automated emails to interest leads for this event.</p>
+                                    <button type="button" id="create-sequence-btn" class="btn btn-primary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#plus"></use></svg>Create email sequence</button>
                                 </div>
+                            </section>
 
-                                <div id="sequence-exists-state" style="display: none;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <div id="sequence-exists-state" class="hidden">
+                                <section class="panel">
+                                    <div class="panel-header">
                                         <div>
-                                            <h3 style="margin: 0 0 4px 0; color: var(--admin-sidebar);">📧 Email Sequence</h3>
-                                            <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin: 0;">
-                                                Manage automated emails sent to verified interest leads
-                                            </p>
+                                            <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#mail"></use></svg>Email sequence</h2>
+                                            <p class="panel-subtitle">Automated emails sent to verified interest leads, in this order.</p>
                                         </div>
-                                        <button type="button" id="add-sequence-email-btn" class="btn-sm primary">
-                                            ➕ Add Email
-                                        </button>
+                                        <button type="button" id="add-sequence-email-btn" class="btn btn-primary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#plus"></use></svg>Add email</button>
                                     </div>
+                                    <div class="panel-body" id="sequence-emails-list"></div>
+                                </section>
 
-                                    <div id="sequence-emails-list"></div>
-
-                                    <div id="recipient-delivery-overview" style="margin-top: 40px; display: none;">
-                                        <div style="border-top: 2px solid var(--admin-border); padding-top: 24px;">
-                                            <h3 style="margin: 0 0 12px 0; color: var(--admin-sidebar);">📊 Recipient Delivery Overview</h3>
-                                            <p style="color: var(--admin-text-muted); font-size: 0.85rem; margin: 0 0 16px 0;">
-                                                Track which recipients have received each email in the sequence
-                                            </p>
-                                            <div class="table-container">
-                                                <table class="data-table">
-                                                    <thead id="recipient-overview-header">
-                                                        <tr>
-                                                            <th>Recipient</th>
-                                                            <th>Total</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody id="recipient-overview-body">
-                                                        <tr><td colspan="2" style="text-align: center; padding: 20px; color: var(--admin-text-muted);">Loading...</td></tr>
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                <section class="panel hidden" id="recipient-delivery-overview">
+                                    <div class="panel-header">
+                                        <div>
+                                            <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#chart-bar"></use></svg>Delivery by recipient</h2>
+                                            <p class="panel-subtitle">Which recipients have received each email in the sequence.</p>
                                         </div>
                                     </div>
-                                </div>
+                                    <div class="panel-body">
+                                        <table class="data-table delivery-table">
+                                            <thead id="recipient-overview-header">
+                                                <tr>
+                                                    <th scope="col">Recipient</th>
+                                                    <th scope="col" class="cell-center">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="recipient-overview-body">
+                                                <tr><td colspan="2" class="empty-state">Loading...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </section>
                             </div>
                         </div>
                     </div>
                 </div>
-
             </div>
         </main>
     </div>
 
     <div id="not-committee" class="access-denied hidden">
-        <h2>⛔ Access Denied</h2>
-        <p style="color: var(--admin-text-muted);">You do not have committee access.</p>
-        <a href="events.html" class="btn-sm primary">Go to Events</a>
+        <h2>Access denied</h2>
+        <p class="page-subtitle">You do not have committee member access.</p>
+        <p><a href="events.html" class="btn-sm primary">Go to events</a></p>
     </div>
 
-    <div id="create-sequence-modal" class="modal">
-        <div class="modal-content">
+    <div id="create-sequence-modal" class="modal-overlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="create-sequence-title">
             <div class="modal-header">
-                <h3>📧 Create Email Sequence</h3>
+                <h2 id="create-sequence-title">Create email sequence</h2>
+                <button type="button" class="modal-close" data-close-modal="create-sequence-modal" aria-label="Close"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#x"></use></svg></button>
             </div>
             <div class="modal-body">
-                <div class="form-group">
-                    <label style="display: block; margin-bottom: 16px; padding: 16px; border: 2px solid var(--admin-border); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
-                        <input type="radio" name="sequence-create-option" value="scratch" checked style="position: absolute; opacity: 0; pointer-events: none;">
-                        <span style="font-weight: 500; font-size: 1rem;">✨ Start from scratch</span>
-                        <div style="color: var(--admin-text-muted); font-size: 0.85rem; margin-top: 4px;">Create a new empty sequence</div>
-                    </label>
-
-                    <label style="display: block; padding: 16px; border: 2px solid var(--admin-border); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
-                        <input type="radio" name="sequence-create-option" value="copy" style="position: absolute; opacity: 0; pointer-events: none;">
-                        <span style="font-weight: 500; font-size: 1rem;">📋 Copy from another event</span>
-                        <div style="color: var(--admin-text-muted); font-size: 0.85rem; margin-top: 4px;">Duplicate an existing sequence</div>
-                    </label>
-                </div>
-
-                <div id="copy-from-event-section" style="display: none; margin-top: 16px; padding: 16px; background: var(--admin-bg-secondary); border-radius: 8px;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Select Event</label>
-                        <select id="copy-from-event-select" style="width: 100%;">
-                            <option value="">Loading events...</option>
-                        </select>
+                <fieldset class="form-group">
+                    <legend class="visually-hidden">How to start the sequence</legend>
+                    <div class="option-cards">
+                        <label class="option-card">
+                            <input type="radio" class="visually-hidden" name="sequence-create-option" value="scratch" checked>
+                            <span class="option-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#sparkles"></use></svg>Start from scratch</span>
+                            <span class="option-card-desc">Create a new, empty sequence</span>
+                        </label>
+                        <label class="option-card">
+                            <input type="radio" class="visually-hidden" name="sequence-create-option" value="copy">
+                            <span class="option-card-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#copy"></use></svg>Copy from another event</span>
+                            <span class="option-card-desc">Duplicate an existing sequence</span>
+                        </label>
                     </div>
+                </fieldset>
+
+                <div id="copy-from-event-section" class="form-group hidden">
+                    <label for="copy-from-event-select">Event to copy from</label>
+                    <select id="copy-from-event-select">
+                        <option value="">Loading events...</option>
+                    </select>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn-sm" id="close-create-sequence-btn">Cancel</button>
-                <button type="button" class="btn-sm primary" id="confirm-create-sequence-btn">Create Sequence</button>
+                <button type="button" class="btn btn-ghost" id="close-create-sequence-btn">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirm-create-sequence-btn">Create sequence</button>
             </div>
         </div>
     </div>
 
-    <div id="sponsor-modal" class="modal">
-        <div class="modal-content">
+    <div id="sponsor-modal" class="modal-overlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sponsor-modal-title">
             <div class="modal-header">
-                <h3 id="sponsor-modal-title">➕ Add Sponsor</h3>
+                <h2 id="sponsor-modal-title">Add sponsor</h2>
+                <button type="button" class="modal-close" data-close-modal="sponsor-modal" aria-label="Close"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#x"></use></svg></button>
             </div>
             <form id="sponsor-form">
                 <input type="hidden" id="sponsor-id">
                 <div class="modal-body">
-                    <div class="sponsor-grid">
+                    <div class="modal-grid">
                         <div class="form-group">
-                            <label for="sponsor-company-name">Company Name *</label>
+                            <label for="sponsor-company-name">Company name <span class="required" aria-hidden="true">*</span></label>
                             <input type="text" id="sponsor-company-name" required placeholder="Contoso">
                         </div>
                         <div class="form-group">
-                            <label for="sponsor-contact-person">Contact Person</label>
+                            <label for="sponsor-contact-person">Contact person</label>
                             <input type="text" id="sponsor-contact-person" placeholder="Jane Doe">
                         </div>
                         <div class="form-group">
-                            <label for="sponsor-phone-number">Phone Number</label>
-                            <input type="text" id="sponsor-phone-number" placeholder="+47 ...">
+                            <label for="sponsor-phone-number">Phone number</label>
+                            <input type="tel" id="sponsor-phone-number" placeholder="+47 ...">
                         </div>
                         <div class="form-group">
-                            <label for="sponsor-email">E-mail</label>
+                            <label for="sponsor-email">Email</label>
                             <input type="email" id="sponsor-email" placeholder="sponsor@company.com">
                         </div>
                         <div class="form-group">
@@ -1412,31 +761,32 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn-sm" id="close-sponsor-modal-btn">Cancel</button>
-                    <button type="submit" id="save-sponsor-btn" class="btn-sm primary">➕ Add Sponsor</button>
+                    <button type="button" class="btn btn-ghost" id="close-sponsor-modal-btn">Cancel</button>
+                    <button type="submit" id="save-sponsor-btn" class="btn btn-primary">Add sponsor</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="financial-modal" class="modal">
-        <div class="modal-content">
+    <div id="financial-modal" class="modal-overlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="financial-modal-title">
             <div class="modal-header">
-                <h3 id="financial-modal-title">➕ Add Financial Row</h3>
+                <h2 id="financial-modal-title">Add financial row</h2>
+                <button type="button" class="modal-close" data-close-modal="financial-modal" aria-label="Close"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#x"></use></svg></button>
             </div>
             <form id="financial-form">
                 <input type="hidden" id="financial-id">
                 <div class="modal-body">
-                    <div class="sponsor-grid">
+                    <div class="modal-grid">
                         <div class="form-group">
-                            <label for="financial-type">Type *</label>
+                            <label for="financial-type">Type <span class="required" aria-hidden="true">*</span></label>
                             <select id="financial-type">
                                 <option value="expense">Expense</option>
                                 <option value="income">Income</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="financial-category">Category *</label>
+                            <label for="financial-category">Category <span class="required" aria-hidden="true">*</span></label>
                             <select id="financial-category">
                                 <option value="venue">Venue</option>
                                 <option value="food">Food</option>
@@ -1448,17 +798,17 @@
                             </select>
                         </div>
                         <div class="form-group full-width">
-                            <label for="financial-description">Description *</label>
+                            <label for="financial-description">Description <span class="required" aria-hidden="true">*</span></label>
                             <input type="text" id="financial-description" required placeholder="e.g. Stage rental, Prize money">
                         </div>
                         <div class="form-group">
-                            <label for="financial-amount">Amount *</label>
+                            <label for="financial-amount">Amount <span class="required" aria-hidden="true">*</span></label>
                             <input type="number" id="financial-amount" required min="0" step="0.01" placeholder="25000">
                         </div>
                         <div class="form-group" id="financial-paidby-group">
-                            <label for="financial-paid-by">Paid By</label>
+                            <label for="financial-paid-by">Paid by</label>
                             <select id="financial-paid-by">
-                                <option value="event">Event (org cost)</option>
+                                <option value="event">Event (organisation cost)</option>
                                 <option value="participant">Participant</option>
                             </select>
                         </div>
@@ -1469,8 +819,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn-sm" id="close-financial-modal-btn">Cancel</button>
-                    <button type="submit" id="save-financial-btn" class="btn-sm primary">➕ Add Row</button>
+                    <button type="button" class="btn btn-ghost" id="close-financial-modal-btn">Cancel</button>
+                    <button type="submit" id="save-financial-btn" class="btn btn-primary">Add row</button>
                 </div>
             </form>
         </div>
@@ -1485,5 +835,3 @@
     <script src="js/admin-events.js"></script>
 </body>
 </html>
-
-

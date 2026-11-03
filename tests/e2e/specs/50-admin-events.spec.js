@@ -54,7 +54,7 @@ test('admin advances an event one status step at a time', async ({ page, harness
     await page.locator('.status-step[data-status="registration"]').click();
     await expect.poll(() => dialogs.last()?.message).toContain('one step at a time');
     await page.locator('.status-step[data-status="pre-registration"]').click();
-    await expect(page.locator('#status-title')).toHaveText('Pre-Registration');
+    await expect(page.locator('#status-title')).toHaveText('Pre-registration');
     await page.locator('#save-btn').click();
     await expect.poll(async () => (await rows('SELECT Status FROM Events WHERE Id = @id', { id: draft.id }))[0].Status).toBe('pre-registration');
 });
@@ -102,7 +102,7 @@ test('admin records, edits and deletes a sponsor', async ({ page, harness, login
     await page.locator('#sponsors-table-body select.sponsor-status-select').selectOption('confirmed');
     await expect.poll(async () => (await rows('SELECT SponsorStatus s FROM EventFinancials WHERE Id = @id', { id: row.Id }))[0].s).toBe('confirmed');
 
-    await page.locator('#sponsors-table-body button', { hasText: '🗑️' }).click();
+    await page.locator('#sponsors-table-body button[data-action="delete-sponsor"]').click();
     await expect.poll(() => dialogs.last()?.message).toBe('Delete this sponsor entry?');
     await expect(page.locator('#sponsors-table-body')).not.toContainText('Contoso');
 });
@@ -144,7 +144,7 @@ test('admin starts an event sequence from scratch', async ({ page, harness, logi
     const w = await openAdminEvents(page, harness, loginAs);
     await page.goto(`/admin-events.html?event=${w.event.id}&tab=sequence`);
     await page.locator('#create-sequence-btn').click();
-    await page.getByText('✨ Start from scratch').click();
+    await page.getByText('Start from scratch').click();
     await page.locator('#create-sequence-modal').getByRole('button', { name: 'Create Sequence' }).click();
     await expect(page.locator('#sequence-exists-state')).toBeVisible();
     const [e] = await rows('SELECT SequenceId, SequenceEnabled FROM Events WHERE Id = @id', { id: w.event.id });
@@ -169,7 +169,7 @@ test('copying a sequence from another event works', async ({ page, harness, logi
     const w = await openAdminEvents(page, harness, loginAs, { sequences: [seq], events: [source] });
     await page.goto(`/admin-events.html?event=${w.event.id}&tab=sequence`);
     await page.locator('#create-sequence-btn').click();
-    await page.getByText('📋 Copy from another event').click();
+    await page.getByText('Copy from another event').click();
     await page.locator('#copy-from-event-select').selectOption(source.id);
     await page.locator('#create-sequence-modal').getByRole('button', { name: 'Create Sequence' }).click();
     await expect(page.locator('#sequence-exists-state')).toBeVisible({ timeout: 4000 });

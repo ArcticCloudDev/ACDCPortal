@@ -155,3 +155,19 @@ Headings use `--weight-bold` and slight negative letter spacing.
   warning, registered = success, verified = info); no decorative blue.
 - 2026-11-03: Icon-only buttons that run through `withBusy()` pass no busy label, because the label replaces the
   button's content and would wipe the icon; the disabled state shows progress instead.
+- 2026-11-03: Event editor (`admin-events.html`) migrated. Page sections appended to `admin-styles.css` are scoped
+  to a body class (`body.page-events`) so per-page rules cannot leak into other admin pages.
+- 2026-11-03: Event status stepper: done = success, current = accent, upcoming = neutral. The status notice uses the
+  status tones (pre-registration info, registration open success, live violet, draft and completed neutral). The stepper
+  sits in the General tab because "Save event" applies it; a picked but unsaved status shows a warning "Not saved yet"
+  badge. Below the stepper's natural width it scrolls sideways and centres the current step.
+- 2026-11-03: Collapsible settings groups are `details.disclosure` with a `.disclosure-meta` line summarising their state
+  ("2 of 5 emails on", "Off"). No "click to expand" hints: the chevron says it.
+- 2026-11-03: A list whose rows are the page's main objects (the events list) becomes stacked cards below 640px;
+  secondary tables keep scrolling inside their panel.
+- 2026-11-03: Icon-only row actions are bordered `.btn-sm.icon-only` with an `aria-label`. Reordering uses
+  `arrow-up` / `arrow-down` (added to the sprite); chevrons are reserved for expand and collapse.
+- 2026-11-03: Status semantics on the event editor: invitation pending = warning, registered = success; sponsor
+  reached out = neutral, negotiating = warning, confirmed = success, declined = danger; interest lead joined = success,
+  in solo queue = info, interest only = neutral. Budget: income amounts in success text, expenses stay neutral (an
+  expense is not an error); only a negative net balance uses danger.

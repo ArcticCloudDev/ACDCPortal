@@ -9,7 +9,7 @@ const path = require('node:path');
 
 const ICONS = [
     // navigation & actions
-    'arrow-left', 'arrow-right', 'chevron-down', 'chevron-left', 'chevron-right', 'chevron-up', 'external-link',
+    'arrow-left', 'arrow-right', 'arrow-up', 'arrow-down', 'chevron-down', 'chevron-left', 'chevron-right', 'chevron-up', 'external-link',
     'menu', 'x', 'plus', 'check', 'pencil', 'square-pen', 'trash-2', 'save', 'copy', 'search', 'filter',
     'sliders-horizontal', 'ellipsis', 'refresh-cw', 'undo-2', 'download', 'upload', 'send', 'printer', 'eye', 'link',
     'log-in', 'log-out', 'settings', 'list', 'layout-dashboard', 'house',
