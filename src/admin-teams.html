@@ -1,183 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Teams - ACDC Committee</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <title>Teams - ACDC Admin</title>
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <style>        .main-content {
-            flex: 1;
-            padding: 24px 32px;
-        }
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        .page-title { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
-
-        .filters { display: flex; gap: 10px; align-items: center; }
-        .filters select, .filters input {
-            padding: 6px 12px;
-            border: 1px solid var(--admin-border);
-            border-radius: 6px;
-            font-size: 0.85rem;
-        }
-        .filters input[type="search"] { width: 180px; }
-
-        .stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
-
-        .stat-card {
-            background: white;
-            border: 1px solid var(--admin-border);
-            border-radius: 8px;
-            padding: 14px 20px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-width: 150px;
-        }
-
-        .stat-card .icon {
-            width: 40px; height: 40px;
-            border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.1rem;
-        }
-
-        .stat-card .icon.blue { background: #dbeafe; color: #2563eb; }
-        .stat-card .icon.green { background: #d1fae5; color: #059669; }
-        .stat-card .icon.purple { background: #ede9fe; color: #7c3aed; }
-        .stat-card .icon.amber { background: #fef3c7; color: #d97706; }
-
-        .stat-card .info .value { font-size: 1.5rem; font-weight: 700; color: var(--admin-sidebar); line-height: 1; }
-        .stat-card .info .label { font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 2px; }
-
-        .panel {
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--admin-border);
-        }
-
-        .data-table { width: 100%; border-collapse: collapse; }
-
-        .data-table th {
-            text-align: left;
-            padding: 10px 16px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--admin-text-muted);
-            background: var(--admin-bg);
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .data-table td {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--admin-border);
-            font-size: 0.85rem;
-        }
-
-        .data-table tbody tr:hover { background: var(--admin-bg); }
-        .data-table tbody tr:last-child td { border-bottom: none; }
-
-        .badge {
-            display: inline-flex;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 500;
-        }
-
-        .badge.full { background: #d1fae5; color: #065f46; }
-        .badge.partial { background: #dbeafe; color: #1d4ed8; }
-        .badge.empty { background: #fef3c7; color: #92400e; }
-
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 0.75rem;
-            border-radius: 4px;
-            border: 1px solid var(--admin-border);
-            background: white;
-            color: var(--admin-text);
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        .btn-sm:hover { background: var(--admin-bg); }
-        .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
-        .btn-sm.primary:hover { background: #2563eb; }
-
-        .team-main-row.expanded { background: #f8fafc; }
-        .team-main-row.expanded:hover { background: #f8fafc; }
-
-        .member-details-row td {
-            background: #f8fafc;
-            padding: 0;
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .member-details-wrap {
-            padding: 14px 18px;
-        }
-
-        .member-title {
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: var(--admin-text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            margin-bottom: 10px;
-        }
-
-        .member-list {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border: 1px solid var(--admin-border);
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .member-list td {
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--admin-border);
-            font-size: 0.82rem;
-        }
-
-        .member-list tr:last-child td { border-bottom: none; }
-
-        .expand-btn {
-            min-width: 74px;
-            text-align: center;
-        }
-
-        .member-empty {
-            color: var(--admin-text-muted);
-            font-size: 0.82rem;
-            padding: 8px 0;
-        }
-
-        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
-
-        .access-denied {
-            max-width: 400px;
-            margin: 100px auto;
-            text-align: center;
-            padding: 40px;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--admin-border);
-        }
-    </style>
 </head>
 <body>
     <div class="admin-layout">
@@ -191,71 +20,82 @@
 
             <div id="admin-content" class="hidden">
                 <div class="page-header">
-                    <h1 class="page-title">Teams</h1>
-                    <div class="filters">
-                        <select id="event-filter">
-                            <option value="">All Events</option>
-                        </select>
-                        <input type="search" id="search-teams" placeholder="Search teams...">
+                    <div>
+                        <h1 class="page-title">Teams</h1>
+                        <p class="page-subtitle">Every registered team with its members and pending invitations</p>
                     </div>
                 </div>
 
-                <div class="stats-row">
+                <div class="stats-row stats-compact">
                     <div class="stat-card">
-                        <div class="icon blue">👥</div>
-                        <div class="info">
-                            <div class="value" id="total-teams">0</div>
-                            <div class="label">Teams</div>
+                        <div class="stat-icon tone-accent"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-teams">0</div>
+                            <div class="stat-label">Teams</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="icon green">👤</div>
-                        <div class="info">
-                            <div class="value" id="total-participants">0</div>
-                            <div class="label">Participants</div>
+                        <div class="stat-icon tone-accent"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#user-check"></use></svg></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-participants">0</div>
+                            <div class="stat-label">Participants</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="icon purple">✓</div>
-                        <div class="info">
-                            <div class="value" id="total-committed">0</div>
-                            <div class="label">Committed</div>
+                        <div class="stat-icon tone-neutral"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#ticket"></use></svg></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-committed">0</div>
+                            <div class="stat-label">Committed places</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="icon amber">📊</div>
-                        <div class="info">
-                            <div class="value" id="fill-rate">0%</div>
-                            <div class="label">Fill Rate</div>
+                        <div class="stat-icon tone-neutral"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#chart-pie"></use></svg></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="fill-rate">0%</div>
+                            <div class="stat-label">Fill rate</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="panel">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Team Name</th>
-                                <th>Event</th>
-                                <th>Admin</th>
-                                <th>Members</th>
-                                <th>Created</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="teams-table-body">
-                            <tr><td colspan="6" class="empty-state">Loading...</td></tr>
-                        </tbody>
-                    </table>
+                <div class="toolbar">
+                    <div class="search-field">
+                        <svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#search"></use></svg>
+                        <label for="search-teams" class="visually-hidden">Search teams</label>
+                        <input type="search" id="search-teams" placeholder="Search by team or admin">
+                    </div>
+                    <label for="event-filter" class="visually-hidden">Event</label>
+                    <select id="event-filter">
+                        <option value="">All events</option>
+                    </select>
                 </div>
+
+                <section class="panel">
+                    <div class="panel-body">
+                        <table class="data-table teams-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Team</th>
+                                    <th scope="col">Event</th>
+                                    <th scope="col">Admin</th>
+                                    <th scope="col">Members</th>
+                                    <th scope="col">Created</th>
+                                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="teams-table-body">
+                                <tr><td colspan="6" class="empty-state">Loading teams...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <div id="not-committee" class="access-denied hidden">
+                <h2>Access denied</h2>
+                <p class="page-subtitle">You do not have committee access.</p>
+                <p><a href="events.html" class="btn-sm primary">Go to events</a></p>
             </div>
         </main>
-    </div>
-
-    <div id="not-committee" class="access-denied hidden">
-        <h2>⛔ Access Denied</h2>
-        <p style="color: var(--admin-text-muted);">You do not have committee access.</p>
-        <a href="events.html" class="btn-sm primary">Go to Events</a>
     </div>
 
     <script src="js/config.js"></script>

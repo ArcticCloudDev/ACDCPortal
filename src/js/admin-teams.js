@@ -44,7 +44,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     } catch (error) {
         console.error('Error:', error);
-        loadingDiv.innerHTML = `<p class="error-message">Error: ${escapeHtml(error.message)}</p>`;
+        loadingDiv.innerHTML = `
+            <div class="notice notice-danger">${icon('triangle-alert')}<div><div class="notice-title">Could not load teams</div><div class="notice-body">${escapeHtml(error.message)}</div></div></div>
+        `;
     }
 });
 
@@ -101,8 +103,8 @@ function populateEventFilter() {
     const eventFilter = document.getElementById('event-filter');
 
     const statusLabels = {
-        'pre-registration': 'Pre-Reg',
-        'registration': 'Registration',
+        'pre-registration': 'Pre-registration',
+        'registration': 'Registration open',
         'live': 'Live'
     };
 
@@ -197,11 +199,12 @@ function renderTeamsTable() {
         const pendingCount = pendingInvites.length;
         const committed = committedSize(team);
 
-        let countClass = 'partial';
+        // Full team = success (done), no members yet = warning (needs attention), in between = neutral.
+        let countTone = '';
         if (memberCount >= committed) {
-            countClass = 'full';
+            countTone = ' badge-success';
         } else if (memberCount === 0) {
-            countClass = 'empty';
+            countTone = ' badge-warning';
         }
 
         const members = getTeamMembers(team.id);
@@ -210,9 +213,10 @@ function renderTeamsTable() {
             ? [teamAdmin, ...members]
             : members;
         const isExpanded = expandedTeams.has(team.id);
-        const eventUrl = `admin-events.html?event=${encodeURIComponent(team.eventId)}&tab=teams`;
         const adminInfo = getTeamAdminInfo(team.id);
         const teamIdAttr = escapeHtml(team.id);
+        const teamName = team.teamName || 'Unnamed team';
+        const detailsId = `team-members-${teamIdAttr}`;
 
         const memberRows = displayedMembers.map(member => {
             const displayName = (member.user?.firstName || member.user?.lastName)
@@ -220,18 +224,25 @@ function renderTeamsTable() {
                 : (member.user?.email || member.participation?.email || 'Unknown');
             const displayEmail = member.user?.email || member.participation?.email || '';
             const roleBadge = member.isRegisteredAdmin || member.participation?.isTeamAdmin
-                ? '<span class="badge full" style="margin-left:6px;">Admin</span>'
+                ? '<span class="badge badge-accent">Team admin</span>'
                 : '';
 
             const removeBtn = canDelete && !member.isRegisteredAdmin
-                ? `<button type="button" class="btn-sm" style="color:#dc2626;border-color:#fca5a5;" data-action="remove-member" data-participation-id="${escapeHtml(member.participation.id)}" data-team-id="${teamIdAttr}">Remove</button>`
+                ? `<button type="button" class="btn-sm danger-ghost" data-action="remove-member" data-participation-id="${escapeHtml(member.participation.id)}" data-team-id="${teamIdAttr}" aria-label="Remove ${escapeHtml(displayName)} from ${escapeHtml(teamName)}">Remove</button>`
                 : '';
 
             return `
                 <tr>
-                    <td><strong>${escapeHtml(displayName)}</strong>${roleBadge}</td>
-                    <td style="color:#64748b;">${escapeHtml(displayEmail)}</td>
-                    <td style="text-align:right;">${removeBtn}</td>
+                    <td>
+                        <div class="member-person">
+                            <span class="avatar" aria-hidden="true">${escapeHtml(initialsFor(member.user, displayEmail))}</span>
+                            <span class="member-text">
+                                <span class="member-name"><strong>${escapeHtml(displayName)}</strong>${roleBadge}</span>
+                                ${displayEmail && displayEmail !== displayName ? `<span class="member-email">${escapeHtml(displayEmail)}</span>` : ''}
+                            </span>
+                        </div>
+                    </td>
+                    <td class="member-action">${removeBtn}</td>
                 </tr>
             `;
         }).join('');
@@ -239,23 +250,31 @@ function renderTeamsTable() {
         const inviteRows = pendingInvites.map(invite => {
             const isExpiredInvite = invite.isExpired;
             const cancelBtn = canDelete
-                ? `<button type="button" class="btn-sm" style="color:#dc2626;border-color:#fca5a5;" data-action="cancel-invite" data-invite-id="${escapeHtml(invite.id)}" data-team-id="${teamIdAttr}">Cancel</button>`
+                ? `<button type="button" class="btn-sm danger-ghost" data-action="cancel-invite" data-invite-id="${escapeHtml(invite.id)}" data-team-id="${teamIdAttr}" aria-label="Cancel the invitation for ${escapeHtml(invite.email)}">Cancel invite</button>`
                 : '';
             return `
-                <tr style="opacity:${isExpiredInvite ? '0.6' : '1'}">
-                    <td><em style="color:#64748b;">${escapeHtml(invite.email)}</em></td>
-                    <td><span class="badge partial" style="font-size:0.7rem;">${isExpiredInvite ? 'Expired' : 'Invited'}</span></td>
-                    <td style="text-align:right;">${cancelBtn}</td>
+                <tr class="member-invite${isExpiredInvite ? ' is-expired' : ''}">
+                    <td>
+                        <div class="member-person">
+                            <span class="avatar avatar-invite" aria-hidden="true">${icon('mail', 'icon-sm')}</span>
+                            <span class="member-text">
+                                <span class="member-name">${escapeHtml(invite.email)}${isExpiredInvite
+                                    ? '<span class="badge">Invitation expired</span>'
+                                    : '<span class="badge badge-warning">Invitation pending</span>'}</span>
+                            </span>
+                        </div>
+                    </td>
+                    <td class="member-action">${cancelBtn}</td>
                 </tr>
             `;
         }).join('');
 
         const totalShown = displayedMembers.length + pendingInvites.length;
         const detailsHtml = isExpanded ? `
-            <tr class="member-details-row">
+            <tr class="member-details-row" id="${detailsId}">
                 <td colspan="6">
                     <div class="member-details-wrap">
-                        <div class="member-title">Team Members (${members.length})${pendingInvites.length > 0 ? ` &nbsp;·&nbsp; <span style="color:#64748b;font-weight:normal;">${pendingInvites.length} pending invite${pendingInvites.length > 1 ? 's' : ''}</span>` : ''}</div>
+                        <div class="member-title">Team members (${members.length})${pendingInvites.length > 0 ? `<span class="member-title-meta">${pendingInvites.length} pending invite${pendingInvites.length > 1 ? 's' : ''}</span>` : ''}</div>
                         ${totalShown === 0
                             ? '<div class="member-empty">No members or invitations yet.</div>'
                             : `<table class="member-list"><tbody>${memberRows}${inviteRows}</tbody></table>`}
@@ -265,23 +284,35 @@ function renderTeamsTable() {
         ` : '';
 
         const highlighted = highlightedTeamId && sameId(highlightedTeamId, team.id) ? ' highlighted' : '';
+        const adminLabel = adminInfo.name || adminInfo.email;
+        // The event name opens that event in the event editor, like event names elsewhere in admin.
+        const eventCell = event
+            ? `<a class="table-link" href="admin-events.html?event=${encodeURIComponent(event.id)}" title="Open ${escapeHtml(event.name)} in the event editor">${icon('calendar-days', 'icon-sm cell-icon')}${escapeHtml(event.name)}</a>`
+            : `<span class="text-muted">${icon('calendar-days', 'icon-sm cell-icon')}Unknown event</span>`;
 
         return `
             <tr class="team-main-row ${isExpanded ? 'expanded' : ''}${highlighted}" data-team-id="${teamIdAttr}">
-                <td><strong>${escapeHtml(team.teamName)}</strong></td>
-                <td>${event ? escapeHtml(event.name) : '<em style="color:#94a3b8">Unknown</em>'}</td>
-                <td style="color: #64748b;">${escapeHtml(adminInfo.name || adminInfo.email || 'Unknown')}</td>
-                <td><span class="badge ${countClass}" title="${memberCount} members${pendingCount > 0 ? ', ' + pendingCount + ' invited' : ''}">${memberCount}${pendingCount > 0 ? '+' + pendingCount : ''}/${committed}</span></td>
-                <td style="color: #64748b;">${createdDate}</td>
-                <td style="display: flex; gap: 6px; align-items: center;">
-                    <button type="button" class="btn-sm expand-btn" data-action="toggle-members" data-team-id="${teamIdAttr}">${isExpanded ? 'Hide' : 'Members'}</button>
-                    <a href="${eventUrl}" class="btn-sm">View Event</a>
-                    ${canDelete ? `<button type="button" class="btn-sm" style="color: #dc2626; border-color: #fca5a5;" data-action="delete-team" data-team-id="${teamIdAttr}">🗑️</button>` : ''}
+                <td class="col-team"><strong>${escapeHtml(teamName)}</strong></td>
+                <td class="col-event">${eventCell}</td>
+                <td class="col-admin${adminLabel ? '' : ' text-muted'}">${icon('user', 'icon-sm cell-icon')}${escapeHtml(adminLabel || (team.adminUserId ? 'Unknown' : 'No admin'))}</td>
+                <td class="col-members"><span class="badge${countTone} team-count" title="${memberCount} of ${committed} places filled">${memberCount} / ${committed}</span>${pendingCount > 0 ? `<span class="team-invited">+${pendingCount} invited</span>` : ''}</td>
+                <td class="col-created text-muted"><span class="cell-label">Created </span>${createdDate}</td>
+                <td class="col-actions">
+                    <div class="row-actions">
+                        <button type="button" class="btn-sm expand-btn" data-action="toggle-members" data-team-id="${teamIdAttr}" aria-expanded="${isExpanded}"${isExpanded ? ` aria-controls="${detailsId}"` : ''}>Members${icon('chevron-down', 'icon-sm expand-chevron')}</button>
+                        ${canDelete ? `<button type="button" class="btn-sm icon-only danger-ghost" data-action="delete-team" data-team-id="${teamIdAttr}" aria-label="Delete team ${escapeHtml(teamName)}" title="Delete team">${icon('trash-2', 'icon-sm')}</button>` : ''}
+                    </div>
                 </td>
             </tr>
             ${detailsHtml}
         `;
     }).join('');
+}
+
+// Avatar initials for the member list; falls back to the first letter of the email.
+function initialsFor(user, email) {
+    const letters = `${(user?.firstName || '').trim().charAt(0)}${(user?.lastName || '').trim().charAt(0)}`;
+    return letters || (email || '?').trim().charAt(0) || '?';
 }
 
 function getTeamAdminInfo(teamId) {
@@ -358,6 +389,9 @@ function toggleTeamMembers(teamId) {
         expandedTeams.add(key);
     }
     renderTeamsTable();
+    // The table re-renders; keep keyboard focus on the toggle that was used.
+    const toggle = document.querySelector(`.expand-btn[data-team-id="${CSS.escape(String(key))}"]`);
+    if (toggle) toggle.focus();
 }
 
 async function cancelInvitation(inviteId, teamId, button) {
@@ -440,7 +474,8 @@ async function deleteTeam(teamId, button) {
         return;
     }
 
-    await withBusy(button, '⏳', async () => {
+    // No busy label: the button is icon-only, so it shows its disabled/busy state instead.
+    await withBusy(button, '', async () => {
         try {
             await API.teams.delete(teamId);
             allTeams = allTeams.filter(t => !sameId(t.id, teamId));

@@ -38,15 +38,17 @@ function computeHotelColumns(startDate, endDate) {
 
 function buildTableHeaders() {
     const thead = document.getElementById('participants-thead');
-    const nightHeaders = NIGHT_LABELS.map(l => `<th class="night-cell">${l}</th>`).join('');
+    const nightHeaders = NIGHT_KEYS.map((key, i) =>
+        `<th scope="col" class="night-cell" title="Night ${escapeHtml(NIGHT_ARROWS[key] || key)}">${escapeHtml(NIGHT_LABELS[i])}</th>`
+    ).join('');
     const colCount = 4 + NIGHT_KEYS.length + 2;
     thead.innerHTML = `<tr>
-        <th>Name</th><th>Email</th><th>Phone</th>
+        <th scope="col">Name</th><th scope="col">Email</th><th scope="col">Phone</th>
         ${nightHeaders}
-        <th>Nights</th><th>Allergies / Dietary</th><th style="width:50px"></th>
+        <th scope="col">Nights</th><th scope="col">Allergies and diet</th><th scope="col" class="col-actions"><span class="visually-hidden">Actions</span></th>
     </tr>`;
     const body = document.getElementById('participants-body');
-    body.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">Loading...</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">Loading participants...</td></tr>`;
 }
 
 async function init() {
@@ -147,15 +149,18 @@ function updateUI() {
 }
 
 function updateSummary() {
-    document.getElementById('event-name-breadcrumb').textContent = currentEvent.name;
+    const breadcrumb = document.getElementById('event-name-breadcrumb');
+    breadcrumb.textContent = currentEvent.name;
+    // The event crumb opens this event in the event editor (its parent page).
+    breadcrumb.href = `admin-events.html?event=${encodeURIComponent(currentEvent.id)}`;
     document.getElementById('stat-event-name').textContent = currentEvent.name;
 
     const startDate = new Date(currentEvent.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const endDate = new Date(currentEvent.endDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    document.getElementById('stat-event-dates').textContent = `${startDate} - ${endDate}`;
+    document.getElementById('stat-event-dates').textContent = `${startDate} – ${endDate}`;
 
     const status = currentEvent.status || 'draft';
-    const statusLabels = { draft: 'Draft', 'pre-registration': 'Pre-Registration', waitlist: 'Waitlist', registration: 'Registration', live: 'Live', completed: 'Completed' };
+    const statusLabels = { draft: 'Draft', 'pre-registration': 'Pre-registration', waitlist: 'Waitlist', registration: 'Registration open', live: 'Live', completed: 'Completed' };
     document.getElementById('stat-status').innerHTML = `<span class="badge ${escapeHtml(status)}">${escapeHtml(statusLabels[status] || status)}</span>`;
 
     document.getElementById('stat-teams').textContent = allTeams.length;
@@ -177,7 +182,7 @@ function renderParticipants() {
         filtered = filtered.filter(p => p.allergies && p.allergies.trim());
     }
 
-    document.getElementById('participant-count').textContent = `${filtered.length} participants`;
+    document.getElementById('participant-count').textContent = `${filtered.length} participant${filtered.length === 1 ? '' : 's'}`;
 
     if (filtered.length === 0) {
         const colCount = 3 + NIGHT_KEYS.length + 3;
@@ -214,17 +219,20 @@ function renderGroupedByTeam(tbody, participants) {
     });
 
     let html = '';
+    const countLabel = (n, noun) => `${n} ${noun}${n === 1 ? '' : 's'}`;
+    const groupLabel = (iconName, kind, name, count) => `
+        <span class="roster-group">
+            <span class="roster-group-icon" aria-hidden="true">${icon(iconName, 'icon-sm')}</span>
+            <span class="visually-hidden">${kind}: </span><strong>${name}</strong>
+            <span class="roster-group-count">${count}</span>
+        </span>`;
 
     Object.entries(teamGroups).forEach(([teamId, group]) => {
         const teamNights = group.members.reduce((sum, m) => sum + countHotelNights(m.hotelNights), 0);
         html += `
             <tr class="team-header-row">
-                <td colspan="${3 + NIGHT_KEYS.length}">
-                    <span class="badge team" style="margin-right: 8px;">👥 Team</span>
-                    ${escapeHtml(group.name)}
-                    <span style="font-weight: normal; color: var(--admin-text-muted); margin-left: 8px;">(${group.members.length} members)</span>
-                </td>
-                <td><strong>${teamNights}</strong></td>
+                <td colspan="${3 + NIGHT_KEYS.length}">${groupLabel('users', 'Team', escapeHtml(group.name), countLabel(group.members.length, 'member'))}</td>
+                <td class="nights-total">${teamNights}</td>
                 <td></td>
                 <td></td>
             </tr>
@@ -238,12 +246,8 @@ function renderGroupedByTeam(tbody, participants) {
         const committeeNights = committee.reduce((sum, m) => sum + countHotelNights(m.hotelNights), 0);
         html += `
             <tr class="team-header-row committee-section">
-                <td colspan="${3 + NIGHT_KEYS.length}">
-                    <span class="badge committee" style="margin-right: 8px;">🏛️ Committee</span>
-                    Committee Members
-                    <span style="font-weight: normal; color: var(--admin-text-muted); margin-left: 8px;">(${committee.length} members)</span>
-                </td>
-                <td><strong>${committeeNights}</strong></td>
+                <td colspan="${3 + NIGHT_KEYS.length}">${groupLabel('landmark', 'Group', 'Committee', countLabel(committee.length, 'member'))}</td>
+                <td class="nights-total">${committeeNights}</td>
                 <td></td>
                 <td></td>
             </tr>
@@ -257,12 +261,8 @@ function renderGroupedByTeam(tbody, participants) {
         const judgeNights = judges.reduce((sum, m) => sum + countHotelNights(m.hotelNights), 0);
         html += `
             <tr class="team-header-row judge-section">
-                <td colspan="${3 + NIGHT_KEYS.length}">
-                    <span class="badge judge" style="margin-right: 8px;">⚖️ Judges</span>
-                    Judges Panel
-                    <span style="font-weight: normal; color: var(--admin-text-muted); margin-left: 8px;">(${judges.length} members)</span>
-                </td>
-                <td><strong>${judgeNights}</strong></td>
+                <td colspan="${3 + NIGHT_KEYS.length}">${groupLabel('scale', 'Group', 'Judges', countLabel(judges.length, 'judge'))}</td>
+                <td class="nights-total">${judgeNights}</td>
                 <td></td>
                 <td></td>
             </tr>
@@ -275,11 +275,7 @@ function renderGroupedByTeam(tbody, participants) {
     if (noTeam.length > 0) {
         html += `
             <tr class="team-header-row no-team-section">
-                <td colspan="${3 + NIGHT_KEYS.length + 3}">
-                    <span class="badge single" style="margin-right: 8px;">👤 No Team</span>
-                    Individual Participants
-                    <span style="font-weight: normal; color: var(--admin-text-muted); margin-left: 8px;">(${noTeam.length} participants)</span>
-                </td>
+                <td colspan="${3 + NIGHT_KEYS.length + 3}">${groupLabel('user', 'Group', 'No team', countLabel(noTeam.length, 'participant'))}</td>
             </tr>
         `;
         noTeam.forEach(p => {
@@ -311,52 +307,54 @@ function renderParticipantRow(p, isGrouped) {
     const nights = p.hotelNights || {};
     const nightCells = NIGHT_KEYS.map(key => {
         const checked = nights[key];
-        return `<td class="night-cell ${checked ? 'checked' : 'unchecked'}">${checked ? '✓' : '–'}</td>`;
+        return checked
+            ? `<td class="night-cell checked">${icon('check', 'icon-sm')}<span class="visually-hidden">Booked</span></td>`
+            : `<td class="night-cell unchecked"><span aria-hidden="true">–</span><span class="visually-hidden">Not booked</span></td>`;
     }).join('');
 
     const totalNights = countHotelNights(nights);
 
-    const paidByLabels = { team: '👥 Team', committee: '🏛️ Org', self: '👤 Self' };
-    const paidByColors = { team: '#3b82f6', committee: '#8b5cf6', self: '#f59e0b' };
+    // Who pays the hotel: neutral badge, the wallet icon says what it is about.
+    const paidByLabels = { team: 'Team', committee: 'ACDC', self: 'Self' };
     const paidByLabel = p.hotelPaidBy ? paidByLabels[p.hotelPaidBy] || p.hotelPaidBy : '';
-    const paidByColor = p.hotelPaidBy ? paidByColors[p.hotelPaidBy] || '#94a3b8' : '';
     const paidByBadge = p.hotelPaidBy && totalNights > 0
-        ? `<span style="display:inline-block;font-size:0.65rem;padding:1px 5px;border-radius:4px;background:${paidByColor}15;color:${paidByColor};border:1px solid ${paidByColor}40;margin-left:4px;">${escapeHtml(paidByLabel)}</span>`
+        ? `<span class="badge paid-by" title="Hotel paid by: ${escapeHtml(paidByLabel)}">${icon('wallet', 'icon-sm')}<span class="visually-hidden">Paid by </span>${escapeHtml(paidByLabel)}</span>`
         : '';
 
     let allergyHtml = '';
     if (p.allergies && p.allergies.trim()) {
         const items = p.allergies.split(/[,\n]/).map(s => s.trim()).filter(s => s);
-        allergyHtml = items.map(a => `<span class="allergy-tag">⚠️ ${escapeHtml(a)}</span>`).join('');
+        allergyHtml = items.map(a => `<span class="badge badge-warning allergy-tag">${escapeHtml(a)}</span>`).join('');
     } else {
         allergyHtml = '<span class="no-allergy">None</span>';
     }
 
-    const adminBadge = p.isTeamAdmin ? '<span class="badge admin" style="margin-left: 6px;">Admin</span>' : '';
+    const adminBadge = p.isTeamAdmin ? '<span class="badge badge-accent">Team admin</span>' : '';
     const roleBadge = roles.includes('judge')
-        ? '<span class="badge judge" style="margin-left: 6px;">Judge</span>'
+        ? '<span class="badge">Judge</span>'
         : roles.includes('committee')
-            ? '<span class="badge committee" style="margin-left: 6px;">Committee</span>'
+            ? '<span class="badge">Committee</span>'
             : '';
 
     const canDelete = currentPermissions && (currentPermissions.isPortalAdmin || currentPermissions.highestRole === 'committee');
     const isTeamMember = !!p.teamId;
+    const fullName = `${p.firstName} ${p.lastName}`.trim();
     const deleteBtn = canDelete && !isTeamMember
-        ? `<button type="button" class="btn-sm btn-delete-participant" data-id="${escapeHtml(p.id)}" title="Remove participation" style="color:#dc2626;border-color:#fca5a5;padding:2px 6px;font-size:0.75rem;">🗑️</button>`
+        ? `<button type="button" class="btn-sm icon-only danger-ghost btn-delete-participant" data-id="${escapeHtml(p.id)}" title="Remove from event" aria-label="Remove ${escapeHtml(fullName)} from this event">${icon('trash-2', 'icon-sm')}</button>`
         : '';
 
     return `
         <tr class="${isGrouped ? 'team-member-row' : ''}">
-            <td>
+            <td class="roster-name">
                 <strong>${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}</strong>
                 ${adminBadge}${roleBadge}
             </td>
             <td>${escapeHtml(p.email)}</td>
-            <td>${escapeHtml(p.phone)}</td>
+            <td class="roster-phone">${escapeHtml(p.phone)}</td>
             ${nightCells}
-            <td><strong>${totalNights}</strong>${paidByBadge}</td>
+            <td class="nights-total">${totalNights}${paidByBadge}</td>
             <td class="allergy-cell">${allergyHtml}</td>
-            <td>${deleteBtn}</td>
+            <td class="col-actions">${deleteBtn}</td>
         </tr>
     `;
 }
@@ -382,9 +380,9 @@ function renderHotelSummary() {
 
     summary.innerHTML = NIGHT_KEYS.map(key => `
         <div class="hotel-night-stat">
-            <div class="day">${NIGHT_ARROWS[key] || key}</div>
+            <div class="day">${escapeHtml(NIGHT_ARROWS[key] || key)}</div>
             <div class="count">${nightCounts[key]}</div>
-            <div class="day">rooms</div>
+            <div class="unit">room${nightCounts[key] === 1 ? '' : 's'}</div>
         </div>
     `).join('');
 }
@@ -409,7 +407,8 @@ function setupFilters() {
             return;
         }
 
-        await withBusy(btn, '⏳', async () => {
+        // No busy label: the button is icon-only, so it shows its disabled/busy state instead.
+        await withBusy(btn, '', async () => {
             try {
                 await API.participations.delete(participant.id);
                 allParticipants = allParticipants.filter(p => !sameId(p.id, id));

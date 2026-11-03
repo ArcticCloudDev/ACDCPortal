@@ -3,7 +3,11 @@ let allEvents = [];
 let currentPermissions = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    currentPermissions = await Permissions.initAdminPage('interest');
+    // Same gate as before; these elements only decide where "Access denied" is shown.
+    currentPermissions = await Permissions.initAdminPage('interest', {
+        contentEl: document.getElementById('admin-content'),
+        accessDeniedEl: document.getElementById('not-committee')
+    });
 
     if (!currentPermissions) return;
 
@@ -68,7 +72,7 @@ async function loadData() {
     } catch (error) {
         console.error('Error loading data:', error);
         document.getElementById('queue-table-body').innerHTML =
-            '<tr><td colspan="8" class="empty-state">Error loading data</td></tr>';
+            '<tr><td colspan="8" class="empty-state">Could not load the interest list. Reload the page to try again.</td></tr>';
     }
 }
 
@@ -76,7 +80,7 @@ function renderTable() {
     const tbody = document.getElementById('queue-table-body');
 
     if (allEntries.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No entries</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No one has registered interest yet.</td></tr>';
         updateSelection();
         return;
     }
@@ -86,31 +90,29 @@ function renderTable() {
             month: 'short', day: 'numeric', year: 'numeric'
         });
 
-        let status = 'notified';
-        let statusLabel = entry.verified ? 'Verified' : 'Unverified';
+        // Registered = done (success); verified = waiting for registration (info); unverified = needs attention.
+        let statusBadge = entry.verified
+            ? '<span class="badge badge-info">Verified</span>'
+            : '<span class="badge badge-warning">Unverified</span>';
         if (entry.converted) {
-            status = 'registered';
-            statusLabel = 'Converted';
+            statusBadge = '<span class="badge badge-success">Registered</span>';
         }
 
-        const name = [entry.firstName, entry.lastName].filter(Boolean).join(' ') || '-';
+        const name = [entry.firstName, entry.lastName].filter(Boolean).join(' ');
 
         const event = allEvents.find(e => sameId(e.id, entry.eventId));
-        const eventName = event ? event.name : '-';
 
         return `
             <tr>
-                <td><input type="checkbox" class="entry-checkbox" data-id="${escapeHtml(entry.id)}"></td>
-                <td style="color: var(--admin-text-muted);">${index + 1}</td>
-                <td><strong>${escapeHtml(entry.email)}</strong></td>
-                <td>${escapeHtml(name)}</td>
-                <td style="color: var(--admin-text-muted);">${escapeHtml(eventName)}</td>
-                <td style="color: var(--admin-text-muted);">${date}</td>
-                <td><span class="badge ${status}">${statusLabel}</span></td>
-                <td>
-                    <div class="actions">
-                        ${!entry.converted ? `<button class="btn-sm danger" data-action="remove" data-id="${escapeHtml(entry.id)}">Remove</button>` : ''}
-                    </div>
+                <td class="col-select"><input type="checkbox" class="entry-checkbox" data-id="${escapeHtml(entry.id)}" aria-label="Select ${escapeHtml(entry.email)}"></td>
+                <td class="col-index text-muted">${index + 1}</td>
+                <td class="lead-email"><strong>${escapeHtml(entry.email)}</strong></td>
+                <td>${name ? escapeHtml(name) : '<span class="text-muted">—</span>'}</td>
+                <td class="text-muted">${event ? escapeHtml(event.name) : '—'}</td>
+                <td class="text-muted">${date}</td>
+                <td>${statusBadge}</td>
+                <td class="col-actions">
+                    ${!entry.converted ? `<button type="button" class="btn-sm danger-ghost" data-action="remove" data-id="${escapeHtml(entry.id)}" aria-label="Remove ${escapeHtml(entry.email)} from the interest list">Remove</button>` : ''}
                 </td>
             </tr>
         `;
@@ -127,7 +129,7 @@ function toggleSelectAll() {
 function updateSelection() {
     const checked = document.querySelectorAll('.entry-checkbox:checked').length;
     document.getElementById('selected-count').textContent = `${checked} selected`;
-    document.getElementById('bulk-actions').style.display = checked > 0 ? 'flex' : 'none';
+    document.getElementById('bulk-actions').classList.toggle('hidden', checked === 0);
 }
 
 function getSelectedIds() {
@@ -176,6 +178,6 @@ function copyShareLink() {
     document.execCommand('copy');
 
     const btn = document.getElementById('copy-share-link-btn');
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = 'Copy', 2000);
+    btn.innerHTML = `${icon('check')}Copied`;
+    setTimeout(() => { btn.innerHTML = `${icon('copy')}Copy link`; }, 2000);
 }

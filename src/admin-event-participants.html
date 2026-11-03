@@ -1,295 +1,122 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Participants - ACDC Admin</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <title>Event participants - ACDC Admin</title>
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/admin-styles.css">
-    <style>        .page-header { margin-bottom: 24px; }
-        .breadcrumb { font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 8px; }
-        .breadcrumb a { color: var(--admin-primary); text-decoration: none; }
-        .breadcrumb a:hover { text-decoration: underline; }
-        .page-title { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin: 0; }
-
-        .event-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .stat-card {
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--admin-border);
-            padding: 16px;
-        }
-
-        .stat-card .label { font-size: 0.75rem; color: var(--admin-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        .stat-card .value { font-size: 1.5rem; font-weight: 600; color: var(--admin-sidebar); margin-top: 4px; }
-        .stat-card .sub { font-size: 0.8rem; color: var(--admin-text-muted); margin-top: 2px; }
-
-        .toolbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
-
-        .filter-group { display: flex; gap: 8px; align-items: center; }
-        .filter-group label { font-size: 0.8rem; color: var(--admin-text-muted); }
-        .filter-group select {
-            padding: 6px 12px;
-            border: 1px solid var(--admin-border);
-            border-radius: 4px;
-            font-size: 0.85rem;
-        }
-
-        .btn-sm {
-            padding: 6px 12px;
-            font-size: 0.8rem;
-            border-radius: 4px;
-            border: 1px solid var(--admin-border);
-            background: white;
-            color: var(--admin-text);
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .btn-sm:hover { background: var(--admin-bg); }
-        .btn-sm.primary { background: var(--admin-primary); border-color: var(--admin-primary); color: white; }
-        .btn-sm.primary:hover { background: #2563eb; }
-
-        .panel {
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--admin-border);
-            margin-bottom: 24px;
-        }
-
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 14px 18px;
-            border-bottom: 1px solid var(--admin-border);
-        }
-
-        .panel-title { font-size: 0.9rem; font-weight: 600; color: var(--admin-sidebar); }
-        .panel-body { padding: 0; }
-
-        .data-table { width: 100%; border-collapse: collapse; }
-
-        .data-table th {
-            text-align: left;
-            padding: 10px 12px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--admin-text-muted);
-            background: var(--admin-bg);
-            border-bottom: 1px solid var(--admin-border);
-            white-space: nowrap;
-        }
-
-        .data-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--admin-border);
-            font-size: 0.85rem;
-            vertical-align: top;
-        }
-
-        .data-table tbody tr:hover { background: #f1f5f9; }
-        .data-table tbody tr:last-child td { border-bottom: none; }
-
-        .team-header-row td {
-            background: #e2e8f0;
-            font-weight: 600;
-            color: var(--admin-sidebar);
-            padding: 8px 12px;
-        }
-        .team-header-row:hover td { background: #e2e8f0; }
-
-        .team-member-row td:first-child { padding-left: 28px; }
-
-        .no-team-section td { background: #fef3c7; }
-
-        .committee-section td { background: #dbeafe; }
-
-        .judge-section td { background: #fef3c7; }
-
-        .badge.judge { background: #fef3c7; color: #92400e; }
-        .badge.committee { background: #dbeafe; color: #1e40af; }
-
-        .night-cell { text-align: center; width: 45px; }
-        .night-cell.checked { color: var(--admin-success); font-weight: 600; }
-        .night-cell.unchecked { color: #cbd5e1; }
-
-        .allergy-cell { max-width: 200px; }
-        .allergy-tag {
-            display: inline-block;
-            background: #fee2e2;
-            color: #b91c1c;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            margin: 2px;
-        }
-        .no-allergy { color: var(--admin-text-muted); font-size: 0.8rem; }
-
-        .badge {
-            display: inline-flex;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 500;
-        }
-        .badge.admin { background: #dbeafe; color: #1d4ed8; }
-        .badge.team { background: #ede9fe; color: #7c3aed; }
-        .badge.single { background: #fce7f3; color: #be185d; }
-
-        .badge.draft { background: #f1f5f9; color: #475569; }
-        .badge.waitlist { background: #fef3c7; color: #92400e; }
-        .badge.registration { background: #dbeafe; color: #1d4ed8; }
-        .badge.live { background: #d1fae5; color: #065f46; }
-
-        .hotel-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 12px;
-            padding: 16px;
-            background: #f0fdf4;
-            border-radius: 8px;
-            margin-top: 16px;
-        }
-
-        .hotel-night-stat { text-align: center; }
-        .hotel-night-stat .day { font-size: 0.75rem; color: var(--admin-text-muted); }
-        .hotel-night-stat .count { font-size: 1.2rem; font-weight: 600; color: var(--admin-success); }
-
-        .empty-state { padding: 40px; text-align: center; color: var(--admin-text-muted); }
-
-        .hidden { display: none !important; }
-
-        .access-denied {
-            max-width: 400px;
-            margin: 100px auto;
-            text-align: center;
-            padding: 40px;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--admin-border);
-        }
-
-        @media print {
-            .sidebar, .toolbar, .btn-sm { display: none !important; }
-            .main-content { margin-left: 0; padding: 0; }
-            .panel { border: 1px solid #ccc; }
-            .data-table th { background: #f0f0f0; }
-        }
-    </style></head>
-<body>
+</head>
+<body class="page-event-participants">
     <div class="admin-layout">
         <div id="sidebar-container"></div>
 
-        <main class="main-content" id="admin-content">
-            <div class="page-header">
-                <div class="breadcrumb">
-                    <a href="admin-events.html">Events</a> / <span id="event-name-breadcrumb">Loading...</span>
-                </div>
-                <h1 class="page-title">📋 Participants & Hotel</h1>
-            </div>
+        <main class="main-content">
+            <div id="admin-content">
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                    <a href="admin-events.html">Events</a>
+                    <span aria-hidden="true">/</span>
+                    <a href="admin-events.html" id="event-name-breadcrumb">Loading...</a>
+                </nav>
 
-            <div class="event-summary" id="event-summary">
-                <div class="stat-card">
-                    <div class="label">Event</div>
-                    <div class="value" id="stat-event-name">-</div>
-                    <div class="sub" id="stat-event-dates">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">Status</div>
-                    <div class="value" id="stat-status">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">Teams</div>
-                    <div class="value" id="stat-teams">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">Participants</div>
-                    <div class="value" id="stat-participants">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">With Allergies</div>
-                    <div class="value" id="stat-allergies">0</div>
-                </div>
-            </div>
-
-            <div class="toolbar">
-                <div class="filter-group">
-                    <label>Group by:</label>
-                    <select id="group-filter">
-                        <option value="team">Team</option>
-                        <option value="none">None (flat list)</option>
-                    </select>
-                    <label style="margin-left: 16px;">Show:</label>
-                    <select id="show-filter">
-                        <option value="all">All Participants</option>
-                        <option value="with-hotel">With Hotel Nights</option>
-                        <option value="with-allergies">With Allergies</option>
-                    </select>
-                </div>
-                <div>
-                    <button type="button" class="btn-sm" id="print-btn">🖨️ Print for Hotel</button>
-                    <button class="btn-sm" id="export-btn">📥 Export CSV</button>
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header">
-                    <span class="panel-title">👥 Participants by Team</span>
-                    <span id="participant-count" style="font-size: 0.8rem; color: var(--admin-text-muted);">0 participants</span>
-                </div>
-                <div class="panel-body">
-                    <table class="data-table" id="participants-table">
-                        <thead id="participants-thead">
-                            <tr>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Phone</th>
-                                <th>Nights</th>
-                                <th>Allergies / Dietary</th>
-                            </tr>
-                        </thead>
-                        <tbody id="participants-body">
-                            <tr><td colspan="5" class="empty-state">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header">
-                    <span class="panel-title">🏨 Hotel Nights Summary</span>
-                </div>
-                <div class="panel-body" style="padding: 16px;">
-                    <div class="hotel-summary" id="hotel-summary">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Participants and hotel nights</h1>
+                        <div class="page-subtitle meta-list">
+                            <strong class="meta-item roster-event-name" id="stat-event-name">–</strong>
+                            <span class="meta-item"><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="/images/icons.svg#calendar-days"></use></svg><span id="stat-event-dates">–</span></span>
+                            <span class="meta-item" id="stat-status"></span>
+                        </div>
+                    </div>
+                    <div class="page-header-actions">
+                        <button type="button" class="btn btn-secondary" id="print-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#printer"></use></svg>Print for hotel</button>
+                        <button type="button" class="btn btn-secondary" id="export-btn"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#download"></use></svg>Export all as CSV</button>
                     </div>
                 </div>
+
+                <div class="stats-row stats-compact" id="event-summary">
+                    <div class="stat-card">
+                        <div class="stat-icon tone-accent"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-teams">0</div>
+                            <div class="stat-label">Teams</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon tone-accent"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#user-check"></use></svg></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-participants">0</div>
+                            <div class="stat-label">Participants</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon tone-warning"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#utensils"></use></svg></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="stat-allergies">0</div>
+                            <div class="stat-label">With allergies</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="toolbar">
+                    <div class="toolbar-field">
+                        <label for="group-filter">Group by</label>
+                        <select id="group-filter">
+                            <option value="team">Team</option>
+                            <option value="none">No grouping</option>
+                        </select>
+                    </div>
+                    <div class="toolbar-field">
+                        <label for="show-filter">Show</label>
+                        <select id="show-filter">
+                            <option value="all">All participants</option>
+                            <option value="with-hotel">With hotel nights</option>
+                            <option value="with-allergies">With allergies</option>
+                        </select>
+                    </div>
+                </div>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg>Participants</h2>
+                        <span class="panel-meta" id="participant-count">0 participants</span>
+                    </div>
+                    <div class="panel-body">
+                        <table class="data-table roster-table" id="participants-table">
+                            <thead id="participants-thead">
+                                <tr>
+                                    <th scope="col">Name</th>
+                                    <th scope="col">Email</th>
+                                    <th scope="col">Phone</th>
+                                    <th scope="col">Nights</th>
+                                    <th scope="col">Allergies and diet</th>
+                                </tr>
+                            </thead>
+                            <tbody id="participants-body">
+                                <tr><td colspan="5" class="empty-state">Loading participants...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <h2 class="panel-title"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bed-double"></use></svg>Hotel nights</h2>
+                        <span class="panel-meta">Rooms needed per night, all participants</span>
+                    </div>
+                    <div class="panel-body padded">
+                        <div class="hotel-summary" id="hotel-summary"></div>
+                    </div>
+                </section>
+            </div>
+
+            <div id="not-committee" class="access-denied hidden">
+                <h2>Access denied</h2>
+                <p class="page-subtitle">You don't have permission to access the admin area.</p>
+                <p><a href="events.html" class="btn-sm primary">Go to events</a></p>
             </div>
         </main>
-    </div>
-
-    <div id="not-committee" class="access-denied hidden">
-        <h2>🔒 Access Denied</h2>
-        <p style="margin-top: 12px; color: var(--admin-text-muted);">You don't have permission to access the admin area.</p>
-        <a href="index.html" class="btn-sm primary" style="margin-top: 20px; display: inline-block;">Go to Portal</a>
     </div>
 
     <script src="js/config.js"></script>
