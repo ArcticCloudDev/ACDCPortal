@@ -212,22 +212,33 @@ function setRecipients(list) {
     document.getElementById('recipient-count').textContent = recipients.length;
 }
 
+// Each load gets a number. A response is applied only if it is still the latest load and the
+// filter has not changed meanwhile; otherwise a slow default load (e.g. while the database wakes up)
+// could overwrite custom recipients typed in the meantime, and the email would go to the whole event.
+let recipientsLoadSeq = 0;
+
 async function loadRecipients() {
+    const seq = ++recipientsLoadSeq;
     const selectedEventId = document.getElementById('event-select').value;
     const filter = document.getElementById('recipient-filter').value;
+    const apply = (list) => {
+        if (seq !== recipientsLoadSeq) return;
+        if (document.getElementById('recipient-filter').value !== filter) return;
+        setRecipients(list);
+    };
 
     if (filter === 'event-contacts') {
         if (!selectedEventId) {
-            setRecipients([]);
+            apply([]);
             return;
         }
         try {
             const response = await fetch(`${CONFIG.api.baseUrl}/email/recipients?eventId=${encodeURIComponent(selectedEventId)}&filter=all-event-contacts`);
             if (!response.ok) throw new Error('Failed to load');
-            setRecipients(await response.json());
+            apply(await response.json());
         } catch (error) {
             console.error('Error loading event contacts:', error);
-            setRecipients([]);
+            apply([]);
         }
         return;
     }
@@ -238,7 +249,7 @@ async function loadRecipients() {
             if (!response.ok) throw new Error('Failed to load');
             const data = await response.json();
             const leads = data.leads || [];
-            setRecipients(leads
+            apply(leads
                 .filter(l => l.verified)
                 .map(l => ({
                     email: l.email,
@@ -248,7 +259,7 @@ async function loadRecipients() {
                 })));
         } catch (error) {
             console.error('Error loading interest leads:', error);
-            setRecipients([]);
+            apply([]);
         }
         return;
     }
@@ -259,21 +270,22 @@ async function loadRecipients() {
     }
 
     if (!selectedEventId) {
-        setRecipients([]);
+        apply([]);
         return;
     }
 
     try {
         const response = await fetch(`${CONFIG.api.baseUrl}/email/recipients?eventId=${encodeURIComponent(selectedEventId)}&filter=${encodeURIComponent(filter)}`);
         if (!response.ok) throw new Error('Failed to load');
-        setRecipients(await response.json());
+        apply(await response.json());
     } catch (error) {
         console.error('Error loading recipients:', error);
-        setRecipients([]);
+        apply([]);
     }
 }
 
 function parseCustomEmails() {
+    recipientsLoadSeq++;
     const text = document.getElementById('custom-emails').value;
     const emails = text.split('\n')
         .map(e => e.trim())

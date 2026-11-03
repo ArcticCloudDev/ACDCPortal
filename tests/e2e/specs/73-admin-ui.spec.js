@@ -412,6 +412,30 @@ test.describe('admin-side contract fixes', () => {
         expect(mail.html).toContain('Bring your laptop charger.');
     });
 
+    test('a slow default recipient load does not overwrite custom recipients', async ({ page, harness, loginAs }) => {
+        // Found 2026-11-03: the page's first recipient load (whole event) landed after the admin had
+        // switched to custom recipients, so a "custom" email went to every participant.
+        const w = buildWorld();
+        await harness.seed(w.seed());
+        await loginAs(w.admin);
+        let release;
+        const gate = new Promise(r => { release = r; });
+        let held = 0;
+        await page.route('**/api/email/recipients**', async route => { held++; await gate; await route.continue(); });
+        await page.goto('/admin-email.html');
+        await expect.poll(() => held).toBeGreaterThan(0);
+
+        await page.locator('#recipient-filter').selectOption('custom');
+        await page.locator('#custom-emails').fill('alpha@e2e.test');
+        await expect(page.locator('#recipient-count')).toHaveText('1');
+
+        const lateLoad = page.waitForResponse(r => r.url().includes('/api/email/recipients'));
+        release();
+        await lateLoad;
+        await page.waitForTimeout(300);
+        await expect(page.locator('#recipient-count')).toHaveText('1');
+    });
+
     test('dashboard Edit opens the event editor and the members column counts team participants', async ({ page, harness, loginAs }) => {
         const w = buildWorld();
         await harness.seed(w.seed());
