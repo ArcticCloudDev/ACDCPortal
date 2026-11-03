@@ -3,39 +3,44 @@
 document.addEventListener('DOMContentLoaded', async () => {
     Auth.init();
 
+    // Button labels say what the click does: "Accept" opens the details step, the code button only
+    // verifies, and the join label is used once the visitor is signed in and the click accepts.
     const ROLE_COPY = {
         participant: {
-            subtitle: 'Team Invitation',
-            icon: '🎉',
-            heading: 'You\'ve Been Invited!',
-            detail: 'You have been invited to join team',
-            acceptLabel: 'Accept Invitation →',
-            verifyLabel: 'Verify & Join Team 🎉',
-            verifyingLabel: 'Verifying & joining...',
-            successTitle: 'You\'re In!',
-            successPrefix: 'You\'ve successfully joined team '
+            subtitle: 'Team invitation',
+            icon: 'users',
+            heading: 'You\'ve been invited',
+            detail: 'to join the team',
+            acceptLabel: 'Accept invitation',
+            joinLabel: 'Join the team',
+            verifyLabel: 'Verify and continue',
+            verifyingLabel: 'Verifying…',
+            successTitle: 'You\'re in!',
+            successPrefix: 'You\'ve joined team '
         },
         judge: {
-            subtitle: 'Judge Invitation',
-            icon: '⚖️',
-            heading: 'Judge Invitation',
-            detail: 'You have been invited to serve as a Judge for',
-            acceptLabel: '⚖️ Accept Judge Invitation →',
-            verifyLabel: 'Verify & Accept ⚖️',
-            verifyingLabel: 'Verifying & accepting...',
-            successTitle: 'Welcome to the Jury!',
-            successPrefix: 'You are now registered as a Judge for '
+            subtitle: 'Judge invitation',
+            icon: 'scale',
+            heading: 'You\'re invited to judge',
+            detail: 'the teams at',
+            acceptLabel: 'Accept judge invitation',
+            joinLabel: 'Join as judge',
+            verifyLabel: 'Verify and continue',
+            verifyingLabel: 'Verifying…',
+            successTitle: 'Welcome to the jury!',
+            successPrefix: 'You\'re now a judge for '
         },
         committee: {
-            subtitle: 'Committee Invitation',
-            icon: '🏛️',
-            heading: 'Committee Invitation',
-            detail: 'You have been invited to join the Committee for',
-            acceptLabel: '🏛️ Accept Committee Invitation →',
-            verifyLabel: 'Verify & Accept 🏛️',
-            verifyingLabel: 'Verifying & accepting...',
-            successTitle: 'Welcome to the Committee!',
-            successPrefix: 'You are now a Committee member for '
+            subtitle: 'Committee invitation',
+            icon: 'landmark',
+            heading: 'You\'re invited to the committee',
+            detail: 'to help organize',
+            acceptLabel: 'Accept committee invitation',
+            joinLabel: 'Join the committee',
+            verifyLabel: 'Verify and continue',
+            verifyingLabel: 'Verifying…',
+            successTitle: 'Welcome to the committee!',
+            successPrefix: 'You\'re now on the committee for '
         }
     };
 
@@ -43,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const wakeTimer = setTimeout(() => {
         if (stepLoading.classList.contains('hidden')) return;
         if (!stepLoading.querySelector('.loader-wake')) {
-            stepLoading.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span><div class="wake-title">Waking up the Arctic Database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up...</div></div>');
+            stepLoading.insertAdjacentHTML('beforeend', '<div class="loader-wake"><span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span><div class="wake-title">Waking up the Arctic database<span class="wake-dots"></span></div>Our polar bear database keeper is hibernating! Give it a moment to wake up and stretch. This can take up to a minute.<div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up…</div></div>');
         }
     }, 1200);
 
@@ -51,13 +56,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const inviteId = urlParams.get('invite');
 
     if (!inviteId) {
-        showError('No Invitation Found', 'This link is missing an invitation ID. Please use the link from your invitation email.');
+        showError('No invitation found', 'This link is missing an invitation ID. Open the link from your invitation email again.');
         return;
     }
 
     let invitation = null;
     let currentUser = null;
     let alreadyLoggedIn = false;
+    let signedInAtStart = false;
     let pendingProfile = {};
     let submitting = false;
     let copy = ROLE_COPY.participant;
@@ -66,17 +72,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         invitation = await API.invitations.get(inviteId);
 
         if (!invitation) {
-            showError('Invitation Not Found', 'This invitation could not be found. It may have been deleted.');
+            showError('Invitation not found', 'This invitation could not be found. It may have been withdrawn.');
             return;
         }
 
         if (invitation.isExpired) {
-            showError('Invitation Expired', 'This invitation has expired. Please ask the event organizer to send a new one.');
+            showError('Invitation expired', 'This invitation has expired. Ask the person who invited you to send a new one.');
             return;
         }
 
         if (invitation.status !== 'pending') {
-            showError('Already Processed', `This invitation has already been ${invitation.status}.`);
+            showError('Invitation no longer open', `This invitation has already been ${invitation.status}.`);
             return;
         }
 
@@ -86,7 +92,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     } catch (err) {
         console.error('Failed to load invitation:', err);
-        showError('Error Loading Invitation', 'Could not load the invitation. Please try again later.');
+        // A wrong or withdrawn invitation id also lands here (the API answers 404).
+        showError('Invitation not available', 'Check that you opened the full link from your invitation email. If it still fails, try again in a moment or ask the person who invited you.');
         return;
     }
 
@@ -102,7 +109,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    signedInAtStart = alreadyLoggedIn;
     initProfileForm();
+
+    // Presentation only: the step bar over the details and verify steps. A visitor who arrives
+    // signed in goes straight from their details to joining, so they get no bar.
+    function setInviteProgress(step) {
+        const bar = document.getElementById('invite-progress');
+        bar.classList.toggle('hidden', !step || signedInAtStart);
+        bar.querySelectorAll('.progress-step').forEach((el, index) => {
+            el.classList.toggle('completed', index + 1 < step);
+            el.classList.toggle('active', index + 1 === step);
+            if (index + 1 === step) el.setAttribute('aria-current', 'step');
+            else el.removeAttribute('aria-current');
+        });
+    }
 
     function initProfileForm() {
         const firstNameField = document.getElementById('profile-firstName');
@@ -127,6 +148,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         allergiesField.value = pendingProfile.allergies || currentUser?.allergies || invitation.inviteeAllergies || '';
         if (pendingProfile.email) emailField.value = pendingProfile.email;
 
+        // Once the visitor is signed in, submitting this form accepts the invitation.
+        document.getElementById('profile-heading').textContent = alreadyLoggedIn ? 'Confirm your details' : 'Your details';
+        document.getElementById('profile-lead').textContent = alreadyLoggedIn
+            ? (signedInAtStart ? 'Check your details, then join.' : 'Your email is verified. Check your details, then join.')
+            : 'Tell us who you are. Next, we\'ll verify your email.';
+        document.querySelector('#continue-to-verify-btn .btn-text').textContent = alreadyLoggedIn ? copy.joinLabel : 'Continue';
+
         firstNameField.focus();
     }
 
@@ -134,6 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('step-invite').classList.add('hidden');
         document.getElementById('step-profile').classList.remove('hidden');
         initProfileForm();
+        setInviteProgress(alreadyLoggedIn ? 3 : 1);
     });
 
     document.getElementById('profile-form').addEventListener('submit', async (e) => {
@@ -148,7 +177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const allergies = document.getElementById('profile-allergies').value.trim();
 
         if (!firstName || !lastName || !phone) {
-            errorDiv.textContent = 'Please fill in all required fields.';
+            errorDiv.textContent = 'Fill in your first name, last name and phone number.';
             errorDiv.classList.remove('hidden');
             return;
         }
@@ -157,7 +186,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const email = document.getElementById('profile-email').value.trim().toLowerCase();
         if (!email) {
-            errorDiv.textContent = 'Please enter your email address.';
+            errorDiv.textContent = 'Enter your email address.';
             errorDiv.classList.remove('hidden');
             return;
         }
@@ -175,6 +204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('substep-otp').classList.add('hidden');
         document.getElementById('email-error').classList.add('hidden');
         document.getElementById('email-display').textContent = email;
+        setInviteProgress(2);
     });
 
     document.getElementById('send-otp-btn').addEventListener('click', async () => {
@@ -192,7 +222,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (err) {
             showOtpSubstep(email);
             const otpError = document.getElementById('otp-error');
-            otpError.textContent = (err.message || 'Failed to send code.') + ' You may already have a pending code.';
+            otpError.textContent = (err.message || 'Could not send a code.') + ' If you already have a recent code, enter it below.';
             otpError.classList.remove('hidden');
         } finally {
             setBusy(btn, false);
@@ -215,7 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const code = document.getElementById('otp-code').value.trim();
 
         if (code.length !== 6) {
-            errorDiv.textContent = 'Please enter the 6-digit code.';
+            errorDiv.textContent = 'Enter the 6-digit code from the email.';
             errorDiv.classList.remove('hidden');
             return;
         }
@@ -245,6 +275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             initProfileForm();
             document.getElementById('step-verify').classList.add('hidden');
             document.getElementById('step-profile').classList.remove('hidden');
+            setInviteProgress(3);
 
         } catch (err) {
             errorDiv.textContent = err.message || 'Verification failed. Please try again.';
@@ -256,21 +287,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('resend-otp-link').addEventListener('click', async (e) => {
         e.preventDefault();
-        const link = e.target;
-        link.textContent = 'Sending...';
-        link.style.pointerEvents = 'none';
+        const link = e.currentTarget;
+        link.textContent = 'Sending…';
+        link.disabled = true;
         try {
             await API.auth.sendOtp(document.getElementById('profile-email').value.trim().toLowerCase());
-            link.textContent = '✓ Code sent!';
+            link.textContent = 'New code sent';
             setTimeout(() => {
                 link.textContent = 'Resend code';
-                link.style.pointerEvents = '';
+                link.disabled = false;
             }, 30000);
         } catch (err) {
             link.textContent = 'Resend code';
-            link.style.pointerEvents = '';
+            link.disabled = false;
             const otpError = document.getElementById('otp-error');
-            otpError.textContent = err.message || 'Failed to resend.';
+            otpError.textContent = err.message || 'Could not send a new code. Wait a minute and try again.';
             otpError.classList.remove('hidden');
         }
     });
@@ -297,7 +328,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
 
             if (!result.success) {
-                throw new Error(result.message || result.error || 'Failed to accept invitation.');
+                throw new Error(result.message || result.error || 'Could not accept the invitation. Try again in a moment.');
             }
 
             // The session issued before the account existed has userId: null; a fresh one
@@ -307,6 +338,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             sessionStorage.removeItem('pendingInvitation');
 
+            setInviteProgress(0);
             document.getElementById('step-invite').classList.add('hidden');
             document.getElementById('step-profile').classList.add('hidden');
             document.getElementById('step-verify').classList.add('hidden');
@@ -361,7 +393,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.getElementById('page-subtitle').textContent = copy.subtitle;
         document.title = `${copy.subtitle} - ACDC Portal`;
-        document.getElementById('invite-icon').textContent = copy.icon;
+        document.getElementById('invite-icon').innerHTML = icon(copy.icon);
         document.getElementById('invite-heading').textContent = copy.heading;
         document.getElementById('invite-detail-line').textContent = copy.detail;
         document.getElementById('next-to-profile-btn').textContent = copy.acceptLabel;
@@ -381,16 +413,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             eventLine.classList.add('hidden');
         }
 
+        // Date and place with icons; the values are API data, so they go in as text nodes.
+        const metaItem = (iconName, text) => {
+            const item = document.createElement('span');
+            item.className = 'meta-item';
+            item.innerHTML = icon(iconName);
+            item.append(text);
+            return item;
+        };
         const metaParts = [];
         if (inv.eventStartDate) {
-            metaParts.push(`📅 ${formatDate(inv.eventStartDate)}${inv.eventEndDate ? ' – ' + formatDate(inv.eventEndDate) : ''}`);
+            metaParts.push(metaItem('calendar', `${formatDate(inv.eventStartDate)}${inv.eventEndDate ? ' – ' + formatDate(inv.eventEndDate) : ''}`));
         }
         if (inv.eventLocation) {
-            metaParts.push(`📍 ${inv.eventLocation}`);
+            metaParts.push(metaItem('map-pin', inv.eventLocation));
         }
         const metaLine = document.getElementById('invite-meta-line');
         if (metaParts.length > 0) {
-            metaLine.textContent = metaParts.join(' · ');
+            metaLine.replaceChildren(...metaParts);
         } else {
             metaLine.classList.add('hidden');
         }
@@ -398,6 +438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const hintLine = document.getElementById('invite-email-hint');
         if (inv.emailHint) {
             hintLine.textContent = `Sent to ${inv.emailHint}`;
+            document.getElementById('profile-email-hint').textContent = `Use the address the invitation was sent to (${inv.emailHint}).`;
         } else {
             hintLine.classList.add('hidden');
         }

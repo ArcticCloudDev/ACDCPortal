@@ -24,13 +24,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         eventsSection.innerHTML = `
             <div class="acdc-loader">
                 <div class="loader-spinner"></div>
-                <div class="loader-text">Loading events...</div>
+                <div class="loader-text">Loading events…</div>
                 <div class="loader-wake">
                     <span class="wake-scene"><span class="wake-bear">🐻‍❄️</span> <span class="wake-zzz">💤</span></span>
-                    <div class="wake-title">Waking up the Arctic Database<span class="wake-dots"></span></div>
+                    <div class="wake-title">Waking up the Arctic database<span class="wake-dots"></span></div>
                     Our polar bear database keeper is hibernating!
                     Give it a moment to wake up, stretch, and fetch your events. This can take up to a minute.
-                    <div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up...</div>
+                    <div class="wake-subtitle">☕ Brewing some Arctic coffee to speed things up…</div>
                 </div>
             </div>
         `;
@@ -124,12 +124,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const isPreReg = event.status === 'pre-registration';
                 const isLive = event.status === 'live';
-                const statusText = isPreReg ? 'Coming Soon' : (isLive ? 'Live' : 'Registration Open');
+                const statusText = isPreReg ? 'Coming soon' : (isLive ? 'Live' : 'Registration open');
                 const statusTone = isPreReg ? 'badge-info' : (isLive ? 'badge-violet' : 'badge-success');
                 const statusPill = hasTeam
-                    ? `<span class="my-status-pill team badge badge-accent">${icon('circle-check', 'icon-sm')}<span>Team Registered</span></span>`
+                    ? `<span class="my-status-pill team badge badge-accent">${icon('circle-check', 'icon-sm')}<span>Team registered</span></span>`
                     : isInterestRegistered
-                        ? `<span class="my-status-pill interest badge badge-accent">${icon('bell', 'icon-sm')}<span>Interest Registered</span></span>`
+                        ? `<span class="my-status-pill interest badge badge-accent">${icon('bell', 'icon-sm')}<span>Interest registered</span></span>`
                         : '';
 
                 const meta = `<span class="meta-item">${icon('calendar')}${escapeHtml(formatDateRange(event.startDate, event.endDate))}</span>`
@@ -146,12 +146,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (isLive) {
                     helperText = '<p class="helper-text">Registration is closed — the event is in progress.</p>';
                 } else if (isPreReg) {
-                    actions = `<a href="register.html?intent=interest&eventId=${eventIdAttr}" class="btn-event interest-only btn btn-secondary">${icon('bell')}Register Interest</a>`;
+                    actions = `<a href="register.html?intent=interest&eventId=${eventIdAttr}" class="btn-event interest-only btn btn-secondary">${icon('bell')}Register interest</a>`;
                     helperText = '<p class="helper-text">Be the first to know when registration opens.</p>';
                 } else {
                     actions = `
-                        <a href="register.html?intent=team&eventId=${eventIdAttr}" class="btn-event primary btn btn-primary">${icon('users')}Register Team</a>
-                        <a href="register.html?intent=interest&eventId=${eventIdAttr}" class="btn-event secondary btn btn-secondary">${icon('bell')}Register Interest</a>
+                        <a href="register.html?intent=team&eventId=${eventIdAttr}" class="btn-event primary btn btn-primary">${icon('users')}Register a team</a>
+                        <a href="register.html?intent=interest&eventId=${eventIdAttr}" class="btn-event secondary btn btn-secondary">${icon('bell')}Register interest</a>
                     `;
                     helperText = '<p class="helper-text">Register your team, or register interest to stay informed.</p>';
                 }

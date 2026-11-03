@@ -1,81 +1,80 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Complete Registration - ACDC Portal</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <title>Finish your profile - ACDC Portal</title>
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/portal.css">
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🏔️ ACDC Portal</h1>
-            <p class="subtitle">Complete Your Registration</p>
-        </header>
+<body class="page-auth">
+    <header id="site-header" data-sign-in="off"></header>
 
-        <main>
-            <div id="loading" class="card acdc-loader">
-                <div class="loader-spinner"></div>
-                <div class="loader-text">Loading registration...</div>
-            </div>
+    <main class="auth-main">
+        <div class="auth-intro">
+            <h1>Welcome! Let's get you set up</h1>
+            <p class="auth-lead">Add your name and phone number to finish your profile.</p>
+        </div>
 
-            <div id="registration-card" class="card hidden">
-                <div id="invitation-banner" class="hidden" style="border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                    <p style="margin: 0 0 8px; font-weight: 600;" id="invitation-title"></p>
-                    <p style="margin: 0; color: #475569;" id="invitation-details"></p>
-                    <p style="margin: 8px 0 0; color: #64748b; font-size: 14px;" id="invitation-helper"></p>
+        <div id="loading" class="card auth-card acdc-loader">
+            <div class="loader-spinner"></div>
+            <div class="loader-text">Loading your profile…</div>
+        </div>
+
+        <section id="registration-card" class="card auth-card hidden" aria-label="Your profile">
+            <div id="invitation-banner" class="invite-banner hidden">
+                <span class="invite-banner-icon" id="invitation-icon" aria-hidden="true"></span>
+                <div>
+                    <p class="invite-banner-title" id="invitation-title"></p>
+                    <p id="invitation-details"></p>
+                    <p class="invite-banner-helper" id="invitation-helper"></p>
                 </div>
-                <h2>Welcome! Let's get you set up</h2>
-                <p>Please complete your profile to continue.</p>
-                
-                <form id="complete-registration-form">
-                    <fieldset>
-                        <legend>Personal Information</legend>
-                        
-                        <div class="form-group">
-                            <label for="firstName">First Name *</label>
-                            <input type="text" id="firstName" name="firstName" required 
-                                   placeholder="Enter your first name">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="lastName">Last Name *</label>
-                            <input type="text" id="lastName" name="lastName" required
-                                   placeholder="Enter your last name">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="email">Email</label>
-                            <input type="email" id="email" name="email" readonly class="readonly">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="phone">Phone *</label>
-                            <input type="tel" id="phone" name="phone" required
-                                   placeholder="Enter your phone number">
-                        </div>
-                    </fieldset>
-
-                    <div id="form-error" class="error-message hidden"></div>
-                    
-                    <button type="submit" class="btn btn-primary btn-large" id="complete-btn">
-                        <span class="btn-text">Complete Registration</span>
-                        <span class="btn-loading hidden">Completing...</span>
-                    </button>
-                </form>
             </div>
-        </main>
 
-        <footer>
-            <p>&copy; 2026 ACDC Portal</p>
-        </footer>
-    </div>
+            <form id="complete-registration-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="firstName">First name *</label>
+                        <input type="text" id="firstName" name="firstName" required autocomplete="given-name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="lastName">Last name *</label>
+                        <input type="text" id="lastName" name="lastName" required autocomplete="family-name">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" readonly class="readonly">
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone *</label>
+                    <input type="tel" id="phone" name="phone" required autocomplete="tel"
+                           placeholder="+47 xxx xx xxx">
+                </div>
+
+                <div id="form-error" class="error-message hidden" role="alert"></div>
+
+                <button type="submit" class="btn btn-primary btn-large btn-full" id="complete-btn">
+                    <span class="btn-text">Save and continue</span>
+                    <span class="btn-loading hidden">Saving…</span>
+                </button>
+            </form>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 ACDC Portal</p>
+    </footer>
 
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/site-header.js"></script>
     <script src="js/complete-registration.js"></script>
 </body>
 </html>

@@ -178,19 +178,21 @@ const SiteHeader = (() => {
 
         const modalHTML = `
         <div id="sh-profile-modal" class="modal-overlay">
-            <div class="modal">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sh-profile-heading">
                 <div class="modal-header">
-                    <h2>Your profile</h2>
+                    <h2 id="sh-profile-heading">Your profile</h2>
                     <button type="button" class="modal-close" id="sh-close-profile" aria-label="Close">&times;</button>
                 </div>
                 <form id="sh-profile-form">
-                    <div class="form-group">
-                        <label for="sh-firstName">First Name *</label>
-                        <input type="text" id="sh-firstName" name="firstName" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="sh-lastName">Last Name *</label>
-                        <input type="text" id="sh-lastName" name="lastName" required>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="sh-firstName">First name *</label>
+                            <input type="text" id="sh-firstName" name="firstName" required autocomplete="given-name">
+                        </div>
+                        <div class="form-group">
+                            <label for="sh-lastName">Last name *</label>
+                            <input type="text" id="sh-lastName" name="lastName" required autocomplete="family-name">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="sh-email">Email</label>
@@ -198,21 +200,21 @@ const SiteHeader = (() => {
                     </div>
                     <div class="form-group">
                         <label for="sh-phone">Phone *</label>
-                        <input type="tel" id="sh-phone" name="phone" required>
+                        <input type="tel" id="sh-phone" name="phone" required autocomplete="tel">
                     </div>
                     <div class="form-group">
                         <label for="sh-gamertag">Gamertag</label>
-                        <input type="text" id="sh-gamertag" name="gamertag" placeholder="Your gaming username (optional)">
+                        <input type="text" id="sh-gamertag" name="gamertag" placeholder="Optional" autocomplete="off">
                     </div>
                     <div class="form-group">
-                        <label for="sh-allergies">Allergies / Dietary Requirements</label>
+                        <label for="sh-allergies">Allergies or dietary requirements</label>
                         <textarea id="sh-allergies" name="allergies" rows="3" maxlength="500"
-                                  placeholder="Enter any allergies or dietary requirements..."></textarea>
+                                  placeholder="Optional"></textarea>
                     </div>
-                    <div id="sh-profile-error" class="error-message hidden"></div>
-                    <div id="sh-profile-success" class="success-message hidden"></div>
+                    <div id="sh-profile-error" class="error-message hidden" role="alert"></div>
+                    <div id="sh-profile-success" class="success-message hidden" role="status"></div>
                     <button type="submit" class="btn btn-primary" id="sh-save-profile-btn">
-                        <span class="btn-text">Save Profile</span>
+                        <span class="btn-text">Save profile</span>
                         <span class="btn-loading hidden">Saving...</span>
                     </button>
                 </form>
@@ -341,7 +343,9 @@ const SiteHeader = (() => {
 })();
 
 // Show the top bar straight away; the page script re-renders it with its title once data loads.
+// Sign-in and invitation pages mark the container data-sign-in="off": a "Sign in" button there
+// would only lead away from the flow the visitor is already in.
 document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('site-header');
-    if (el && !el.hasChildNodes()) SiteHeader.render();
+    if (el && !el.hasChildNodes()) SiteHeader.render({ showSignIn: el.dataset.signIn !== 'off' });
 });

@@ -1,230 +1,221 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In - ACDC Portal</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <title>Sign in - ACDC Portal</title>
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/portal.css">
     <script src="https://www.google.com/recaptcha/api.js?render=6Lc7aKwsAAAAAA5DkTtC2lFIF5eAGVTHpQAkZFep"></script></head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🏔️ ACDC Portal</h1>
-            <p class="subtitle" id="page-subtitle">Sign In</p>
-        </header>
+<body class="page-auth">
+    <header id="site-header" data-sign-in="off"></header>
 
-        <main>
-            <div class="progress-steps" id="progress-steps">
-                <div class="progress-step active" data-step="1">
-                    <div class="step-circle">1</div>
-                    <span class="step-label">Email</span>
-                </div>
-                <div class="progress-line"></div>
-                <div class="progress-step" data-step="2">
-                    <div class="step-circle">2</div>
-                    <span class="step-label">Details</span>
-                </div>
-                <div class="progress-line"></div>
-                <div class="progress-step" data-step="3">
-                    <div class="step-circle">3</div>
-                    <span class="step-label">Verify</span>
-                </div>
-            </div>
+    <main class="auth-main">
+        <div class="auth-intro">
+            <h1 id="page-subtitle">Sign in</h1>
+        </div>
 
-            <div id="step-email" class="card">
-                <h2 id="email-heading">Sign In</h2>
-                <p id="email-subheading">Enter your email address to sign in.</p>
+        <ol class="progress-steps auth-progress" id="progress-steps" aria-label="Progress">
+            <li class="progress-step active" data-step="1" aria-current="step">
+                <span class="step-circle" aria-hidden="true"><span class="step-num"></span><svg class="icon step-check" aria-hidden="true" focusable="false"><use href="/images/icons.svg#check"></use></svg></span>
+                <span class="step-label">Email</span>
+            </li>
+            <li class="progress-step hidden" data-step="2">
+                <span class="step-circle" aria-hidden="true"><span class="step-num"></span><svg class="icon step-check" aria-hidden="true" focusable="false"><use href="/images/icons.svg#check"></use></svg></span>
+                <span class="step-label">Details</span>
+            </li>
+            <li class="progress-step" data-step="3">
+                <span class="step-circle" aria-hidden="true"><span class="step-num"></span><svg class="icon step-check" aria-hidden="true" focusable="false"><use href="/images/icons.svg#check"></use></svg></span>
+                <span class="step-label">Code</span>
+            </li>
+            <li class="progress-step hidden" data-step="4">
+                <span class="step-circle" aria-hidden="true"><span class="step-num"></span><svg class="icon step-check" aria-hidden="true" focusable="false"><use href="/images/icons.svg#check"></use></svg></span>
+                <span class="step-label">Hotel</span>
+            </li>
+        </ol>
 
-                <div class="info-notice">
-                    <strong>🔑 No password needed</strong>
-                    <p>We'll send a one-time code to your email to verify your identity.</p>
+        <section id="step-email" class="card auth-card" aria-labelledby="email-heading">
+            <h2 id="email-heading">Enter your email</h2>
+            <p id="email-subheading" class="auth-card-lead">Sign in, or create an account if you're new here.</p>
+
+            <form id="email-check-form">
+                <div class="form-group">
+                    <label for="checkEmail">Email address</label>
+                    <input type="email" id="checkEmail" name="checkEmail" required
+                           placeholder="you@company.com" autocomplete="email" autocapitalize="none" spellcheck="false" autofocus>
                 </div>
 
-                <form id="email-check-form">
+                <div id="email-check-error" class="error-message hidden" role="alert"></div>
+
+                <button type="submit" class="btn btn-primary btn-large btn-full" id="email-check-btn">
+                    <span class="btn-text">Continue</span>
+                    <span class="btn-loading hidden">Checking…</span>
+                </button>
+            </form>
+
+            <p class="auth-hint"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#key-round"></use></svg><span>No password needed. We'll email you a one-time code.</span></p>
+        </section>
+
+        <section id="step-form" class="card auth-card hidden" aria-labelledby="form-heading">
+            <h2 id="form-heading">Your details</h2>
+            <p id="form-subheading" class="auth-card-lead">Next, we'll email you a code to confirm it's you.</p>
+
+            <form id="registration-form">
+                <fieldset class="auth-fieldset">
+                    <legend>About you</legend>
+
                     <div class="form-group">
-                        <label for="checkEmail">Email address *</label>
-                        <input type="email" id="checkEmail" name="checkEmail" required
-                               placeholder="you@company.com" autofocus>
+                        <label for="regEmail">Email</label>
+                        <input type="email" id="regEmail" name="email" readonly class="readonly" autocomplete="email">
+                        <button type="button" class="link-button" id="back-to-email">Use a different email</button>
                     </div>
 
-                    <div id="email-check-error" class="error-message hidden"></div>
-
-                    <button type="submit" class="btn btn-primary btn-full" id="email-check-btn">
-                        <span class="btn-text">Continue →</span>
-                        <span class="btn-loading hidden">Checking...</span>
-                    </button>
-                </form>
-            </div>
-
-            <div id="step-form" class="card hidden">
-                <h2 id="form-heading">Create Your Account</h2>
-                <p id="form-subheading">Complete the form below to get started.</p>
-
-                <form id="registration-form">
-                    <fieldset>
-                        <legend>Personal Information</legend>
-
+                    <div class="form-row">
                         <div class="form-group">
-                            <label for="regEmail">Email</label>
-                            <input type="email" id="regEmail" name="email" readonly class="readonly">
+                            <label for="firstName">First name *</label>
+                            <input type="text" id="firstName" name="firstName" required minlength="2" maxlength="50" autocomplete="given-name">
                         </div>
 
                         <div class="form-group">
-                            <label for="firstName">First Name *</label>
-                            <input type="text" id="firstName" name="firstName" required minlength="2" maxlength="50">
+                            <label for="lastName">Last name *</label>
+                            <input type="text" id="lastName" name="lastName" required minlength="2" maxlength="50" autocomplete="family-name">
                         </div>
-
-                        <div class="form-group">
-                            <label for="lastName">Last Name *</label>
-                            <input type="text" id="lastName" name="lastName" required minlength="2" maxlength="50">
-                        </div>
-
-                        <div class="form-group" id="phone-group">
-                            <label for="phone">Phone *</label>
-                            <input type="tel" id="phone" name="phone" required>
-                        </div>
-                    </fieldset>
-
-                    <fieldset id="team-fieldset" class="hidden">
-                        <legend>Team Information</legend>
-
-                        <div class="form-group">
-                            <label for="teamName">Team Name *</label>
-                            <input type="text" id="teamName" name="teamName" minlength="2" maxlength="100">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="numberOfParticipants">Number of Participants *</label>
-                            <select id="numberOfParticipants" name="numberOfParticipants">
-                                <option value="">Select...</option>
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                                <option value="4">4</option>
-                                <option value="5">5</option>
-                            </select>
-                        </div>
-                    </fieldset>
-
-                    <fieldset id="role-fieldset" class="hidden">
-                        <legend>Your Role</legend>
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="willParticipate" name="willParticipate" checked>
-                                <span>I will be participating in the event myself</span>
-                            </label>
-                            <p class="field-hint">Uncheck this if you are only registering the team as an admin and will not be competing.</p>
-                        </div>
-                    </fieldset>
-
-                    <div id="form-error" class="error-message hidden"></div>
-
-                    <button type="submit" class="btn btn-primary btn-full" id="submit-btn">
-                        <span class="btn-text" id="submit-btn-text">Create Account →</span>
-                        <span class="btn-loading hidden">Preparing...</span>
-                    </button>
-
-                    <p class="recaptcha-notice">
-                        Protected by reCAPTCHA.
-                        <a href="https://policies.google.com/privacy" target="_blank">Privacy</a> ·
-                        <a href="https://policies.google.com/terms" target="_blank">Terms</a>
-                    </p>
-                </form>
-
-                <p class="form-footer">
-                    <a href="#" id="back-to-email">← Use a different email</a>
-                </p>
-            </div>
-
-            <div id="step-otp" class="card hidden">
-                <div id="otp-welcome-back" class="info-notice info-notice-success hidden" style="margin-bottom: 16px;">
-                    <strong>👋 Welcome back!</strong>
-                    <p>We've sent a verification code to your email.</p>
-                </div>
-                <h2>📧 Check Your Email</h2>
-                <p>We sent a 6-digit code to <strong id="otp-email-display"></strong></p>
-
-                <form id="otp-form">
-                    <div class="form-group">
-                        <label for="otpCode">Verification Code</label>
-                        <input type="text" id="otpCode" name="otpCode" required
-                               placeholder="000000" maxlength="6" pattern="[0-9]{6}"
-                               inputmode="numeric" autocomplete="one-time-code"
-                               style="font-size: 1.8rem; text-align: center; letter-spacing: 8px; font-family: 'Courier New', monospace;">
                     </div>
 
-                    <div id="otp-error" class="error-message hidden"></div>
+                    <div class="form-group" id="phone-group">
+                        <label for="phone">Phone *</label>
+                        <input type="tel" id="phone" name="phone" required autocomplete="tel" placeholder="+47 xxx xx xxx">
+                    </div>
+                </fieldset>
 
-                    <button type="submit" class="btn btn-primary btn-full" id="verify-otp-btn">
-                        <span class="btn-text" id="verify-btn-text">Verify &amp; Complete Registration →</span>
-                        <span class="btn-loading hidden">Verifying...</span>
-                    </button>
-                </form>
+                <fieldset id="team-fieldset" class="auth-fieldset hidden">
+                    <legend>Your team</legend>
 
-                <p class="form-footer">
-                    Didn't receive the code? <a href="#" id="resend-otp-btn">Resend code</a>
-                </p>
-                <p class="form-footer">
-                    <a href="#" id="back-to-email-otp">← Use a different email</a>
-                </p>
-                <p class="form-footer" style="font-size: 0.8rem; color: var(--text-muted);">
-                    Code expires in 10 minutes.
-                </p>
-            </div>
+                    <div class="form-group">
+                        <label for="teamName">Team name *</label>
+                        <input type="text" id="teamName" name="teamName" minlength="2" maxlength="100" autocomplete="off">
+                    </div>
 
-            <div id="step-completing" class="card hidden">
-                <h2>⏳ <span id="completing-heading">Completing...</span></h2>
-                <p id="completing-text">Please wait...</p>
-                <div id="completing-error" class="error-message hidden"></div>
-            </div>
+                    <div class="form-group">
+                        <label for="numberOfParticipants">Number of participants *</label>
+                        <select id="numberOfParticipants" name="numberOfParticipants">
+                            <option value="">Select…</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                        </select>
+                    </div>
+                </fieldset>
 
-            <div id="step-hotel" class="card hidden">
-                <h2>🏨 Hotel Booking</h2>
-                <p>Please review your hotel nights for this event. <strong>Your stay has been arranged</strong> — confirm the nights below to complete your registration.</p>
+                <fieldset id="role-fieldset" class="auth-fieldset hidden">
+                    <legend>Your role</legend>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="willParticipate" name="willParticipate" checked aria-describedby="willParticipate-hint">
+                            <span>I will take part in the event myself</span>
+                        </label>
+                        <p class="field-hint" id="willParticipate-hint">Untick this if you only manage the team and won't compete.</p>
+                    </div>
+                </fieldset>
 
-                <div id="hotel-nights-container" style="margin: 20px 0;"></div>
+                <div id="form-error" class="error-message hidden" role="alert"></div>
 
-                <div id="hotel-optional-notice" class="info-notice hidden" style="margin-bottom: 16px;">
-                    <strong>Optional nights available</strong>
-                    <p id="hotel-optional-notice-text">You can also book the night before or after the event.</p>
-                </div>
-
-                <div style="display: flex; align-items: center; gap: 10px; margin: 16px 0; padding: 12px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
-                    <span style="font-size: 1.2rem;">🛏️</span>
-                    <span id="hotel-nights-summary" style="font-weight: 500; color: #166534;"></span>
-                </div>
-
-                <div id="hotel-step-error" class="error-message hidden"></div>
-
-                <button type="button" class="btn btn-primary btn-full" id="acknowledge-hotel-btn">
-                    <span class="btn-text">✅ Confirm Hotel Stay →</span>
-                    <span class="btn-loading hidden">Saving...</span>
+                <button type="submit" class="btn btn-primary btn-large btn-full" id="submit-btn">
+                    <span class="btn-text" id="submit-btn-text">Create account</span>
+                    <span class="btn-loading hidden">Sending your code…</span>
                 </button>
 
-                <p class="form-footer" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 16px;">
-                    You can update optional nights later from your event page. Mandatory event nights cannot be changed here.
+                <p class="recaptcha-notice">
+                    This site is protected by reCAPTCHA and the Google
+                    <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and
+                    <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> apply.
                 </p>
+            </form>
+        </section>
+
+        <section id="step-otp" class="card auth-card hidden" aria-labelledby="otp-heading">
+            <p id="otp-welcome-back" class="auth-eyebrow hidden">Welcome back</p>
+            <h2 id="otp-heading">Check your email</h2>
+            <p class="auth-card-lead">We sent a 6-digit code to <strong id="otp-email-display" class="auth-email"></strong>. It expires in 10 minutes.</p>
+
+            <form id="otp-form">
+                <div class="form-group">
+                    <label for="otpCode">Verification code</label>
+                    <input type="text" id="otpCode" name="otpCode" class="code-input" required
+                           placeholder="000000" maxlength="6" pattern="[0-9]{6}"
+                           inputmode="numeric" autocomplete="one-time-code">
+                </div>
+
+                <div id="otp-error" class="error-message hidden" role="alert"></div>
+
+                <button type="submit" class="btn btn-primary btn-large btn-full" id="verify-otp-btn">
+                    <span class="btn-text" id="verify-btn-text">Verify and create account</span>
+                    <span class="btn-loading hidden">Verifying…</span>
+                </button>
+            </form>
+
+            <div class="auth-card-footer">
+                <p>Didn't get the code? Check your spam folder, or send a new one.</p>
+                <div class="auth-links">
+                    <button type="button" class="link-button" id="resend-otp-btn">Resend code</button>
+                    <button type="button" class="link-button" id="back-to-email-otp">Use a different email</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="step-completing" class="card auth-card auth-status hidden" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <h2><span id="completing-heading">Completing…</span></h2>
+            <p id="completing-text">Please wait…</p>
+            <div id="completing-error" class="error-message hidden" role="alert"></div>
+        </section>
+
+        <section id="step-hotel" class="card auth-card hidden" aria-labelledby="hotel-heading">
+            <span class="auth-card-icon" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bed-double"></use></svg></span>
+            <h2 id="hotel-heading">Your hotel nights</h2>
+            <p class="auth-card-lead">Tick the nights you need a room, then confirm to finish your registration. Nights with a lock are part of the event and already booked.</p>
+
+            <div id="hotel-nights-container"></div>
+
+            <p class="hotel-step-summary" aria-live="polite"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#moon"></use></svg><span id="hotel-nights-summary"></span></p>
+
+            <div id="hotel-optional-notice" class="auth-note hidden">
+                <strong>Optional nights available</strong>
+                <p id="hotel-optional-notice-text">You can also book the night before or after the event.</p>
             </div>
 
-            <div id="step-success" class="card hidden">
-                <h2>✅ <span id="success-heading-text">Account Created!</span></h2>
-                <p id="success-team-line" class="hidden">Your team <strong id="success-team-name"></strong> has been registered successfully.</p>
-                <p id="success-profile-line" class="hidden">Your account has been created. You are now signed in!</p>
-                <p id="success-interest-line" class="hidden">Your interest in <strong id="success-event-name"></strong> has been registered. We'll notify you when registration opens!</p>
-                <a href="events.html" class="btn btn-primary">Go to Events</a>
-            </div>
-        </main>
+            <div id="hotel-step-error" class="error-message hidden" role="alert"></div>
 
-        <footer>
-            <p>&copy; 2026 ACDC Portal</p>
-        </footer>
-    </div>
+            <button type="button" class="btn btn-primary btn-large btn-full" id="acknowledge-hotel-btn">
+                <span class="btn-text">Confirm hotel nights</span>
+                <span class="btn-loading hidden">Saving…</span>
+            </button>
+
+            <p class="field-hint auth-card-after">After this, the organizers manage your booking. Contact them if your plans change.</p>
+        </section>
+
+        <section id="step-success" class="card auth-card auth-status hidden" aria-live="polite">
+            <span class="auth-status-icon is-success" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#circle-check"></use></svg></span>
+            <h2><span id="success-heading-text">Account created</span></h2>
+            <p id="success-team-line" class="hidden">Your team <strong id="success-team-name"></strong> is registered.</p>
+            <p id="success-profile-line" class="hidden">Your account is ready and you're signed in.</p>
+            <p id="success-interest-line" class="hidden">Your interest in <strong id="success-event-name"></strong> is registered. We'll let you know when registration opens.</p>
+            <a href="events.html" class="btn btn-primary btn-large">Go to events</a>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 ACDC Portal</p>
+    </footer>
 
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/site-header.js"></script>
     <script src="js/register.js"></script>
 </body>
 </html>

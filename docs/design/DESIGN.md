@@ -82,6 +82,7 @@ block in `tokens.css`. Check every migrated page in both schemes.
 | App shell | `#site-header.app-header` > `.topbar` + `.page-hero` (rendered by `site-header.js`) |
 | Event page (`portal.css`) | `.event-info-strip` (facts band under the hero: status badge, date, place, cost), `.participants-grid` > `.participant-card` (avatar, name, role badges, ghost Edit, contact meta), `.add-member-slot` / `.unlock-slot` (dashed placeholder tiles), `.event-panel-icon` (icon circle in centred panels), `.hotel-urgency-alert` (+ `.is-info`), `.badge-modal` (claim/award dialogs toggled with `.hidden`) |
 | Filter pills (`portal.css`) | Second-level navigation under `.tabs` (badge categories: `#tab-content-badges .badge-tab`). Never stack two underline tab bars |
+| Auth flows (`portal.css`) | `body.page-auth` > `#site-header[data-sign-in="off"]` + `.auth-main` (narrow column) > `.auth-intro` (h1), `ol.progress-steps.auth-progress` (CSS-counted steps, check when done), one `.card.auth-card` per step (`h2`, `.auth-card-lead`, form, `.auth-card-footer`); `.auth-status` (+ `.auth-status-icon.is-success/.is-danger`) for waiting/done/failed; `.auth-fieldset` (quiet uppercase legend), `.link-button` (text-style real button), `.auth-hint`, `.auth-note`. Used by register, accept-invitation, complete-registration |
 
 Reuse an existing component before inventing one. Status colours mean the same everywhere:
 success = done/open, info = upcoming, violet = live, warning = needs attention, danger = destructive/error.
@@ -198,3 +199,22 @@ Headings use `--weight-bold` and slight negative letter spacing.
   warning. "View only" is a neutral notice; a sequence without an event is a warning.
 - 2026-11-03: Choices that act on click are `<button class="option-card" aria-pressed>`; form choices stay
   `<label class="option-card">` with the radio inside.
+- 2026-11-03: Sign-in, registration, invitation and profile-completion pages use one "auth flow" layout: the
+  navy top bar (no "Sign in" button: `data-sign-in="off"`), a 30rem centred column with a faint teal glow,
+  a step bar that only lists the steps this visitor goes through (returning users skip "Details"; "Hotel"
+  only when the event asks), and one card with one primary button per step. Inputs and buttons are 48px tall.
+- 2026-11-03: Button labels describe the click: "Continue" when the next step only collects or sends a code,
+  "Verify and …" on the code step, "Join the team / Join as judge" only where the click accepts. Saving a
+  profile never claims to accept an invitation; the banner links back to the invitation instead.
+- 2026-11-03: Text-style secondary actions (resend code, use a different email) are real `<button>`s styled as
+  `.link-button`, not `<a href="#">`. Hotel nights on the registration step are tappable rows
+  (check-in to check-out day), not the moon calendar, so they work at 375px without sideways scrolling.
+- 2026-11-03: Notices that are not a status (no-password hint, optional hotel nights) are neutral
+  (`.auth-hint`, `.auth-note`); blue `info` is kept for "upcoming". Invitation role icons: team `users`,
+  judge `scale`, committee `landmark` (same as the event page).
+- 2026-11-03: Interest leads on the event page see the "ready to join?" card only while registration is open
+  (`.role-confirmed-section.interest.can-join`); before and after that they see the confirmation panel,
+  worded for the status. `#site-header.inactive` (draft, pre-registration, completed) mutes the hero title.
+- 2026-11-03: Legacy redirect stubs load `tokens.css` + `styles.css` with absolute paths (they are served
+  for unknown deep paths) and show the shared `.acdc-loader` with a plain fallback link.
+- 2026-11-03: Copy uses US spelling ("organizer"), matching the existing portal text.

@@ -1,278 +1,176 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accept Invitation - ACDC Portal</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛰️</text></svg>">
+    <title>Accept invitation - ACDC Portal</title>
+    <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/styles.css">
-    <style>        body {
-            background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 480px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        header {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-        header h1 {
-            font-size: 1.5rem;
-            color: #1e293b;
-            margin: 0;
-        }
-        header .subtitle {
-            color: #64748b;
-            font-size: 0.95rem;
-            margin: 4px 0 0;
-        }
+    <link rel="stylesheet" href="css/portal.css">
+</head>
+<body class="page-auth">
+    <header id="site-header" data-sign-in="off"></header>
 
-        .invite-card {
-            background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
-            border: 2px solid #93c5fd;
-            border-radius: 16px;
-            padding: 28px;
-            text-align: center;
-            margin-bottom: 24px;
-        }
-        .invite-card .invite-icon {
-            font-size: 2.5rem;
-            margin-bottom: 12px;
-        }
-        .invite-card h2 {
-            margin: 0 0 12px;
-            color: #1e40af;
-            font-size: 1.3rem;
-        }
-        .invite-card .invite-detail {
-            color: #475569;
-            font-size: 1rem;
-            line-height: 1.6;
-            margin: 0;
-        }
-        .invite-card .invite-detail strong {
-            color: #1e40af;
-        }
-        .invite-card .invite-event {
-            margin-top: 12px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #1e40af;
-        }
-        .invite-card .invite-meta {
-            margin-top: 8px;
-            font-size: 0.85rem;
-            color: #64748b;
-        }
-        .invite-card .invite-expires {
-            margin-top: 12px;
-            font-size: 0.8rem;
-            color: #94a3b8;
-        }
+    <main class="auth-main">
+        <ol class="progress-steps auth-progress hidden" id="invite-progress" aria-label="Progress">
+            <li class="progress-step" data-step="1">
+                <span class="step-circle" aria-hidden="true"><span class="step-num"></span><svg class="icon step-check" aria-hidden="true" focusable="false"><use href="/images/icons.svg#check"></use></svg></span>
+                <span class="step-label">Details</span>
+            </li>
+            <li class="progress-step" data-step="2">
+                <span class="step-circle" aria-hidden="true"><span class="step-num"></span><svg class="icon step-check" aria-hidden="true" focusable="false"><use href="/images/icons.svg#check"></use></svg></span>
+                <span class="step-label">Verify</span>
+            </li>
+            <li class="progress-step" data-step="3">
+                <span class="step-circle" aria-hidden="true"><span class="step-num"></span><svg class="icon step-check" aria-hidden="true" focusable="false"><use href="/images/icons.svg#check"></use></svg></span>
+                <span class="step-label">Join</span>
+            </li>
+        </ol>
 
-        .step-breadcrumb {
-            text-align: center;
-            margin-bottom: 16px;
-            font-size: 0.8rem;
-            color: #94a3b8;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+        <div id="step-loading" class="card auth-card acdc-loader">
+            <div class="loader-spinner"></div>
+            <div class="loader-text">Loading invitation…</div>
+        </div>
 
-        .success-card {
-            text-align: center;
-            padding: 32px 20px;
-        }
-        .success-card .success-icon {
-            font-size: 3rem;
-            margin-bottom: 16px;
-        }
-        .success-card h2 {
-            margin: 0 0 12px;
-            color: #166534;
-        }
-        .success-card p {
-            color: #475569;
-            line-height: 1.6;
-        }
+        <section id="step-error" class="card auth-card auth-status hidden" aria-labelledby="error-title">
+            <span class="auth-status-icon is-danger" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#circle-x"></use></svg></span>
+            <h2 id="error-title">Invitation not found</h2>
+            <p id="error-message">This invitation link is invalid or has expired.</p>
+            <a href="events.html" class="btn btn-primary btn-large">Go to events</a>
+        </section>
 
-        .error-card {
-            text-align: center;
-            padding: 32px 20px;
-        }
-        .error-card .error-icon {
-            font-size: 3rem;
-            margin-bottom: 16px;
-        }
-        .error-card h2 {
-            margin: 0 0 12px;
-            color: #dc2626;
-        }
-
-        footer {
-            text-align: center;
-            margin-top: 24px;
-            color: #94a3b8;
-            font-size: 0.8rem;
-        }
-    </style></head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🏔️ ACDC Portal</h1>
-            <p class="subtitle" id="page-subtitle">Invitation</p>
-        </header>
-
-        <main>
-            <div id="step-loading" class="card acdc-loader">
-                <div class="loader-spinner"></div>
-                <div class="loader-text">Loading invitation...</div>
-            </div>
-
-            <div id="step-error" class="card hidden">
-                <div class="error-card">
-                    <div class="error-icon">❌</div>
-                    <h2 id="error-title">Invitation Not Found</h2>
-                    <p id="error-message">This invitation link is invalid or has expired.</p>
-                    <a href="events.html" class="btn btn-primary" style="margin-top: 16px; display: inline-block;">Go to Events</a>
-                </div>
-            </div>
-
-            <div id="step-invite" class="hidden">
-                <div class="invite-card">
-                    <div class="invite-icon" id="invite-icon">🎉</div>
-                    <h2 id="invite-heading">You've Been Invited!</h2>
-                    <p class="invite-detail" id="invite-detail-line">You have been invited to join team</p>
-                    <p class="invite-event" id="invite-team-name"></p>
-                    <p class="invite-detail" id="invite-event-line"></p>
-                    <p class="invite-meta" id="invite-meta-line"></p>
-                    <p class="invite-meta" id="invite-email-hint"></p>
-                    <p class="invite-expires" id="invite-expires-line"></p>
+        <div id="step-invite" class="hidden">
+            <section class="card auth-card invite-card" aria-labelledby="invite-heading">
+                <span class="invite-icon" id="invite-icon" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg></span>
+                <p class="invite-kicker" id="page-subtitle">Invitation</p>
+                <h1 id="invite-heading">You've been invited</h1>
+                <p class="invite-detail" id="invite-detail-line">to join the team</p>
+                <p class="invite-event" id="invite-team-name"></p>
+                <p class="invite-detail" id="invite-event-line"></p>
+                <p class="invite-meta meta-list" id="invite-meta-line"></p>
+                <div class="invite-footnotes">
+                    <p id="invite-email-hint"></p>
+                    <p id="invite-expires-line"></p>
                 </div>
 
-                <button type="button" class="btn btn-primary btn-full" id="next-to-profile-btn">
-                    Accept Invitation →
+                <button type="button" class="btn btn-primary btn-large btn-full" id="next-to-profile-btn">
+                    Accept invitation
                 </button>
-            </div>
+            </section>
+        </div>
 
-            <div id="step-profile" class="hidden">
-                <div class="step-breadcrumb">Step 1 of 2 — Your Details</div>
-                <div class="card">
-                    <h2>👤 Confirm Your Details</h2>
-                    <p>Please verify your contact information.</p>
+        <div id="step-profile" class="hidden">
+            <section class="card auth-card" aria-labelledby="profile-heading">
+                <h2 id="profile-heading">Your details</h2>
+                <p class="auth-card-lead" id="profile-lead">Tell us who you are. Next, we'll verify your email.</p>
 
-                    <form id="profile-form">
+                <form id="profile-form">
+                    <div class="form-row">
                         <div class="form-group">
-                            <label for="profile-firstName">First Name *</label>
-                            <input type="text" id="profile-firstName" name="firstName" required minlength="2" maxlength="50">
+                            <label for="profile-firstName">First name *</label>
+                            <input type="text" id="profile-firstName" name="firstName" required minlength="2" maxlength="50" autocomplete="given-name">
                         </div>
 
                         <div class="form-group">
-                            <label for="profile-lastName">Last Name *</label>
-                            <input type="text" id="profile-lastName" name="lastName" required minlength="2" maxlength="50">
+                            <label for="profile-lastName">Last name *</label>
+                            <input type="text" id="profile-lastName" name="lastName" required minlength="2" maxlength="50" autocomplete="family-name">
                         </div>
+                    </div>
 
-                        <div class="form-group">
-                            <label for="profile-phone">Phone *</label>
-                            <input type="tel" id="profile-phone" name="phone" required
-                                   placeholder="+47 xxx xx xxx">
-                        </div>
+                    <div class="form-group">
+                        <label for="profile-email">Email *</label>
+                        <input type="email" id="profile-email" name="email" required autocomplete="email" autocapitalize="none" spellcheck="false" aria-describedby="profile-email-hint">
+                        <p class="field-hint" id="profile-email-hint">Use the address the invitation was sent to.</p>
+                    </div>
 
-                        <div class="form-group">
-                            <label for="profile-gamertag">Gamertag</label>
-                            <input type="text" id="profile-gamertag" name="gamertag"
-                                   placeholder="Optional">
-                        </div>
+                    <div class="form-group">
+                        <label for="profile-phone">Phone *</label>
+                        <input type="tel" id="profile-phone" name="phone" required autocomplete="tel"
+                               placeholder="+47 xxx xx xxx">
+                    </div>
 
-                        <div class="form-group">
-                            <label for="profile-allergies">Allergies / Dietary Requirements</label>
-                            <textarea id="profile-allergies" name="allergies" rows="3" maxlength="500"
-                                      placeholder="Optional"></textarea>
-                        </div>
+                    <div class="form-group">
+                        <label for="profile-gamertag">Gamertag</label>
+                        <input type="text" id="profile-gamertag" name="gamertag" autocomplete="off"
+                               placeholder="Optional">
+                    </div>
 
-                        <div class="form-group">
-                            <label for="profile-email">Email *</label>
-                            <input type="email" id="profile-email" name="email" required class="readonly">
-                        </div>
+                    <div class="form-group">
+                        <label for="profile-allergies">Allergies or dietary requirements</label>
+                        <textarea id="profile-allergies" name="allergies" rows="3" maxlength="500"
+                                  placeholder="Optional"></textarea>
+                    </div>
 
-                        <div id="profile-error" class="error-message hidden"></div>
+                    <div id="profile-error" class="error-message hidden" role="alert"></div>
 
-                        <button type="submit" class="btn btn-primary btn-full" id="continue-to-verify-btn">
-                            <span class="btn-text">Continue →</span>
-                            <span class="btn-loading hidden">Please wait...</span>
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            <div id="step-verify" class="hidden">
-                <div class="step-breadcrumb">Step 2 of 2 — Verify Identity</div>
-
-                <div id="substep-email" class="card">
-                    <h2>📧 Verify Your Identity</h2>
-                    <p>We'll send a one-time code to <strong id="email-display"></strong> to confirm it's you.</p>
-
-                    <div id="email-error" class="error-message hidden"></div>
-
-                    <button type="button" class="btn btn-primary btn-full" id="send-otp-btn">
-                        <span class="btn-text">Send Verification Code →</span>
-                        <span class="btn-loading hidden">Sending...</span>
+                    <button type="submit" class="btn btn-primary btn-large btn-full" id="continue-to-verify-btn">
+                        <span class="btn-text">Continue</span>
+                        <span class="btn-loading hidden">Joining…</span>
                     </button>
+                </form>
+            </section>
+        </div>
+
+        <div id="step-verify" class="hidden">
+            <section id="substep-email" class="card auth-card" aria-labelledby="verify-heading">
+                <span class="auth-card-icon" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#mail"></use></svg></span>
+                <h2 id="verify-heading">Verify your email</h2>
+                <p class="auth-card-lead">We'll send a one-time code to <strong id="email-display" class="auth-email"></strong> to confirm it's you.</p>
+
+                <div id="email-error" class="error-message hidden" role="alert"></div>
+
+                <button type="button" class="btn btn-primary btn-large btn-full" id="send-otp-btn">
+                    <span class="btn-text">Send code</span>
+                    <span class="btn-loading hidden">Sending…</span>
+                </button>
+            </section>
+
+            <section id="substep-otp" class="card auth-card hidden" aria-labelledby="otp-heading">
+                <h2 id="otp-heading">Check your email</h2>
+                <p class="auth-card-lead">We sent a 6-digit code to <strong id="otp-email-display" class="auth-email"></strong>. It expires in 10 minutes.</p>
+
+                <form id="otp-form">
+                    <div class="form-group">
+                        <label for="otp-code">Verification code</label>
+                        <input type="text" id="otp-code" name="otpCode" class="code-input" required
+                               placeholder="000000" maxlength="6" pattern="[0-9]{6}"
+                               inputmode="numeric" autocomplete="one-time-code">
+                    </div>
+
+                    <div id="otp-error" class="error-message hidden" role="alert"></div>
+
+                    <button type="submit" class="btn btn-primary btn-large btn-full" id="verify-otp-btn">
+                        <span class="btn-text">Verify and continue</span>
+                        <span class="btn-loading hidden">Verifying…</span>
+                    </button>
+                </form>
+
+                <div class="auth-card-footer">
+                    <p>Didn't get the code? Check your spam folder, or send a new one.</p>
+                    <div class="auth-links">
+                        <button type="button" class="link-button" id="resend-otp-link">Resend code</button>
+                    </div>
                 </div>
+            </section>
+        </div>
 
-                <div id="substep-otp" class="card hidden">
-                    <h2>🔐 Enter Your Code</h2>
-                    <p>We sent a 6-digit code to <strong id="otp-email-display"></strong></p>
+        <section id="step-success" class="card auth-card auth-status hidden" aria-live="polite">
+            <span class="auth-status-icon is-success" aria-hidden="true"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#party-popper"></use></svg></span>
+            <h2 id="success-title">You're in!</h2>
+            <p><span id="success-prefix">You've joined team </span><strong id="success-team-name"></strong>.</p>
+            <p class="auth-status-note"><span class="spinner spinner-sm" aria-hidden="true"></span>Taking you to your event page…</p>
+        </section>
+    </main>
 
-                    <form id="otp-form">
-                        <div class="form-group">
-                            <label for="otp-code">Verification Code</label>
-                            <input type="text" id="otp-code" name="otpCode" required
-                                   placeholder="000000" maxlength="6" pattern="[0-9]{6}"
-                                   inputmode="numeric" autocomplete="one-time-code"
-                                   style="font-size: 1.8rem; text-align: center; letter-spacing: 8px; font-family: 'Courier New', monospace;">
-                        </div>
-
-                        <div id="otp-error" class="error-message hidden"></div>
-
-                        <button type="submit" class="btn btn-primary btn-full" id="verify-otp-btn">
-                            <span class="btn-text">Verify &amp; Join Team 🎉</span>
-                            <span class="btn-loading hidden">Verifying &amp; joining...</span>
-                        </button>
-                    </form>
-
-                    <p class="form-footer">
-                        Didn't receive the code? <a href="#" id="resend-otp-link">Resend code</a>
-                    </p>
-                    <p class="form-footer" style="font-size: 0.8rem; color: #94a3b8;">
-                        Code expires in 10 minutes.
-                    </p>
-                </div>
-            </div>
-
-            <div id="step-success" class="card hidden">
-                <div class="success-card">
-                    <div class="success-icon">🎉</div>
-                    <h2 id="success-title">You're In!</h2>
-                    <p><span id="success-prefix">You've successfully joined team </span><strong id="success-team-name"></strong>.</p>
-                    <p style="font-size: 0.9rem; color: #64748b; margin-top: 8px;">Redirecting to your event page...</p>
-                </div>
-            </div>
-        </main>
-
-        <footer>
-            <p>&copy; 2026 ACDC Portal</p>
-        </footer>
-    </div>
+    <footer>
+        <p>&copy; 2026 ACDC Portal</p>
+    </footer>
 
     <script src="js/config.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/site-header.js"></script>
     <script src="js/accept-invitation.js"></script>
 </body>
 </html>

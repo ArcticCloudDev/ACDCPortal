@@ -30,16 +30,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     const emailHeading = document.getElementById('email-heading');
     const emailSubheading = document.getElementById('email-subheading');
     if (isInterestIntent) {
-        subtitle.textContent = 'Register Interest';
-        document.title = 'Register Interest - ACDC Portal';
-        emailHeading.textContent = 'Register Interest';
-        emailSubheading.textContent = 'Enter your email address to register your interest.';
+        subtitle.textContent = 'Register interest';
+        document.title = 'Register interest - ACDC Portal';
+        emailHeading.textContent = 'Start with your email';
+        emailSubheading.textContent = 'We\'ll let you know as soon as registration opens.';
     } else if (isTeamIntent) {
-        subtitle.textContent = 'Register Team';
-        document.title = 'Register Team - ACDC Portal';
-        emailHeading.textContent = 'Register Team';
-        emailSubheading.textContent = 'Enter your email address to get started.';
+        subtitle.textContent = 'Register a team';
+        document.title = 'Register a team - ACDC Portal';
+        emailHeading.textContent = 'Start with your email';
+        emailSubheading.textContent = 'We\'ll sign you in, or help you create an account if you\'re new.';
     }
+    const flowTitle = subtitle.textContent;
+
+    // Presentation only: the step bar lists the steps this visitor actually goes through.
+    // Returning users skip "Details"; "Hotel" only appears when the event asks for it.
+    const progressSteps = document.getElementById('progress-steps');
+    function syncProgress(step) {
+        const signingIn = flowMode === 'login' || flowMode === 'team-login' || flowMode === 'interest-login';
+        const withDetails = flowMode ? !signingIn : (isTeamIntent || isInterestIntent);
+        progressSteps.querySelector('[data-step="2"]').classList.toggle('hidden', !withDetails);
+        progressSteps.querySelector('[data-step="4"]').classList.toggle('hidden', step !== 'hotel');
+        // Already signed in and only waiting for the interest to be recorded: there are no steps.
+        progressSteps.classList.toggle('hidden', step === 'completing' && !flowMode);
+    }
+    syncProgress('email');
 
     if (Auth.isLoggedIn() && isInterestIntent) {
         await recordInterestAndShow();
@@ -206,7 +220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const code = codeInput.value.trim();
 
         if (code.length !== 6) {
-            showError('otp-error', 'Please enter the 6-digit code.');
+            showError('otp-error', 'Enter the 6-digit code from the email.');
             return;
         }
 
@@ -275,7 +289,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else if (targetEventId) {
                         window.location.href = eventUrl;
                     } else {
-                        document.getElementById('success-heading-text').textContent = 'Registration Complete!';
+                        document.getElementById('success-heading-text').textContent = 'Registration complete';
                         document.getElementById('success-team-line').classList.remove('hidden');
                         document.getElementById('success-team-name').textContent = pendingFormData.teamName;
                         showStep('success');
@@ -294,26 +308,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('resend-otp-btn').addEventListener('click', async (e) => {
         e.preventDefault();
-        const resendBtn = e.target;
+        const resendBtn = e.currentTarget;
         const isLoginFlow = flowMode === 'login' || flowMode === 'team-login' || flowMode === 'interest-login';
         const email = isLoginFlow ? currentEmail : (pendingFormData ? pendingFormData.email : null);
 
         if (!email) return;
 
-        resendBtn.textContent = 'Sending...';
-        resendBtn.style.pointerEvents = 'none';
+        resendBtn.textContent = 'Sending…';
+        resendBtn.disabled = true;
 
         try {
             await API.auth.sendOtp(email);
-            resendBtn.textContent = '✓ Code sent!';
+            resendBtn.textContent = 'New code sent';
             setTimeout(() => {
                 resendBtn.textContent = 'Resend code';
-                resendBtn.style.pointerEvents = '';
+                resendBtn.disabled = false;
             }, 30000);
         } catch (error) {
             resendBtn.textContent = 'Resend code';
-            resendBtn.style.pointerEvents = '';
-            showError('otp-error', error.message || 'Failed to resend code.');
+            resendBtn.disabled = false;
+            showError('otp-error', error.message || 'Could not send a new code. Wait a minute and try again.');
         }
     });
 
@@ -331,6 +345,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const welcomeBack = document.getElementById('otp-welcome-back');
         welcomeBack.classList.add('hidden');
+
+        syncProgress(step);
+        subtitle.textContent = flowMode === 'register-profile' ? 'Create an account' : flowTitle;
 
         switch (step) {
             case 'email':
@@ -359,9 +376,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     phoneInput.required = true;
                     document.getElementById('teamName').required = true;
                     document.getElementById('numberOfParticipants').required = true;
-                    formHeading.textContent = 'Register Your Team';
-                    formSubheading.textContent = 'Complete the form below to register your team.';
-                    submitBtnText.textContent = 'Register Team →';
+                    formHeading.textContent = 'You and your team';
+                    formSubheading.textContent = 'Next, we\'ll email you a code to confirm it\'s you. Your team is registered once you enter it.';
+                    submitBtnText.textContent = 'Continue';
                 } else if (flowMode === 'interest-register') {
                     teamFieldset.classList.add('hidden');
                     roleFieldset.classList.add('hidden');
@@ -369,9 +386,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     phoneInput.required = false;
                     document.getElementById('teamName').required = false;
                     document.getElementById('numberOfParticipants').required = false;
-                    formHeading.textContent = 'Create Your Account';
-                    formSubheading.textContent = 'Enter your details to register your interest.';
-                    submitBtnText.textContent = 'Continue →';
+                    formHeading.textContent = 'Your name';
+                    formSubheading.textContent = 'Next, we\'ll email you a code to confirm your email address.';
+                    submitBtnText.textContent = 'Continue';
                 } else {
                     teamFieldset.classList.add('hidden');
                     roleFieldset.classList.add('hidden');
@@ -379,9 +396,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     phoneInput.required = true;
                     document.getElementById('teamName').required = false;
                     document.getElementById('numberOfParticipants').required = false;
-                    formHeading.textContent = 'Create Your Account';
-                    formSubheading.textContent = 'Enter your details to create your profile.';
-                    submitBtnText.textContent = 'Create Account →';
+                    formHeading.textContent = 'Your details';
+                    formSubheading.textContent = 'Next, we\'ll email you a code to confirm it\'s you.';
+                    submitBtnText.textContent = 'Continue';
                 }
 
                 stepForm.classList.remove('hidden');
@@ -389,19 +406,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
 
             case 'otp':
+                // Step 3 is the code step; returning users skip the hidden "Details" step.
                 if (flowMode === 'login' || flowMode === 'team-login' || flowMode === 'interest-login') {
-                    updateProgress(2);
+                    updateProgress(3);
                     welcomeBack.classList.remove('hidden');
-                    document.getElementById('verify-btn-text').textContent = 'Verify & Sign In →';
+                    document.getElementById('verify-btn-text').textContent = 'Verify and sign in';
                 } else if (flowMode === 'register-team') {
                     updateProgress(3);
-                    document.getElementById('verify-btn-text').textContent = 'Verify & Complete Registration →';
+                    document.getElementById('verify-btn-text').textContent = 'Verify and register team';
                 } else if (flowMode === 'interest-register') {
                     updateProgress(3);
-                    document.getElementById('verify-btn-text').textContent = 'Verify & Register Interest →';
+                    document.getElementById('verify-btn-text').textContent = 'Verify and register interest';
                 } else {
                     updateProgress(3);
-                    document.getElementById('verify-btn-text').textContent = 'Verify & Create Account →';
+                    document.getElementById('verify-btn-text').textContent = 'Verify and create account';
                 }
                 document.getElementById('otp-email-display').textContent = email;
                 document.getElementById('otpCode').value = '';
@@ -413,15 +431,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 updateProgress(3);
                 const completingHeading = document.getElementById('completing-heading');
                 const completingText = document.getElementById('completing-text');
-                if (flowMode === 'interest-register' || flowMode === 'interest-login') {
-                    completingHeading.textContent = 'Recording Your Interest...';
-                    completingText.textContent = 'Please wait...';
+                if (flowMode === 'interest-register' || flowMode === 'interest-login' || !flowMode) {
+                    completingHeading.textContent = 'Registering your interest…';
+                    completingText.textContent = 'This only takes a moment.';
                 } else if (flowMode === 'register-team') {
-                    completingHeading.textContent = 'Completing Registration...';
-                    completingText.textContent = 'Finalizing your team registration. Please wait...';
+                    completingHeading.textContent = 'Registering your team…';
+                    completingText.textContent = 'Setting up your account and team. This only takes a moment.';
                 } else {
-                    completingHeading.textContent = 'Creating Account...';
-                    completingText.textContent = 'Please wait...';
+                    completingHeading.textContent = 'Creating your account…';
+                    completingText.textContent = 'This only takes a moment.';
                 }
                 stepCompleting.classList.remove('hidden');
                 break;
@@ -474,20 +492,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('hotel-optional-notice').classList.remove('hidden');
         }
 
-        let html = '<div class="hotel-calendar" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">';
+        // One row per night (check-in day to check-out day): readable and easy to tap on a phone.
+        // Non-breaking spaces: a row wraps between the two days, never inside one.
+        const shortDate = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).replace(/ /g, ' ');
+        let html = '<div class="hotel-night-list">';
         hotelDates.forEach((dateInfo, index) => {
-            const date = new Date(dateInfo.date + 'T12:00:00');
-            const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            html += `<div class="hotel-day" style="text-align:center;min-width:48px;"><div class="day-label" style="font-size:0.75rem;color:var(--text-muted);">${dateInfo.dayLabel}</div><div class="day-date" style="font-size:0.85rem;">${monthDay}</div></div>`;
             if (index < hotelDates.length - 1) {
                 const nextDate = hotelDates[index + 1];
                 const nightId = `${dateInfo.dayLabel.toLowerCase()}-${nextDate.dayLabel.toLowerCase()}`;
                 const isDefault = defaultNights.includes(nightId);
                 const isLocked = isDefault && isMandatory;
-                html += `<div class="hotel-night" style="display:flex;flex-direction:column;align-items:center;">`;
-                html += `<input type="checkbox" id="reg-hotel-${nightId}" data-night-id="${nightId}"${isDefault ? ' checked' : ''}${isLocked ? ' disabled' : ''} style="margin-bottom:2px;">`;
-                html += `<label for="reg-hotel-${nightId}" style="font-size:0.8rem;cursor:${isLocked ? 'default' : 'pointer'};">${isLocked ? '🔒' : '🌙'}</label>`;
-                html += `</div>`;
+                html += `<label class="checkbox-label hotel-night-option${isLocked ? ' is-locked' : ''}" for="reg-hotel-${nightId}">`;
+                html += `<input type="checkbox" id="reg-hotel-${nightId}" data-night-id="${nightId}"${isDefault ? ' checked' : ''}${isLocked ? ' disabled' : ''}>`;
+                html += `<span class="hotel-night-dates">${dateInfo.dayLabel} ${shortDate(dateInfo.date)} <span aria-hidden="true">–</span><span class="visually-hidden">to</span> ${nextDate.dayLabel} ${shortDate(nextDate.date)}</span>`;
+                if (isLocked) html += `<span class="badge">${icon('lock', 'icon-sm')}Event night</span>`;
+                html += `</label>`;
             }
         });
         html += '</div>';
@@ -496,7 +515,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         function updateSummary() {
             const checked = Array.from(container.querySelectorAll('input[type="checkbox"]')).filter(cb => cb.checked);
             const countEl = document.getElementById('hotel-nights-summary');
-            countEl.textContent = `${checked.length} night${checked.length !== 1 ? 's' : ''} selected for your stay`;
+            countEl.textContent = `${checked.length} night${checked.length !== 1 ? 's' : ''} selected`;
         }
         container.querySelectorAll('input[type="checkbox"]:not([disabled])').forEach(cb => cb.addEventListener('change', updateSummary));
         updateSummary();
@@ -521,7 +540,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (err) {
                 console.error('Hotel save error:', err);
                 const errorDiv = document.getElementById('hotel-step-error');
-                errorDiv.textContent = err.message || 'Failed to save hotel booking. Please update it from your event page.';
+                errorDiv.textContent = err.message || 'Could not save your hotel nights. Try again, or contact the organizers.';
                 errorDiv.classList.remove('hidden');
                 ackBtn.disabled = false;
                 ackBtn.querySelector('.btn-text').classList.remove('hidden');
@@ -546,7 +565,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         } catch (error) {
             console.error('Interest recording error:', error);
-            showError('completing-error', error.message || 'Failed to record interest. Please try again.');
+            showError('completing-error', error.message || 'Could not register your interest. Reload the page to try again.');
         }
     }
 
@@ -577,10 +596,12 @@ function updateProgress(activeStep) {
     steps.forEach((step, index) => {
         const stepNum = index + 1;
         step.classList.remove('active', 'completed');
+        step.removeAttribute('aria-current');
         if (stepNum < activeStep) {
             step.classList.add('completed');
         } else if (stepNum === activeStep) {
             step.classList.add('active');
+            step.setAttribute('aria-current', 'step');
         }
     });
 }

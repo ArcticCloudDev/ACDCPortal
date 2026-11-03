@@ -14,20 +14,20 @@
     <div id="event-info-strip" class="event-info-strip hidden"></div>
     <div class="container container-wide">
         <main class="portal-main">
-            <a href="events.html" class="back-link"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#arrow-left"></use></svg>Back to Events</a>
+            <a href="events.html" class="back-link"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#arrow-left"></use></svg>Back to events</a>
 
             <div id="loading" class="acdc-loader">
                 <div class="loader-spinner"></div>
-                <div class="loader-text">Loading event...</div>
+                <div class="loader-text">Loading event…</div>
             </div>
 
             <div id="content" class="hidden">
                 <div id="pre-reg-section" class="pre-reg-section hidden">
                     <div class="pre-reg-icon event-panel-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bell"></use></svg></div>
-                    <h2>This Event is in Pre-Registration</h2>
-                    <p>Registration hasn't opened yet, but you can register your interest to be notified as soon as it does!</p>
-                    <a id="interest-link" href="#" class="btn-interest btn btn-primary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bell"></use></svg>Register Interest</a>
-                    <p class="pre-reg-hint">No account needed — just your name and email.</p>
+                    <h2>Registration opens soon</h2>
+                    <p>Registration hasn't opened yet. Register your interest and we'll email you as soon as it does.</p>
+                    <a id="interest-link" href="#" class="btn-interest btn btn-primary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bell"></use></svg>Register interest</a>
+                    <p class="pre-reg-hint">All we need is your name and email.</p>
                 </div>
 
                 <div id="role-confirmed-section" class="role-confirmed-section hidden">
@@ -41,25 +41,25 @@
                     <div id="interest-upgrade-actions" class="interest-upgrade hidden">
                         <div class="interest-card card">
                             <div class="interest-card-header" id="interest-card-header">
-                                <h3><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bell"></use></svg>Interest Registered</h3>
-                                <span class="ich-sub">Registration is open — ready to join?</span>
+                                <h3><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#bell"></use></svg>Interest registered</h3>
+                                <span class="ich-sub">Registration is open. Ready to join?</span>
                             </div>
 
                             <div class="interest-card-body">
-                                <p class="ich-message">You've registered your interest. Take the next step by creating a team or joining the solo queue so we can match you with other participants.</p>
+                                <p class="ich-message">Take the next step: register a team, or join the solo queue and we'll match you with other participants.</p>
 
                                 <div id="upgrade-not-queued" class="interest-cta-row">
                                     <button type="button" id="upgrade-register-team-btn-a" class="interest-cta-btn">
                                         <span class="icb-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg></span>
                                         <span class="icb-text">
-                                            <span class="icb-label">Register a Team</span>
-                                            <span class="icb-hint">Create and manage your team</span>
+                                            <span class="icb-label">Register a team</span>
+                                            <span class="icb-hint">Create a team and add members</span>
                                         </span>
                                     </button>
                                     <button type="button" id="interest-solo-btn" class="interest-cta-btn icb-green">
                                         <span class="icb-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#dices"></use></svg></span>
                                         <span class="icb-text">
-                                            <span class="icb-label">Join Solo Queue</span>
+                                            <span class="icb-label">Join the solo queue</span>
                                             <span class="icb-hint">We'll match you with others</span>
                                         </span>
                                     </button>
@@ -69,15 +69,15 @@
                                     <button type="button" id="upgrade-register-team-btn-b" class="interest-cta-btn">
                                         <span class="icb-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg></span>
                                         <span class="icb-text">
-                                            <span class="icb-label">Register a Team</span>
-                                            <span class="icb-hint">Create and manage your team</span>
+                                            <span class="icb-label">Register a team</span>
+                                            <span class="icb-hint">Create a team and add members</span>
                                         </span>
                                     </button>
                                     <div class="interest-cta-btn icb-green icb-queued">
                                         <span class="icb-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#dices"></use></svg></span>
                                         <div class="icb-queued-wrap">
                                             <span class="icb-text">
-                                                <span class="icb-label">In Solo Queue</span>
+                                                <span class="icb-label">In the solo queue</span>
                                                 <span class="icb-hint">Position <strong id="interest-queue-position">—</strong></span>
                                             </span>
                                             <button type="button" id="leave-queue-interest-btn" class="iat-leave btn btn-small btn-danger-ghost"><svg class="icon icon-sm" aria-hidden="true" focusable="false"><use href="/images/icons.svg#x"></use></svg>Leave</button>
@@ -89,13 +89,13 @@
                     </div>
 
                     <div class="role-actions">
-                        <button type="button" id="edit-details-btn" class="btn btn-secondary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#pencil"></use></svg>Update My Details &amp; Hotel</button>
+                        <button type="button" id="edit-details-btn" class="btn btn-secondary"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#pencil"></use></svg>Update my details</button>
                         <a id="role-admin-link" href="admin-dashboard.html" class="admin-portal-link btn btn-primary hidden"></a>
                     </div>
                 </div>
 
                 <div id="event-nav" class="event-nav tabs hidden">
-                    <button type="button" class="event-nav-tab tab active" data-tab="team"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg>My Team</button>
+                    <button type="button" class="event-nav-tab tab active" data-tab="team"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#users"></use></svg>My team</button>
                     <button type="button" class="event-nav-tab tab" data-tab="badges"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#award"></use></svg>Badges <span class="nav-count badge" id="badges-nav-count">0</span></button>
                 </div>
 
@@ -112,19 +112,19 @@
 
                     <div id="create-team-section" class="create-team-section">
                         <div class="action-buttons">
-                            <button type="button" id="create-team-btn" class="btn btn-primary btn-large"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#plus"></use></svg>Create New Team</button>
-                            <button type="button" id="join-solo-btn" class="btn btn-secondary btn-large"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#dices"></use></svg>Join Solo Queue</button>
+                            <button type="button" id="create-team-btn" class="btn btn-primary btn-large"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#plus"></use></svg>Create a team</button>
+                            <button type="button" id="join-solo-btn" class="btn btn-secondary btn-large"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#dices"></use></svg>Join the solo queue</button>
                         </div>
-                        <p class="solo-hint">No team? Join solo and we'll match you with others!</p>
+                        <p class="solo-hint">No team yet? Join the solo queue and we'll match you with others.</p>
                     </div>
 
                     <div id="solo-queue-status" class="solo-queue-status hidden">
                         <div class="queue-card">
                             <div class="queue-icon event-panel-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#dices"></use></svg></div>
-                            <h3>You're in the Solo Queue!</h3>
+                            <h3>You're in the solo queue</h3>
                             <p>We'll match you with other solo players or teams looking for members.</p>
-                            <p class="queue-position">Position: <span id="queue-position">-</span></p>
-                            <button type="button" id="leave-queue-btn" class="btn btn-secondary">Leave Queue</button>
+                            <p class="queue-position">Position <span id="queue-position">–</span></p>
+                            <button type="button" id="leave-queue-btn" class="btn btn-secondary">Leave the queue</button>
                         </div>
                     </div>
                 </div>
@@ -144,34 +144,33 @@
     <div id="create-team-modal" class="modal-overlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="create-team-heading">
             <div class="modal-header">
-                <h2 id="create-team-heading">Create New Team</h2>
+                <h2 id="create-team-heading">Create a team</h2>
                 <button type="button" class="modal-close" id="close-create-team" aria-label="Close">&times;</button>
             </div>
 
             <div class="modal-step-indicators">
                 <div class="modal-step active" id="step-indicator-1">
                     <span class="step-num">1</span>
-                    <span class="step-label">Team Details</span>
+                    <span class="step-label">Team details</span>
                 </div>
                 <div class="modal-step-connector"></div>
                 <div class="modal-step" id="step-indicator-2">
                     <span class="step-num">2</span>
-                    <span class="step-label">Review &amp; Confirm</span>
+                    <span class="step-label">Review and confirm</span>
                 </div>
             </div>
 
             <form id="create-team-form">
                 <div id="create-team-step-1" class="modal-step-panel">
                     <div class="form-group">
-                        <label for="teamName">Team Name *</label>
-                        <input type="text" id="teamName" name="teamName" required
-                               placeholder="Enter team name">
+                        <label for="teamName">Team name *</label>
+                        <input type="text" id="teamName" name="teamName" required autocomplete="off">
                     </div>
 
                     <div class="form-group">
-                        <label for="expectedParticipants">Number of Participants *</label>
+                        <label for="expectedParticipants">Number of participants *</label>
                         <select id="expectedParticipants" name="expectedParticipants" required>
-                            <option value="">Select...</option>
+                            <option value="">Select…</option>
                         </select>
                     </div>
 
@@ -189,7 +188,7 @@
                         </div>
                     </div>
 
-                    <div id="create-team-step1-error" class="error-message hidden"></div>
+                    <div id="create-team-step1-error" class="error-message hidden" role="alert"></div>
                     <button type="button" class="btn btn-primary btn-full" id="create-team-next">Next<svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#arrow-right"></use></svg></button>
                 </div>
 
@@ -203,14 +202,14 @@
                         </label>
                     </div>
 
-                    <div id="create-team-error" class="error-message hidden"></div>
+                    <div id="create-team-error" class="error-message hidden" role="alert"></div>
                     <div id="create-team-success" class="success-message hidden"></div>
 
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" id="create-team-back"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#arrow-left"></use></svg>Back</button>
                         <button type="submit" class="btn btn-primary btn-grow" id="create-team-submit">
-                            <span class="btn-text">Create Team</span>
-                            <span class="btn-loading hidden">Creating...</span>
+                            <span class="btn-text">Create team</span>
+                            <span class="btn-loading hidden">Creating…</span>
                         </button>
                     </div>
                 </div>
@@ -221,38 +220,35 @@
     <div id="invite-member-modal" class="modal-overlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="invite-member-heading">
             <div class="modal-header">
-                <h2 id="invite-member-heading">Register Team Member</h2>
+                <h2 id="invite-member-heading">Add a team member</h2>
                 <button type="button" class="modal-close" id="close-invite-member" aria-label="Close">&times;</button>
             </div>
 
             <form id="invite-member-form">
                 <input type="hidden" id="invite-teamId">
 
-                <p class="modal-lead">Invite a new member to <strong id="invite-teamName"></strong></p>
+                <p class="modal-lead">Add someone to <strong id="invite-teamName"></strong>.</p>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="invite-firstName">First Name *</label>
-                        <input type="text" id="invite-firstName" name="firstName" required
-                               placeholder="First name">
+                        <label for="invite-firstName">First name *</label>
+                        <input type="text" id="invite-firstName" name="firstName" required autocomplete="off">
                     </div>
                     <div class="form-group">
-                        <label for="invite-lastName">Last Name *</label>
-                        <input type="text" id="invite-lastName" name="lastName" required
-                               placeholder="Last name">
+                        <label for="invite-lastName">Last name *</label>
+                        <input type="text" id="invite-lastName" name="lastName" required autocomplete="off">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="invite-email">Email Address *</label>
-                    <input type="email" id="invite-email" name="email" required
-                           placeholder="Enter email address">
+                    <label for="invite-email">Email *</label>
+                    <input type="email" id="invite-email" name="email" required autocomplete="off" autocapitalize="none" spellcheck="false">
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label for="invite-phone">Phone</label>
-                        <input type="tel" id="invite-phone" name="phone" placeholder="Phone number">
+                        <input type="tel" id="invite-phone" name="phone" autocomplete="off" placeholder="Optional">
                     </div>
                     <div class="form-group">
                         <label for="invite-gamertag">Gamertag</label>
@@ -261,18 +257,18 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="invite-allergies">Allergies / Dietary Requirements</label>
+                    <label for="invite-allergies">Allergies or dietary requirements</label>
                     <textarea id="invite-allergies" name="allergies" rows="3" maxlength="500" placeholder="Optional"></textarea>
                 </div>
 
-                <p class="field-hint">This creates an editable pending contact in your team. They will confirm these details when they first sign in.</p>
+                <p class="field-hint">They're added to your team straight away. We'll email them a link to confirm their details.</p>
 
-                <div id="invite-error" class="error-message hidden"></div>
+                <div id="invite-error" class="error-message hidden" role="alert"></div>
                 <div id="invite-success" class="success-message hidden"></div>
 
                 <button type="submit" class="btn btn-primary" id="send-invite-btn">
-                    <span class="btn-text">Register Team Member</span>
-                    <span class="btn-loading hidden">Sending...</span>
+                    <span class="btn-text">Add member</span>
+                    <span class="btn-loading hidden">Adding…</span>
                 </button>
             </form>
         </div>
@@ -281,7 +277,7 @@
     <div id="team-details-modal" class="modal-overlay">
         <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="team-modal-title">
             <div class="modal-header">
-                <h2 id="team-modal-title">Team Name</h2>
+                <h2 id="team-modal-title">Team</h2>
                 <button type="button" class="modal-close" id="close-team-details" aria-label="Close">&times;</button>
             </div>
 
@@ -290,8 +286,8 @@
                 </div>
 
                 <div id="team-admin-actions" class="team-admin-actions hidden">
-                    <h4>Admin Actions</h4>
-                    <button type="button" id="invite-member-btn" class="btn btn-secondary btn-small"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#user-plus"></use></svg>Register Team Member</button>
+                    <h4>Admin actions</h4>
+                    <button type="button" id="invite-member-btn" class="btn btn-secondary btn-small"><svg class="icon" aria-hidden="true" focusable="false"><use href="/images/icons.svg#user-plus"></use></svg>Add a team member</button>
                 </div>
             </div>
         </div>
@@ -300,7 +296,7 @@
     <div id="solo-queue-modal" class="modal-overlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="solo-queue-heading">
             <div class="modal-header">
-                <h2 id="solo-queue-heading">Join Solo Queue</h2>
+                <h2 id="solo-queue-heading">Join the solo queue</h2>
                 <button type="button" class="modal-close" id="close-solo-queue" aria-label="Close">&times;</button>
             </div>
 
@@ -309,16 +305,16 @@
             <form id="solo-queue-form">
                 <div class="form-group">
                     <label for="solo-note">Note (optional)</label>
-                    <textarea id="solo-note" rows="3" placeholder="Tell us about your skills, preferences, or anything else..." maxlength="500"></textarea>
-                    <span class="field-hint">E.g., "Experienced in C#, prefer backend work"</span>
+                    <textarea id="solo-note" rows="3" placeholder="Your skills, preferences or anything else" maxlength="500" aria-describedby="solo-note-hint"></textarea>
+                    <span class="field-hint" id="solo-note-hint">For example: "Experienced in C#, prefer backend work".</span>
                 </div>
 
-                <div id="solo-queue-error" class="error-message hidden"></div>
+                <div id="solo-queue-error" class="error-message hidden" role="alert"></div>
                 <div id="solo-queue-success" class="success-message hidden"></div>
 
                 <button type="submit" class="btn btn-primary" id="join-queue-btn">
-                    <span class="btn-text">Join Solo Queue</span>
-                    <span class="btn-loading hidden">Joining...</span>
+                    <span class="btn-text">Join the solo queue</span>
+                    <span class="btn-loading hidden">Joining…</span>
                 </button>
             </form>
         </div>
@@ -327,7 +323,7 @@
     <div id="edit-participant-modal" class="modal-overlay">
         <div class="modal modal-tabbed modal-wide" role="dialog" aria-modal="true" aria-labelledby="edit-participant-heading">
             <div class="modal-header">
-                <h2 id="edit-participant-heading">Edit Participant</h2>
+                <h2 id="edit-participant-heading">Edit details</h2>
                 <button type="button" class="modal-close" id="close-edit-participant" aria-label="Close">&times;</button>
             </div>
 
@@ -350,45 +346,45 @@
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="edit-firstName">First Name *</label>
-                            <input type="text" id="edit-firstName" name="firstName">
+                            <label for="edit-firstName">First name *</label>
+                            <input type="text" id="edit-firstName" name="firstName" autocomplete="off">
                         </div>
 
                         <div class="form-group">
-                            <label for="edit-lastName">Last Name *</label>
-                            <input type="text" id="edit-lastName" name="lastName">
+                            <label for="edit-lastName">Last name *</label>
+                            <input type="text" id="edit-lastName" name="lastName" autocomplete="off">
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label for="edit-phone">Phone *</label>
-                            <input type="tel" id="edit-phone" name="phone">
+                            <input type="tel" id="edit-phone" name="phone" autocomplete="off">
                         </div>
 
                         <div class="form-group">
                             <label for="edit-gamertag">Gamertag</label>
                             <input type="text" id="edit-gamertag" name="gamertag"
-                                   placeholder="Gaming username (optional)">
+                                   placeholder="Optional">
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="edit-allergies">Allergies / Dietary Requirements</label>
+                        <label for="edit-allergies">Allergies or dietary requirements</label>
                         <textarea id="edit-allergies" name="allergies" rows="3"
-                                  maxlength="500" placeholder="Enter any allergies or dietary requirements..."></textarea>
+                                  maxlength="500" placeholder="Optional"></textarea>
                     </div>
 
                     <div class="form-group">
                         <label class="radio-label confirm-label checkbox-label">
                             <input type="checkbox" id="edit-data-verified">
-                            <span>I verify that my personal information and hotel nights are correct</span>
+                            <span>I confirm these details and hotel nights are correct</span>
                         </label>
                     </div>
                 </div>
 
                 <div class="tab-content" id="tab-hotel">
-                    <p class="tab-description" id="hotel-tab-description">Select which nights you need hotel accommodation. Check the boxes between the days you'll be staying.</p>
+                    <p class="tab-description" id="hotel-tab-description">Select the nights you need a hotel room: tap the moon between two days.</p>
 
                     <div class="hotel-calendar" id="hotel-calendar-container">
                     </div>
@@ -400,14 +396,14 @@
                 </div>
 
                 <div class="tab-content" id="tab-roles">
-                    <p class="tab-description">Configure team membership roles for this participant.</p>
+                    <p class="tab-description">Choose this person's roles in the team.</p>
 
                     <div class="toggle-group">
                         <label class="toggle-label checkbox-label">
                             <input type="checkbox" id="edit-isAdmin">
                             <span class="toggle-content">
                                 <span class="toggle-text">Admin</span>
-                                <span class="toggle-hint">Can manage team, invite members, and edit participant info</span>
+                                <span class="toggle-hint">Can manage the team, add members and edit their details</span>
                             </span>
                         </label>
                         <label class="toggle-label checkbox-label">
@@ -420,12 +416,12 @@
                     </div>
                 </div>
 
-                <div id="edit-participant-error" class="error-message hidden"></div>
-                <div id="edit-participant-success" class="success-message hidden"></div>
+                <div id="edit-participant-error" class="error-message hidden" role="alert"></div>
+                <div id="edit-participant-success" class="success-message hidden" role="status"></div>
 
                 <button type="submit" class="btn btn-primary" id="save-participant-btn">
-                    <span class="btn-text">Save Changes</span>
-                    <span class="btn-loading hidden">Saving...</span>
+                    <span class="btn-text">Save changes</span>
+                    <span class="btn-loading hidden">Saving…</span>
                 </button>
             </form>
         </div>
@@ -435,22 +431,22 @@
         <div class="badge-modal-backdrop" id="badge-claim-backdrop"></div>
         <div class="badge-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="badge-claim-title">
             <div class="badge-modal-header">
-                <h3 id="badge-claim-title">Claim Badge</h3>
+                <h3 id="badge-claim-title">Claim badge</h3>
                 <button type="button" class="modal-close" id="badge-claim-close" aria-label="Close">&times;</button>
             </div>
             <div class="badge-modal-body">
                 <input type="hidden" id="badge-claim-eb-id">
                 <input type="hidden" id="badge-claim-team-id">
                 <div class="form-group">
-                    <label for="badge-claim-url">Blog Post URL *</label>
-                    <input type="url" id="badge-claim-url" placeholder="https://acdc.blog/your-team/badge-post" required>
-                    <p class="field-hint">Enter the URL to the blog post that demonstrates this badge.</p>
+                    <label for="badge-claim-url">Blog post URL *</label>
+                    <input type="url" id="badge-claim-url" placeholder="https://acdc.blog/your-team/badge-post" required inputmode="url" autocomplete="off" aria-describedby="badge-claim-url-hint">
+                    <p class="field-hint" id="badge-claim-url-hint">Link to the blog post that shows how your team earned this badge. The judges review it.</p>
                 </div>
-                <div id="badge-claim-error" class="error-message hidden"></div>
+                <div id="badge-claim-error" class="error-message hidden" role="alert"></div>
             </div>
             <div class="badge-modal-footer">
                 <button type="button" class="btn btn-secondary" id="badge-claim-cancel">Cancel</button>
-                <button type="button" class="btn btn-primary" id="badge-claim-submit-btn">Save Claim</button>
+                <button type="button" class="btn btn-primary" id="badge-claim-submit-btn">Submit claim</button>
             </div>
         </div>
     </div>
@@ -464,7 +460,7 @@
             <div id="registration-terms-body" class="terms-box"></div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-secondary" id="registration-terms-cancel">Cancel</button>
-                <button type="button" class="btn btn-primary" id="registration-terms-confirm">I Understand — Continue</button>
+                <button type="button" class="btn btn-primary" id="registration-terms-confirm">I understand, continue</button>
             </div>
         </div>
     </div>
@@ -473,23 +469,23 @@
         <div class="badge-modal-backdrop" id="badge-award-backdrop"></div>
         <div class="badge-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="badge-award-title">
             <div class="badge-modal-header">
-                <h3 id="badge-award-title">Award Badge</h3>
+                <h3 id="badge-award-title">Award badge</h3>
                 <button type="button" class="modal-close" id="badge-award-close" aria-label="Close">&times;</button>
             </div>
             <div class="badge-modal-body">
                 <input type="hidden" id="badge-award-eb-id">
                 <div class="form-group">
-                    <label for="badge-award-team">Award to Team *</label>
+                    <label for="badge-award-team">Award to team *</label>
                     <select id="badge-award-team">
-                        <option value="">Select a team...</option>
+                        <option value="">Select a team…</option>
                     </select>
-                    <p class="field-hint">Select the team that wins this exclusive badge.</p>
+                    <p class="field-hint">Only one team can win this exclusive badge.</p>
                 </div>
-                <div id="badge-award-error" class="error-message hidden"></div>
+                <div id="badge-award-error" class="error-message hidden" role="alert"></div>
             </div>
             <div class="badge-modal-footer">
                 <button type="button" class="btn btn-secondary" id="badge-award-cancel">Cancel</button>
-                <button type="button" class="btn btn-primary" id="badge-award-submit-btn">Award Badge</button>
+                <button type="button" class="btn btn-primary" id="badge-award-submit-btn">Award badge</button>
             </div>
         </div>
     </div>
