@@ -7,6 +7,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!currentPermissions) return;
 
+    // The breadcrumb leads to the People list; only show it to admins who can open that page.
+    if ((currentPermissions.allowedPages || []).includes('users')) {
+        document.getElementById('person-breadcrumb').classList.remove('hidden');
+    }
+
     try {
         let [events, users] = await Promise.all([
             API.events.list(),
@@ -40,20 +45,20 @@ async function searchPerson() {
         return;
     }
 
-    await withBusy(document.getElementById('search-btn'), '⏳ Searching...', async () => {
-        container.innerHTML = '<div class="empty-state"><p>Searching...</p></div>';
+    await withBusy(document.getElementById('search-btn'), 'Looking up…', async () => {
+        container.innerHTML = '<div class="panel"><div class="empty-state"><p>Looking up…</p></div></div>';
 
         try {
             const participations = await API.participations.getByPerson(email);
 
             if (!participations || participations.length === 0) {
                 container.innerHTML = `
-                    <div class="no-results">
-                        <div style="font-size: 2rem; margin-bottom: 12px;">🚫</div>
-                        <h3 style="margin: 0 0 6px; color: var(--admin-sidebar);">No results found</h3>
-                        <p style="margin: 0; color: var(--admin-text-muted); font-size: 0.85rem;">
-                            No participations found for <strong>${escapeHtml(email)}</strong>
-                        </p>
+                    <div class="panel">
+                        <div class="empty-state">
+                            <span class="empty-state-icon">${icon('user-round')}</span>
+                            <h2 class="empty-state-title">No results found</h2>
+                            <p>No events or roles are recorded for <strong>${escapeHtml(email)}</strong>.</p>
+                        </div>
                     </div>`;
                 return;
             }
@@ -62,13 +67,39 @@ async function searchPerson() {
         } catch (error) {
             console.error('Error searching:', error);
             container.innerHTML = `
-                <div class="no-results">
-                    <div style="font-size: 2rem; margin-bottom: 12px;">⚠️</div>
-                    <h3 style="margin: 0 0 6px; color: var(--admin-sidebar);">Search failed</h3>
-                    <p style="margin: 0; color: var(--admin-text-muted);">${escapeHtml(error.message)}</p>
+                <div class="notice notice-danger">
+                    ${icon('triangle-alert')}
+                    <div>
+                        <div class="notice-title">Search failed</div>
+                        <div class="notice-body">${escapeHtml(error.message)}</div>
+                    </div>
                 </div>`;
         }
     });
+}
+
+// Role badges: staff roles use the accent, everything else is neutral. The icon tells them apart.
+const ROLE_META = {
+    participant: { label: 'Participant', icon: 'user-check',     tone: '' },
+    judge:       { label: 'Judge',       icon: 'scale',          tone: 'badge-accent' },
+    committee:   { label: 'Committee',   icon: 'shield',         tone: 'badge-accent' },
+    interest:    { label: 'Interest',    icon: 'clipboard-list', tone: '' },
+    sponsor:     { label: 'Sponsor',     icon: 'gem',            tone: '' }
+};
+
+// Same status classes and labels as the admin events list.
+const EVENT_STATUS_LABELS = {
+    'draft': 'Draft',
+    'pre-registration': 'Pre-registration',
+    'registration': 'Registration open',
+    'live': 'Live',
+    'completed': 'Completed'
+};
+
+function roleBadge(role) {
+    const meta = ROLE_META[role];
+    if (!meta) return `<span class="badge">${escapeHtml(role)}</span>`;
+    return `<span class="badge ${meta.tone}">${icon(meta.icon, 'icon-sm')}${meta.label}</span>`;
 }
 
 function renderPersonResult(email, participations) {
@@ -99,83 +130,82 @@ function renderPersonResult(email, participations) {
 
     const timelineHTML = sorted.map(p => {
         const event = findEvent(p.eventId);
-        const eventName = event?.name || 'Unknown Event';
+        const eventName = event?.name || p.eventName || 'Unknown event';
         const eventDates = event
             ? formatDateRange(event.startDate, event.endDate)
             : '';
         const roles = p.roles || [];
 
-        const rolePills = roles.map(r =>
-            `<span class="role-pill ${escapeHtml(r)}">${getRoleIcon(r)} ${escapeHtml(r)}</span>`
-        ).join('');
+        // Event and team links stay in the admin area: the event editor and the teams list.
+        const title = event
+            ? `<a class="timeline-title" href="admin-events.html?event=${encodeURIComponent(event.id)}">${escapeHtml(eventName)}</a>`
+            : `<span class="timeline-title">${escapeHtml(eventName)}</span>`;
+        const status = event?.status;
+        const statusBadge = status
+            ? `<span class="badge ${escapeHtml(status)}">${escapeHtml(EVENT_STATUS_LABELS[status] || status)}</span>`
+            : '';
 
         const metaParts = [];
         if (p.teamId) {
-            metaParts.push(`<span>👥 On a team</span>`);
+            metaParts.push(`<a class="meta-item" href="admin-teams.html?team=${encodeURIComponent(p.teamId)}">${icon('users')}View team</a>`);
+        }
+        if (p.isTeamAdmin) {
+            metaParts.push(`<span class="meta-item">${icon('star')}Team admin</span>`);
         }
         if (p.interestDate) {
-            metaParts.push(`<span>📋 Interest: ${formatDate(p.interestDate)}</span>`);
+            metaParts.push(`<span class="meta-item">${icon('clipboard-list')}Interest ${formatDate(p.interestDate)}</span>`);
         }
         if (p.createdAt) {
-            metaParts.push(`<span>📅 Joined: ${formatDate(p.createdAt)}</span>`);
+            metaParts.push(`<span class="meta-item">${icon('calendar')}Joined ${formatDate(p.createdAt)}</span>`);
         }
 
         return `
-            <div class="timeline-event">
-                <div class="timeline-dot">📅</div>
+            <div class="timeline-entry">
+                <span class="timeline-dot">${icon('calendar-days')}</span>
                 <div class="timeline-content">
-                    <div class="event-name">${escapeHtml(eventName)}</div>
-                    <div class="event-dates">${escapeHtml(eventDates)}</div>
-                    <div class="timeline-roles">${rolePills}</div>
-                    <div class="timeline-meta">${metaParts.join('')}</div>
+                    <div class="timeline-heading">${title}${statusBadge}</div>
+                    ${eventDates ? `<div class="timeline-sub">${escapeHtml(eventDates)}</div>` : ''}
+                    ${roles.length ? `<div class="badge-list">${roles.map(roleBadge).join('')}</div>` : ''}
+                    ${metaParts.length ? `<div class="meta-list">${metaParts.join('')}</div>` : ''}
                 </div>
             </div>
         `;
     }).join('');
 
+    const contact = [`<a class="meta-item" href="mailto:${escapeHtml(email)}">${icon('mail')}${escapeHtml(email)}</a>`];
+    if (user?.phone) {
+        contact.push(`<a class="meta-item" href="tel:${escapeHtml(String(user.phone).replace(/[^\d+]/g, ''))}">${icon('phone')}${escapeHtml(user.phone)}</a>`);
+    }
+
     container.innerHTML = `
-        <div class="person-card">
-            <div class="person-header">
-                <div class="person-avatar">${escapeHtml(initials)}</div>
-                <div class="person-info">
+        <section class="panel person-profile">
+            <div class="person-profile-header">
+                <span class="avatar avatar-lg" aria-hidden="true">${escapeHtml(initials)}</span>
+                <div class="person-profile-info">
                     <h2>${escapeHtml(displayName)}</h2>
-                    <div class="email">${escapeHtml(email)}</div>
-                    <span class="user-status ${user ? 'registered' : 'unregistered'}">
-                        ${user ? '✓ Registered user' : '○ No account yet'}
-                    </span>
+                    <div class="meta-list">${contact.join('')}</div>
+                </div>
+                <div class="person-profile-badges">
+                    <span class="badge badge-dot ${user ? 'badge-success' : ''}">${user ? 'Registered user' : 'No account yet'}</span>
+                    ${user?.isPortalAdmin ? `<span class="badge badge-accent">${icon('shield-check', 'icon-sm')}Portal admin</span>` : ''}
                 </div>
             </div>
-            <div class="person-stats">
-                <div class="person-stat">
-                    <div class="value">${eventCount}</div>
-                    <div class="label">Events</div>
-                </div>
-                <div class="person-stat">
-                    <div class="value">${roleCount}</div>
-                    <div class="label">Unique Roles</div>
-                </div>
-                <div class="person-stat">
-                    <div class="value">${participations.length}</div>
-                    <div class="label">Participations</div>
-                </div>
+            <dl class="person-stats">
+                <div class="person-stat"><dt>Events</dt><dd>${eventCount}</dd></div>
+                <div class="person-stat"><dt>Roles</dt><dd>${roleCount}</dd></div>
+                <div class="person-stat"><dt>Participations</dt><dd>${participations.length}</dd></div>
+            </dl>
+        </section>
+        <section class="panel">
+            <div class="panel-header">
+                <h3 class="panel-title">${icon('calendar-days')}Participation history</h3>
+                <span class="badge count">${participations.length}</span>
             </div>
-            <div class="timeline">
-                <div class="timeline-title">Participation History</div>
+            <div class="timeline person-history">
                 ${timelineHTML}
             </div>
-        </div>
+        </section>
     `;
-}
-
-function getRoleIcon(role) {
-    const icons = {
-        interest: '📋',
-        participant: '🏃',
-        judge: '⚖️',
-        committee: '🛡️',
-        sponsor: '💎'
-    };
-    return icons[role] || '●';
 }
 
 function formatDate(dateStr) {

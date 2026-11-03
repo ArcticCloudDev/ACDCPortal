@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         contentDiv.classList.remove('hidden');
     } catch (err) {
         console.error(err);
-        loadingDiv.innerHTML = `<p style="color:var(--admin-danger);padding:40px;">Error loading data: ${escapeHtml(err.message)}</p>`;
+        loadingDiv.innerHTML = `<div class="notice notice-danger">${icon('triangle-alert')}<div><div class="notice-title">Could not load people</div><div class="notice-body">${escapeHtml(err.message)}</div></div></div>`;
     }
 });
 
@@ -63,7 +63,7 @@ async function loadAllData() {
         .forEach(e => {
             const opt = document.createElement('option');
             opt.value = e.id;
-            opt.textContent = e.name + (e.isActive ? ' (Active)' : '');
+            opt.textContent = e.name + (e.isActive ? ' (active)' : '');
             evtSel.appendChild(opt);
         });
 
@@ -94,7 +94,7 @@ function setupActions() {
     document.getElementById('drawer-close-btn').addEventListener('click', closeDrawer);
 
     document.getElementById('stats-row').addEventListener('click', (e) => {
-        const card = e.target.closest('.stat-card[data-key]');
+        const card = e.target.closest('.pill[data-key]');
         if (card) toggleStatFilter(card.dataset.key);
     });
 
@@ -115,6 +115,8 @@ function setView(v) {
     currentView = v;
     document.getElementById('view-flat') .classList.toggle('active', v === 'flat');
     document.getElementById('view-event').classList.toggle('active', v === 'event');
+    document.getElementById('view-flat') .setAttribute('aria-pressed', String(v === 'flat'));
+    document.getElementById('view-event').setAttribute('aria-pressed', String(v === 'event'));
     render();
 }
 
@@ -267,23 +269,21 @@ function renderStats(rows) {
     };
 
     const defs = [
-        { key: 'all',         icon: '👤', color: 'blue',   label: 'Total',        value: c.all },
-        { key: 'participant', icon: '🏃', color: 'green',  label: 'Participants',  value: c.participant },
-        { key: 'judge',       icon: '⚖️', color: 'purple', label: 'Judges',        value: c.judge },
-        { key: 'committee',   icon: '🛡️', color: 'slate',  label: 'Committee',     value: c.committee },
-        { key: 'interest',    icon: '📋', color: 'amber',  label: 'Interest',      value: c.interest },
-        { key: 'invited',     icon: '✉️', color: 'rose',   label: 'Invited',       value: c.invited },
+        { key: 'all',         label: 'All',          value: c.all },
+        { key: 'participant', label: 'Participants', value: c.participant },
+        { key: 'judge',       label: 'Judges',       value: c.judge },
+        { key: 'committee',   label: 'Committee',    value: c.committee },
+        { key: 'interest',    label: 'Interest',     value: c.interest },
+        { key: 'invited',     label: 'Invited',      value: c.invited },
     ];
 
-    document.getElementById('stats-row').innerHTML = defs.map(s => `
-        <div class="stat-card ${activeStatFilter === s.key ? 'active' : ''}" data-key="${s.key}">
-            <div class="stat-icon ${s.color}">${s.icon}</div>
-            <div class="stat-info">
-                <div class="value">${s.value}</div>
-                <div class="label">${s.label}</div>
-            </div>
-        </div>
-    `).join('');
+    // Quick filters mirror the role filter: the active pill is whichever group filters the list.
+    const current = document.getElementById('filter-group').value || activeStatFilter || 'all';
+    document.getElementById('stats-row').innerHTML = defs.map(s => {
+        const on = current === s.key;
+        const roleIcon = ROLE_META[s.key] ? icon(ROLE_META[s.key].icon, 'icon-sm') : '';
+        return `<button type="button" class="pill${on ? ' active' : ''}" data-key="${s.key}" aria-pressed="${on}">${roleIcon}${s.label}<span class="pill-count">${s.value}</span></button>`;
+    }).join('');
 }
 
 function toggleStatFilter(key) {
@@ -294,38 +294,36 @@ function toggleStatFilter(key) {
 
 function renderShareBar() {
     const gk = document.getElementById('filter-group').value || activeStatFilter || '';
-    document.getElementById('interest-share-bar').style.display = gk === 'interest' ? 'flex' : 'none';
-}
-
-function avatarClass(r) {
-    return r.primaryGroup === 'committee' ? 'committee'
-         : r.primaryGroup === 'judge'     ? 'judge'
-         : r.primaryGroup === 'interest'  ? 'interest'
-         : r.primaryGroup === 'invited'   ? 'invited' : '';
+    document.getElementById('interest-share-bar').classList.toggle('hidden', gk !== 'interest');
 }
 
 function personCell(r) {
     return `<div class="person-cell">
-        <div class="avatar ${avatarClass(r)}">${escapeHtml(getInitials(r.displayName, r.email))}</div>
-        <div>
+        <span class="avatar" aria-hidden="true">${escapeHtml(getInitials(r.displayName, r.email))}</span>
+        <div class="person-text">
             <div class="person-name">${escapeHtml(r.displayName)}</div>
             <div class="person-email">${escapeHtml(r.email)}</div>
         </div>
     </div>`;
 }
 
+// Opens the person drawer (the row click handler does the work); gives keyboard users a control.
+function viewButton(r) {
+    return `<button type="button" class="btn-sm ghost">View<span class="visually-hidden"> ${escapeHtml(r.displayName)}</span>${icon('chevron-right', 'icon-sm')}</button>`;
+}
+
 function renderFlat(rows) {
     const noEventFilter = !document.getElementById('filter-event').value;
     document.getElementById('panel-title').textContent = buildPanelTitle();
-    document.getElementById('panel-count').textContent = `${rows.length} people`;
+    document.getElementById('panel-count').textContent = `${rows.length} ${rows.length === 1 ? 'person' : 'people'}`;
 
     document.getElementById('main-thead').innerHTML = `<tr>
-        <th>Person</th>
-        ${noEventFilter ? '<th>Event</th>' : ''}
-        <th>Roles</th>
-        <th>Team</th>
-        <th>Since</th>
-        <th></th>
+        <th scope="col">Person</th>
+        ${noEventFilter ? '<th scope="col">Event</th>' : ''}
+        <th scope="col">Roles</th>
+        <th scope="col">Team</th>
+        <th scope="col">Since</th>
+        <th scope="col"><span class="visually-hidden">Actions</span></th>
     </tr>`;
 
     const span = noEventFilter ? 6 : 5;
@@ -337,21 +335,21 @@ function renderFlat(rows) {
     }
 
     document.getElementById('main-tbody').innerHTML = rows.map((r, idx) => `<tr data-row-index="${idx}">
-            <td>${personCell(r)}</td>
-            ${noEventFilter ? `<td style="font-size:0.82rem;color:var(--admin-text-muted);">${escapeHtml(r.eventName)}</td>` : ''}
-            <td>${r.roles.map(rolePill).join('')}</td>
-            <td style="font-size:0.82rem;color:var(--admin-text-muted);">${escapeHtml(r.teamName || '—')}</td>
-            <td style="font-size:0.8rem;color:var(--admin-text-muted);">${formatDate(r.createdAt)}</td>
-            <td><button type="button" class="btn-sm">👤 View</button></td>
+            <td class="cell-person">${personCell(r)}</td>
+            ${noEventFilter ? `<td class="cell-meta text-muted">${escapeHtml(r.eventName)}</td>` : ''}
+            <td class="cell-meta"><div class="badge-list">${r.roles.map(rolePill).join('')}</div></td>
+            <td class="cell-meta text-muted">${escapeHtml(r.teamName || '—')}</td>
+            <td class="cell-since text-muted">${formatDate(r.createdAt)}</td>
+            <td class="cell-actions">${viewButton(r)}</td>
         </tr>`).join('');
 }
 
 function renderByEvent(rows) {
     document.getElementById('panel-title').textContent = buildPanelTitle();
-    document.getElementById('panel-count').textContent = `${rows.length} people`;
+    document.getElementById('panel-count').textContent = `${rows.length} ${rows.length === 1 ? 'person' : 'people'}`;
 
     document.getElementById('main-thead').innerHTML = `<tr>
-        <th>Person</th><th>Roles</th><th>Team</th><th>Since</th><th></th>
+        <th scope="col">Person</th><th scope="col">Roles</th><th scope="col">Team</th><th scope="col">Since</th><th scope="col"><span class="visually-hidden">Actions</span></th>
     </tr>`;
 
     if (!rows.length) {
@@ -362,11 +360,11 @@ function renderByEvent(rows) {
 
     const GROUP_ORDER = ['committee','judge','participant','interest','invited'];
     const GROUP_LABEL = {
-        committee:   '🛡️ Committee',
-        judge:       '⚖️ Judges',
-        participant: '🏃 Participants',
-        interest:    '📋 Interest',
-        invited:     '✉️ Invited (pending)',
+        committee:   'Committee',
+        judge:       'Judges',
+        participant: 'Participants',
+        interest:    'Interest',
+        invited:     'Invited (pending)',
     };
 
     const eventOrder = allEvents
@@ -390,10 +388,10 @@ function renderByEvent(rows) {
         const eventRows = byEvent[eid];
         if (!eventRows) return;
         const evtNode = `evt-${eventIndex}`;
-        const eventName = eventRows[0].eventName;
+        const eventName = eid === '__none__' ? 'Not linked to an event' : eventRows[0].eventName;
 
-        html += `<tr class="group-header-row" data-group="${evtNode}">
-            <td colspan="5">📅 ${escapeHtml(eventName)}<span class="group-toggle" id="arrow-${evtNode}">▾</span></td>
+        html += `<tr class="group-header-row group-event" data-group="${evtNode}">
+            <td colspan="5"><button type="button" class="group-toggle-btn" id="arrow-${evtNode}" aria-expanded="true">${icon('chevron-down', 'icon-sm group-chevron')}${icon('calendar-days')}<span class="group-label">${escapeHtml(eventName)}</span><span class="group-count">${eventRows.length}</span></button></td>
         </tr>`;
 
         const byGroup = {};
@@ -404,21 +402,18 @@ function renderByEvent(rows) {
             if (!gRows?.length) continue;
             const grpNode = `${evtNode}-${gk}`;
 
-            html += `<tr class="group-header-row group-member-${evtNode}" style="background:#f8fafc;" data-group="${grpNode}">
-                <td colspan="5" style="padding-left:32px;">
-                    ${GROUP_LABEL[gk]} <span style="font-weight:400;opacity:.7;">(${gRows.length})</span>
-                    <span class="group-toggle" id="arrow-${grpNode}">▾</span>
-                </td>
+            html += `<tr class="group-header-row group-role group-member-${evtNode}" data-group="${grpNode}">
+                <td colspan="5"><button type="button" class="group-toggle-btn" id="arrow-${grpNode}" aria-expanded="true">${icon('chevron-down', 'icon-sm group-chevron')}${icon(ROLE_META[gk].icon)}<span class="group-label">${GROUP_LABEL[gk]}</span><span class="group-count">${gRows.length}</span></button></td>
             </tr>`;
 
             for (const r of gRows) {
                 const idx = rowIndexMap.get(r);
                 html += `<tr class="group-member-${evtNode} group-member-${grpNode}" data-row-index="${idx}">
-                    <td style="padding-left:48px;">${personCell(r)}</td>
-                    <td>${r.roles.map(rolePill).join('')}</td>
-                    <td style="font-size:0.82rem;color:var(--admin-text-muted);">${escapeHtml(r.teamName || '—')}</td>
-                    <td style="font-size:0.8rem;color:var(--admin-text-muted);">${formatDate(r.createdAt)}</td>
-                    <td><button type="button" class="btn-sm">👤 View</button></td>
+                    <td class="cell-person indent">${personCell(r)}</td>
+                    <td class="cell-meta"><div class="badge-list">${r.roles.map(rolePill).join('')}</div></td>
+                    <td class="cell-meta text-muted">${escapeHtml(r.teamName || '—')}</td>
+                    <td class="cell-since text-muted">${formatDate(r.createdAt)}</td>
+                    <td class="cell-actions">${viewButton(r)}</td>
                 </tr>`;
             }
         }
@@ -434,7 +429,7 @@ function toggleGroup(groupId) {
     if (!members.length) return;
     const isCollapsed = members[0].classList.contains('group-collapsed');
     members.forEach(el => el.classList.toggle('group-collapsed', !isCollapsed));
-    if (arrow) arrow.textContent = isCollapsed ? '▾' : '▸';
+    if (arrow) arrow.setAttribute('aria-expanded', String(isCollapsed));
 }
 
 async function openDrawer(idx) {
@@ -447,13 +442,14 @@ async function openDrawer(idx) {
     document.getElementById('drawer-avatar').textContent = getInitials(row.displayName, row.email);
     document.getElementById('drawer-name').textContent   = row.displayName || row.email;
     document.getElementById('drawer-email').textContent  = row.email;
+    document.getElementById('drawer-person-link').href   = `admin-person.html?email=${encodeURIComponent(row.email)}`;
 
     const pill = document.getElementById('drawer-status-pill');
-    pill.className = 'drawer-status-pill ' + (row.hasAccount ? 'registered' : 'no-account');
-    pill.textContent = row.hasAccount ? '✓ Registered user' : '○ No account yet';
+    pill.className = 'badge badge-dot' + (row.hasAccount ? ' badge-success' : '');
+    pill.textContent = row.hasAccount ? 'Registered user' : 'No account yet';
 
     document.getElementById('drawer-stats').innerHTML = '';
-    document.getElementById('drawer-body').innerHTML  = '<div class="drawer-loading">Loading history…</div>';
+    document.getElementById('drawer-body').innerHTML  = '<div class="empty-state">Loading history…</div>';
 
     try {
         const participations = (await API.participations.getByPerson(row.email)) || [];
@@ -478,52 +474,60 @@ async function openDrawer(idx) {
         let body = '';
 
         if (sorted.length) {
-            body += '<div class="drawer-section-title">Participation History</div>';
+            body += '<h3 class="drawer-section-title">Participation history</h3><div class="timeline">';
             body += sorted.map(p => {
                 const ev   = findEvent(p.eventId);
                 const tm   = findTeam(p.teamId);
                 const meta = [];
-                if (tm)            meta.push(`👥 ${escapeHtml(tm.teamName)}`);
-                if (p.isTeamAdmin) meta.push('⭐ Team Admin');
-                if (p.createdAt)   meta.push(`📅 Joined ${formatDate(p.createdAt)}`);
+                if (tm)            meta.push(`<a class="meta-item" href="admin-teams.html?team=${encodeURIComponent(tm.id)}">${icon('users')}${escapeHtml(tm.teamName)}</a>`);
+                if (p.isTeamAdmin) meta.push(`<span class="meta-item">${icon('star')}Team admin</span>`);
+                if (p.createdAt)   meta.push(`<span class="meta-item">${icon('calendar')}Joined ${formatDate(p.createdAt)}</span>`);
+                const title = ev
+                    ? `<a class="timeline-title" href="admin-events.html?event=${encodeURIComponent(ev.id)}">${escapeHtml(ev.name)}</a>`
+                    : '<span class="timeline-title">—</span>';
                 return `<div class="timeline-entry">
-                    <div class="tl-dot">📅</div>
-                    <div>
-                        <div class="tl-event-name">${escapeHtml(ev?.name || '—')}</div>
-                        <div class="tl-event-date">${ev ? escapeHtml(formatDateRange(ev.startDate, ev.endDate)) : ''}</div>
-                        <div class="tl-roles">${(p.roles || []).map(rolePill).join('')}</div>
-                        <div class="tl-meta">${meta.join(' · ')}</div>
+                    <span class="timeline-dot">${icon('calendar-days')}</span>
+                    <div class="timeline-content">
+                        ${title}
+                        <div class="timeline-sub">${ev ? escapeHtml(formatDateRange(ev.startDate, ev.endDate)) : ''}</div>
+                        <div class="badge-list">${(p.roles || []).map(rolePill).join('')}</div>
+                        ${meta.length ? `<div class="meta-list">${meta.join('')}</div>` : ''}
                     </div>
                 </div>`;
             }).join('');
+            body += '</div>';
         }
 
         if (invitations.length) {
-            body += '<div class="drawer-section-title">Invitations</div>';
+            body += '<h3 class="drawer-section-title">Invitations</h3><div class="timeline">';
             body += invitations.map(inv => {
                 const ev = findEvent(inv.eventId);
                 const tm = findTeam(inv.teamId);
-                const statusBadge = { pending: 'pending', accepted: 'accepted', declined: 'declined' }[inv.status] || '';
+                // pending = needs attention, accepted = done; declined or expired stay neutral.
+                const statusTone = { pending: 'badge-warning', accepted: 'badge-success' }[inv.status] || '';
+                const meta = [];
+                if (tm) meta.push(`<a class="meta-item" href="admin-teams.html?team=${encodeURIComponent(tm.id)}">${icon('users')}${escapeHtml(tm.teamName)}</a>`);
+                meta.push(`<span class="meta-item">${icon('calendar')}Invited ${formatDate(inv.createdAt)}</span>`);
                 return `<div class="timeline-entry">
-                    <div class="tl-dot">✉️</div>
-                    <div>
-                        <div class="tl-event-name">${escapeHtml(ev?.name || '—')} <span class="badge ${statusBadge}">${escapeHtml(inv.status)}</span></div>
-                        ${tm ? `<div class="tl-event-date">Team: ${escapeHtml(tm.teamName)}</div>` : ''}
-                        <div class="tl-meta">Invited ${formatDate(inv.createdAt)}</div>
+                    <span class="timeline-dot is-muted">${icon('mail')}</span>
+                    <div class="timeline-content">
+                        <div class="timeline-heading"><span class="timeline-title">${escapeHtml(ev?.name || '—')}</span><span class="badge ${statusTone}">${escapeHtml(capitalize(inv.status))}</span></div>
+                        <div class="meta-list">${meta.join('')}</div>
                     </div>
                 </div>`;
             }).join('');
+            body += '</div>';
         }
 
         if (!body) {
-            body = '<div style="padding:40px 0;text-align:center;color:var(--admin-text-muted);">No history found</div>';
+            body = '<div class="empty-state">No events or invitations yet</div>';
         }
 
         document.getElementById('drawer-body').innerHTML = body;
 
     } catch (err) {
         document.getElementById('drawer-body').innerHTML =
-            `<div style="padding:20px;color:var(--admin-danger);">Error loading: ${escapeHtml(err.message)}</div>`;
+            `<div class="notice notice-danger">${icon('triangle-alert')}<div><div class="notice-title">Could not load the history</div><div class="notice-body">${escapeHtml(err.message)}</div></div></div>`;
     }
 }
 
@@ -560,7 +564,7 @@ function buildPanelTitle() {
     const eid = document.getElementById('filter-event').value;
     const labels = {
         participant: 'Participants', judge: 'Judges', committee: 'Committee',
-        interest: 'Interest Leads', invited: 'Invited (Pending)', 'no-account': 'No Account',
+        interest: 'Interest leads', invited: 'Invited (pending)', 'no-account': 'No account yet',
     };
     const parts = [];
     if (labels[gk]) parts.push(labels[gk]);
@@ -568,12 +572,28 @@ function buildPanelTitle() {
         const ev = findEvent(eid);
         if (ev) parts.push(ev.name);
     }
-    return parts.length ? parts.join(' — ') : 'All People';
+    return parts.length ? parts.join(' — ') : 'All people';
 }
 
+// Role badges: staff roles use the accent, a pending invitation needs attention (warning),
+// everything else is neutral. The icon tells the roles apart.
+const ROLE_META = {
+    participant: { label: 'Participant', icon: 'user-check',     tone: '' },
+    judge:       { label: 'Judge',       icon: 'scale',          tone: 'badge-accent' },
+    committee:   { label: 'Committee',   icon: 'shield',         tone: 'badge-accent' },
+    interest:    { label: 'Interest',    icon: 'clipboard-list', tone: '' },
+    sponsor:     { label: 'Sponsor',     icon: 'gem',            tone: '' },
+    invited:     { label: 'Invited',     icon: 'mail',           tone: 'badge-warning' },
+};
+
 function rolePill(role) {
-    const label = { participant: '🏃 Participant', judge: '⚖️ Judge', committee: '🛡️ Committee', interest: '📋 Interest', sponsor: '💎 Sponsor', invited: '✉️ Invited' };
-    return `<span class="role-pill ${escapeHtml(role)}">${escapeHtml(label[role] || role)}</span>`;
+    const meta = ROLE_META[role];
+    if (!meta) return `<span class="badge">${escapeHtml(role)}</span>`;
+    return `<span class="badge ${meta.tone}">${icon(meta.icon, 'icon-sm')}${meta.label}</span>`;
+}
+
+function capitalize(str) {
+    return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 }
 
 function getInitials(name, email) {
@@ -599,6 +619,6 @@ function copyShareLink() {
     inp.select();
     document.execCommand('copy');
     const btn = document.getElementById('copy-share-link-btn');
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = 'Copy', 2000);
+    btn.textContent = 'Copied';
+    setTimeout(() => btn.textContent = 'Copy link', 2000);
 }
